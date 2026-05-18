@@ -1622,7 +1622,7 @@ class _MeasurementValueDisplay extends StatelessWidget {
   }
 }
 
-class _SlidingRulerScale extends StatelessWidget {
+class _SlidingRulerScale extends StatefulWidget {
   const _SlidingRulerScale({
     super.key,
     required this.value,
@@ -1646,44 +1646,106 @@ class _SlidingRulerScale extends StatelessWidget {
   final String Function(double value) labelFormatter;
   final ValueChanged<double> onChanged;
 
+  @override
+  State<_SlidingRulerScale> createState() => _SlidingRulerScaleState();
+}
+
+class _SlidingRulerScaleState extends State<_SlidingRulerScale> {
+  double? _dragStartValue;
+  double _dragOffset = 0;
+  double? _visualValue;
+  double? _lastCommittedValue;
+
   double _snap(double rawValue) {
-    final snapped = min + (((rawValue - min) / valueStep).round() * valueStep);
-    return snapped.clamp(min, max).toDouble();
+    final snapped = widget.min +
+        (((rawValue - widget.min) / widget.valueStep).round() *
+            widget.valueStep);
+    return snapped.clamp(widget.min, widget.max).toDouble();
+  }
+
+  double _clamp(double rawValue) {
+    return rawValue.clamp(widget.min, widget.max).toDouble();
+  }
+
+  void _commitValue(double rawValue) {
+    final snapped = _snap(rawValue);
+    if (snapped == _lastCommittedValue || snapped == widget.value) return;
+    _lastCommittedValue = snapped;
+    widget.onChanged(snapped);
+  }
+
+  @override
+  void didUpdateWidget(covariant _SlidingRulerScale oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_dragStartValue == null) {
+      _visualValue = null;
+      _lastCommittedValue = null;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
+    final displayValue = _visualValue ?? widget.value;
     return SizedBox(
       height: 104,
       child: LayoutBuilder(
         builder: (context, constraints) {
           final width = math.max(1.0, constraints.maxWidth);
-          final unitsPerPixel = (visibleHalfRange * 2) / width;
+          final unitsPerPixel = (widget.visibleHalfRange * 2) / width;
 
           void updateFromTap(double dx) {
             final center = width / 2;
-            onChanged(_snap(value + ((dx - center) * unitsPerPixel)));
+            _commitValue(widget.value + ((dx - center) * unitsPerPixel));
           }
 
           void updateFromDrag(double dx) {
-            onChanged(_snap(value - (dx * unitsPerPixel)));
+            _dragOffset += dx;
+            final rawValue = _clamp((_dragStartValue ?? widget.value) -
+                (_dragOffset * unitsPerPixel));
+            setState(() => _visualValue = rawValue);
+            _commitValue(rawValue);
           }
 
           return GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTapDown: (details) => updateFromTap(details.localPosition.dx),
+            onHorizontalDragStart: (_) {
+              _dragStartValue = widget.value;
+              _dragOffset = 0;
+              _visualValue = widget.value;
+              _lastCommittedValue = widget.value;
+            },
             onHorizontalDragUpdate: (details) =>
                 updateFromDrag(details.delta.dx),
+            onHorizontalDragEnd: (_) {
+              final rawValue = _visualValue ?? widget.value;
+              final snapped = _snap(rawValue);
+              if (snapped != widget.value) widget.onChanged(snapped);
+              setState(() {
+                _dragStartValue = null;
+                _dragOffset = 0;
+                _visualValue = null;
+                _lastCommittedValue = null;
+              });
+            },
+            onHorizontalDragCancel: () {
+              setState(() {
+                _dragStartValue = null;
+                _dragOffset = 0;
+                _visualValue = null;
+                _lastCommittedValue = null;
+              });
+            },
             child: CustomPaint(
               painter: _SlidingRulerPainter(
-                value: value,
-                min: min,
-                max: max,
-                tickStep: tickStep,
-                visibleHalfRange: visibleHalfRange,
-                majorEvery: majorEvery,
-                labelFormatter: labelFormatter,
+                value: displayValue,
+                min: widget.min,
+                max: widget.max,
+                tickStep: widget.tickStep,
+                visibleHalfRange: widget.visibleHalfRange,
+                majorEvery: widget.majorEvery,
+                labelFormatter: widget.labelFormatter,
                 activeColor: palette.lime,
                 tickColor: palette.rule,
                 majorTickColor: palette.inkMuted.withValues(alpha: 0.48),

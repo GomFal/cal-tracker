@@ -45,13 +45,16 @@ void main() {
     await $(const ValueKey('calorie_wizard_sex_female')).tap();
     await $(const ValueKey('calorie_wizard_next_button')).tap();
 
-    await $(const ValueKey('calorie_wizard_age_field')).enterText('35');
+    await $(const ValueKey('calorie_wizard_birth_month_wheel'))
+        .waitUntilVisible(timeout: const Duration(seconds: 20));
     await $(const ValueKey('calorie_wizard_next_button')).tap();
 
-    await $(const ValueKey('calorie_wizard_height_cm_field')).enterText('165');
+    await $(const ValueKey('calorie_wizard_height_ruler'))
+        .waitUntilVisible(timeout: const Duration(seconds: 20));
     await $(const ValueKey('calorie_wizard_next_button')).tap();
 
-    await $(const ValueKey('calorie_wizard_weight_kg_field')).enterText('70');
+    await $(const ValueKey('calorie_wizard_weight_ruler'))
+        .waitUntilVisible(timeout: const Duration(seconds: 20));
     await $(const ValueKey('calorie_wizard_next_button')).tap();
 
     await $(const ValueKey('calorie_wizard_goal_lose_fat')).tap();
@@ -68,7 +71,7 @@ void main() {
     );
     await $(const ValueKey('calorie_wizard_use_estimate_button')).tap();
 
-    await $('1620').waitUntilVisible(
+    await $(const ValueKey('dashboard_remaining_calories')).waitUntilVisible(
       timeout: const Duration(seconds: 20),
     );
   });

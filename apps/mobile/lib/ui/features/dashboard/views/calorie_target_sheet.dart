@@ -227,12 +227,15 @@ enum _WizardStep {
 }
 
 class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
-  final _ageController = TextEditingController(text: '30');
   final _heightController = TextEditingController(text: '170');
   final _weightController = TextEditingController(text: '70');
   final _feetController = TextEditingController(text: '5');
   final _inchesController = TextEditingController(text: '7');
   final _poundsController = TextEditingController(text: '154');
+  late DateTime _birthDate;
+  late final FixedExtentScrollController _birthMonthController;
+  late final FixedExtentScrollController _birthDayController;
+  late final FixedExtentScrollController _birthYearController;
   int _stepIndex = 0;
   bool _heightMetric = true;
   bool _weightMetric = true;
@@ -246,13 +249,28 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
   CalorieEstimate? _estimate;
 
   @override
+  void initState() {
+    super.initState();
+    _birthDate = _defaultBirthDate();
+    _birthMonthController =
+        FixedExtentScrollController(initialItem: _birthDate.month - 1);
+    _birthDayController =
+        FixedExtentScrollController(initialItem: _birthDate.day - 1);
+    _birthYearController = FixedExtentScrollController(
+      initialItem: _birthDate.year - _oldestAllowedBirthDate().year,
+    );
+  }
+
+  @override
   void dispose() {
-    _ageController.dispose();
     _heightController.dispose();
     _weightController.dispose();
     _feetController.dispose();
     _inchesController.dispose();
     _poundsController.dispose();
+    _birthMonthController.dispose();
+    _birthDayController.dispose();
+    _birthYearController.dispose();
     super.dispose();
   }
 
@@ -391,12 +409,96 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
     return '$feet\'$inches"';
   }
 
-  void _setAgeFromRuler(double value) {
-    final age = value.round().clamp(18, 100);
+  DateTime _today() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
+
+  DateTime _youngestAllowedBirthDate() {
+    final today = _today();
+    return DateTime(today.year - 18, today.month, today.day);
+  }
+
+  DateTime _oldestAllowedBirthDate() {
+    final today = _today();
+    return DateTime(today.year - 100, today.month, today.day);
+  }
+
+  DateTime _defaultBirthDate() {
+    final today = _today();
+    return DateTime(today.year - 30, today.month, today.day);
+  }
+
+  List<int> get _birthYearValues {
+    final oldest = _oldestAllowedBirthDate().year;
+    final youngest = _youngestAllowedBirthDate().year;
+    return List<int>.generate(youngest - oldest + 1, (index) => oldest + index);
+  }
+
+  int _daysInMonth(int year, int month) {
+    return DateTime(year, month + 1, 0).day;
+  }
+
+  DateTime _clampBirthDate(DateTime date) {
+    final oldest = _oldestAllowedBirthDate();
+    final youngest = _youngestAllowedBirthDate();
+    if (date.isBefore(oldest)) return oldest;
+    if (date.isAfter(youngest)) return youngest;
+    return date;
+  }
+
+  DateTime _safeBirthDate({
+    required int year,
+    required int month,
+    required int day,
+  }) {
+    final safeDay = day.clamp(1, _daysInMonth(year, month)).toInt();
+    return _clampBirthDate(DateTime(year, month, safeDay));
+  }
+
+  int _ageFromBirthDate(DateTime birthDate) {
+    final today = _today();
+    var age = today.year - birthDate.year;
+    final hadBirthdayThisYear = today.month > birthDate.month ||
+        (today.month == birthDate.month && today.day >= birthDate.day);
+    if (!hadBirthdayThisYear) age -= 1;
+    return age;
+  }
+
+  void _syncBirthWheelControllers() {
+    final yearIndex = _birthDate.year - _oldestAllowedBirthDate().year;
+    if (_birthMonthController.hasClients) {
+      _birthMonthController.jumpToItem(_birthDate.month - 1);
+    }
+    if (_birthDayController.hasClients) {
+      _birthDayController.jumpToItem(_birthDate.day - 1);
+    }
+    if (_birthYearController.hasClients) {
+      _birthYearController.jumpToItem(yearIndex);
+    }
+  }
+
+  void _setBirthDate({int? month, int? day, int? year}) {
+    final requestedYear = year ?? _birthDate.year;
+    final requestedMonth = month ?? _birthDate.month;
+    final requestedDay = day ?? _birthDate.day;
+    final next = _safeBirthDate(
+      year: requestedYear,
+      month: requestedMonth,
+      day: requestedDay,
+    );
+    final needsWheelSync = next.year != requestedYear ||
+        next.month != requestedMonth ||
+        next.day != requestedDay;
     setState(() {
-      _setControllerText(_ageController, age.toString());
+      _birthDate = next;
       _error = null;
     });
+    if (needsWheelSync) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _syncBirthWheelControllers();
+      });
+    }
   }
 
   void _setHeightFromRuler(double value) {
@@ -424,6 +526,47 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
         final pounds = value.round().clamp(78, 551);
         _setControllerText(_poundsController, pounds.toString());
       }
+      _error = null;
+    });
+  }
+
+  void _setHeightUnit(bool metric) {
+    setState(() {
+      if (metric && !_heightMetric) {
+        final heightCm = _heightInCm();
+        if (heightCm != null) {
+          _setControllerText(_heightController, heightCm.round().toString());
+        }
+      }
+      if (!metric && _heightMetric) {
+        final heightCm = double.tryParse(_heightController.text.trim());
+        if (heightCm != null) {
+          final totalInches = (heightCm / 2.54).round().clamp(48, 90);
+          _setControllerText(_feetController, (totalInches ~/ 12).toString());
+          _setControllerText(_inchesController, (totalInches % 12).toString());
+        }
+      }
+      _heightMetric = metric;
+      _error = null;
+    });
+  }
+
+  void _setWeightUnit(bool metric) {
+    setState(() {
+      if (metric && !_weightMetric) {
+        final weightKg = _weightInKg();
+        if (weightKg != null) {
+          _setControllerText(_weightController, _formatCompactNumber(weightKg));
+        }
+      }
+      if (!metric && _weightMetric) {
+        final weightKg = double.tryParse(_weightController.text.trim());
+        if (weightKg != null) {
+          final pounds = (weightKg / 0.45359237).round().clamp(78, 551);
+          _setControllerText(_poundsController, pounds.toString());
+        }
+      }
+      _weightMetric = metric;
       _error = null;
     });
   }
@@ -461,26 +604,19 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
   }
 
   Widget _ageStep() {
-    final value = double.tryParse(_ageController.text.trim()) ?? 30;
     return _WizardQuestionPage(
-      title: 'How old are you?',
-      subtitle: 'Age helps estimate your resting calorie needs.',
+      title: "When's your birthday?",
+      centerTitle: true,
       children: [
-        _WizardNumberCard(
-          fieldKey: const ValueKey('calorie_wizard_age_field'),
-          controller: _ageController,
-          suffix: 'years',
-          decimal: false,
-          onChanged: (_) => setState(() => _error = null),
-        ),
-        const SizedBox(height: FreshSpacing.xl),
-        _RulerScale(
-          value: value,
-          min: 18,
-          max: 100,
-          step: 1,
-          majorEvery: 10,
-          onChanged: _setAgeFromRuler,
+        _BirthdayWheelPicker(
+          selectedDate: _birthDate,
+          years: _birthYearValues,
+          monthController: _birthMonthController,
+          dayController: _birthDayController,
+          yearController: _birthYearController,
+          onMonthChanged: (month) => _setBirthDate(month: month),
+          onDayChanged: (day) => _setBirthDate(day: day),
+          onYearChanged: (year) => _setBirthDate(year: year),
         ),
       ],
     );
@@ -492,66 +628,40 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
         ? (double.tryParse(_heightController.text.trim()) ?? heightCm)
         : (heightCm / 2.54).clamp(48, 90).toDouble();
     return _WizardQuestionPage(
-      title: 'What is your height?',
-      subtitle: 'Use the unit that feels easiest to enter.',
+      title: 'How tall are you?',
+      centerTitle: true,
       children: [
-        _UnitToggle(
-          firstKey: const ValueKey('calorie_wizard_metric_units'),
-          secondKey: const ValueKey('calorie_wizard_us_units'),
-          firstLabel: 'cm',
-          secondLabel: 'ft',
-          firstSelected: _heightMetric,
-          onFirstTap: () => setState(() {
-            _heightMetric = true;
-            _error = null;
-          }),
-          onSecondTap: () => setState(() {
-            _heightMetric = false;
-            _error = null;
-          }),
-        ),
-        const SizedBox(height: FreshSpacing.md),
-        if (_heightMetric)
-          _WizardNumberCard(
-            fieldKey: const ValueKey('calorie_wizard_height_cm_field'),
-            controller: _heightController,
-            suffix: 'cm',
-            decimal: true,
-            onChanged: (_) => setState(() => _error = null),
-          )
-        else
-          Row(
-            children: [
-              Expanded(
-                child: _WizardNumberCard(
-                  fieldKey: const ValueKey('calorie_wizard_height_ft_field'),
-                  controller: _feetController,
-                  suffix: 'ft',
-                  decimal: false,
-                  onChanged: (_) => setState(() => _error = null),
-                ),
-              ),
-              const SizedBox(width: FreshSpacing.sm),
-              Expanded(
-                child: _WizardNumberCard(
-                  fieldKey: const ValueKey('calorie_wizard_height_in_field'),
-                  controller: _inchesController,
-                  suffix: 'in',
-                  decimal: true,
-                  onChanged: (_) => setState(() => _error = null),
-                ),
-              ),
-            ],
+        Center(
+          child: _CompactUnitToggle(
+            firstKey: const ValueKey('calorie_wizard_metric_units'),
+            secondKey: const ValueKey('calorie_wizard_us_units'),
+            firstLabel: 'cm',
+            secondLabel: 'ft',
+            firstSelected: _heightMetric,
+            onFirstTap: () => _setHeightUnit(true),
+            onSecondTap: () => _setHeightUnit(false),
           ),
+        ),
+        const SizedBox(height: 42),
+        _MeasurementValueDisplay(
+          value: _heightMetric
+              ? value.toStringAsFixed(1)
+              : _formatFeetAndInches(value),
+          unit: _heightMetric ? 'cm' : 'ft',
+        ),
         const SizedBox(height: FreshSpacing.xl),
-        _RulerScale(
+        _SlidingRulerScale(
+          key: const ValueKey('calorie_wizard_height_ruler'),
           value: value,
           min: _heightMetric ? 120 : 48,
           max: _heightMetric ? 230 : 90,
-          step: 1,
-          majorEvery: _heightMetric ? 10 : 12,
-          minLabel: _heightMetric ? null : _formatFeetAndInches(48),
-          maxLabel: _heightMetric ? null : _formatFeetAndInches(90),
+          valueStep: 1,
+          tickStep: 1,
+          visibleHalfRange: _heightMetric ? 15 : 6,
+          majorEvery: _heightMetric ? 10 : 6,
+          labelFormatter: _heightMetric
+              ? (mark) => mark.round().toString()
+              : (mark) => _formatFeetAndInches(mark),
           onChanged: _setHeightFromRuler,
         ),
       ],
@@ -564,48 +674,38 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
         ? (double.tryParse(_weightController.text.trim()) ?? weightKg)
         : (weightKg / 0.45359237).clamp(78, 551).toDouble();
     return _WizardQuestionPage(
-      title: 'What is your current weight?',
-      subtitle: 'Your target is based on your current body weight.',
+      title: "What's your current weight?",
+      centerTitle: true,
       children: [
-        _UnitToggle(
-          firstKey: const ValueKey('calorie_wizard_metric_units'),
-          secondKey: const ValueKey('calorie_wizard_us_units'),
-          firstLabel: 'kg',
-          secondLabel: 'lb',
-          firstSelected: _weightMetric,
-          onFirstTap: () => setState(() {
-            _weightMetric = true;
-            _error = null;
-          }),
-          onSecondTap: () => setState(() {
-            _weightMetric = false;
-            _error = null;
-          }),
-        ),
-        const SizedBox(height: FreshSpacing.md),
-        if (_weightMetric)
-          _WizardNumberCard(
-            fieldKey: const ValueKey('calorie_wizard_weight_kg_field'),
-            controller: _weightController,
-            suffix: 'kg',
-            decimal: true,
-            onChanged: (_) => setState(() => _error = null),
-          )
-        else
-          _WizardNumberCard(
-            fieldKey: const ValueKey('calorie_wizard_weight_lb_field'),
-            controller: _poundsController,
-            suffix: 'lb',
-            decimal: true,
-            onChanged: (_) => setState(() => _error = null),
+        Center(
+          child: _CompactUnitToggle(
+            firstKey: const ValueKey('calorie_wizard_metric_units'),
+            secondKey: const ValueKey('calorie_wizard_us_units'),
+            firstLabel: 'kg',
+            secondLabel: 'lb',
+            firstSelected: _weightMetric,
+            onFirstTap: () => _setWeightUnit(true),
+            onSecondTap: () => _setWeightUnit(false),
           ),
+        ),
+        const SizedBox(height: 42),
+        _MeasurementValueDisplay(
+          value: _weightMetric
+              ? value.toStringAsFixed(1)
+              : value.round().toString(),
+          unit: _weightMetric ? 'kg' : 'lb',
+        ),
         const SizedBox(height: FreshSpacing.xl),
-        _RulerScale(
+        _SlidingRulerScale(
+          key: const ValueKey('calorie_wizard_weight_ruler'),
           value: value,
           min: _weightMetric ? 35 : 78,
           max: _weightMetric ? 250 : 551,
-          step: _weightMetric ? 0.5 : 1,
-          majorEvery: _weightMetric ? 25 : 50,
+          valueStep: _weightMetric ? 0.5 : 1,
+          tickStep: 1,
+          visibleHalfRange: _weightMetric ? 15 : 30,
+          majorEvery: _weightMetric ? 10 : 20,
+          labelFormatter: (mark) => mark.round().toString(),
           onChanged: _setWeightFromRuler,
         ),
       ],
@@ -744,9 +844,9 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
   bool _validateCurrentStep(_WizardStep step) {
     switch (step) {
       case _WizardStep.age:
-        final age = int.tryParse(_ageController.text.trim());
-        if (age == null || age < 18 || age > 100) {
-          setState(() => _error = 'Enter an age from 18 to 100.');
+        final age = _ageFromBirthDate(_birthDate);
+        if (age < 18 || age > 100) {
+          setState(() => _error = 'Choose a birthday for ages 18 to 100.');
           return false;
         }
         return true;
@@ -789,7 +889,7 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
       _error = null;
     });
     try {
-      final estimate = await widget.estimateCalories(
+      final estimateFuture = widget.estimateCalories(
         age: profile.age,
         sex: _sex,
         heightCm: profile.heightCm,
@@ -798,6 +898,8 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
         goal: _goal,
         pace: _selectedPace,
       );
+      final estimate = await estimateFuture;
+      await Future<void>.delayed(const Duration(milliseconds: 1100));
       if (!mounted) return;
       setState(() {
         _estimate = estimate;
@@ -812,15 +914,14 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
   }
 
   _ProfileValues? _profileValues() {
-    final age = int.tryParse(_ageController.text.trim());
+    final age = _ageFromBirthDate(_birthDate);
     final heightCm = _heightMetric
         ? double.tryParse(_heightController.text.trim())
         : _heightInCm();
     final weightKg = _weightMetric
         ? double.tryParse(_weightController.text.trim())
         : _weightInKg();
-    if (age == null ||
-        age < 18 ||
+    if (age < 18 ||
         age > 100 ||
         heightCm == null ||
         heightCm < 120 ||
@@ -1058,12 +1159,14 @@ class _WizardTopBar extends StatelessWidget {
 class _WizardQuestionPage extends StatelessWidget {
   const _WizardQuestionPage({
     required this.title,
-    required this.subtitle,
+    this.subtitle,
+    this.centerTitle = false,
     required this.children,
   });
 
   final String title;
-  final String subtitle;
+  final String? subtitle;
+  final bool centerTitle;
   final List<Widget> children;
 
   @override
@@ -1078,20 +1181,24 @@ class _WizardQuestionPage extends StatelessWidget {
           const SizedBox(height: FreshSpacing.md),
           Text(
             title,
+            textAlign: centerTitle ? TextAlign.center : TextAlign.start,
             style: textTheme.headlineSmall?.copyWith(
               color: palette.ink,
               fontWeight: FontWeight.w800,
               height: 1.05,
             ),
           ),
-          const SizedBox(height: FreshSpacing.sm),
-          Text(
-            subtitle,
-            style: textTheme.bodyMedium?.copyWith(
-              color: palette.inkMuted,
-              height: 1.35,
+          if (subtitle != null && subtitle!.isNotEmpty) ...[
+            const SizedBox(height: FreshSpacing.sm),
+            Text(
+              subtitle!,
+              textAlign: centerTitle ? TextAlign.center : TextAlign.start,
+              style: textTheme.bodyMedium?.copyWith(
+                color: palette.inkMuted,
+                height: 1.35,
+              ),
             ),
-          ),
+          ],
           const SizedBox(height: FreshSpacing.xl),
           ...children,
           const SizedBox(height: FreshSpacing.lg),
@@ -1210,8 +1317,176 @@ class _WizardChoiceCard extends StatelessWidget {
   }
 }
 
-class _UnitToggle extends StatelessWidget {
-  const _UnitToggle({
+class _BirthdayWheelPicker extends StatelessWidget {
+  const _BirthdayWheelPicker({
+    required this.selectedDate,
+    required this.years,
+    required this.monthController,
+    required this.dayController,
+    required this.yearController,
+    required this.onMonthChanged,
+    required this.onDayChanged,
+    required this.onYearChanged,
+  });
+
+  final DateTime selectedDate;
+  final List<int> years;
+  final FixedExtentScrollController monthController;
+  final FixedExtentScrollController dayController;
+  final FixedExtentScrollController yearController;
+  final ValueChanged<int> onMonthChanged;
+  final ValueChanged<int> onDayChanged;
+  final ValueChanged<int> onYearChanged;
+
+  int get _dayCount =>
+      DateTime(selectedDate.year, selectedDate.month + 1, 0).day;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.freshPalette;
+    return SizedBox(
+      height: 340,
+      child: Column(
+        children: [
+          Row(
+            children: [
+              _BirthdayWheelLabel(text: 'Month', color: palette.inkMuted),
+              _BirthdayWheelLabel(text: 'Day', color: palette.inkMuted),
+              _BirthdayWheelLabel(text: 'Year', color: palette.inkMuted),
+            ],
+          ),
+          const SizedBox(height: FreshSpacing.sm),
+          Expanded(
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Container(
+                  height: 70,
+                  decoration: BoxDecoration(
+                    border: Border.symmetric(
+                      horizontal: BorderSide(color: palette.limeSoft),
+                    ),
+                  ),
+                ),
+                Row(
+                  children: [
+                    _BirthdayWheel(
+                      key: const ValueKey('calorie_wizard_birth_month_wheel'),
+                      controller: monthController,
+                      values: List<int>.generate(12, (index) => index + 1),
+                      selectedValue: selectedDate.month,
+                      format: (value) => value.toString().padLeft(2, '0'),
+                      onChanged: onMonthChanged,
+                    ),
+                    _BirthdayWheel(
+                      key: const ValueKey('calorie_wizard_birth_day_wheel'),
+                      controller: dayController,
+                      values:
+                          List<int>.generate(_dayCount, (index) => index + 1),
+                      selectedValue: selectedDate.day,
+                      format: (value) => value.toString().padLeft(2, '0'),
+                      onChanged: onDayChanged,
+                    ),
+                    _BirthdayWheel(
+                      key: const ValueKey('calorie_wizard_birth_year_wheel'),
+                      controller: yearController,
+                      values: years,
+                      selectedValue: selectedDate.year,
+                      format: (value) => value.toString(),
+                      onChanged: onYearChanged,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BirthdayWheelLabel extends StatelessWidget {
+  const _BirthdayWheelLabel({
+    required this.text,
+    required this.color,
+  });
+
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+      ),
+    );
+  }
+}
+
+class _BirthdayWheel extends StatelessWidget {
+  const _BirthdayWheel({
+    super.key,
+    required this.controller,
+    required this.values,
+    required this.selectedValue,
+    required this.format,
+    required this.onChanged,
+  });
+
+  final FixedExtentScrollController controller;
+  final List<int> values;
+  final int selectedValue;
+  final String Function(int value) format;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.freshPalette;
+    final textTheme = Theme.of(context).textTheme;
+    return Expanded(
+      child: ListWheelScrollView.useDelegate(
+        controller: controller,
+        physics: const FixedExtentScrollPhysics(),
+        itemExtent: 46,
+        diameterRatio: 8,
+        perspective: 0.001,
+        overAndUnderCenterOpacity: 0.78,
+        onSelectedItemChanged: (index) {
+          if (index >= 0 && index < values.length) onChanged(values[index]);
+        },
+        childDelegate: ListWheelChildBuilderDelegate(
+          childCount: values.length,
+          builder: (context, index) {
+            final value = values[index];
+            final selected = value == selectedValue;
+            return Center(
+              child: Text(
+                format(value),
+                style:
+                    (selected ? textTheme.headlineSmall : textTheme.titleLarge)
+                        ?.copyWith(
+                  color: selected ? palette.lime : palette.inkMuted,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _CompactUnitToggle extends StatelessWidget {
+  const _CompactUnitToggle({
     required this.firstKey,
     required this.secondKey,
     required this.firstLabel,
@@ -1231,39 +1506,29 @@ class _UnitToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = context.freshPalette;
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: palette.surfaceSoft,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _UnitToggleSegment(
-              key: firstKey,
-              label: firstLabel,
-              selected: firstSelected,
-              onTap: onFirstTap,
-            ),
-          ),
-          Expanded(
-            child: _UnitToggleSegment(
-              key: secondKey,
-              label: secondLabel,
-              selected: !firstSelected,
-              onTap: onSecondTap,
-            ),
-          ),
-        ],
-      ),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _CompactUnitSegment(
+          key: firstKey,
+          label: firstLabel,
+          selected: firstSelected,
+          onTap: onFirstTap,
+        ),
+        const SizedBox(width: FreshSpacing.sm),
+        _CompactUnitSegment(
+          key: secondKey,
+          label: secondLabel,
+          selected: !firstSelected,
+          onTap: onSecondTap,
+        ),
+      ],
     );
   }
 }
 
-class _UnitToggleSegment extends StatelessWidget {
-  const _UnitToggleSegment({
+class _CompactUnitSegment extends StatelessWidget {
+  const _CompactUnitSegment({
     super.key,
     required this.label,
     required this.selected,
@@ -1277,238 +1542,257 @@ class _UnitToggleSegment extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
-    return InkWell(
-      borderRadius: BorderRadius.circular(999),
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: selected ? palette.lime : Colors.transparent,
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Text(
-          label,
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: palette.ink,
-                fontWeight: FontWeight.w800,
-              ),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOutCubic,
+          width: 54,
+          height: 42,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? palette.lime : palette.surface,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: selected ? palette.lime : palette.ruleSoft,
+            ),
+            boxShadow: selected
+                ? const []
+                : const [
+                    BoxShadow(
+                      color: Color(0x14080907),
+                      blurRadius: 16,
+                      offset: Offset(0, 8),
+                    ),
+                  ],
+          ),
+          child: Text(
+            label,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: palette.ink,
+                  fontWeight: FontWeight.w800,
+                ),
+          ),
         ),
       ),
     );
   }
 }
 
-class _WizardNumberCard extends StatelessWidget {
-  const _WizardNumberCard({
-    required this.fieldKey,
-    required this.controller,
-    required this.suffix,
-    required this.decimal,
-    required this.onChanged,
+class _MeasurementValueDisplay extends StatelessWidget {
+  const _MeasurementValueDisplay({
+    required this.value,
+    required this.unit,
   });
 
-  final Key fieldKey;
-  final TextEditingController controller;
-  final String suffix;
-  final bool decimal;
-  final ValueChanged<String> onChanged;
+  final String value;
+  final String unit;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
     final textTheme = Theme.of(context).textTheme;
-    return FreshCard(
-      color: palette.surface,
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-      child: TextField(
-        key: fieldKey,
-        controller: controller,
+    return Center(
+      child: RichText(
         textAlign: TextAlign.center,
-        keyboardType: TextInputType.numberWithOptions(decimal: decimal),
-        inputFormatters: [
-          FilteringTextInputFormatter.allow(
-            decimal ? RegExp(r'[0-9.]') : RegExp(r'[0-9]'),
-          ),
-        ],
-        style: textTheme.displaySmall?.copyWith(
-          color: palette.ink,
-          fontWeight: FontWeight.w800,
-          fontFeatures: const [FontFeature.tabularFigures()],
+        text: TextSpan(
+          children: [
+            TextSpan(
+              text: value,
+              style: textTheme.displayMedium?.copyWith(
+                color: palette.ink,
+                fontWeight: FontWeight.w800,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+            TextSpan(
+              text: ' $unit',
+              style: textTheme.titleMedium?.copyWith(
+                color: palette.ink,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
         ),
-        decoration: InputDecoration(
-          border: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          focusedBorder: InputBorder.none,
-          contentPadding: EdgeInsets.zero,
-          suffixText: suffix,
-          suffixStyle: textTheme.titleMedium?.copyWith(
-            color: palette.ink,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        onChanged: onChanged,
       ),
     );
   }
 }
 
-class _RulerScale extends StatelessWidget {
-  const _RulerScale({
+class _SlidingRulerScale extends StatelessWidget {
+  const _SlidingRulerScale({
+    super.key,
     required this.value,
     required this.min,
     required this.max,
-    required this.step,
+    required this.valueStep,
+    required this.tickStep,
+    required this.visibleHalfRange,
     required this.majorEvery,
+    required this.labelFormatter,
     required this.onChanged,
-    this.minLabel,
-    this.maxLabel,
   });
 
   final double value;
   final double min;
   final double max;
-  final double step;
+  final double valueStep;
+  final double tickStep;
+  final double visibleHalfRange;
   final double majorEvery;
+  final String Function(double value) labelFormatter;
   final ValueChanged<double> onChanged;
-  final String? minLabel;
-  final String? maxLabel;
+
+  double _snap(double rawValue) {
+    final snapped = min + (((rawValue - min) / valueStep).round() * valueStep);
+    return snapped.clamp(min, max).toDouble();
+  }
 
   @override
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
-    return FreshCard(
-      color: palette.surface,
-      padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
-      child: Column(
-        children: [
-          SizedBox(
-            height: 86,
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                void updateValue(double dx) {
-                  final width = math.max(1.0, constraints.maxWidth);
-                  final normalized = (dx / width).clamp(0.0, 1.0).toDouble();
-                  final rawValue = min + (max - min) * normalized;
-                  final snapped =
-                      min + (((rawValue - min) / step).round() * step);
-                  onChanged(snapped.clamp(min, max).toDouble());
-                }
+    return SizedBox(
+      height: 104,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final width = math.max(1.0, constraints.maxWidth);
+          final unitsPerPixel = (visibleHalfRange * 2) / width;
 
-                return GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTapDown: (details) => updateValue(details.localPosition.dx),
-                  onHorizontalDragStart: (details) =>
-                      updateValue(details.localPosition.dx),
-                  onHorizontalDragUpdate: (details) =>
-                      updateValue(details.localPosition.dx),
-                  child: CustomPaint(
-                    painter: _RulerPainter(
-                      value: value,
-                      min: min,
-                      max: max,
-                      majorEvery: majorEvery,
-                      activeColor: palette.limeDeep,
-                      tickColor: palette.rule,
-                      textColor: palette.inkMuted,
-                    ),
-                    child: const SizedBox.expand(),
-                  ),
-                );
-              },
+          void updateFromTap(double dx) {
+            final center = width / 2;
+            onChanged(_snap(value + ((dx - center) * unitsPerPixel)));
+          }
+
+          void updateFromDrag(double dx) {
+            onChanged(_snap(value - (dx * unitsPerPixel)));
+          }
+
+          return GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTapDown: (details) => updateFromTap(details.localPosition.dx),
+            onHorizontalDragUpdate: (details) =>
+                updateFromDrag(details.delta.dx),
+            child: CustomPaint(
+              painter: _SlidingRulerPainter(
+                value: value,
+                min: min,
+                max: max,
+                tickStep: tickStep,
+                visibleHalfRange: visibleHalfRange,
+                majorEvery: majorEvery,
+                labelFormatter: labelFormatter,
+                activeColor: palette.lime,
+                tickColor: palette.rule,
+                majorTickColor: palette.inkMuted.withValues(alpha: 0.48),
+                labelColor: palette.inkMuted,
+              ),
+              child: const SizedBox.expand(),
             ),
-          ),
-          const SizedBox(height: FreshSpacing.sm),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                minLabel ?? min.toStringAsFixed(0),
-                style: Theme.of(context)
-                    .textTheme
-                    .labelMedium
-                    ?.copyWith(color: palette.inkMuted),
-              ),
-              Text(
-                maxLabel ?? max.toStringAsFixed(0),
-                style: Theme.of(context)
-                    .textTheme
-                    .labelMedium
-                    ?.copyWith(color: palette.inkMuted),
-              ),
-            ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }
 }
 
-class _RulerPainter extends CustomPainter {
-  const _RulerPainter({
+class _SlidingRulerPainter extends CustomPainter {
+  const _SlidingRulerPainter({
     required this.value,
     required this.min,
     required this.max,
+    required this.tickStep,
+    required this.visibleHalfRange,
     required this.majorEvery,
+    required this.labelFormatter,
     required this.activeColor,
     required this.tickColor,
-    required this.textColor,
+    required this.majorTickColor,
+    required this.labelColor,
   });
 
   final double value;
   final double min;
   final double max;
+  final double tickStep;
+  final double visibleHalfRange;
   final double majorEvery;
+  final String Function(double value) labelFormatter;
   final Color activeColor;
   final Color tickColor;
-  final Color textColor;
+  final Color majorTickColor;
+  final Color labelColor;
 
   @override
   void paint(Canvas canvas, Size size) {
+    final centerX = size.width / 2;
+    final visibleMin = math.max(min, value - visibleHalfRange);
+    final visibleMax = math.min(max, value + visibleHalfRange);
+    final unitsPerPixel = (visibleHalfRange * 2) / math.max(1.0, size.width);
+    final startTick = (visibleMin / tickStep).floor() * tickStep;
+    final endTick = (visibleMax / tickStep).ceil() * tickStep;
+
     final tickPaint = Paint()
       ..color = tickColor
-      ..strokeWidth = 2
+      ..strokeWidth = 1.8
       ..strokeCap = StrokeCap.round;
     final majorPaint = Paint()
-      ..color = textColor.withValues(alpha: 0.55)
-      ..strokeWidth = 3
+      ..color = majorTickColor
+      ..strokeWidth = 2.2
       ..strokeCap = StrokeCap.round;
     final activePaint = Paint()
       ..color = activeColor
-      ..strokeWidth = 5
+      ..strokeWidth = 4
       ..strokeCap = StrokeCap.round;
-    const ticks = 32;
-    final bottom = size.height - 10;
-    for (var i = 0; i <= ticks; i++) {
-      final x = size.width * i / ticks;
-      final tickValue = min + ((max - min) * i / ticks);
-      final isMajor = ((tickValue - min) % majorEvery).abs() < 1.8 ||
-          (i == 0 || i == ticks);
-      final height = isMajor ? 32.0 : (i.isEven ? 22.0 : 14.0);
+
+    const tickTop = 12.0;
+    const labelTop = 66.0;
+    for (var tick = startTick; tick <= endTick + 0.001; tick += tickStep) {
+      if (tick < min || tick > max) continue;
+      final x = centerX + ((tick - value) / unitsPerPixel);
+      if (x < -16 || x > size.width + 16) continue;
+      final roundedTick = tick.roundToDouble();
+      final isMajor = (roundedTick % majorEvery).abs() < 0.001;
+      final tickHeight = isMajor ? 42.0 : 28.0;
       canvas.drawLine(
-        Offset(x, bottom),
-        Offset(x, bottom - height),
+        Offset(x, tickTop),
+        Offset(x, tickTop + tickHeight),
         isMajor ? majorPaint : tickPaint,
       );
+      if (isMajor) {
+        final textPainter = TextPainter(
+          text: TextSpan(
+            text: labelFormatter(roundedTick),
+            style: TextStyle(
+              color: labelColor,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        textPainter.paint(canvas, Offset(x - textPainter.width / 2, labelTop));
+      }
     }
 
-    final normalized = ((value.clamp(min, max) - min) / (max - min)).toDouble();
-    final indicatorX = size.width * normalized;
     canvas.drawLine(
-      Offset(indicatorX, bottom + 2),
-      Offset(indicatorX, 8),
+      Offset(centerX, tickTop),
+      Offset(centerX, tickTop + 64),
       activePaint,
     );
-    canvas.drawCircle(Offset(indicatorX, 8), 7, activePaint);
   }
 
   @override
-  bool shouldRepaint(covariant _RulerPainter oldDelegate) {
+  bool shouldRepaint(covariant _SlidingRulerPainter oldDelegate) {
     return value != oldDelegate.value ||
         min != oldDelegate.min ||
         max != oldDelegate.max ||
-        activeColor != oldDelegate.activeColor;
+        activeColor != oldDelegate.activeColor ||
+        tickColor != oldDelegate.tickColor ||
+        majorTickColor != oldDelegate.majorTickColor ||
+        labelColor != oldDelegate.labelColor;
   }
 }
 
@@ -1537,7 +1821,7 @@ class _LoadingPlanStep extends StatelessWidget {
             TweenAnimationBuilder<double>(
               duration: const Duration(milliseconds: 850),
               curve: Curves.easeOutCubic,
-              tween: Tween(begin: 0, end: 0.65),
+              tween: Tween<double>(begin: 0, end: 1),
               builder: (context, value, child) {
                 return _ProgressRing(
                   progress: value,

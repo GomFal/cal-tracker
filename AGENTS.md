@@ -26,13 +26,13 @@ When compiling the mobile app against the deployed dev environment, use:
 
 ```bash
 cd /home/javier/dev/cal-tracker/apps/mobile
-flutter build apk --debug --dart-define=API_BASE_URL=https://dev-api.bettercalories.app
+flutter build apk --flavor dev --debug --dart-define=API_BASE_URL=https://dev-api.bettercalories.app
 ```
 
 Use the local emulator URL only for local backend testing:
 
 ```bash
-flutter build apk --debug --dart-define=API_BASE_URL=http://10.0.2.2:3000
+flutter build apk --flavor dev --debug --dart-define=API_BASE_URL=http://10.0.2.2:3000
 ```
 
 ---
@@ -158,7 +158,7 @@ For Whisper/STT manual testing, the host microphone must be available to the emu
 3. After installing the app, grant microphone permission if the runtime prompt is not convenient:
 
 ```bash
-adb -s emulator-5554 shell pm grant com.example.cal_tracker_mobile android.permission.RECORD_AUDIO
+adb -s emulator-5554 shell pm grant app.bettercalories.dev android.permission.RECORD_AUDIO
 ```
 
 4. Open the app, tap the microphone control, speak into the host machine microphone, stop recording, and submit the transcript flow.
@@ -182,11 +182,13 @@ Use `-no-audio` only for non-voice tests where microphone input is irrelevant.
 
 ### Installing and Running the Flutter App
 
-For normal development and any "start the whole system" request, start the emulator using the Android Emulator Initialization section first, verify `sys.boot_completed == 1`, then start the app with `flutter run` so hot reload and hot restart stay available:
+The Android app uses product flavors. For current development builds, always run the `dev` flavor. Do not use plain `flutter run` or plain `flutter build apk`; unflavored commands can target stale/default packages or fail to find the flavored APK output. The dev flavor installs as package `app.bettercalories.dev` and outputs `app-dev-debug.apk`.
+
+For normal development and any "start the whole system" request, start the emulator using the Android Emulator Initialization section first, verify `sys.boot_completed == 1`, then start the app with the dev-flavor `flutter run` command so hot reload and hot restart stay available:
 
 ```bash
 cd /home/javier/dev/cal-tracker/apps/mobile
-flutter run --debug --dart-define=API_BASE_URL=http://10.0.2.2:3000 -d emulator-5554
+flutter run --flavor dev --debug --dart-define=API_BASE_URL=http://10.0.2.2:3000 -d emulator-5554
 ```
 
 Keep the `flutter run` process attached. Use these Flutter run keys from that terminal:
@@ -202,9 +204,9 @@ Use `flutter build apk` plus `adb install -r` only when you specifically need a 
 
 ```bash
 cd /home/javier/dev/cal-tracker/apps/mobile
-flutter build apk --debug --dart-define=API_BASE_URL=http://10.0.2.2:3000
-adb -s emulator-5554 install -r build/app/outputs/flutter-apk/app-debug.apk
-adb -s emulator-5554 shell am start -n com.example.cal_tracker_mobile/.MainActivity
+flutter build apk --flavor dev --debug --dart-define=API_BASE_URL=http://10.0.2.2:3000
+adb -s emulator-5554 install -r build/app/outputs/flutter-apk/app-dev-debug.apk
+adb -s emulator-5554 shell am start -n app.bettercalories.dev/com.example.cal_tracker_mobile.MainActivity
 ```
 
 ### Taking Screenshots
@@ -299,7 +301,7 @@ bun --env-file=.env src/index.ts
 
 # Flutter app with hot reload/hot restart enabled
 cd /home/javier/dev/cal-tracker/apps/mobile
-flutter run --debug --dart-define=API_BASE_URL=http://10.0.2.2:3000 -d emulator-5554
+flutter run --flavor dev --debug --dart-define=API_BASE_URL=http://10.0.2.2:3000 -d emulator-5554
 ```
 
 ---

@@ -12,6 +12,7 @@ This document keeps the original product direction, but corrects several archite
 * Flutter is specified as an MVVM presentation client with API repositories and thin platform adapters. It must not perform agent reasoning, nutrition calculation, database access, or vector retrieval.
 * Write actions are now proposal-first, idempotent, auditable, and transaction-backed.
 * Privacy, security, observability, testing, and deployment boundaries were made explicit.
+* As of 18/05/2026, the backend database layer uses Drizzle ORM over postgres-js, with new forward migrations managed under `infra/db/drizzle`.
 
 ## Project Summary
 
@@ -146,6 +147,7 @@ Bun
 TypeScript
 PostgreSQL
 pgvector
+Drizzle ORM
 Docker
 Optional Redis
 ```
@@ -175,14 +177,17 @@ Redis is optional and should be used only for operational concerns such as backg
 ```text
 PostgreSQL 16 or newer
 pgvector extension
-SQL migrations managed by the backend
+Drizzle ORM over postgres-js
+Legacy SQL migrations followed by Drizzle migrations
 ```
 
-PostgreSQL stores users, meals, meal items, proposals, templates, food memories, nutrition targets, action calls, confirmations, corrections, audit events, and custom foods.
+PostgreSQL stores users, credentials, sessions, password reset tokens, nutrition targets, daily goal snapshots, food items, food portions, food search documents, meals, meal items, proposals, proposal items, templates, template items, food memories, embeddings, user food feedback/preferences, confirmations, corrections, action calls, audit events, agent connections, outbox jobs, reference import records, and reserved future tables.
 
-pgvector stores embeddings used to retrieve user-specific semantic memories. Vector rows must point back to structured relational records.
+The backend uses Drizzle ORM for type-safe PostgreSQL schema definitions, query builders, parameterized SQL fragments, and forward migration metadata. Existing legacy migrations in `infra/db/migrations` remain immutable history and still run first; all new migrations are generated or authored under `infra/db/drizzle`.
 
-Embedding generation is provided by OpenRouter using `openai/text-embedding-3-small`. The model is not hosted by us; the backend requests embeddings from OpenRouter and stores the returned 1536-dimensional vectors for multilingual food memory retrieval. Flutter must never generate embeddings or call an embedding model provider directly.
+pgvector stores 1024-dimensional embeddings for local `bge-m3` retrieval. Vector rows must point back to structured relational records.
+
+Embedding generation is handled by backend-owned embedding providers. The current configured MVP provider is local `bge-m3` (`EMBEDDING_PROVIDER=local`, `EMBEDDING_MODEL=bge-m3`, `EMBEDDING_DIMENSIONS=1024`), used for multilingual food search and memory retrieval. Flutter must never generate embeddings or call an embedding model provider directly.
 
 ### LLM Provider
 
@@ -1266,6 +1271,7 @@ Recommended implementation order:
 1. Create monorepo structure.
 2. Add backend config, health route, and database connection.
 3. Add SQL migrations for core tables.
+3a. Add Drizzle ORM schema, shared database client, and Drizzle migration baseline for new forward migrations.
 4. Create contracts package and API schema generation.
 5. Implement action registry and executor.
 6. Implement propose_meal_log without LLM.

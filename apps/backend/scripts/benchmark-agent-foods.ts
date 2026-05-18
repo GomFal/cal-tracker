@@ -1,10 +1,12 @@
 import { mkdir, writeFile, appendFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import postgres, { type Sql } from "postgres";
+import { and, eq } from "drizzle-orm";
 import { ActionExecutor } from "../src/actions/executor.js";
 import { AuthService } from "../src/auth/service.js";
 import { loadConfig } from "../src/config/env.js";
+import { createDbClient, type AppDb } from "../src/db/client.js";
+import { foodItems, users } from "../src/db/schema.js";
 import { LocalBgeM3EmbeddingProvider } from "../src/embeddings/provider.js";
 import { createApp } from "../src/http/app.js";
 import { MemoryRetrievalService } from "../src/memory/retrieval.js";
@@ -94,7 +96,7 @@ async function main() {
 
   const config = loadConfig();
   const repository = new PostgresRepository(config.DATABASE_URL);
-  const sql = postgres(config.DATABASE_URL);
+  const client = createDbClient(config.DATABASE_URL);
   const runLogger = new MemoryRunLogger();
   const app = createBenchmarkApp(config, repository, runLogger);
   const runId = new Date().toISOString().replace(/[:.]/g, "-");
@@ -118,7 +120,7 @@ async function main() {
     await runPool(selectedCases, args.concurrency ?? 1, async (benchmarkCase) => {
       const row = await runCase({
         app,
-        sql,
+        db: client.db,
         config,
         runLogger,
         outputDir,
@@ -136,8 +138,8 @@ async function main() {
     await writeFile(resolve(outputDir, "summary.md"), renderMarkdownSummary(summary), "utf8");
     console.log(JSON.stringify({ outputDir, summary }, null, 2));
   } finally {
-    await cleanupBenchmarkUser(sql, email);
-    await sql.end({ timeout: 5 });
+    await cleanupBenchmarkUser(client.db, email);
+    await client.close();
     await repository.close();
   }
 }
@@ -189,7 +191,7 @@ function createBenchmarkApp(
 
 async function runCase(input: {
   app: ReturnType<typeof createApp>;
-  sql: Sql;
+  db: AppDb;
   config: ReturnType<typeof loadConfig>;
   runLogger: MemoryRunLogger;
   outputDir: string;
@@ -222,7 +224,7 @@ async function runCase(input: {
     const generation = generationId
       ? await fetchOpenRouterGeneration(input.config.OPENROUTER_API_KEY, generationId)
       : undefined;
-    const checks = await evaluateCase(input.sql, input.benchmarkCase, result.body, runLog);
+    const checks = await evaluateCase(input.db, input.benchmarkCase, result.body, runLog);
     const ok = result.status === 200 && Object.values(checks).every(Boolean);
     return {
       id: input.benchmarkCase.id,
@@ -287,7 +289,7 @@ async function requestJson(
 }
 
 async function evaluateCase(
-  sql: Sql,
+  db: AppDb,
   benchmarkCase: BenchmarkCase,
   body: unknown,
   runLog?: Record<string, unknown>,
@@ -301,7 +303,7 @@ async function evaluateCase(
     foods: containsExpectedFoods(body, benchmarkCase.expectedFoods),
   };
   if (benchmarkCase.culturalCheck) {
-    checks.cultural = await culturalCheck(sql, benchmarkCase, body);
+    checks.cultural = await culturalCheck(db, benchmarkCase, body);
   }
   return checks;
 }
@@ -312,7 +314,7 @@ function containsExpectedFoods(body: unknown, expectedFoods: string[]): boolean 
 }
 
 async function culturalCheck(
-  sql: Sql,
+  db: AppDb,
   benchmarkCase: BenchmarkCase,
   body: unknown,
 ): Promise<boolean> {
@@ -321,7 +323,7 @@ async function culturalCheck(
   for (const group of groups) {
     const candidates = Array.isArray(group.candidates) ? group.candidates : [];
     if (candidates.length === 0) continue;
-    const keyed = await Promise.all(candidates.slice(0, 8).map((candidate) => foodKeyForCandidate(sql, candidate)));
+    const keyed = await Promise.all(candidates.slice(0, 8).map((candidate) => foodKeyForCandidate(db, candidate)));
     const first = keyed[0];
     if (benchmarkCase.language === "es") {
       if (keyed.some((item) => item.foodKey === "es") && first?.foodKey !== "es") return false;
@@ -346,22 +348,27 @@ function candidateGroupsFromBody(body: unknown): Array<{ candidates?: unknown[] 
 }
 
 async function foodKeyForCandidate(
-  sql: Sql,
+  db: AppDb,
   candidate: unknown,
 ): Promise<{ foodKey?: string; externalSource?: string }> {
   if (!isRecord(candidate)) return {};
   const externalSource = typeof candidate.externalSource === "string" ? candidate.externalSource : undefined;
   const externalId = typeof candidate.externalId === "string" ? candidate.externalId : undefined;
   if (!externalSource || !externalId) return { externalSource };
-  const [row] = await sql`
-    SELECT food_key, external_source
-    FROM food_items
-    WHERE external_source = ${externalSource} AND external_id = ${externalId}
-    LIMIT 1
-  `;
+  const [row] = await db
+    .select({
+      foodKey: foodItems.foodKey,
+      externalSource: foodItems.externalSource,
+    })
+    .from(foodItems)
+    .where(and(
+      eq(foodItems.externalSource, externalSource),
+      eq(foodItems.externalId, externalId),
+    ))
+    .limit(1);
   return {
-    foodKey: typeof row?.food_key === "string" ? row.food_key : undefined,
-    externalSource,
+    foodKey: row?.foodKey ?? undefined,
+    externalSource: row?.externalSource ?? externalSource,
   };
 }
 
@@ -488,9 +495,9 @@ function flattenSpans(spans: ProfileSpan[]): ProfileSpan[] {
   return spans.flatMap((span) => [span, ...flattenSpans(span.children ?? [])]);
 }
 
-async function cleanupBenchmarkUser(sql: Sql, email: string) {
+async function cleanupBenchmarkUser(db: AppDb, email: string) {
   try {
-    await sql`DELETE FROM users WHERE email = ${email}`;
+    await db.delete(users).where(eq(users.email, email));
   } catch (error) {
     console.warn("benchmark.cleanup.failed", error instanceof Error ? error.message : String(error));
   }

@@ -1,11 +1,13 @@
 import { createHash } from "node:crypto";
-import postgres from "postgres";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { loadConfig } from "../src/config/env.js";
+import { createDbClient } from "../src/db/client.js";
+import { foodItemEmbeddings, foodItems } from "../src/db/schema.js";
 import { LocalBgeM3EmbeddingProvider } from "../src/embeddings/provider.js";
 import { PostgresRepository } from "../src/repository/postgres.js";
 
 const config = loadConfig();
-const sql = postgres(config.DATABASE_URL, { max: 1 });
+const client = createDbClient(config.DATABASE_URL, { max: 1 });
 const repository = new PostgresRepository(config.DATABASE_URL);
 const embeddingProvider = new LocalBgeM3EmbeddingProvider(
   config.EMBEDDING_BASE_URL ?? "http://localhost:8081",
@@ -23,24 +25,19 @@ if (!model) {
   throw new Error("active_embedding_model_not_found");
 }
 
-const rows = await sql`
-  SELECT food_items.*
-  FROM food_items
-  LEFT JOIN food_item_embeddings existing
-    ON existing.food_item_id = food_items.id
-   AND existing.embedding_model_id = ${model.id}
-  WHERE food_items.user_id IS NULL
-    AND food_items.external_source = 'usda_fdc'
-    AND food_items.data_type IN ('SR Legacy', 'Foundation')
-  ORDER BY
-    CASE food_items.data_type
-      WHEN 'SR Legacy' THEN 0
-      WHEN 'Foundation' THEN 1
-      ELSE 2
-    END,
-    food_items.name
-  ${limit ? sql`LIMIT ${limit}` : sql``}
-`;
+const foodQuery = client.db
+  .select()
+  .from(foodItems)
+  .where(and(
+    isNull(foodItems.userId),
+    eq(foodItems.externalSource, "usda_fdc"),
+    inArray(foodItems.dataType, ["SR Legacy", "Foundation"]),
+  ))
+  .orderBy(
+    sql`CASE ${foodItems.dataType} WHEN 'SR Legacy' THEN 0 WHEN 'Foundation' THEN 1 ELSE 2 END`,
+    foodItems.name,
+  );
+const rows = limit ? await foodQuery.limit(limit) : await foodQuery;
 
 let embedded = 0;
 let skipped = 0;
@@ -54,16 +51,20 @@ for (let offset = 0; offset < rows.length; offset += batchSize) {
       hash: sha256(text),
     };
   });
-  const existing = await sql`
-    SELECT food_item_id, embedded_text_hash
-    FROM food_item_embeddings
-    WHERE embedding_model_id = ${model.id}
-      AND food_item_id IN ${sql(batch.map((item) => item.foodItemId))}
-  `;
+  const existing = await client.db
+    .select({
+      foodItemId: foodItemEmbeddings.foodItemId,
+      embeddedTextHash: foodItemEmbeddings.embeddedTextHash,
+    })
+    .from(foodItemEmbeddings)
+    .where(and(
+      eq(foodItemEmbeddings.embeddingModelId, model.id),
+      inArray(foodItemEmbeddings.foodItemId, batch.map((item) => item.foodItemId)),
+    ));
   const hashes = new Map(
     existing.map((row) => [
-      row.food_item_id as string,
-      row.embedded_text_hash as string,
+      row.foodItemId,
+      row.embeddedTextHash,
     ]),
   );
   const pending = batch.filter((item) => hashes.get(item.foodItemId) !== item.hash);
@@ -86,18 +87,19 @@ for (let offset = 0; offset < rows.length; offset += batchSize) {
   console.log(`Embedded ${embedded} foods, skipped ${skipped}`);
 }
 
-await sql.end();
+await client.close();
+await repository.close();
 console.log(`Food embeddings complete. Embedded ${embedded}, skipped ${skipped}.`);
 
 function embeddedFoodText(row: Record<string, unknown>): string {
   return [
     `name: ${row.name ?? ""}`,
-    `canonical: ${row.canonical_name ?? row.normalized_name ?? ""}`,
-    `category: ${row.food_category ?? ""}`,
-    `data type: ${row.data_type ?? ""}`,
+    `canonical: ${row.canonicalName ?? row.canonical_name ?? row.normalizedName ?? row.normalized_name ?? ""}`,
+    `category: ${row.foodCategory ?? row.food_category ?? ""}`,
+    `data type: ${row.dataType ?? row.data_type ?? ""}`,
     `brand: ${row.brand ?? ""}`,
     `ingredients: ${row.ingredients ?? ""}`,
-    `serving: ${row.household_serving_fulltext ?? ""}`,
+    `serving: ${row.householdServingFulltext ?? row.household_serving_fulltext ?? ""}`,
   ]
     .filter((line) => !line.endsWith(": "))
     .join("\n");

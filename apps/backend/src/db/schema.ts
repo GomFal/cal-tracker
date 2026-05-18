@@ -1,10 +1,15 @@
-import { boolean, customType, date, index, integer, jsonb, numeric, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
+import { boolean, check, date, index, integer, jsonb, numeric, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid, vector } from "drizzle-orm/pg-core";
 
-const vector = customType<{ data: number[]; driverData: string }>({
-  dataType() {
-    return "vector(1024)";
-  }
+type JsonObject = Record<string, unknown>;
+
+const timestamps = {
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+};
+
+export const schemaMigrations = pgTable("schema_migrations", {
+  filename: text("filename").primaryKey().notNull(),
+  appliedAt: timestamp("applied_at", { withTimezone: true }).notNull().defaultNow()
 });
 
 export const users = pgTable("users", {
@@ -14,7 +19,9 @@ export const users = pgTable("users", {
   trustedModeEnabled: boolean("trusted_mode_enabled").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   deletedAt: timestamp("deleted_at", { withTimezone: true })
-});
+}, (table) => [
+  uniqueIndex("users_active_email_unique").on(sql`lower(${table.email})`).where(sql`${table.deletedAt} IS NULL`)
+]);
 
 export const userCredentials = pgTable("user_credentials", {
   userId: uuid("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
@@ -43,6 +50,17 @@ export const authSessions = pgTable("auth_sessions", {
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   rotatedAt: timestamp("rotated_at", { withTimezone: true })
+}, (table) => [
+  index("auth_sessions_active_idx").on(table.userId, table.expiresAt).where(sql`${table.revokedAt} IS NULL`)
+]);
+
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
 });
 
 export const nutritionTargets = pgTable("nutrition_targets", {
@@ -72,7 +90,8 @@ export const dailyGoalSnapshots = pgTable("daily_goal_snapshots", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
 }, (table) => [
-  primaryKey({ columns: [table.userId, table.targetDate] })
+  primaryKey({ columns: [table.userId, table.targetDate] }),
+  index("daily_goal_snapshots_user_date_idx").on(table.userId, table.targetDate)
 ]);
 
 export const foodItems = pgTable("food_items", {
@@ -97,13 +116,28 @@ export const foodItems = pgTable("food_items", {
   ingredients: text("ingredients"),
   marketCountry: text("market_country"),
   householdServingFulltext: text("household_serving_fulltext"),
-  nutrientsJson: jsonb("nutrients_json").notNull().default(sql`'{}'::jsonb`),
+  nutrientsJson: jsonb("nutrients_json").$type<JsonObject>().notNull().default(sql`'{}'::jsonb`),
   servingGrams: numeric("serving_grams", { precision: 10, scale: 2 }).notNull().default("100"),
   calories: integer("calories").notNull(),
   proteinGrams: numeric("protein_grams", { precision: 10, scale: 2 }).notNull(),
   carbsGrams: numeric("carbs_grams", { precision: 10, scale: 2 }).notNull(),
-  fatGrams: numeric("fat_grams", { precision: 10, scale: 2 }).notNull()
-});
+  fatGrams: numeric("fat_grams", { precision: 10, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+}, (table) => [
+  index("food_items_external_source_id_idx").on(table.externalSource, table.externalId).where(sql`${table.externalSource} IS NOT NULL AND ${table.externalId} IS NOT NULL`),
+  index("food_items_external_source_id_lookup_idx").on(table.externalSource, table.externalId).where(sql`${table.externalSource} IS NOT NULL AND ${table.externalId} IS NOT NULL`),
+  index("food_items_barcode_lookup_idx").on(table.barcode).where(sql`${table.barcode} IS NOT NULL`),
+  index("food_items_data_type_lookup_idx").on(table.dataType).where(sql`${table.dataType} IS NOT NULL`),
+  index("food_items_food_key_lookup_idx").on(table.foodKey).where(sql`${table.foodKey} IS NOT NULL`),
+  index("food_items_ndb_number_lookup_idx").on(table.ndbNumber).where(sql`${table.ndbNumber} IS NOT NULL`),
+  index("food_items_canonical_name_idx").on(table.canonicalName).where(sql`${table.canonicalName} IS NOT NULL`),
+  index("food_items_normalized_name_trgm_idx").using("gin", table.normalizedName.op("gin_trgm_ops")),
+  index("food_items_canonical_name_trgm_idx").using("gin", table.canonicalName.op("gin_trgm_ops")).where(sql`${table.canonicalName} IS NOT NULL`),
+  index("food_items_brand_trgm_idx").using("gin", table.brand.op("gin_trgm_ops")).where(sql`${table.brand} IS NOT NULL`),
+  index("food_items_usda_normalized_name_trgm_idx").using("gin", table.normalizedName.op("gin_trgm_ops")).where(sql`${table.externalSource} = 'usda_fdc'`),
+  index("food_items_usda_canonical_name_trgm_idx").using("gin", table.canonicalName.op("gin_trgm_ops")).where(sql`${table.externalSource} = 'usda_fdc' AND ${table.canonicalName} IS NOT NULL`),
+  index("food_items_usda_brand_trgm_idx").using("gin", table.brand.op("gin_trgm_ops")).where(sql`${table.externalSource} = 'usda_fdc' AND ${table.brand} IS NOT NULL`)
+]);
 
 export const foodPortions = pgTable("food_portions", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -118,7 +152,11 @@ export const foodPortions = pgTable("food_portions", {
   kind: text("kind").notNull().default("serving"),
   sourceDescription: text("source_description").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
-});
+}, (table) => [
+  index("food_portions_food_item_id_idx").on(table.foodItemId),
+  index("food_portions_aliases_gin_idx").using("gin", table.normalizedAliases),
+  uniqueIndex("food_portions_food_usda_portion_unique").on(table.foodItemId, table.usdaPortionId).where(sql`${table.usdaPortionId} IS NOT NULL`)
+]);
 
 export const foodSearchDocuments = pgTable("food_search_documents", {
   foodItemId: uuid("food_item_id").primaryKey().references(() => foodItems.id, { onDelete: "cascade" }),
@@ -133,8 +171,11 @@ export const foodSearchDocuments = pgTable("food_search_documents", {
   foodKey: text("food_key"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
 }, (table) => [
+  index("food_search_documents_generic_es_trgm_idx").using("gin", table.searchText.op("gin_trgm_ops")).where(sql`${table.scope} = 'generic' AND ${table.locale} = 'es'`),
+  index("food_search_documents_generic_en_trgm_idx").using("gin", table.searchText.op("gin_trgm_ops")).where(sql`${table.scope} = 'generic' AND ${table.locale} = 'en'`),
+  index("food_search_documents_market_trgm_idx").using("gin", table.searchText.op("gin_trgm_ops")).where(sql`${table.scope} = 'market'`),
   index("food_search_documents_scope_locale_rank_idx").on(table.scope, table.locale, table.rankBucket),
-  index("food_search_documents_user_idx").on(table.userId)
+  index("food_search_documents_user_idx").on(table.userId).where(sql`${table.userId} IS NOT NULL`)
 ]);
 
 export const referenceDataImports = pgTable("reference_data_imports", {
@@ -142,11 +183,14 @@ export const referenceDataImports = pgTable("reference_data_imports", {
   source: text("source").notNull(),
   targetSchema: text("target_schema").notNull(),
   manifestSha256: text("manifest_sha256").notNull(),
-  manifestJson: jsonb("manifest_json").notNull(),
+  manifestJson: jsonb("manifest_json").$type<JsonObject>().notNull(),
   foodCount: integer("food_count").notNull(),
   portionCount: integer("portion_count").notNull(),
   importedAt: timestamp("imported_at", { withTimezone: true }).notNull().defaultNow()
-});
+}, (table) => [
+  uniqueIndex("reference_data_imports_source_schema_manifest_unique").on(table.source, table.targetSchema, table.manifestSha256),
+  index("reference_data_imports_source_imported_at_idx").on(table.source, table.importedAt)
+]);
 
 export const mealProposals = pgTable("meal_proposals", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -165,6 +209,34 @@ export const mealProposals = pgTable("meal_proposals", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
 });
 
+function mealItemColumns() {
+  return {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    quantity: numeric("quantity", { precision: 10, scale: 2 }).notNull(),
+    unit: text("unit").notNull(),
+    calories: integer("calories").notNull(),
+    proteinGrams: numeric("protein_grams", { precision: 10, scale: 2 }).notNull(),
+    carbsGrams: numeric("carbs_grams", { precision: 10, scale: 2 }).notNull(),
+    fatGrams: numeric("fat_grams", { precision: 10, scale: 2 }).notNull(),
+    source: text("source").notNull().default("snapshot"),
+    originalText: text("original_text"),
+    canonicalName: text("canonical_name"),
+    externalSource: text("external_source"),
+    externalId: text("external_id"),
+    sourceUrl: text("source_url"),
+    license: text("license"),
+    confidence: numeric("confidence", { precision: 5, scale: 4 }),
+    needsReview: boolean("needs_review").notNull().default(false)
+  };
+}
+
+export const mealProposalItems = pgTable("meal_proposal_items", {
+  ...mealItemColumns(),
+  proposalId: uuid("proposal_id").notNull().references(() => mealProposals.id, { onDelete: "cascade" }),
+  foodItemId: uuid("food_item_id").references(() => foodItems.id)
+});
+
 export const meals = pgTable("meals", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -179,6 +251,14 @@ export const meals = pgTable("meals", {
   fatGrams: numeric("fat_grams", { precision: 10, scale: 2 }).notNull(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+}, (table) => [
+  index("meals_user_occurred_at_idx").on(table.userId, table.occurredAt).where(sql`${table.deletedAt} IS NULL`),
+  check("meals_meal_type_check", sql`(${table.mealType} IS NULL AND ${table.mealTypeLabel} IS NULL) OR (${table.mealType} = ANY (ARRAY['breakfast','lunch','dinner','snack','pre_workout','post_workout','other']) AND ${table.mealTypeLabel} IS NOT NULL AND btrim(${table.mealTypeLabel}) <> '' AND char_length(${table.mealTypeLabel}) <= 40)`)
+]);
+
+export const mealItems = pgTable("meal_items", {
+  ...mealItemColumns(),
+  mealId: uuid("meal_id").notNull().references(() => meals.id, { onDelete: "cascade" })
 });
 
 export const mealTemplates = pgTable("meal_templates", {
@@ -195,6 +275,11 @@ export const mealTemplates = pgTable("meal_templates", {
   deletedAt: timestamp("deleted_at", { withTimezone: true })
 });
 
+export const mealTemplateItems = pgTable("meal_template_items", {
+  ...mealItemColumns(),
+  templateId: uuid("template_id").notNull().references(() => mealTemplates.id, { onDelete: "cascade" })
+});
+
 export const foodMemories = pgTable("food_memories", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -202,14 +287,19 @@ export const foodMemories = pgTable("food_memories", {
   label: text("label").notNull(),
   mealTemplateId: uuid("meal_template_id").references(() => mealTemplates.id),
   usageCount: integer("usage_count").notNull().default(0),
-  confidence: numeric("confidence", { precision: 5, scale: 4 }).notNull().default("1")
-});
+  confidence: numeric("confidence", { precision: 5, scale: 4 }).notNull().default("1"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true })
+}, (table) => [
+  uniqueIndex("food_memories_user_normalized_unique").on(table.userId, table.normalizedText)
+]);
 
 export const embeddingModels = pgTable("embedding_models", {
   id: uuid("id").primaryKey().defaultRandom(),
   provider: text("provider").notNull(),
   model: text("model").notNull(),
-  dimensions: integer("dimensions").notNull()
+  dimensions: integer("dimensions").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
 }, (table) => [
   index("embedding_models_lookup_idx").on(table.provider, table.model, table.dimensions)
 ]);
@@ -218,7 +308,8 @@ export const foodMemoryEmbeddings = pgTable("food_memory_embeddings", {
   id: uuid("id").primaryKey().defaultRandom(),
   foodMemoryId: uuid("food_memory_id").notNull().references(() => foodMemories.id, { onDelete: "cascade" }),
   embeddingModelId: uuid("embedding_model_id").notNull().references(() => embeddingModels.id),
-  embedding: vector("embedding").notNull()
+  embedding: vector("embedding", { dimensions: 1024 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
 });
 
 export const foodItemEmbeddings = pgTable("food_item_embeddings", {
@@ -227,7 +318,7 @@ export const foodItemEmbeddings = pgTable("food_item_embeddings", {
   embeddingModelId: uuid("embedding_model_id").notNull().references(() => embeddingModels.id),
   embeddedText: text("embedded_text").notNull(),
   embeddedTextHash: text("embedded_text_hash").notNull(),
-  embedding: vector("embedding").notNull(),
+  embedding: vector("embedding", { dimensions: 1024 }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
 }, (table) => [
@@ -243,7 +334,7 @@ export const userFoodFeedbackEvents = pgTable("user_food_feedback_events", {
   queryText: text("query_text").notNull(),
   normalizedQuery: text("normalized_query").notNull(),
   action: text("action").notNull(),
-  metadataJson: jsonb("metadata_json").notNull().default(sql`'{}'::jsonb`),
+  metadataJson: jsonb("metadata_json").$type<JsonObject>().notNull().default(sql`'{}'::jsonb`),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
 }, (table) => [
   index("user_food_feedback_events_user_created_idx").on(table.userId, table.createdAt),
@@ -265,14 +356,33 @@ export const userFoodPreferences = pgTable("user_food_preferences", {
   index("user_food_preferences_food_idx").on(table.foodItemId)
 ]);
 
+export const corrections = pgTable("corrections", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  mealId: uuid("meal_id").references(() => meals.id),
+  proposalId: uuid("proposal_id").references(() => mealProposals.id),
+  correctionText: text("correction_text").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+});
+
+export const confirmationRequests = pgTable("confirmation_requests", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  actionId: text("action_id").notNull(),
+  inputJson: jsonb("input_json").$type<JsonObject>().notNull(),
+  status: text("status").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  resolvedAt: timestamp("resolved_at", { withTimezone: true })
+});
+
 export const actionCalls = pgTable("action_calls", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   actionId: text("action_id").notNull(),
   source: text("source").notNull(),
-  inputJson: jsonb("input_json").notNull(),
-  outputJson: jsonb("output_json"),
-  errorJson: jsonb("error_json"),
+  inputJson: jsonb("input_json").$type<unknown>().notNull(),
+  outputJson: jsonb("output_json").$type<unknown>(),
+  errorJson: jsonb("error_json").$type<unknown>(),
   confirmationStatus: text("confirmation_status").notNull(),
   traceId: text("trace_id").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -283,14 +393,82 @@ export const auditEvents = pgTable("audit_events", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
   eventType: text("event_type").notNull(),
-  metadataJson: jsonb("metadata_json").notNull().default(sql`'{}'::jsonb`),
+  metadataJson: jsonb("metadata_json").$type<unknown>().notNull().default(sql`'{}'::jsonb`),
   traceId: text("trace_id").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
 });
 
-export const userRelations = relations(users, ({ one, many }) => ({
+export const agentConnections = pgTable("agent_connections", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  source: text("source").notNull(),
+  scopes: text("scopes").array().notNull(),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+});
+
+export const outboxJobs = pgTable("outbox_jobs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  jobType: text("job_type").notNull(),
+  payloadJson: jsonb("payload_json").$type<JsonObject>().notNull(),
+  status: text("status").notNull().default("pending"),
+  attempts: integer("attempts").notNull().default(0),
+  runAfter: timestamp("run_after", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
+});
+
+export const foodAliases = pgTable("food_aliases", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+  aliasText: text("alias_text").notNull(),
+  normalizedAlias: text("normalized_alias").notNull(),
+  locale: text("locale").notNull().default("und"),
+  canonicalEnglishName: text("canonical_english_name").notNull(),
+  foodItemId: uuid("food_item_id").references(() => foodItems.id, { onDelete: "set null" }),
+  source: text("source").notNull(),
+  confidence: numeric("confidence", { precision: 5, scale: 4 }).notNull().default("1"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+}, (table) => [
+  index("food_aliases_normalized_alias_idx").on(table.normalizedAlias)
+]);
+
+export const usersRelations = relations(users, ({ one, many }) => ({
   credential: one(userCredentials),
   identities: many(authIdentities),
   sessions: many(authSessions),
-  meals: many(meals)
+  meals: many(meals),
+  templates: many(mealTemplates),
+  memories: many(foodMemories),
+  actionCalls: many(actionCalls),
+  auditEvents: many(auditEvents)
+}));
+
+export const foodItemsRelations = relations(foodItems, ({ one, many }) => ({
+  user: one(users, { fields: [foodItems.userId], references: [users.id] }),
+  portions: many(foodPortions),
+  searchDocument: one(foodSearchDocuments),
+  embeddings: many(foodItemEmbeddings)
+}));
+
+export const mealsRelations = relations(meals, ({ one, many }) => ({
+  user: one(users, { fields: [meals.userId], references: [users.id] }),
+  proposal: one(mealProposals, { fields: [meals.proposalId], references: [mealProposals.id] }),
+  items: many(mealItems)
+}));
+
+export const mealProposalsRelations = relations(mealProposals, ({ one, many }) => ({
+  user: one(users, { fields: [mealProposals.userId], references: [users.id] }),
+  items: many(mealProposalItems)
+}));
+
+export const mealTemplatesRelations = relations(mealTemplates, ({ one, many }) => ({
+  user: one(users, { fields: [mealTemplates.userId], references: [users.id] }),
+  items: many(mealTemplateItems),
+  aliases: many(foodMemories)
+}));
+
+export const foodMemoriesRelations = relations(foodMemories, ({ one }) => ({
+  user: one(users, { fields: [foodMemories.userId], references: [users.id] }),
+  template: one(mealTemplates, { fields: [foodMemories.mealTemplateId], references: [mealTemplates.id] })
 }));

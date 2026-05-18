@@ -19,7 +19,11 @@ export class MemoryRetrievalService {
       return { matches: [], vectorUnavailable: true };
     }
 
-    await this.embeddingProvider.embed([normalized]);
+    try {
+      await this.embeddingProvider.embed([normalized]);
+    } catch {
+      return { matches: [], vectorUnavailable: true };
+    }
     return { matches: [], vectorUnavailable: true };
   }
 }

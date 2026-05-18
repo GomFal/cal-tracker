@@ -20,6 +20,13 @@ GoRouter buildRouter(AuthViewModel authViewModel) {
     refreshListenable: authViewModel,
     redirect: (context, state) {
       final isAuthRoute = state.matchedLocation == '/auth';
+      final isSessionLoadingRoute = state.matchedLocation == '/session-loading';
+      if (authViewModel.isRestoringSession) {
+        return isSessionLoadingRoute ? null : '/session-loading';
+      }
+      if (isSessionLoadingRoute) {
+        return authViewModel.hasSession ? '/dashboard' : '/auth';
+      }
       if (!authViewModel.hasSession && !isAuthRoute) {
         return '/auth';
       }
@@ -32,6 +39,10 @@ GoRouter buildRouter(AuthViewModel authViewModel) {
       GoRoute(
         path: '/auth',
         builder: (context, state) => const _LightOnlyAuthRoute(),
+      ),
+      GoRoute(
+        path: '/session-loading',
+        builder: (context, state) => const _SessionLoadingRoute(),
       ),
       GoRoute(
         path: '/meal/create',
@@ -118,6 +129,19 @@ class _LightOnlyAuthRoute extends StatelessWidget {
       child: Theme(
         data: buildLightTheme(),
         child: const AuthScreen(),
+      ),
+    );
+  }
+}
+
+class _SessionLoadingRoute extends StatelessWidget {
+  const _SessionLoadingRoute();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(
+        child: CircularProgressIndicator(),
       ),
     );
   }

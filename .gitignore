@@ -10,9 +10,11 @@ dist/
 .env.prod
 .venv-usda/
 .venv-openfoodfacts/
+.venv-bedca/
 *.log
 logs/
 data/usda/
 data/openfoodfacts/
+data/bedca/
 __pycache__/
 *.pyc

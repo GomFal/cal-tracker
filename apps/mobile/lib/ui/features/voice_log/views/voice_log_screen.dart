@@ -15,52 +15,9 @@ class MealCreateScreen extends StatefulWidget {
 }
 
 class _MealCreateScreenState extends State<MealCreateScreen> {
-  final _textController = TextEditingController();
-  final _textFieldFocusNode = FocusNode();
-  bool _transcriptReadyFocusQueued = false;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final viewModel = context.read<VoiceLogViewModel>();
-      if (viewModel.state == VoiceLogState.transcriptReady) {
-        _requestTextFieldFocus();
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _textController.dispose();
-    _textFieldFocusNode.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     final viewModel = context.watch<VoiceLogViewModel>();
-    if (_textController.text != viewModel.transcript) {
-      _textController.value = TextEditingValue(
-        text: viewModel.transcript,
-        selection: TextSelection.collapsed(offset: viewModel.transcript.length),
-      );
-    }
-
-    if (viewModel.state == VoiceLogState.transcriptReady) {
-      if (!_transcriptReadyFocusQueued) {
-        _transcriptReadyFocusQueued = true;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted || viewModel.state != VoiceLogState.transcriptReady) {
-            return;
-          }
-          _requestTextFieldFocus();
-        });
-      }
-    } else {
-      _transcriptReadyFocusQueued = false;
-    }
 
     return Scaffold(
       backgroundColor: FreshColors.screen,
@@ -89,27 +46,15 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              FreshCard(
-                padding: const EdgeInsets.all(14),
-                child: TextField(
-                  key: const ValueKey('meal_text_field'),
-                  controller: _textController,
-                  focusNode: _textFieldFocusNode,
-                  minLines: 3,
-                  maxLines: 6,
-                  decoration: const InputDecoration(
-                    labelText: 'Meal',
-                    hintText: 'Tell me what you ate',
-                    prefixIcon: Icon(Icons.restaurant_rounded),
-                  ),
-                  onChanged: viewModel.updateTranscript,
-                  enabled: viewModel.state != VoiceLogState.transcribing &&
-                      viewModel.state != VoiceLogState.agentRunning,
-                ),
-              ),
+              _VoiceCaptureCard(viewModel: viewModel),
               const SizedBox(height: FreshSpacing.md),
-              _buildControls(context, viewModel),
-              const SizedBox(height: FreshSpacing.lg),
+              if (viewModel.transcript.isNotEmpty) ...[
+                _TranscriptCard(
+                  transcript: viewModel.transcript,
+                  isCorrection: viewModel.proposal != null,
+                ),
+                const SizedBox(height: FreshSpacing.lg),
+              ],
               if (viewModel.isLoading)
                 const LinearProgressIndicator(minHeight: 3),
               if (viewModel.state == VoiceLogState.recording) ...[
@@ -202,11 +147,6 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
     );
   }
 
-  void _requestTextFieldFocus() {
-    if (!_textFieldFocusNode.canRequestFocus) return;
-    _textFieldFocusNode.requestFocus();
-  }
-
   Future<void> _showProposalEditor(
     BuildContext context,
     VoiceLogViewModel viewModel,
@@ -237,23 +177,6 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
     );
     if (!context.mounted || selection == null) return;
     await viewModel.commitProposal(mealLabel: selection.label);
-  }
-
-  Widget _buildControls(BuildContext context, VoiceLogViewModel viewModel) {
-    final canSubmit = viewModel.state == VoiceLogState.idle ||
-        viewModel.state == VoiceLogState.ready ||
-        viewModel.state == VoiceLogState.transcriptReady ||
-        viewModel.state == VoiceLogState.resultReady ||
-        viewModel.state == VoiceLogState.error;
-
-    return FilledButton.icon(
-      key: const ValueKey('submit_meal_button'),
-      icon: const Icon(Icons.keyboard_double_arrow_right_rounded),
-      onPressed: canSubmit && !viewModel.isLoading
-          ? () => viewModel.submitText(_textController.text)
-          : null,
-      label: const Text('Submit meal'),
-    );
   }
 }
 
@@ -597,7 +520,6 @@ class _PortionChoiceChip extends StatelessWidget {
   }
 }
 
-// ignore: unused_element
 class _VoiceCaptureCard extends StatelessWidget {
   const _VoiceCaptureCard({required this.viewModel});
 
@@ -606,6 +528,7 @@ class _VoiceCaptureCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isRecording = viewModel.state == VoiceLogState.recording;
+    final isCorrection = viewModel.proposal != null;
     final isDisabled = viewModel.state == VoiceLogState.stopping ||
         viewModel.state == VoiceLogState.transcribing ||
         viewModel.state == VoiceLogState.agentRunning;
@@ -648,7 +571,9 @@ class _VoiceCaptureCard extends StatelessWidget {
                 Text(
                   isRecording
                       ? 'Tap stop when you are done.'
-                      : 'Say your meal naturally.',
+                      : isCorrection
+                          ? 'Say the correction.'
+                          : 'Say your meal naturally.',
                   style: textTheme.titleLarge?.copyWith(
                     color: isRecording ? null : limeCardTextColor,
                     fontWeight: FontWeight.w700,
@@ -657,7 +582,9 @@ class _VoiceCaptureCard extends StatelessWidget {
                 ),
                 const SizedBox(height: FreshSpacing.sm),
                 Text(
-                  'The meal will be filled with your voice.',
+                  isCorrection
+                      ? 'Your current proposal will update from the next transcript.'
+                      : 'The meal proposal will be filled from the transcript.',
                   style: textTheme.bodyMedium?.copyWith(
                     color:
                         isRecording ? FreshColors.inkSoft : limeCardTextColor,
@@ -672,7 +599,7 @@ class _VoiceCaptureCard extends StatelessWidget {
             child: IconButton(
               key: const ValueKey('mic_button'),
               tooltip: isRecording ? 'Stop recording' : 'Record voice',
-              onPressed: isDisabled ? null : viewModel.toggleRecording,
+              onPressed: isDisabled ? null : viewModel.toggleGlobalRecording,
               icon: Icon(isRecording ? Icons.stop_rounded : Icons.mic_rounded),
               style: IconButton.styleFrom(
                 backgroundColor:
@@ -683,6 +610,55 @@ class _VoiceCaptureCard extends StatelessWidget {
                 shape: const CircleBorder(),
                 iconSize: 34,
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TranscriptCard extends StatelessWidget {
+  const _TranscriptCard({required this.transcript, required this.isCorrection});
+
+  final String transcript;
+  final bool isCorrection;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return FreshCard(
+      key: const ValueKey('voice_transcript_card'),
+      shadow: false,
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const FreshIconChip(
+            icon: Icons.graphic_eq_rounded,
+            color: FreshColors.water,
+            backgroundColor: FreshColors.surfaceSoft,
+          ),
+          const SizedBox(width: FreshSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isCorrection ? 'Last correction' : 'Last transcript',
+                  style: textTheme.labelLarge?.copyWith(
+                    color: FreshColors.inkMuted,
+                  ),
+                ),
+                const SizedBox(height: FreshSpacing.xs),
+                Text(
+                  transcript,
+                  key: const ValueKey('voice_transcript_text'),
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: FreshColors.inkSoft,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -1504,14 +1480,18 @@ class _NutritionEditorSheetState extends State<_NutritionEditorSheet> {
   void initState() {
     super.initState();
     final nutrition = widget.item.currentNutrition();
-    _caloriesController =
-        TextEditingController(text: nutrition.calories.toString());
-    _proteinController =
-        TextEditingController(text: _formatMacro(nutrition.proteinGrams));
-    _carbsController =
-        TextEditingController(text: _formatMacro(nutrition.carbsGrams));
-    _fatController =
-        TextEditingController(text: _formatMacro(nutrition.fatGrams));
+    _caloriesController = TextEditingController(
+      text: nutrition.calories.toString(),
+    );
+    _proteinController = TextEditingController(
+      text: _formatMacro(nutrition.proteinGrams),
+    );
+    _carbsController = TextEditingController(
+      text: _formatMacro(nutrition.carbsGrams),
+    );
+    _fatController = TextEditingController(
+      text: _formatMacro(nutrition.fatGrams),
+    );
   }
 
   @override
@@ -1578,8 +1558,9 @@ class _NutritionEditorSheetState extends State<_NutritionEditorSheet> {
                   child: TextField(
                     key: const ValueKey('proposal_nutrition_protein'),
                     controller: _proteinController,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     decoration: const InputDecoration(labelText: 'Protein'),
                   ),
                 ),
@@ -1588,8 +1569,9 @@ class _NutritionEditorSheetState extends State<_NutritionEditorSheet> {
                   child: TextField(
                     key: const ValueKey('proposal_nutrition_carbs'),
                     controller: _carbsController,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     decoration: const InputDecoration(labelText: 'Carbs'),
                   ),
                 ),
@@ -1598,8 +1580,9 @@ class _NutritionEditorSheetState extends State<_NutritionEditorSheet> {
                   child: TextField(
                     key: const ValueKey('proposal_nutrition_fat'),
                     controller: _fatController,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
                     decoration: const InputDecoration(labelText: 'Fat'),
                   ),
                 ),

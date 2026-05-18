@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
 import '../data/repositories/auth_repository.dart';
@@ -28,17 +29,22 @@ class CalTrackerBootstrap extends StatelessWidget {
     super.key,
     this.apiConfig = const ApiConfig.fromEnvironment(),
     this.preferencesRepository,
+    this.tokenStorage,
+    this.httpClient,
   });
 
   final ApiConfig apiConfig;
   final AppPreferencesRepository? preferencesRepository;
+  final TokenStorage? tokenStorage;
+  final http.Client? httpClient;
 
   @override
   Widget build(BuildContext context) {
-    const tokenStorage = SecureTokenStorage();
+    final tokenStorage = this.tokenStorage ?? const SecureTokenStorage();
     final apiClient = CalTrackerApiClient(
       config: apiConfig,
       tokenStorage: tokenStorage,
+      httpClient: httpClient,
     );
     final authRepository =
         AuthRepository(apiClient: apiClient, tokenStorage: tokenStorage);

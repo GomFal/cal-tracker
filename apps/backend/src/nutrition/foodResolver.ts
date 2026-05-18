@@ -63,6 +63,7 @@ type PortionOption = {
 
 const resolvedGramsSymbol = Symbol("resolvedGrams");
 const localCandidateSymbol = Symbol("localCandidate");
+const MIN_QUERY_FALLBACK_CONFIDENCE = 0.75;
 type MealItemWithResolvedGrams = MealItem & { [resolvedGramsSymbol]?: number };
 type MealItemWithLocalMarker = MealItem & { [localCandidateSymbol]?: boolean };
 
@@ -86,6 +87,7 @@ function searchQueriesForMention(mention: FoodMention): string[] {
   const queries = [
     canonicalNameForMention(mention),
     canonicalEnglishFallbackName(mention),
+    ...translatedSearchAliases(canonicalNameForMention(mention)),
   ].filter((query): query is string => Boolean(query));
   return [...new Set(queries)];
 }
@@ -415,7 +417,14 @@ export class LocalFoodDataProvider implements FoodDataProvider {
       foods = queryFoods;
       compatibleFoods = queryCompatibleFoods;
       scoringMention = searchMention;
-      if (compatibleFoods.length > 0) break;
+      if (
+        compatibleFoods.some(
+          (food) =>
+            localConfidence(food, searchMention) >=
+            MIN_QUERY_FALLBACK_CONFIDENCE,
+        )
+      )
+        break;
     }
     if (
       compatibleFoods.length === 0 &&
@@ -534,13 +543,18 @@ function isBrandedFood(food: FoodItemRecord): boolean {
   return food.dataType === "Branded" || food.source === "usda_branded";
 }
 
+function isBedcaFood(food: FoodItemRecord): boolean {
+  return food.externalSource === "bedca" || food.dataType === "BEDCA";
+}
+
 function localFoodPriority(food: FoodItemRecord, mention: FoodMention): number {
   if (food.userId) return 0;
   if (hasMarketProductIntent(mention) && isBrandedFood(food)) return 1;
-  if (food.dataType === "SR Legacy") return 2;
-  if (food.dataType === "Foundation") return 3;
-  if (isBrandedFood(food)) return 6;
-  return 4;
+  if (isBedcaFood(food)) return 2;
+  if (food.dataType === "SR Legacy") return 3;
+  if (food.dataType === "Foundation") return 4;
+  if (isBrandedFood(food)) return 7;
+  return 5;
 }
 
 function markLocalCandidate(item: MealItem): MealItem {
@@ -752,7 +766,7 @@ function extractQuantityMentions(text: string): FoodMention[] {
       match[2]!,
     );
     const unitValue = normalizeUnit(match[2]!);
-    const originalText = match[3]!.trim();
+    const originalText = cleanExtractedFoodText(match[3]!.trim());
     mentions.push(
       buildMention(originalText, quantity, unitValue, match[2], "metric"),
     );
@@ -768,7 +782,7 @@ function extractQuantityMentions(text: string): FoodMention[] {
     const quantity = parseCountToken(match[1]!);
     if (!quantity) continue;
     const rawUnitText = match[2]!;
-    const foodText = match[3]!.trim();
+    const foodText = cleanExtractedFoodText(match[3]!.trim());
     mentions.push(
       buildMention(
         foodText,
@@ -796,7 +810,7 @@ function extractCountMentions(text: string): FoodMention[] {
     if (!quantity) continue;
     const portionDescriptorRaw = match[2]?.trim();
     const portionDescriptor = normalizePortionDescriptor(portionDescriptorRaw);
-    const foodText = match[3]!.trim();
+    const foodText = cleanExtractedFoodText(match[3]!.trim());
     const firstFoodToken = normalizeText(foodText).split(" ")[0] ?? "";
     if (metricUnits.has(firstFoodToken) || countPrefixUnits.has(firstFoodToken))
       continue;
@@ -828,9 +842,10 @@ function buildMention(
   unitKind: UnitKind,
   originalText = foodText,
 ): FoodMention {
-  const canonicalName = normalizeFoodName(foodText);
+  const cleanedFoodText = cleanExtractedFoodText(foodText);
+  const canonicalName = normalizeFoodName(cleanedFoodText);
   return {
-    originalText,
+    originalText: cleanExtractedFoodText(originalText),
     canonicalName,
     canonicalEnglishName: canonicalName,
     quantity,
@@ -844,10 +859,15 @@ function buildMention(
 
 function normalizeFoodName(value: string): string {
   const normalized = normalizeText(value)
+    .replace(/\b(?:por\s+favor|please)\b/g, " ")
     .replace(/\b(de|del|of|a|mi|my|the|fresh|cooked|raw|sliced)\b/g, " ")
     .replace(/\s+/g, " ")
     .trim();
   return singularizeLastToken(normalized);
+}
+
+function cleanExtractedFoodText(value: string): string {
+  return value.replace(/\s+\b(?:por\s+favor|please)\b\s*$/i, "").trim();
 }
 
 function singularizeLastToken(value: string): string {
@@ -935,10 +955,11 @@ function localConfidence(food: FoodItemRecord, mention: FoodMention): number {
   }
   const canonical = normalizeText(food.canonicalName ?? food.normalizedName);
   const mentionCanonical = canonicalNameForMention(mention);
-  if (canonical === mentionCanonical) return 0.96;
+  const bedcaBoost = isBedcaFood(food) ? 0.02 : 0;
+  if (canonical === mentionCanonical) return Math.min(0.99, 0.96 + bedcaBoost);
   if (food.normalizedName === mentionCanonical)
-    return 0.94;
-  return 0.78;
+    return Math.min(0.99, 0.94 + bedcaBoost);
+  return isBedcaFood(food) ? 0.84 : 0.78;
 }
 
 function usdaFoodFromRecord(food: FoodItemRecord): UsdaFood {
@@ -1990,6 +2011,25 @@ function aliasesForCanonical(canonicalName: string): string[] {
   const normalized = normalizeText(canonicalName);
   return [...new Set([normalized, ...normalized.split(" ").filter(Boolean)])];
 }
+
+function translatedSearchAliases(canonicalName: string): string[] {
+  const normalized = normalizeText(canonicalName);
+  const aliases = spanishFoodSearchAliases.get(normalized) ?? [];
+  return aliases.map(normalizeFoodName);
+}
+
+const spanishFoodSearchAliases = new Map<string, string[]>([
+  ["pan", ["bread"]],
+  ["mantequilla", ["butter"]],
+  ["pollo", ["chicken"]],
+  ["pechuga de pollo", ["chicken breast"]],
+  ["arroz", ["rice"]],
+  ["huevo", ["egg"]],
+  ["huevos", ["egg"]],
+  ["leche", ["milk"]],
+  ["avena", ["oats"]],
+  ["jamon", ["ham"]],
+]);
 
 function normalizeUsdaPortions(
   food: UsdaFood,

@@ -4,6 +4,12 @@ This file contains environment-specific instructions for coding agents working o
 
 ---
 
+## Branch Workflow
+
+Always do development work on the `develop` branch. Before making code or documentation changes, switch to `develop` and update it from the remote when possible. Use `main` only when explicitly asked to sync, release, or inspect production-aligned history.
+
+---
+
 ## Deployed Environment URLs
 
 Current backend API environments:
@@ -59,11 +65,34 @@ ssh -i ~/.ssh/jgf root@bettercalories.app
 
 ---
 
-## Flutter E2E Testing and Visual Validation
+## Flutter Testing and Visual Validation
 
-For Flutter mobile features, use **Patrol** as the main E2E testing framework. Whenever a new feature, screen, permission flow, navigation flow, or critical user interaction is implemented, add or update Patrol tests to verify the behavior on Android/iOS where relevant. Patrol should be used for real end-to-end flows, especially those involving native dialogs, permissions, authentication, recording/audio flows, backend interactions, and multi-screen journeys. Use stable finders such as keys, semantic labels, and visible text; avoid fragile selectors.
+Use this testing pyramid for mobile work:
 
-Use **Marionette MCP** as a development and visual-validation tool for the coding agent. After implementing UI changes, the agent should use Marionette to interact with the running Flutter app, take screenshots, inspect the visible UI, tap/scroll/type where needed, and verify that the implemented changes are visually correct. Marionette is not a replacement for Patrol tests; it is used to give the agent “eyes and hands” during development so it can detect layout issues, bad spacing, overflow, broken visual states, or screens that do not update correctly after changes. The expected workflow is: implement the feature, run/analyze Flutter checks, use Marionette MCP to visually inspect and interact with the app, fix any visual or interaction issues, then add/update Patrol E2E tests for the final behavior.
+1. **Dart unit tests** for pure logic, ViewModels, repositories, parsers, cache behavior, localization helpers, and service wrappers.
+2. **Flutter widget tests** as the main validation layer for Flutter UI. Use `flutter test` to cover rendering, state changes, form validation, taps, drags, swipes, navigation, loading/success/empty/error states, disabled/enabled controls, and screen flows that do not require native platform UI.
+3. **Golden tests** selectively for stable visual surfaces where regressions are costly, such as complex cards, forms, modals, responsive layouts, and light/dark theme variants.
+4. **Semantics/accessibility tests** for important interactive controls, icon-only buttons, tap targets, disabled states, and labels.
+5. **Patrol/integration tests** only for the small set of flows that need a real device/emulator, platform plugins, native dialogs, permissions, microphone/recording, OS integrations, external apps, or final release confidence.
+
+For Flutter UI changes, prefer widget tests over Patrol. A new screen, form, modal, navigation path, swipe action, or stateful component should normally add or update `apps/mobile/test/...` coverage with fake repositories or mocked platform services. Do not call the real backend from widget tests, and avoid mocking HTTP in every screen test; prefer injecting a fake repository/ViewModel at the Provider boundary. Mock the generated API client only in repository tests, and mock platform channels/services only for plugin-facing service tests.
+
+Widget tests should use stable keys, semantics labels, and visible text. For tap/drag targets that may also exist offstage or underneath another widget, use `.hitTestable()` or `tester.ensureVisible(...)` before the interaction. `apps/mobile/test/flutter_test_config.dart` makes hit-test warnings fatal, so a tap on a covered/offscreen/disabled target should fail the test instead of only logging a warning.
+
+Use **Patrol** for critical device-backed flows only. Good Patrol candidates are app startup smoke, one happy-path auth/backend journey, microphone permission and recording, native permission dialogs, Android AppFunctions/iOS App Intents, deep links, push notifications, platform views, and pre-release smoke tests. Do not add Patrol coverage for Flutter-only UI states that can be exercised with `WidgetTester`.
+
+Use **Marionette MCP** as a development and visual-validation tool for the coding agent. After implementing UI changes, the agent should use Marionette to interact with the running Flutter app, take screenshots, inspect the visible UI, tap/scroll/type where needed, and verify that the implemented changes are visually correct. Marionette is not a replacement for automated tests; it is used to give the agent "eyes and hands" during development so it can detect layout issues, bad spacing, overflow, broken visual states, or screens that do not update correctly after changes.
+
+Expected UI workflow:
+
+```text
+implement change
+run flutter analyze / flutter test
+use Marionette MCP for visual inspection when UI changed
+fix visual or interaction issues
+add/update widget tests for Flutter-only behavior
+add/update Patrol only when native/device behavior is part of the acceptance criteria
+```
 
 
 ---
@@ -275,7 +304,18 @@ cd /home/javier/dev/cal-tracker/apps/mobile
 flutter test
 ```
 
+Use this as the default Flutter validation command for PR-sized work. It runs unit, ViewModel, repository, service, and widget tests without starting an emulator.
+
+For golden updates, run only when the visual baseline intentionally changes:
+
+```bash
+cd /home/javier/dev/cal-tracker/apps/mobile
+flutter test --update-goldens
+```
+
 ### Patrol E2E Tests
+
+Patrol is not the default validation layer for every UI change. Run it for native/device-critical flows, release smoke, or when the changed behavior cannot be represented with `WidgetTester`.
 
 Patrol tests and `apps/mobile/lib/main_test.dart` must use `CalTrackerBootstrap(apiConfig: ApiConfig(baseUrl: 'http://10.0.2.2:3000'))` directly. Do not depend on a Patrol `--dart-define` for the backend URL; Patrol also injects its own app/test server ports, and those must never become the API base URL. If a Patrol auth failure shows a URL such as `http://10.0.2.2:<random-port>/v1/auth/...`, the test entrypoint is using the wrong API config.
 
@@ -315,7 +355,7 @@ export PATH="$HOME/.pub-cache/bin:$PATH"
 marionette_mcp
 ```
 
-Run the Flutter app in debug mode first and use the VM Service `ws://.../ws` URI printed by `flutter run` with Marionette's `connect` tool.
+Run the Flutter app in debug mode first and use the VM Service `ws://.../ws` URI printed by `flutter run` with Marionette's `connect` tool. Use Marionette after UI changes for visual confidence, but keep the durable regression coverage in `flutter test` unless the flow requires Patrol.
 
 ### Groq STT Isolation Test
 
@@ -325,4 +365,4 @@ bun --env-file=.env scripts/test-groq-whisper.ts
 ```
 
 
-*Last updated: 2026-05-09*
+*Last updated: 2026-05-12*

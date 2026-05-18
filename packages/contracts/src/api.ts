@@ -34,6 +34,7 @@ export const executeActionResponseSchema = z.object({
 
 export const agentRunRequestSchema = z.object({
   text: z.string().min(1),
+  activeProposalId: uuidSchema.optional(),
   source: z.enum(["flutter", "ios_appintents", "android_appfunctions"]).default("flutter")
 });
 

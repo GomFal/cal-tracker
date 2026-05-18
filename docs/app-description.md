@@ -566,7 +566,7 @@ Flutter implementation work must use the existing project skills under `.agents/
 * Use `flutter-build-responsive-layout` for mobile/tablet layout work and adaptive screens.
 * Use `flutter-fix-layout-issues` whenever Flutter reports layout overflow or unbounded constraint errors.
 * Use `flutter-add-widget-test` for component-level widget behavior and rendering tests.
-* Use `flutter-add-integration-test` for end-to-end flows such as login, text logging, proposal confirmation, correction, and dashboard refresh.
+* Use `flutter-add-integration-test` only for the small set of device-backed flows that cannot be covered with widget tests, such as native permissions, microphone/recording, OS-agent adapters, deep links, platform views, and pre-release smoke tests.
 * Use `flutter-add-widget-preview` when building reusable or visually complex widgets.
 * Use `flutter-setup-localization` before introducing user-visible strings that need localization.
 * Use `flutter-implement-json-serialization` only for small manual DTOs not covered by the generated OpenAPI client.
@@ -1199,6 +1199,14 @@ Every action call should have a trace ID so logs, audit events, LLM calls, and d
 
 ## Testing Requirements
 
+Use a fast-first testing pyramid:
+
+* backend API/integration tests for business behavior, auth, permissions, persistence, contracts, and error fixtures;
+* Flutter unit tests for pure Dart logic, ViewModels, repositories, and services;
+* Flutter widget tests as the main UI validation layer for rendering, forms, taps, drags, navigation, and loading/success/empty/error states;
+* selective golden and semantics tests for visual and accessibility-sensitive surfaces;
+* minimal Patrol/integration tests for native/device behavior and final release confidence.
+
 Backend tests must cover:
 
 * action schema validation,
@@ -1222,7 +1230,14 @@ Flutter tests must cover:
 * correction flow,
 * loading states,
 * API error states,
-* permission/trusted-mode states.
+* permission/trusted-mode states,
+* disabled/enabled controls,
+* navigation between critical Flutter screens,
+* accessibility labels and tap targets for important controls.
+
+Flutter widget tests must use fake repositories or mocked services at the Provider/ViewModel boundary. They must not call the real backend. Mock HTTP/generated API clients only in repository/API-client tests. Use `.hitTestable()` or `ensureVisible` for interactions that can otherwise match offstage or covered widgets.
+
+Patrol tests must stay selective and should cover only flows that need a real device/emulator or native UI, such as startup smoke, one critical auth/backend path, microphone permission/recording, OS-agent integrations, deep links, and release smoke.
 
 Agent golden tests must include:
 

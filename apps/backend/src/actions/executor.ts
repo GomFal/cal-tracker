@@ -12,6 +12,7 @@ import {
   getRemainingTargetsInputSchema,
   proposeMealLogInputSchema,
   queryFoodMemoryInputSchema,
+  reviseMealProposalInputSchema,
   searchNutritionDatabaseInputSchema,
   updateMealTemplateInputSchema,
   type ActionContext,
@@ -230,6 +231,8 @@ export class ActionExecutor {
         });
         return { meal };
       }
+      case "revise_meal_proposal":
+        return this.reviseMealProposal(input, context);
       case "correct_meal":
         return this.correctMeal(input, context);
       case "delete_meal": {
@@ -613,6 +616,142 @@ export class ActionExecutor {
     return { meal: corrected };
   }
 
+  async getProposalForAgentContext(
+    userId: string,
+    proposalId: string,
+  ): Promise<MealProposal | undefined> {
+    return this.repository.getProposal(userId, proposalId);
+  }
+
+  private async reviseMealProposal(input: unknown, context: ActionContext) {
+    const parsed = reviseMealProposalInputSchema.parse(input);
+    const proposal = await this.requireProposal(
+      context.actorUserId,
+      parsed.proposalId,
+    );
+    if (proposal.status === "committed") {
+      throw new ActionExecutionError("proposal_already_committed");
+    }
+    if (proposal.status === "rejected") {
+      throw new ActionExecutionError("proposal_not_editable");
+    }
+
+    const items = [...proposal.items];
+    for (const operation of parsed.operations) {
+      switch (operation.type) {
+        case "add_item": {
+          const resolved = await this.resolveRevisionMention(
+            context.actorUserId,
+            operation.mention,
+          );
+          if ("clarificationRequired" in resolved) return resolved;
+          items.push(...resolved.items);
+          break;
+        }
+        case "remove_item": {
+          const index = findProposalItemIndex(items, operation);
+          if (index < 0) {
+            throw new ActionExecutionError("proposal_item_not_found");
+          }
+          items.splice(index, 1);
+          break;
+        }
+        case "replace_item": {
+          const index = findProposalItemIndex(items, operation);
+          if (index < 0) {
+            throw new ActionExecutionError("proposal_item_not_found");
+          }
+          const resolved = await this.resolveRevisionMention(
+            context.actorUserId,
+            operation.mention,
+          );
+          if ("clarificationRequired" in resolved) return resolved;
+          items.splice(index, 1, ...resolved.items);
+          break;
+        }
+        case "update_item_quantity": {
+          const index = findProposalItemIndex(items, operation);
+          if (index < 0) {
+            throw new ActionExecutionError("proposal_item_not_found");
+          }
+          const current = items[index]!;
+          if (sameUnit(current.unit, operation.unit)) {
+            items[index] = scaleMealItem(
+              current,
+              operation.quantity,
+              operation.unit,
+            );
+            break;
+          }
+          const foodName = current.canonicalName ?? current.name;
+          const resolved = await this.resolveRevisionMention(
+            context.actorUserId,
+            {
+              originalText:
+                `${operation.quantity} ${operation.rawUnitText ?? operation.unit} ${foodName}`.trim(),
+              canonicalEnglishName: foodName,
+              quantity: operation.quantity,
+              unit: operation.unit,
+              rawUnitText: operation.rawUnitText ?? operation.unit,
+              unitKind: operation.unit === "g" ? "metric" : "unknown",
+              confidence: current.confidence ?? 0.8,
+              marketProduct: false,
+            },
+          );
+          if ("clarificationRequired" in resolved) return resolved;
+          items.splice(index, 1, ...resolved.items);
+          break;
+        }
+      }
+    }
+
+    if (items.length === 0) {
+      throw new ActionExecutionError("proposal_empty");
+    }
+
+    const corrected = await this.repository.updateProposal(
+      context.actorUserId,
+      {
+        ...proposal,
+        status: "corrected",
+        title: inferTitle(proposal.phrase, items),
+        items,
+        nutrition: sumNutrition(items),
+      },
+    );
+    await recordFoodFeedback(this.repository, {
+      userId: context.actorUserId,
+      eventType: "proposal_corrected",
+      traceId: context.traceId,
+      source: context.source,
+      phrase: parsed.instruction,
+      proposalId: corrected.id,
+      items: corrected.items,
+      previousItems: proposal.items,
+      metadata: { revisionOperationCount: parsed.operations.length },
+    });
+    return {
+      proposal: corrected,
+      message: "Meal proposal updated.",
+    };
+  }
+
+  private async resolveRevisionMention(userId: string, mention: FoodMention) {
+    const resolution = await this.resolveMealMentions(userId, [mention]);
+    if (resolution.clarificationRequired || resolution.items.length === 0) {
+      return {
+        clarificationRequired: true,
+        resolvedItems: resolution.items,
+        unresolvedMentions: resolution.unresolvedMentions,
+        options: resolution.candidateGroups,
+        message:
+          unsupportedUnitClarification(resolution.candidateGroups) ??
+          "I need a food match before updating the meal proposal.",
+      };
+    }
+    return { items: resolution.items };
+  }
+
   private async requireProposal(
     userId: string,
     proposalId: string,
@@ -744,6 +883,64 @@ function canonicalNameForMention(mention: FoodMention): string {
       mention.canonicalEnglishName ??
       mention.originalText,
   );
+}
+
+function findProposalItemIndex(
+  items: MealItem[],
+  target: { itemIndex?: number; matchText?: string },
+): number {
+  if (
+    target.itemIndex !== undefined &&
+    target.itemIndex >= 0 &&
+    target.itemIndex < items.length
+  ) {
+    return target.itemIndex;
+  }
+  const normalizedMatch = normalizeText(target.matchText ?? "");
+  if (!normalizedMatch) return -1;
+  return items.findIndex((item) => {
+    const names = [item.name, item.canonicalName, item.originalText]
+      .filter((value): value is string => Boolean(value))
+      .map(normalizeText);
+    return names.some(
+      (name) =>
+        name === normalizedMatch ||
+        name.includes(normalizedMatch) ||
+        normalizedMatch.includes(name),
+    );
+  });
+}
+
+function sameUnit(left: string, right: string): boolean {
+  return normalizeText(left) === normalizeText(right);
+}
+
+function scaleMealItem(
+  item: MealItem,
+  quantity: number,
+  unit: string,
+): MealItem {
+  const ratio = quantity / item.quantity;
+  return {
+    ...item,
+    quantity,
+    unit,
+    calories: Math.round(item.calories * ratio),
+    proteinGrams: roundOne(item.proteinGrams * ratio),
+    carbsGrams: roundOne(item.carbsGrams * ratio),
+    fatGrams: roundOne(item.fatGrams * ratio),
+    resolvedGrams:
+      item.resolvedGrams === undefined
+        ? undefined
+        : roundOne(item.resolvedGrams * ratio),
+    source: item.source.endsWith(":manual_edit")
+      ? item.source
+      : `${item.source}:manual_edit`,
+  };
+}
+
+function roundOne(value: number): number {
+  return Math.round(value * 10) / 10;
 }
 
 function inferTitle(text: string, items: MealItem[]): string {

@@ -16,6 +16,7 @@ describe("contracts", () => {
       "commit_meal",
       "create_meal_proposal_from_items",
       "correct_meal",
+      "revise_meal_proposal",
       "delete_meal",
       "get_daily_summary",
       "get_remaining_targets",

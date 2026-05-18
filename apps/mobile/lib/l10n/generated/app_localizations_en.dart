@@ -223,6 +223,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsLanguageSpanish => 'Español';
 
   @override
+  String get settingsDataSourcesTitle => 'Data sources';
+
+  @override
+  String get settingsDataSourcesSubtitle =>
+      'Food matches can include public reference data.';
+
+  @override
+  String get settingsDataSourcesOpenFoodFacts =>
+      'Contains information from Open Food Facts, made available under ODbL 1.0. © Open Food Facts contributors.';
+
+  @override
+  String get settingsDataSourcesUsda =>
+      'USDA FoodData Central data is public domain under CC0 1.0.';
+
+  @override
   String get dashboardCouldNotLoadToday => 'Could not load today';
 
   @override

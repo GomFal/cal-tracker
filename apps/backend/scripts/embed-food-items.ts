@@ -30,13 +30,16 @@ const rows = await sql`
     ON existing.food_item_id = food_items.id
    AND existing.embedding_model_id = ${model.id}
   WHERE food_items.user_id IS NULL
-    AND food_items.external_source = 'usda_fdc'
-    AND food_items.data_type IN ('SR Legacy', 'Foundation')
+    AND (
+      (food_items.external_source = 'bedca' AND food_items.data_type = 'BEDCA')
+      OR (food_items.external_source = 'usda_fdc' AND food_items.data_type IN ('SR Legacy', 'Foundation'))
+    )
   ORDER BY
-    CASE food_items.data_type
-      WHEN 'SR Legacy' THEN 0
-      WHEN 'Foundation' THEN 1
-      ELSE 2
+    CASE
+      WHEN food_items.external_source = 'bedca' THEN 0
+      WHEN food_items.data_type = 'SR Legacy' THEN 1
+      WHEN food_items.data_type = 'Foundation' THEN 2
+      ELSE 3
     END,
     food_items.name
   ${limit ? sql`LIMIT ${limit}` : sql``}
@@ -90,17 +93,28 @@ await sql.end();
 console.log(`Food embeddings complete. Embedded ${embedded}, skipped ${skipped}.`);
 
 function embeddedFoodText(row: Record<string, unknown>): string {
+  const bedcaNameEn = bedcaEnglishName(row.nutrients_json);
   return [
     `name: ${row.name ?? ""}`,
     `canonical: ${row.canonical_name ?? row.normalized_name ?? ""}`,
+    `english: ${bedcaNameEn ?? ""}`,
     `category: ${row.food_category ?? ""}`,
     `data type: ${row.data_type ?? ""}`,
+    `source: ${row.external_source ?? row.source ?? ""}`,
     `brand: ${row.brand ?? ""}`,
     `ingredients: ${row.ingredients ?? ""}`,
     `serving: ${row.household_serving_fulltext ?? ""}`,
   ]
     .filter((line) => !line.endsWith(": "))
     .join("\n");
+}
+
+function bedcaEnglishName(value: unknown): string | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const name = (value as { name_en?: unknown }).name_en;
+  return typeof name === "string" && name.trim().length > 0
+    ? name.trim()
+    : undefined;
 }
 
 function sha256(value: string): string {

@@ -440,6 +440,35 @@ describe("FoodResolver", () => {
     );
   });
 
+  it("does not include polite trailing words in extracted food names", async () => {
+    const extractor = new DeterministicFoodTextExtractor();
+
+    await expect(
+      extractor.extract("Ponme 200 gramos de pan por favor"),
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          originalText: "pan",
+          canonicalName: "pan",
+          quantity: 200,
+          unit: "g",
+        }),
+      ]),
+    );
+    await expect(
+      extractor.extract("Put me 200 grams of bread please"),
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          originalText: "bread",
+          canonicalName: "bread",
+          quantity: 200,
+          unit: "g",
+        }),
+      ]),
+    );
+  });
+
   it("extracts household portions and unsupported implicit counts without validating them", async () => {
     const extractor = new DeterministicFoodTextExtractor();
 
@@ -464,6 +493,33 @@ describe("FoodResolver", () => {
           unit: "rice",
           rawUnitText: "rice",
           unitKind: "implicit_count",
+        }),
+      ]),
+    );
+  });
+
+  it("uses translated search aliases for deterministic Spanish food mentions", async () => {
+    const repository = testFoodRepository();
+    const resolver = new FoodResolver(
+      new DeterministicFoodTextExtractor(),
+      [new LocalFoodDataProvider(repository)],
+      repository,
+      0.75,
+    );
+
+    const result = await resolver.resolveMealText(
+      "user-1",
+      "Ponme 200 gramos de pan por favor",
+    );
+
+    expect(result.clarificationRequired).toBe(false);
+    expect(result.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "Bread",
+          canonicalName: "pan",
+          quantity: 200,
+          unit: "g",
         }),
       ]),
     );
@@ -850,6 +906,116 @@ describe("FoodResolver", () => {
       expect.objectContaining({
         externalId: "3002",
         calories: 165,
+      }),
+    );
+  });
+
+  it("prefers BEDCA over USDA for Spanish canonical names", async () => {
+    const repository = InMemoryRepository.seeded();
+    await repository.upsertFoodItem({
+      name: "Aceite de oliva",
+      normalizedName: "aceite de oliva",
+      canonicalName: "Aceite de oliva",
+      source: "bedca",
+      externalSource: "bedca",
+      externalId: "2543",
+      dataType: "BEDCA",
+      foodKey: "es",
+      servingGrams: 100,
+      calories: 884,
+      proteinGrams: 0,
+      carbsGrams: 0,
+      fatGrams: 100,
+      nutrients: { name_en: "Olive oil" },
+    });
+    await repository.upsertFoodItem({
+      name: "Oil, olive, salad or cooking",
+      normalizedName: "aceite de oliva",
+      canonicalName: "aceite de oliva",
+      source: "usda_fdc",
+      externalSource: "usda_fdc",
+      externalId: "4053",
+      dataType: "SR Legacy",
+      servingGrams: 100,
+      calories: 884,
+      proteinGrams: 0,
+      carbsGrams: 0,
+      fatGrams: 100,
+    });
+    const resolver = new FoodResolver(
+      new DeterministicFoodTextExtractor(),
+      [new LocalFoodDataProvider(repository)],
+      repository,
+      0.75,
+    );
+
+    const result = await resolver.resolveMealMentions("user-1", [
+      {
+        ...mention("aceite de oliva"),
+        canonicalEnglishName: "olive oil",
+        language: "es",
+      },
+    ]);
+
+    expect(result.clarificationRequired).toBe(false);
+    expect(result.items[0]).toEqual(
+      expect.objectContaining({
+        canonicalName: "aceite oliva",
+        externalSource: "bedca",
+        externalId: "2543",
+      }),
+    );
+  });
+
+  it("keeps English generic searches on USDA instead of matching BEDCA metadata", async () => {
+    const repository = InMemoryRepository.seeded();
+    await repository.upsertFoodItem({
+      name: "Aceite de oliva",
+      normalizedName: "aceite de oliva",
+      canonicalName: "Aceite de oliva",
+      source: "bedca",
+      externalSource: "bedca",
+      externalId: "2543",
+      dataType: "BEDCA",
+      foodKey: "es",
+      servingGrams: 100,
+      calories: 884,
+      proteinGrams: 0,
+      carbsGrams: 0,
+      fatGrams: 100,
+      nutrients: { name_en: "Olive oil" },
+    });
+    await repository.upsertFoodItem({
+      name: "Olive oil",
+      normalizedName: "olive oil",
+      canonicalName: "olive oil",
+      source: "usda_fdc",
+      externalSource: "usda_fdc",
+      externalId: "4053",
+      dataType: "SR Legacy",
+      servingGrams: 100,
+      calories: 884,
+      proteinGrams: 0,
+      carbsGrams: 0,
+      fatGrams: 100,
+    });
+    const resolver = new FoodResolver(
+      new DeterministicFoodTextExtractor(),
+      [new LocalFoodDataProvider(repository)],
+      repository,
+      0.75,
+    );
+
+    const result = await resolver.resolveMealMentions("user-1", [
+      mention("olive oil"),
+    ]);
+
+    expect(result.clarificationRequired).toBe(false);
+    expect(result.items[0]).toEqual(
+      expect.objectContaining({
+        canonicalName: "olive oil",
+        externalSource: "usda_fdc",
+        externalId: "4053",
       }),
     );
   });

@@ -72,11 +72,11 @@ void main() {
         ),
       );
 
-      await tester.enterText(
-        find.byKey(const ValueKey('meal_text_field')),
-        'long food',
-      );
-      await tester.tap(find.byKey(const ValueKey('submit_meal_button')));
+      expect(find.byKey(const ValueKey('meal_text_field')), findsNothing);
+      expect(find.byKey(const ValueKey('submit_meal_button')), findsNothing);
+      expect(find.byKey(const ValueKey('mic_button')), findsOneWidget);
+
+      await viewModel.submitText('long food');
       await tester.pumpAndSettle();
 
       expect(
@@ -88,14 +88,16 @@ void main() {
         findsNothing,
       );
 
-      final toggleFinder =
-          find.byKey(const ValueKey('food_candidate_toggle_very_long_food'));
+      final toggleFinder = find.byKey(
+        const ValueKey('food_candidate_toggle_very_long_food'),
+      );
       await tester.ensureVisible(toggleFinder);
       await tester.pumpAndSettle();
       await tester.tap(toggleFinder);
       await tester.pumpAndSettle();
-      final candidateNineFinder =
-          find.byKey(const ValueKey('food_candidate_very_long_food_9'));
+      final candidateNineFinder = find.byKey(
+        const ValueKey('food_candidate_very_long_food_9'),
+      );
       await tester.ensureVisible(candidateNineFinder);
       await tester.pumpAndSettle();
 
@@ -156,11 +158,7 @@ void main() {
         ),
       );
 
-      await tester.enterText(
-        find.byKey(const ValueKey('meal_text_field')),
-        'chicken',
-      );
-      await tester.tap(find.byKey(const ValueKey('submit_meal_button')));
+      await viewModel.submitText('chicken');
       await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(const ValueKey('food_candidate_chicken_breast_0')),
@@ -177,24 +175,27 @@ void main() {
         find.byKey(const ValueKey('proposal_item_0_candidate_9')),
         findsNothing,
       );
-      final editorToggleFinder =
-          find.byKey(const ValueKey('proposal_item_0_candidate_toggle'));
+      final editorToggleFinder = find.byKey(
+        const ValueKey('proposal_item_0_candidate_toggle'),
+      );
       await tester.ensureVisible(editorToggleFinder);
       await tester.pumpAndSettle();
       await tester.tap(editorToggleFinder);
       await tester.pumpAndSettle();
-      final editorCandidateNineFinder =
-          find.byKey(const ValueKey('proposal_item_0_candidate_9'));
+      final editorCandidateNineFinder = find.byKey(
+        const ValueKey('proposal_item_0_candidate_9'),
+      );
       await tester.ensureVisible(editorCandidateNineFinder);
       await tester.pumpAndSettle();
+      expect(editorCandidateNineFinder, findsOneWidget);
       expect(
-        editorCandidateNineFinder,
-        findsOneWidget,
+        find.byKey(const ValueKey('proposal_item_calories_0')),
+        findsNothing,
       );
       expect(
-          find.byKey(const ValueKey('proposal_item_calories_0')), findsNothing);
-      expect(
-          find.byKey(const ValueKey('proposal_item_protein_0')), findsNothing);
+        find.byKey(const ValueKey('proposal_item_protein_0')),
+        findsNothing,
+      );
 
       await tester.tap(
         find.byKey(const ValueKey('edit_proposal_item_nutrition_0')),
@@ -253,11 +254,7 @@ void main() {
         ),
       );
 
-      await tester.enterText(
-        find.byKey(const ValueKey('meal_text_field')),
-        '100 gramos de pan',
-      );
-      await tester.tap(find.byKey(const ValueKey('submit_meal_button')));
+      await viewModel.submitText('100 gramos de pan');
       await tester.pumpAndSettle();
 
       expect(find.text('pan 100 g'), findsOneWidget);

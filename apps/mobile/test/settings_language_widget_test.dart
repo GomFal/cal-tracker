@@ -47,6 +47,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Language'), findsOneWidget);
+    expect(find.text('Data sources'), findsOneWidget);
+    expect(find.textContaining('Open Food Facts'), findsOneWidget);
+    expect(find.textContaining('USDA FoodData Central'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('language_settings_row')));
     await tester.pumpAndSettle();
@@ -54,6 +57,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Idioma'), findsOneWidget);
+    expect(find.text('Fuentes de datos'), findsOneWidget);
     expect(preferencesRepository.savedLocaleCode, 'es');
   });
 }

@@ -11,14 +11,17 @@ class AuthViewModel extends ChangeNotifier {
 
   AuthUser? _user;
   bool _isLoading = false;
+  bool _isRestoringSession = false;
   String? _error;
 
   AuthUser? get user => _user;
   bool get hasSession => _user != null;
   bool get isLoading => _isLoading;
+  bool get isRestoringSession => _isRestoringSession;
   String? get error => _error;
 
   Future<void> restoreSession() async {
+    _isRestoringSession = true;
     _setLoading(true);
     try {
       _user = await _authRepository.restoreSession();
@@ -26,6 +29,7 @@ class AuthViewModel extends ChangeNotifier {
     } catch (error) {
       _error = error.toString();
     } finally {
+      _isRestoringSession = false;
       _setLoading(false);
     }
   }

@@ -500,6 +500,30 @@ abstract class AppLocalizations {
   /// **'Español'**
   String get settingsLanguageSpanish;
 
+  /// No description provided for @settingsDataSourcesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Data sources'**
+  String get settingsDataSourcesTitle;
+
+  /// No description provided for @settingsDataSourcesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Food matches can include public reference data.'**
+  String get settingsDataSourcesSubtitle;
+
+  /// No description provided for @settingsDataSourcesOpenFoodFacts.
+  ///
+  /// In en, this message translates to:
+  /// **'Contains information from Open Food Facts, made available under ODbL 1.0. © Open Food Facts contributors.'**
+  String get settingsDataSourcesOpenFoodFacts;
+
+  /// No description provided for @settingsDataSourcesUsda.
+  ///
+  /// In en, this message translates to:
+  /// **'USDA FoodData Central data is public domain under CC0 1.0.'**
+  String get settingsDataSourcesUsda;
+
   /// No description provided for @dashboardCouldNotLoadToday.
   ///
   /// In en, this message translates to:

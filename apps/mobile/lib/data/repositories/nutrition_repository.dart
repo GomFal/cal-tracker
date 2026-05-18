@@ -57,17 +57,30 @@ class VoiceMealRunResult {
 
 class NutritionRepository {
   NutritionRepository({required CalTrackerApiClient apiClient})
-      : _apiClient = apiClient;
+    : _apiClient = apiClient;
 
   final CalTrackerApiClient _apiClient;
 
-  Future<AgentRunResult> logText(String text) async {
-    final json = await _apiClient.runAgent(text);
+  Future<AgentRunResult> logText(
+    String text, {
+    String? activeProposalId,
+  }) async {
+    final json = await _apiClient.runAgent(
+      text,
+      activeProposalId: activeProposalId,
+    );
     return _parseAgentRunResult(json);
   }
 
-  Future<VoiceMealRunResult> logAudio(File audioFile) async {
-    final json = await _apiClient.runVoiceMeal(audioFile, source: 'flutter');
+  Future<VoiceMealRunResult> logAudio(
+    File audioFile, {
+    String? activeProposalId,
+  }) async {
+    final json = await _apiClient.runVoiceMeal(
+      audioFile,
+      source: 'flutter',
+      activeProposalId: activeProposalId,
+    );
     return VoiceMealRunResult(
       transcript: json['transcript'] as String,
       provider: json['provider'] as String,
@@ -94,34 +107,35 @@ class NutritionRepository {
       remaining: json['remaining'] == null
           ? null
           : NutritionSnapshot.fromJson(
-              json['remaining'] as Map<String, Object?>),
+              json['remaining'] as Map<String, Object?>,
+            ),
       meals: json['meals'] == null
           ? null
           : (json['meals'] as List<Object?>)
-              .cast<Map<String, Object?>>()
-              .map(Meal.fromJson)
-              .toList(),
+                .cast<Map<String, Object?>>()
+                .map(Meal.fromJson)
+                .toList(),
       items: json['items'] == null
           ? null
           : (json['items'] as List<Object?>)
-              .cast<Map<String, Object?>>()
-              .map(MealItem.fromJson)
-              .toList(),
+                .cast<Map<String, Object?>>()
+                .map(MealItem.fromJson)
+                .toList(),
       templates: json['templates'] == null
           ? null
           : (json['templates'] as List<Object?>)
-              .cast<Map<String, Object?>>()
-              .map(MealTemplate.fromJson)
-              .toList(),
+                .cast<Map<String, Object?>>()
+                .map(MealTemplate.fromJson)
+                .toList(),
       template: json['template'] == null
           ? null
           : MealTemplate.fromJson(json['template'] as Map<String, Object?>),
       resolvedItems: json['resolvedItems'] == null
           ? null
           : (json['resolvedItems'] as List<Object?>)
-              .cast<Map<String, Object?>>()
-              .map(MealItem.fromJson)
-              .toList(),
+                .cast<Map<String, Object?>>()
+                .map(MealItem.fromJson)
+                .toList(),
       deleted: json['deleted'] as bool?,
       actionId: json['actionId'] as String?,
       input: json['input'],
@@ -148,7 +162,9 @@ class NutritionRepository {
   }
 
   Future<MealProposal> updateProposalItems(
-      String proposalId, List<MealItem> items) async {
+    String proposalId,
+    List<MealItem> items,
+  ) async {
     final json = await _apiClient.correctProposal(
       proposalId: proposalId,
       items: items.map((item) => item.toJson()).toList(),
@@ -162,14 +178,12 @@ class NutritionRepository {
     required List<MealItem> items,
     String? title,
   }) async {
-    final json = await _apiClient.executeAction(
-      'create_meal_proposal_from_items',
-      {
-        'phrase': phrase,
-        if (title != null) 'title': title,
-        'items': items.map((item) => item.toJson()).toList(),
-      },
-    );
+    final json = await _apiClient
+        .executeAction('create_meal_proposal_from_items', {
+          'phrase': phrase,
+          if (title != null) 'title': title,
+          'items': items.map((item) => item.toJson()).toList(),
+        });
     final output = json['output'] as Map<String, Object?>;
     return MealProposal.fromJson(output['proposal'] as Map<String, Object?>);
   }
@@ -182,7 +196,8 @@ class NutritionRepository {
 
   Future<DailySummary> getDailySummary({String? date}) async {
     final json = await _apiClient.getDailySummary(
-        date: date ?? DateTime.now().toIso8601String().substring(0, 10));
+      date: date ?? DateTime.now().toIso8601String().substring(0, 10),
+    );
     final output = json['output'] as Map<String, Object?>;
     return DailySummary.fromJson(output['summary'] as Map<String, Object?>);
   }
@@ -242,7 +257,9 @@ class NutritionRepository {
   }
 
   Future<MealTemplate> setTemplateTrustedMode(
-      MealTemplate template, bool enabled) async {
+    MealTemplate template,
+    bool enabled,
+  ) async {
     final body = template.toUpdateJson()
       ..['trustedAutoCommitEnabled'] = enabled;
     final json = await _apiClient.updateTemplate(template.id, body);

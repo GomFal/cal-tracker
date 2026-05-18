@@ -82,10 +82,20 @@ export class AgentService {
     private readonly runLogger?: LocalRunLogger,
   ) {}
 
-  async run(text: string, context: ActionContext): Promise<AgentRunResult> {
+  async run(
+    text: string,
+    context: ActionContext,
+    activeProposalId?: string,
+  ): Promise<AgentRunResult> {
     const runStarted = Date.now();
+    const activeProposal = activeProposalId
+      ? await this.actionExecutor.getProposalForAgentContext(
+          context.actorUserId,
+          activeProposalId,
+        )
+      : undefined;
     const messages: AgentMessage[] = [
-      buildSystemMessage(context),
+      buildSystemMessage(context, activeProposal),
       { role: "user", content: text },
     ];
 
@@ -110,6 +120,8 @@ export class AgentService {
       timezone: context.timezone,
       model: this.model,
       inputText: text,
+      activeProposalId,
+      activeProposal,
       systemPrompt: messages[0]!.content,
       messages,
       availableTools: allowedActions.map((action) => action.id),
@@ -245,9 +257,23 @@ export class AgentService {
     }
 
     const originalActionId = actionId;
-    if (isMealLoggingIntent(text) && actionId !== "propose_meal_log") {
+    if (
+      isMealLoggingIntent(text) &&
+      !activeProposal &&
+      actionId !== "propose_meal_log"
+    ) {
       actionId = "propose_meal_log";
       parsedInput = { text };
+    }
+    if (
+      activeProposal &&
+      actionId === "revise_meal_proposal" &&
+      typeof parsedInput === "object" &&
+      parsedInput !== null &&
+      !Array.isArray(parsedInput) &&
+      !("proposalId" in parsedInput)
+    ) {
+      parsedInput = { ...parsedInput, proposalId: activeProposal.id };
     }
 
     const actionStarted = Date.now();
@@ -443,6 +469,27 @@ export class AgentService {
           proposal: output.proposal as MealProposal,
           message: "Meal proposal created.",
         };
+      case "revise_meal_proposal": {
+        if (output.clarificationRequired) {
+          return {
+            kind: "clarification_required",
+            options: output.options as unknown[] | undefined,
+            resolvedItems: output.resolvedItems as MealItem[] | undefined,
+            message:
+              typeof output.message === "string"
+                ? output.message
+                : "I need a food match before updating the meal proposal.",
+          };
+        }
+        return {
+          kind: "proposal",
+          proposal: output.proposal as MealProposal,
+          message:
+            typeof output.message === "string"
+              ? output.message
+              : "Meal proposal updated.",
+        };
+      }
       case "commit_meal":
         return {
           kind: "meal_committed",
@@ -539,7 +586,15 @@ function isMealLoggingIntent(text: string): boolean {
     )
   )
     return false;
-  return /\b(log|add|ate|had|consumed|record|registrar|registro|anade|anadir|agrega|agregar|apunta|apuntar|comi|comido|tome|consumi|desayuno|almuerzo|comida|cena|merienda|snack)\b/.test(
+  return (
+    /\b(log|add|ate|had|consumed|record|registrar|registro|anade|anadir|agrega|agregar|apunta|apuntar|pon|ponme|poner|mete|meteme|put|comi|comido|tome|consumi|desayuno|almuerzo|comida|cena|merienda|snack)\b/.test(
+      normalized,
+    ) || hasExplicitFoodQuantity(normalized)
+  );
+}
+
+function hasExplicitFoodQuantity(normalized: string): boolean {
+  return /\b\d+(?:[.,]\d+)?\s*(?:g|gr|gramo|gramos|gram|grams|kg|kilo|kilos|ml|mililitro|mililitros|l|litro|litros|oz|ounce|ounces|cup|cups|taza|tazas)\b(?:\s+(?:de|of))?\s+[a-z]/.test(
     normalized,
   );
 }

@@ -97,8 +97,9 @@ class VoiceLogUiState {
       errorMessage: identical(errorMessage, _unchanged)
           ? this.errorMessage
           : errorMessage as String?,
-      message:
-          identical(message, _unchanged) ? this.message : message as String?,
+      message: identical(message, _unchanged)
+          ? this.message
+          : message as String?,
       transcript: transcript ?? this.transcript,
       recordingDuration: recordingDuration ?? this.recordingDuration,
       proposal: identical(proposal, _unchanged)
@@ -114,8 +115,9 @@ class VoiceLogUiState {
           ? this.remaining
           : remaining as NutritionSnapshot?,
       meals: identical(meals, _unchanged) ? this.meals : meals as List<Meal>?,
-      items:
-          identical(items, _unchanged) ? this.items : items as List<MealItem>?,
+      items: identical(items, _unchanged)
+          ? this.items
+          : items as List<MealItem>?,
       resolvedItems: identical(resolvedItems, _unchanged)
           ? this.resolvedItems
           : resolvedItems as List<MealItem>?,
@@ -147,8 +149,8 @@ class VoiceLogViewModel extends ChangeNotifier {
   VoiceLogViewModel({
     required NutritionRepository nutritionRepository,
     AudioRecorderService? audioRecorderService,
-  })  : _nutritionRepository = nutritionRepository,
-        _audioRecorderService = audioRecorderService ?? AudioRecorderService();
+  }) : _nutritionRepository = nutritionRepository,
+       _audioRecorderService = audioRecorderService ?? AudioRecorderService();
 
   final NutritionRepository _nutritionRepository;
   final AudioRecorderService _audioRecorderService;
@@ -242,12 +244,13 @@ class VoiceLogViewModel extends ChangeNotifier {
       state == VoiceLogState.clarificationRequired;
 
   Future<void> _startRecording() async {
+    final activeProposal = _uiState.proposal;
     _setUiState(
       _uiState.copyWith(
         phase: VoiceLogState.requestingPermission,
         errorMessage: null,
         message: null,
-        proposal: null,
+        proposal: activeProposal,
         autoCommittedMeal: null,
         summary: null,
         remaining: null,
@@ -259,8 +262,12 @@ class VoiceLogViewModel extends ChangeNotifier {
         deleted: null,
         confirmationActionId: null,
         confirmationInput: null,
-        candidateGroups: null,
-        selectedCandidateItems: const {},
+        candidateGroups: activeProposal == null
+            ? null
+            : _uiState.candidateGroups,
+        selectedCandidateItems: activeProposal == null
+            ? const {}
+            : _uiState.selectedCandidateItems,
       ),
     );
     try {
@@ -313,7 +320,13 @@ class VoiceLogViewModel extends ChangeNotifier {
     _setState(VoiceLogState.transcribing);
     try {
       if (submitAfterTranscription) {
-        final voiceResult = await _nutritionRepository.logAudio(File(path));
+        final activeProposalId = _uiState.proposal?.id;
+        final voiceResult = activeProposalId == null
+            ? await _nutritionRepository.logAudio(File(path))
+            : await _nutritionRepository.logAudio(
+                File(path),
+                activeProposalId: activeProposalId,
+              );
         _setUiState(
           _uiState.copyWith(
             transcript: voiceResult.transcript,
@@ -322,8 +335,9 @@ class VoiceLogViewModel extends ChangeNotifier {
         );
         _applyAgentRunResult(voiceResult.result);
       } else {
-        final transcript =
-            await _nutritionRepository.transcribeAudio(File(path));
+        final transcript = await _nutritionRepository.transcribeAudio(
+          File(path),
+        );
         _setUiState(
           _uiState.copyWith(transcript: transcript, errorMessage: null),
         );
@@ -351,13 +365,14 @@ class VoiceLogViewModel extends ChangeNotifier {
   Future<void> submitText([String? overrideText]) async {
     final text = (overrideText ?? _uiState.transcript).trim();
     if (text.isEmpty) return;
+    final activeProposal = _uiState.proposal;
     _setUiState(
       _uiState.copyWith(
         phase: VoiceLogState.agentRunning,
         transcript: text,
         errorMessage: null,
         message: null,
-        proposal: null,
+        proposal: activeProposal,
         autoCommittedMeal: null,
         summary: null,
         remaining: null,
@@ -369,12 +384,22 @@ class VoiceLogViewModel extends ChangeNotifier {
         deleted: null,
         confirmationActionId: null,
         confirmationInput: null,
-        candidateGroups: null,
-        selectedCandidateItems: const {},
+        candidateGroups: activeProposal == null
+            ? null
+            : _uiState.candidateGroups,
+        selectedCandidateItems: activeProposal == null
+            ? const {}
+            : _uiState.selectedCandidateItems,
       ),
     );
     try {
-      final result = await _nutritionRepository.logText(text);
+      final activeProposalId = _uiState.proposal?.id;
+      final result = activeProposalId == null
+          ? await _nutritionRepository.logText(text)
+          : await _nutritionRepository.logText(
+              text,
+              activeProposalId: activeProposalId,
+            );
       _applyAgentRunResult(result);
     } catch (error) {
       _setError('Agent failed: ${error.toString()}');
@@ -495,10 +520,12 @@ class VoiceLogViewModel extends ChangeNotifier {
       return;
     }
 
-    final selectableGroups =
-        groups.where((group) => group.candidates.isNotEmpty).toList();
-    final requiredGroups =
-        selectableGroups.where(_needsCandidateSelection).toList();
+    final selectableGroups = groups
+        .where((group) => group.candidates.isNotEmpty)
+        .toList();
+    final requiredGroups = selectableGroups
+        .where(_needsCandidateSelection)
+        .toList();
     if (selectableGroups.isEmpty ||
         !requiredGroups.every(
           (group) => selections.containsKey(_candidateGroupKey(group)),

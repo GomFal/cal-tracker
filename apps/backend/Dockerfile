@@ -11,6 +11,7 @@ COPY tsconfig.base.json ./
 COPY packages/contracts packages/contracts
 COPY apps/backend apps/backend
 COPY infra/db/migrations infra/db/migrations
+COPY infra/db/drizzle infra/db/drizzle
 
 RUN bun run typecheck
 RUN bun run build
@@ -30,6 +31,7 @@ COPY --from=build /app/packages/contracts/dist ./packages/contracts/dist
 COPY --from=build /app/apps/backend/package.json ./apps/backend/package.json
 COPY --from=build /app/apps/backend/dist ./apps/backend/dist
 COPY --from=build /app/infra/db/migrations ./infra/db/migrations
+COPY --from=build /app/infra/db/drizzle ./infra/db/drizzle
 
 WORKDIR /app/apps/backend
 

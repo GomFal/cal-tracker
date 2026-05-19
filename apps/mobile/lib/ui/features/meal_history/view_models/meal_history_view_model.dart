@@ -2,15 +2,16 @@ import 'package:flutter/foundation.dart';
 
 import '../../../../data/repositories/nutrition_repository.dart';
 import '../../../../domain/models/nutrition_models.dart';
+import '../../../core/user_visible_error.dart';
 
 class MealHistoryViewModel extends ChangeNotifier {
   MealHistoryViewModel({
     required NutritionRepository nutritionRepository,
     Duration cacheTtl = const Duration(seconds: 60),
     DateTime Function()? now,
-  })  : _nutritionRepository = nutritionRepository,
-        _cacheTtl = cacheTtl,
-        _now = now ?? DateTime.now;
+  }) : _nutritionRepository = nutritionRepository,
+       _cacheTtl = cacheTtl,
+       _now = now ?? DateTime.now;
 
   final NutritionRepository _nutritionRepository;
   final Duration _cacheTtl;
@@ -66,7 +67,10 @@ class MealHistoryViewModel extends ChangeNotifier {
       _error = null;
     } catch (error) {
       if (showLoading) {
-        _error = error.toString();
+        _error = userVisibleErrorMessage(
+          error,
+          context: UserErrorContext.mealHistoryLoad,
+        );
       }
     } finally {
       if (showLoading) {
@@ -91,7 +95,10 @@ class MealHistoryViewModel extends ChangeNotifier {
       _lastLoadedAt = _now();
       _error = null;
     } catch (error) {
-      _error = error.toString();
+      _error = userVisibleErrorMessage(
+        error,
+        context: UserErrorContext.mealHistorySave,
+      );
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -102,8 +109,10 @@ class MealHistoryViewModel extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
     try {
-      final deleted =
-          await _nutritionRepository.deleteMeal(meal.id, confirmed: true);
+      final deleted = await _nutritionRepository.deleteMeal(
+        meal.id,
+        confirmed: true,
+      );
       if (deleted) {
         await _loadWeekSummaries();
       }
@@ -111,7 +120,10 @@ class MealHistoryViewModel extends ChangeNotifier {
       _lastLoadedAt = _now();
       _error = null;
     } catch (error) {
-      _error = error.toString();
+      _error = userVisibleErrorMessage(
+        error,
+        context: UserErrorContext.mealHistorySave,
+      );
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -121,9 +133,8 @@ class MealHistoryViewModel extends ChangeNotifier {
   Future<void> _loadWeekSummaries() async {
     _weekSummaries = await Future.wait(
       _weekDates(_now()).map(
-        (date) => _nutritionRepository.getDailySummary(
-          date: _formatDateOnly(date),
-        ),
+        (date) =>
+            _nutritionRepository.getDailySummary(date: _formatDateOnly(date)),
       ),
     );
   }

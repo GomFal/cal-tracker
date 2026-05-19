@@ -157,6 +157,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authSignInFailedTitle => 'Sign in failed';
 
   @override
+  String get authCreateAccountFailedTitle => 'Account creation failed';
+
+  @override
+  String get authEmailInvalidError =>
+      'Enter a valid email address, like name@example.com.';
+
+  @override
+  String get authNameRequiredError => 'Enter your name.';
+
+  @override
+  String get authPasswordRequiredError => 'Enter your password.';
+
+  @override
+  String get authPasswordTooShortError => 'Use at least 8 characters.';
+
+  @override
   String get authHeroHeadline => 'Track your\ncalories better.';
 
   @override

@@ -4,13 +4,14 @@ import '../../../../data/repositories/auth_repository.dart';
 import '../../../../data/repositories/nutrition_repository.dart';
 import '../../../../domain/models/auth_models.dart';
 import '../../../../domain/models/nutrition_models.dart';
+import '../../../core/user_visible_error.dart';
 
 class SettingsViewModel extends ChangeNotifier {
   SettingsViewModel({
     required AuthRepository authRepository,
     required NutritionRepository nutritionRepository,
-  })  : _authRepository = authRepository,
-        _nutritionRepository = nutritionRepository;
+  }) : _authRepository = authRepository,
+       _nutritionRepository = nutritionRepository;
 
   final AuthRepository _authRepository;
   final NutritionRepository _nutritionRepository;
@@ -36,7 +37,10 @@ class SettingsViewModel extends ChangeNotifier {
       );
       _error = null;
     } catch (error) {
-      _error = error.toString();
+      _error = userVisibleErrorMessage(
+        error,
+        context: UserErrorContext.settingsLoad,
+      );
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -60,7 +64,10 @@ class SettingsViewModel extends ChangeNotifier {
       _error = null;
       return goals;
     } catch (error) {
-      _error = error.toString();
+      _error = userVisibleErrorMessage(
+        error,
+        context: UserErrorContext.settingsSave,
+      );
       return null;
     } finally {
       _isLoading = false;
@@ -76,7 +83,10 @@ class SettingsViewModel extends ChangeNotifier {
       _error = null;
       return user;
     } catch (error) {
-      _error = error.toString();
+      _error = userVisibleErrorMessage(
+        error,
+        context: UserErrorContext.settingsSave,
+      );
       return null;
     } finally {
       _isLoading = false;

@@ -380,6 +380,36 @@ abstract class AppLocalizations {
   /// **'Sign in failed'**
   String get authSignInFailedTitle;
 
+  /// No description provided for @authCreateAccountFailedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Account creation failed'**
+  String get authCreateAccountFailedTitle;
+
+  /// No description provided for @authEmailInvalidError.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid email address, like name@example.com.'**
+  String get authEmailInvalidError;
+
+  /// No description provided for @authNameRequiredError.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your name.'**
+  String get authNameRequiredError;
+
+  /// No description provided for @authPasswordRequiredError.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your password.'**
+  String get authPasswordRequiredError;
+
+  /// No description provided for @authPasswordTooShortError.
+  ///
+  /// In en, this message translates to:
+  /// **'Use at least 8 characters.'**
+  String get authPasswordTooShortError;
+
   /// No description provided for @authHeroHeadline.
   ///
   /// In en, this message translates to:

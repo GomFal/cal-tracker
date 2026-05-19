@@ -60,6 +60,66 @@ describe("auth routes", () => {
     expect(await confirm.json()).toEqual({ ok: true });
   });
 
+  it("rejects invalid registration email with a safe validation message", async () => {
+    const { request } = buildTestApp();
+    const response = await request("http://localhost/v1/auth/register", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: "demo444422iii§@example.com",
+        password: "password123",
+        displayName: "Test User"
+      })
+    });
+
+    expect(response.status).toBe(400);
+    const body = await response.json() as { error: { code: string; message: string } };
+    expect(body.error.code).toBe("validation_error");
+    expect(body.error.message).toBe("Invalid request");
+  });
+
+  it("rejects duplicate registration with actionable public copy", async () => {
+    const { request } = buildTestApp();
+    await registerAndAuth(request);
+
+    const response = await request("http://localhost/v1/auth/register", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: "test@example.com",
+        password: "password123",
+        displayName: "Test User"
+      })
+    });
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({
+      error: {
+        code: "email_already_registered",
+        message: "An account already exists for this email"
+      }
+    });
+  });
+
+  it("keeps email and password login failures generic", async () => {
+    const { request } = buildTestApp();
+    await registerAndAuth(request);
+
+    const response = await request("http://localhost/v1/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "test@example.com", password: "wrongpassword" })
+    });
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toMatchObject({
+      error: {
+        code: "invalid_credentials",
+        message: "Invalid email or password"
+      }
+    });
+  });
+
   it("creates a session for a verified Google identity", async () => {
     const { request } = buildTestApp({
       googleTokenVerifier: new FakeGoogleTokenVerifier({

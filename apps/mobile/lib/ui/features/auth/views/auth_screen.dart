@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../l10n/app_localizations_context.dart';
+import '../../../../l10n/generated/app_localizations.dart';
 import '../../../core/design_system.dart';
 import '../view_models/auth_view_model.dart';
 
@@ -27,6 +28,9 @@ class _AuthScreenState extends State<AuthScreen> {
   final _nameController = TextEditingController(text: 'Test User');
   bool _registerMode = false;
   bool _preloadedAuthAssets = false;
+  String? _nameError;
+  String? _emailError;
+  String? _passwordError;
 
   @override
   void didChangeDependencies() {
@@ -77,8 +81,11 @@ class _AuthScreenState extends State<AuthScreen> {
                           TextField(
                             key: const ValueKey('display_name_field'),
                             controller: _nameController,
+                            onChanged: (_) =>
+                                _clearErrors(name: true, remote: true),
                             decoration: InputDecoration(
                               labelText: l10n.authNameLabel,
+                              errorText: _nameError,
                               prefixIcon: const Icon(Icons.person_outline),
                             ),
                           ),
@@ -88,10 +95,14 @@ class _AuthScreenState extends State<AuthScreen> {
                           key: const ValueKey('email_field'),
                           controller: _emailController,
                           keyboardType: TextInputType.emailAddress,
+                          onChanged: (_) =>
+                              _clearErrors(email: true, remote: true),
                           decoration: InputDecoration(
                             labelText: l10n.authEmailLabel,
-                            prefixIcon:
-                                const Icon(Icons.alternate_email_rounded),
+                            errorText: _emailError,
+                            prefixIcon: const Icon(
+                              Icons.alternate_email_rounded,
+                            ),
                           ),
                         ),
                         const SizedBox(height: FreshSpacing.md),
@@ -99,8 +110,11 @@ class _AuthScreenState extends State<AuthScreen> {
                           key: const ValueKey('password_field'),
                           controller: _passwordController,
                           obscureText: true,
+                          onChanged: (_) =>
+                              _clearErrors(password: true, remote: true),
                           decoration: InputDecoration(
                             labelText: l10n.authPasswordLabel,
+                            errorText: _passwordError,
                             prefixIcon: const Icon(Icons.lock_outline_rounded),
                           ),
                         ),
@@ -111,11 +125,13 @@ class _AuthScreenState extends State<AuthScreen> {
                           icon: viewModel.isLoading
                               ? const SizedBox.square(
                                   dimension: 18,
-                                  child:
-                                      CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 )
                               : const Icon(
-                                  Icons.keyboard_double_arrow_right_rounded),
+                                  Icons.keyboard_double_arrow_right_rounded,
+                                ),
                           label: Text(
                             _registerMode
                                 ? l10n.authCreateAccountButton
@@ -133,8 +149,7 @@ class _AuthScreenState extends State<AuthScreen> {
                         ),
                         TextButton(
                           key: const ValueKey('auth_toggle_mode_button'),
-                          onPressed: () =>
-                              setState(() => _registerMode = !_registerMode),
+                          onPressed: _toggleMode,
                           child: Text(
                             _registerMode
                                 ? l10n.authUseExistingAccountButton
@@ -145,7 +160,7 @@ class _AuthScreenState extends State<AuthScreen> {
                           const SizedBox(height: FreshSpacing.sm),
                           FreshStatusBanner(
                             icon: Icons.error_outline_rounded,
-                            title: l10n.authSignInFailedTitle,
+                            title: _authErrorTitle(l10n, viewModel.errorSource),
                             message: viewModel.error!,
                             color: FreshColors.coral,
                           ),
@@ -164,14 +179,81 @@ class _AuthScreenState extends State<AuthScreen> {
 
   Future<void> _submit() {
     final viewModel = context.read<AuthViewModel>();
-    if (_registerMode) {
-      return viewModel.register(
-        _emailController.text,
-        _passwordController.text,
-        _nameController.text,
-      );
+    viewModel.clearError();
+    final l10n = context.l10n;
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    final displayName = _nameController.text.trim();
+    final nextNameError = _registerMode && displayName.isEmpty
+        ? l10n.authNameRequiredError
+        : null;
+    final nextEmailError = _isValidEmail(email)
+        ? null
+        : l10n.authEmailInvalidError;
+    final nextPasswordError = password.isEmpty
+        ? l10n.authPasswordRequiredError
+        : _registerMode && password.length < 8
+        ? l10n.authPasswordTooShortError
+        : null;
+
+    setState(() {
+      _nameError = nextNameError;
+      _emailError = nextEmailError;
+      _passwordError = nextPasswordError;
+    });
+
+    if (nextNameError != null ||
+        nextEmailError != null ||
+        nextPasswordError != null) {
+      return Future<void>.value();
     }
-    return viewModel.login(_emailController.text, _passwordController.text);
+
+    if (_registerMode) {
+      return viewModel.register(email, password, displayName);
+    }
+    return viewModel.login(email, password);
+  }
+
+  void _toggleMode() {
+    context.read<AuthViewModel>().clearError();
+    setState(() {
+      _registerMode = !_registerMode;
+      _nameError = null;
+      _emailError = null;
+      _passwordError = null;
+    });
+  }
+
+  void _clearErrors({
+    bool name = false,
+    bool email = false,
+    bool password = false,
+    bool remote = false,
+  }) {
+    if (remote) context.read<AuthViewModel>().clearError();
+    if ((name && _nameError != null) ||
+        (email && _emailError != null) ||
+        (password && _passwordError != null)) {
+      setState(() {
+        if (name) _nameError = null;
+        if (email) _emailError = null;
+        if (password) _passwordError = null;
+      });
+    }
+  }
+
+  String _authErrorTitle(AppLocalizations l10n, AuthErrorSource? source) {
+    return switch (source) {
+      AuthErrorSource.register => l10n.authCreateAccountFailedTitle,
+      _ => l10n.authSignInFailedTitle,
+    };
+  }
+
+  bool _isValidEmail(String value) {
+    return RegExp(
+      r'^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$',
+      caseSensitive: false,
+    ).hasMatch(value);
   }
 }
 
@@ -196,9 +278,9 @@ class _AuthTopBar extends StatelessWidget {
         const SizedBox(width: FreshSpacing.sm),
         Text(
           context.l10n.appTitle,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
         ),
       ],
     );
@@ -230,14 +312,10 @@ class _LoginHeroCarouselState extends State<_LoginHeroCarousel>
   @override
   void initState() {
     super.initState();
-    _panController = AnimationController(
-      vsync: this,
-      duration: _panDuration,
-    )..addStatusListener(_handlePanStatus);
-    _fadeController = AnimationController(
-      vsync: this,
-      duration: _fadeDuration,
-    )..addStatusListener(_handleFadeStatus);
+    _panController = AnimationController(vsync: this, duration: _panDuration)
+      ..addStatusListener(_handlePanStatus);
+    _fadeController = AnimationController(vsync: this, duration: _fadeDuration)
+      ..addStatusListener(_handleFadeStatus);
   }
 
   @override
@@ -364,11 +442,11 @@ class _LoginHeroCarouselState extends State<_LoginHeroCarousel>
                       maxLines: 3,
                       overflow: TextOverflow.visible,
                       style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                            color: palette.ink,
-                            fontSize: 38,
-                            fontWeight: FontWeight.w800,
-                            height: 1.08,
-                          ),
+                        color: palette.ink,
+                        fontSize: 38,
+                        fontWeight: FontWeight.w800,
+                        height: 1.08,
+                      ),
                     ),
                   ),
                 ],

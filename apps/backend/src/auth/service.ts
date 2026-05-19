@@ -7,8 +7,14 @@ import { RemoteGoogleTokenVerifier, type GoogleTokenVerifier } from "./google.js
 import { hashPassword, verifyPassword } from "./passwords.js";
 import { createRefreshToken, hashRefreshToken, refreshExpiry, signAccessToken } from "./tokens.js";
 
+type AuthErrorStatus = 401 | 409;
+
 export class AuthError extends Error {
-  constructor(public readonly code: string, message = code) {
+  constructor(
+    public readonly code: string,
+    message = code,
+    public readonly status: AuthErrorStatus = 401,
+  ) {
     super(message);
   }
 }
@@ -21,13 +27,32 @@ export class AuthService {
   ) {}
 
   async register(input: RegisterRequest): Promise<TokenPair> {
+    if (await this.repository.findUserByEmail(input.email)) {
+      throw new AuthError(
+        "email_already_registered",
+        "An account already exists for this email",
+        409,
+      );
+    }
     const passwordHash = await hashPassword(input.password);
-    const user = await this.repository.createUser({
-      email: input.email,
-      displayName: input.displayName,
-      passwordHash,
-      scopes: defaultUserScopes
-    });
+    let user;
+    try {
+      user = await this.repository.createUser({
+        email: input.email,
+        displayName: input.displayName,
+        passwordHash,
+        scopes: defaultUserScopes
+      });
+    } catch (error) {
+      if (isDuplicateEmailError(error)) {
+        throw new AuthError(
+          "email_already_registered",
+          "An account already exists for this email",
+          409,
+        );
+      }
+      throw error;
+    }
     await this.repository.recordAuditEvent({
       userId: user.id,
       eventType: "auth.registered",
@@ -164,4 +189,23 @@ function publicUser(user: AuthUser): AuthUser {
     trustedModeEnabled: user.trustedModeEnabled,
     createdAt: user.createdAt
   };
+}
+
+function isDuplicateEmailError(error: unknown): boolean {
+  if (error instanceof Error && error.message === "email_already_registered") {
+    return true;
+  }
+  if (typeof error !== "object" || error === null) {
+    return false;
+  }
+  const maybeDatabaseError = error as {
+    code?: unknown;
+    constraint_name?: unknown;
+    constraint?: unknown;
+  };
+  return maybeDatabaseError.code === "23505" &&
+    (
+      maybeDatabaseError.constraint_name === "users_active_email_unique" ||
+      maybeDatabaseError.constraint === "users_active_email_unique"
+    );
 }

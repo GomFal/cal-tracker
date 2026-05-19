@@ -1,0 +1,97 @@
+import 'dart:convert';
+
+import 'package:cal_tracker_mobile/data/services/api_config.dart';
+import 'package:cal_tracker_mobile/data/services/secure_token_storage.dart';
+import 'package:cal_tracker_mobile/generated/api/cal_tracker_api.dart';
+import 'package:cal_tracker_mobile/ui/core/user_visible_error.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+
+void main() {
+  test(
+    'ApiException keeps API metadata but stringifies as safe copy',
+    () async {
+      final client = CalTrackerApiClient(
+        config: const ApiConfig(baseUrl: 'http://localhost'),
+        tokenStorage: _MemoryTokenStorage(),
+        httpClient: MockClient(
+          (_) async => http.Response(
+            jsonEncode({
+              'error': {
+                'code': 'email_already_registered',
+                'message': 'An account already exists for this email',
+                'traceId': 'trace-secret',
+              },
+            }),
+            409,
+            headers: {'content-type': 'application/json'},
+          ),
+        ),
+      );
+
+      final error = await _captureApiException(
+        client.register(
+          email: 'test@example.com',
+          password: 'password123',
+          displayName: 'Test User',
+        ),
+      );
+
+      expect(error.statusCode, 409);
+      expect(error.code, 'email_already_registered');
+      expect(error.traceId, 'trace-secret');
+      expect(error.toString(), 'An account already exists for this email');
+      expect(error.toString(), isNot(contains('ApiException')));
+      expect(error.toString(), isNot(contains('409')));
+      expect(error.toString(), isNot(contains('trace-secret')));
+      expect(
+        userVisibleErrorMessage(error, context: UserErrorContext.authRegister),
+        'An account already exists for this email. Sign in instead.',
+      );
+    },
+  );
+
+  test('non-json server errors become generic safe API exceptions', () async {
+    final client = CalTrackerApiClient(
+      config: const ApiConfig(baseUrl: 'http://localhost'),
+      tokenStorage: _MemoryTokenStorage(),
+      httpClient: MockClient(
+        (_) async =>
+            http.Response('<html>provider secret exploded</html>', 500),
+      ),
+    );
+
+    final error = await _captureApiException(
+      client.login(email: 'test@example.com', password: 'password123'),
+    );
+
+    expect(error.statusCode, 500);
+    expect(error.message, 'We could not complete that request.');
+    expect(error.toString(), isNot(contains('provider secret exploded')));
+    expect(
+      userVisibleErrorMessage(error, context: UserErrorContext.authLogin),
+      'Something went wrong on our side. Try again.',
+    );
+  });
+}
+
+Future<ApiException> _captureApiException(Future<Object?> future) async {
+  try {
+    await future;
+  } on ApiException catch (error) {
+    return error;
+  }
+  fail('Expected ApiException');
+}
+
+class _MemoryTokenStorage implements TokenStorage {
+  @override
+  Future<void> clear() async {}
+
+  @override
+  Future<StoredTokens?> read() async => null;
+
+  @override
+  Future<void> write(StoredTokens tokens) async {}
+}

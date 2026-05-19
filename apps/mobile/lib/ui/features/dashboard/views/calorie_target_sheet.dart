@@ -6,12 +6,10 @@ import 'package:flutter/services.dart';
 import '../../../../domain/models/nutrition_models.dart';
 import '../../../../l10n/app_localizations_context.dart';
 import '../../../core/design_system.dart';
+import '../../../core/user_visible_error.dart';
 
 class CalorieTargetSelection {
-  const CalorieTargetSelection({
-    required this.calories,
-    required this.source,
-  });
+  const CalorieTargetSelection({required this.calories, required this.source});
 
   final int calories;
   final String source;
@@ -33,7 +31,8 @@ class CalorieTargetSheet extends StatefulWidget {
     required String activityLevel,
     required String goal,
     String? pace,
-  }) estimateCalories;
+  })
+  estimateCalories;
 
   @override
   State<CalorieTargetSheet> createState() => _CalorieTargetSheetState();
@@ -80,10 +79,7 @@ class _CalorieTargetSheetState extends State<CalorieTargetSheet> {
               ),
             ),
             const SizedBox(height: FreshSpacing.lg),
-            Text(
-              'Set your daily calories',
-              style: textTheme.titleLarge,
-            ),
+            Text('Set your daily calories', style: textTheme.titleLarge),
             const SizedBox(height: FreshSpacing.xs),
             Text(
               'Choose the target you want to track each day.',
@@ -108,9 +104,7 @@ class _CalorieTargetSheetState extends State<CalorieTargetSheet> {
                       controller: _controller,
                       textAlign: TextAlign.center,
                       keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                      ],
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       style: textTheme.displaySmall?.copyWith(
                         fontWeight: FontWeight.w800,
                         fontFeatures: const [FontFeature.tabularFigures()],
@@ -169,9 +163,8 @@ class _CalorieTargetSheetState extends State<CalorieTargetSheet> {
       isScrollControlled: true,
       useSafeArea: true,
       useRootNavigator: true,
-      builder: (context) => CalorieCalculatorWizard(
-        estimateCalories: widget.estimateCalories,
-      ),
+      builder: (context) =>
+          CalorieCalculatorWizard(estimateCalories: widget.estimateCalories),
     );
     if (estimate == null || !mounted) return;
     Navigator.of(context).pop(
@@ -188,17 +181,14 @@ class _CalorieTargetSheetState extends State<CalorieTargetSheet> {
       setState(() => _error = 'Enter a target from 800 to 10000 Kcal.');
       return;
     }
-    Navigator.of(context).pop(
-      CalorieTargetSelection(calories: value, source: _source),
-    );
+    Navigator.of(
+      context,
+    ).pop(CalorieTargetSelection(calories: value, source: _source));
   }
 }
 
 class CalorieCalculatorWizard extends StatefulWidget {
-  const CalorieCalculatorWizard({
-    super.key,
-    required this.estimateCalories,
-  });
+  const CalorieCalculatorWizard({super.key, required this.estimateCalories});
 
   final Future<CalorieEstimate> Function({
     required int age,
@@ -208,23 +198,15 @@ class CalorieCalculatorWizard extends StatefulWidget {
     required String activityLevel,
     required String goal,
     String? pace,
-  }) estimateCalories;
+  })
+  estimateCalories;
 
   @override
   State<CalorieCalculatorWizard> createState() =>
       _CalorieCalculatorWizardState();
 }
 
-enum _WizardStep {
-  sex,
-  age,
-  height,
-  weight,
-  goal,
-  pace,
-  activity,
-  result,
-}
+enum _WizardStep { sex, age, height, weight, goal, pace, activity, result }
 
 class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
   final _heightController = TextEditingController(text: '170');
@@ -252,10 +234,12 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
   void initState() {
     super.initState();
     _birthDate = _defaultBirthDate();
-    _birthMonthController =
-        FixedExtentScrollController(initialItem: _birthDate.month - 1);
-    _birthDayController =
-        FixedExtentScrollController(initialItem: _birthDate.day - 1);
+    _birthMonthController = FixedExtentScrollController(
+      initialItem: _birthDate.month - 1,
+    );
+    _birthDayController = FixedExtentScrollController(
+      initialItem: _birthDate.day - 1,
+    );
     _birthYearController = FixedExtentScrollController(
       initialItem: _birthDate.year - _oldestAllowedBirthDate().year,
     );
@@ -318,21 +302,22 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
                   switchOutCurve: Curves.easeInCubic,
                   child: KeyedSubtree(
                     key: ValueKey(_isLoading ? 'loading' : activeStep.name),
-                    child:
-                        _isLoading ? const _LoadingPlanStep() : _bodyForStep(),
+                    child: _isLoading
+                        ? const _LoadingPlanStep()
+                        : _bodyForStep(),
                   ),
                 ),
               ),
               if (!_isLoading) ...[
                 const SizedBox(height: FreshSpacing.lg),
                 FilledButton(
-                  key: ValueKey(_isResultStep
-                      ? 'calorie_wizard_use_estimate_button'
-                      : 'calorie_wizard_next_button'),
-                  onPressed: _primaryAction,
-                  child: Text(
-                    _isResultStep ? 'Use this estimate' : 'Continue',
+                  key: ValueKey(
+                    _isResultStep
+                        ? 'calorie_wizard_use_estimate_button'
+                        : 'calorie_wizard_next_button',
                   ),
+                  onPressed: _primaryAction,
+                  child: Text(_isResultStep ? 'Use this estimate' : 'Continue'),
                 ),
               ],
             ],
@@ -459,7 +444,8 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
   int _ageFromBirthDate(DateTime birthDate) {
     final today = _today();
     var age = today.year - birthDate.year;
-    final hadBirthdayThisYear = today.month > birthDate.month ||
+    final hadBirthdayThisYear =
+        today.month > birthDate.month ||
         (today.month == birthDate.month && today.day >= birthDate.day);
     if (!hadBirthdayThisYear) age -= 1;
     return age;
@@ -487,7 +473,8 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
       month: requestedMonth,
       day: requestedDay,
     );
-    final needsWheelSync = next.year != requestedYear ||
+    final needsWheelSync =
+        next.year != requestedYear ||
         next.month != requestedMonth ||
         next.day != requestedDay;
     setState(() {
@@ -880,8 +867,9 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
   Future<void> _calculateEstimate() async {
     final profile = _profileValues();
     if (profile == null) {
-      setState(() =>
-          _error = 'Enter age, height, and weight in the expected ranges.');
+      setState(
+        () => _error = 'Enter age, height, and weight in the expected ranges.',
+      );
       return;
     }
     setState(() {
@@ -907,7 +895,12 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
       });
     } catch (error) {
       if (!mounted) return;
-      setState(() => _error = error.toString());
+      setState(
+        () => _error = userVisibleErrorMessage(
+          error,
+          context: UserErrorContext.calorieEstimate,
+        ),
+      );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -1078,11 +1071,7 @@ const _gainPaceOptions = [
 ];
 
 class _StepButton extends StatelessWidget {
-  const _StepButton({
-    super.key,
-    required this.icon,
-    required this.onTap,
-  });
+  const _StepButton({super.key, required this.icon, required this.onTap});
 
   final IconData icon;
   final VoidCallback onTap;
@@ -1123,9 +1112,11 @@ class _WizardTopBar extends StatelessWidget {
     return Row(
       children: [
         FreshIconButton(
-          key: ValueKey(canGoBack
-              ? 'calorie_wizard_back_button'
-              : 'calorie_wizard_close_button'),
+          key: ValueKey(
+            canGoBack
+                ? 'calorie_wizard_back_button'
+                : 'calorie_wizard_close_button',
+          ),
           icon: canGoBack ? Icons.arrow_back_rounded : Icons.close_rounded,
           tooltip: canGoBack ? 'Back' : 'Close',
           onPressed: canGoBack ? onBack : onClose,
@@ -1302,11 +1293,7 @@ class _WizardChoiceCard extends StatelessWidget {
                   ),
                 ),
                 child: selected
-                    ? Icon(
-                        Icons.check_rounded,
-                        color: palette.ink,
-                        size: 18,
-                      )
+                    ? Icon(Icons.check_rounded, color: palette.ink, size: 18)
                     : null,
               ),
             ],
@@ -1381,8 +1368,10 @@ class _BirthdayWheelPicker extends StatelessWidget {
                     _BirthdayWheel(
                       key: const ValueKey('calorie_wizard_birth_day_wheel'),
                       controller: dayController,
-                      values:
-                          List<int>.generate(_dayCount, (index) => index + 1),
+                      values: List<int>.generate(
+                        _dayCount,
+                        (index) => index + 1,
+                      ),
                       selectedValue: selectedDate.day,
                       format: (value) => value.toString().padLeft(2, '0'),
                       onChanged: onDayChanged,
@@ -1407,10 +1396,7 @@ class _BirthdayWheelPicker extends StatelessWidget {
 }
 
 class _BirthdayWheelLabel extends StatelessWidget {
-  const _BirthdayWheelLabel({
-    required this.text,
-    required this.color,
-  });
+  const _BirthdayWheelLabel({required this.text, required this.color});
 
   final String text;
   final Color color;
@@ -1422,9 +1408,9 @@ class _BirthdayWheelLabel extends StatelessWidget {
         text,
         textAlign: TextAlign.center,
         style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w600,
-            ),
+          color: color,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
@@ -1472,10 +1458,12 @@ class _BirthdayWheel extends StatelessWidget {
                 style:
                     (selected ? textTheme.headlineSmall : textTheme.titleLarge)
                         ?.copyWith(
-                  color: selected ? palette.lime : palette.inkMuted,
-                  fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
+                          color: selected ? palette.lime : palette.inkMuted,
+                          fontWeight: selected
+                              ? FontWeight.w800
+                              : FontWeight.w500,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
               ),
             );
           },
@@ -1572,9 +1560,9 @@ class _CompactUnitSegment extends StatelessWidget {
           child: Text(
             label,
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: palette.ink,
-                  fontWeight: FontWeight.w800,
-                ),
+              color: palette.ink,
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ),
       ),
@@ -1583,10 +1571,7 @@ class _CompactUnitSegment extends StatelessWidget {
 }
 
 class _MeasurementValueDisplay extends StatelessWidget {
-  const _MeasurementValueDisplay({
-    required this.value,
-    required this.unit,
-  });
+  const _MeasurementValueDisplay({required this.value, required this.unit});
 
   final String value;
   final String unit;
@@ -1657,7 +1642,8 @@ class _SlidingRulerScaleState extends State<_SlidingRulerScale> {
   double? _lastCommittedValue;
 
   double _snap(double rawValue) {
-    final snapped = widget.min +
+    final snapped =
+        widget.min +
         (((rawValue - widget.min) / widget.valueStep).round() *
             widget.valueStep);
     return snapped.clamp(widget.min, widget.max).toDouble();
@@ -1701,8 +1687,9 @@ class _SlidingRulerScaleState extends State<_SlidingRulerScale> {
 
           void updateFromDrag(double dx) {
             _dragOffset += dx;
-            final rawValue = _clamp((_dragStartValue ?? widget.value) -
-                (_dragOffset * unitsPerPixel));
+            final rawValue = _clamp(
+              (_dragStartValue ?? widget.value) - (_dragOffset * unitsPerPixel),
+            );
             setState(() => _visualValue = rawValue);
             _commitValue(rawValue);
           }
@@ -2115,10 +2102,7 @@ class _ProgressRingPainter extends CustomPainter {
 }
 
 class _ResultLine extends StatelessWidget {
-  const _ResultLine({
-    required this.label,
-    required this.value,
-  });
+  const _ResultLine({required this.label, required this.value});
 
   final String label;
   final String value;
@@ -2133,10 +2117,9 @@ class _ResultLine extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(color: palette.inkMuted),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
             ),
           ),
           Text(

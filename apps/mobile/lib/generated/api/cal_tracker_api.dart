@@ -10,13 +10,15 @@ import '../../data/services/secure_token_storage.dart';
 import '../../domain/models/nutrition_models.dart';
 
 class ApiException implements Exception {
-  const ApiException(this.statusCode, this.message);
+  const ApiException(this.statusCode, this.message, {this.code, this.traceId});
 
   final int statusCode;
   final String message;
+  final String? code;
+  final String? traceId;
 
   @override
-  String toString() => 'ApiException($statusCode): $message';
+  String toString() => message;
 }
 
 class CalTrackerApiClient {
@@ -35,36 +37,40 @@ class CalTrackerApiClient {
     required String password,
     required String displayName,
   }) {
-    return _post(
-        '/v1/auth/register',
-        {
-          'email': email,
-          'password': password,
-          'displayName': displayName,
-        },
-        authenticated: false);
+    return _post('/v1/auth/register', {
+      'email': email,
+      'password': password,
+      'displayName': displayName,
+    }, authenticated: false);
   }
 
-  Future<Map<String, Object?>> login(
-      {required String email, required String password}) {
-    return _post('/v1/auth/login', {'email': email, 'password': password},
-        authenticated: false);
+  Future<Map<String, Object?>> login({
+    required String email,
+    required String password,
+  }) {
+    return _post('/v1/auth/login', {
+      'email': email,
+      'password': password,
+    }, authenticated: false);
   }
 
   Future<Map<String, Object?>> loginWithGoogle({required String idToken}) {
-    return _post('/v1/auth/google/login', {'idToken': idToken},
-        authenticated: false);
+    return _post('/v1/auth/google/login', {
+      'idToken': idToken,
+    }, authenticated: false);
   }
 
   Future<Map<String, Object?>> refresh(String refreshToken) {
-    return _post('/v1/auth/refresh', {'refreshToken': refreshToken},
-        authenticated: false);
+    return _post('/v1/auth/refresh', {
+      'refreshToken': refreshToken,
+    }, authenticated: false);
   }
 
   Future<Map<String, Object?>> getMe() => _get('/v1/auth/me');
 
-  Future<Map<String, Object?>> updateSettings(
-      {required bool trustedModeEnabled}) {
+  Future<Map<String, Object?>> updateSettings({
+    required bool trustedModeEnabled,
+  }) {
     return _put('/v1/settings', {'trustedModeEnabled': trustedModeEnabled});
   }
 
@@ -96,15 +102,19 @@ class CalTrackerApiClient {
     return _post('/v1/meals/proposals', {'text': text});
   }
 
-  Future<Map<String, Object?>> commitProposal(String proposalId,
-      {MealLabel? mealLabel}) {
+  Future<Map<String, Object?>> commitProposal(
+    String proposalId, {
+    MealLabel? mealLabel,
+  }) {
     return _post('/v1/meals/proposals/$proposalId/commit', {
       if (mealLabel != null) 'mealLabel': mealLabel.toJson(),
     });
   }
 
   Future<Map<String, Object?>> correctMeal(
-      String mealId, List<Map<String, Object?>> items) {
+    String mealId,
+    List<Map<String, Object?>> items,
+  ) {
     return _post('/v1/meals/$mealId/correct', {'items': items});
   }
 
@@ -118,8 +128,10 @@ class CalTrackerApiClient {
     });
   }
 
-  Future<Map<String, Object?>> deleteMeal(String mealId,
-      {bool confirmed = false}) {
+  Future<Map<String, Object?>> deleteMeal(
+    String mealId, {
+    bool confirmed = false,
+  }) {
     final suffix = confirmed ? '?confirmationToken=DELETE' : '';
     return _delete('/v1/meals/$mealId$suffix');
   }
@@ -137,7 +149,9 @@ class CalTrackerApiClient {
   }
 
   Future<Map<String, Object?>> updateTemplate(
-      String templateId, Map<String, Object?> body) {
+    String templateId,
+    Map<String, Object?> body,
+  ) {
     return _put('/v1/meal-templates/$templateId', body);
   }
 
@@ -146,21 +160,31 @@ class CalTrackerApiClient {
   }
 
   Future<Map<String, Object?>> executeAction(
-      String actionId, Map<String, Object?> input) {
-    return _post(
-        '/v1/actions/$actionId/execute', {'input': input, 'source': 'flutter'});
+    String actionId,
+    Map<String, Object?> input,
+  ) {
+    return _post('/v1/actions/$actionId/execute', {
+      'input': input,
+      'source': 'flutter',
+    });
   }
 
-  Future<Map<String, Object?>> transcribeAudio(File audioFile,
-      {String? source}) async {
-    final request =
-        http.MultipartRequest('POST', _uri('/v1/stt/transcriptions'));
+  Future<Map<String, Object?>> transcribeAudio(
+    File audioFile, {
+    String? source,
+  }) async {
+    final request = http.MultipartRequest(
+      'POST',
+      _uri('/v1/stt/transcriptions'),
+    );
     request.headers.addAll(await _headers(includeContentType: false));
-    request.files.add(await http.MultipartFile.fromPath(
-      'audio',
-      audioFile.path,
-      contentType: _detectContentType(audioFile.path),
-    ));
+    request.files.add(
+      await http.MultipartFile.fromPath(
+        'audio',
+        audioFile.path,
+        contentType: _detectContentType(audioFile.path),
+      ),
+    );
     if (source != null) {
       request.fields['source'] = source;
     }
@@ -179,10 +203,12 @@ class CalTrackerApiClient {
         final tokens = await tokenStorage.read();
         if (tokens != null) {
           final refreshed = await refresh(tokens.refreshToken);
-          await tokenStorage.write(StoredTokens(
-            accessToken: refreshed['accessToken'] as String,
-            refreshToken: refreshed['refreshToken'] as String,
-          ));
+          await tokenStorage.write(
+            StoredTokens(
+              accessToken: refreshed['accessToken'] as String,
+              refreshToken: refreshed['refreshToken'] as String,
+            ),
+          );
           return transcribeAudio(audioFile, source: source);
         }
       }
@@ -193,15 +219,19 @@ class CalTrackerApiClient {
     }
   }
 
-  Future<Map<String, Object?>> runVoiceMeal(File audioFile,
-      {String? source}) async {
+  Future<Map<String, Object?>> runVoiceMeal(
+    File audioFile, {
+    String? source,
+  }) async {
     final request = http.MultipartRequest('POST', _uri('/v1/voice/meal-runs'));
     request.headers.addAll(await _headers(includeContentType: false));
-    request.files.add(await http.MultipartFile.fromPath(
-      'audio',
-      audioFile.path,
-      contentType: _detectContentType(audioFile.path),
-    ));
+    request.files.add(
+      await http.MultipartFile.fromPath(
+        'audio',
+        audioFile.path,
+        contentType: _detectContentType(audioFile.path),
+      ),
+    );
     if (source != null) {
       request.fields['source'] = source;
     }
@@ -220,10 +250,12 @@ class CalTrackerApiClient {
         final tokens = await tokenStorage.read();
         if (tokens != null) {
           final refreshed = await refresh(tokens.refreshToken);
-          await tokenStorage.write(StoredTokens(
-            accessToken: refreshed['accessToken'] as String,
-            refreshToken: refreshed['refreshToken'] as String,
-          ));
+          await tokenStorage.write(
+            StoredTokens(
+              accessToken: refreshed['accessToken'] as String,
+              refreshToken: refreshed['refreshToken'] as String,
+            ),
+          );
           return runVoiceMeal(audioFile, source: source);
         }
       }
@@ -236,12 +268,16 @@ class CalTrackerApiClient {
 
   Future<Map<String, Object?>> _get(String path) async {
     final response = await _sendWithRefresh(
-        () async => _httpClient.get(_uri(path), headers: await _headers()));
+      () async => _httpClient.get(_uri(path), headers: await _headers()),
+    );
     return _decode(response);
   }
 
-  Future<Map<String, Object?>> _post(String path, Map<String, Object?> body,
-      {bool authenticated = true}) async {
+  Future<Map<String, Object?>> _post(
+    String path,
+    Map<String, Object?> body, {
+    bool authenticated = true,
+  }) async {
     final response = await _sendWithRefresh(
       () async => _httpClient.post(
         _uri(path),
@@ -254,17 +290,23 @@ class CalTrackerApiClient {
   }
 
   Future<Map<String, Object?>> _put(
-      String path, Map<String, Object?> body) async {
+    String path,
+    Map<String, Object?> body,
+  ) async {
     final response = await _sendWithRefresh(
-      () async => _httpClient.put(_uri(path),
-          headers: await _headers(), body: jsonEncode(body)),
+      () async => _httpClient.put(
+        _uri(path),
+        headers: await _headers(),
+        body: jsonEncode(body),
+      ),
     );
     return _decode(response);
   }
 
   Future<Map<String, Object?>> _delete(String path) async {
     final response = await _sendWithRefresh(
-        () async => _httpClient.delete(_uri(path), headers: await _headers()));
+      () async => _httpClient.delete(_uri(path), headers: await _headers()),
+    );
     return _decode(response);
   }
 
@@ -278,15 +320,19 @@ class CalTrackerApiClient {
     final tokens = await tokenStorage.read();
     if (tokens == null) return first;
     final refreshed = await refresh(tokens.refreshToken);
-    await tokenStorage.write(StoredTokens(
-      accessToken: refreshed['accessToken'] as String,
-      refreshToken: refreshed['refreshToken'] as String,
-    ));
+    await tokenStorage.write(
+      StoredTokens(
+        accessToken: refreshed['accessToken'] as String,
+        refreshToken: refreshed['refreshToken'] as String,
+      ),
+    );
     return send();
   }
 
-  Future<Map<String, String>> _headers(
-      {bool authenticated = true, bool includeContentType = true}) async {
+  Future<Map<String, String>> _headers({
+    bool authenticated = true,
+    bool includeContentType = true,
+  }) async {
     final headers = <String, String>{
       HttpHeaders.acceptHeader: 'application/json',
     };
@@ -323,14 +369,27 @@ class CalTrackerApiClient {
   }
 
   Map<String, Object?> _decode(http.Response response) {
-    final body = response.body.isEmpty
-        ? <String, Object?>{}
-        : jsonDecode(response.body) as Map<String, Object?>;
+    final body = _decodeBody(response.body);
     if (response.statusCode >= 200 && response.statusCode < 300) return body;
     final error = body['error'] as Map<String, Object?>?;
-    throw ApiException(response.statusCode,
-        error?['message'] as String? ?? 'API request failed');
+    throw ApiException(
+      response.statusCode,
+      error?['message'] as String? ?? 'We could not complete that request.',
+      code: error?['code'] as String?,
+      traceId: error?['traceId'] as String?,
+    );
   }
 
   Uri _uri(String path) => Uri.parse('${config.baseUrl}$path');
+
+  Map<String, Object?> _decodeBody(String rawBody) {
+    if (rawBody.isEmpty) return <String, Object?>{};
+    try {
+      final decoded = jsonDecode(rawBody);
+      if (decoded is Map<String, Object?>) return decoded;
+    } on FormatException {
+      return <String, Object?>{};
+    }
+    return <String, Object?>{};
+  }
 }

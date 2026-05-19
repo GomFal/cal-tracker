@@ -188,6 +188,28 @@ describe("STT endpoint", () => {
     expect(json.result.message).toContain("could not understand");
     expect(agentProvider.calls).toBe(0);
   });
+
+  it("does not return raw provider errors to clients", async () => {
+    const { request } = buildTestApp({
+      sttProvider: new ThrowingSpeechToTextProvider(),
+    });
+    const { authHeader } = await registerAndAuth(request);
+
+    const body = new FormData();
+    body.append("audio", new Blob(["fake audio"], { type: "audio/m4a" }), "test.m4a");
+
+    const res = await request("http://localhost/v1/stt/transcriptions", {
+      method: "POST",
+      headers: bearerOnly(authHeader),
+      body
+    });
+
+    expect(res.status).toBe(500);
+    const json = await res.json();
+    expect(json.error.code).toBe("internal_error");
+    expect(json.error.message).toBe("We could not complete that request. Try again.");
+    expect(json.error.message).not.toContain("provider secret exploded");
+  });
 });
 
 function bearerOnly(authHeader: Record<string, string>): Record<string, string> {
@@ -209,5 +231,11 @@ class CollectingRunLogger implements LocalRunLogger {
 
   async log(event: Record<string, unknown>): Promise<void> {
     this.events.push(event);
+  }
+}
+
+class ThrowingSpeechToTextProvider {
+  async transcribe(): Promise<never> {
+    throw new Error("provider secret exploded");
   }
 }

@@ -118,9 +118,7 @@ void main() {
             sizeBytes: 1024,
           ),
         );
-        when(
-          () => mockNutritionRepository.logAudio(any()),
-        ).thenAnswer(
+        when(() => mockNutritionRepository.logAudio(any())).thenAnswer(
           (_) async => const VoiceMealRunResult(
             transcript: 'chicken and rice',
             provider: 'test',
@@ -207,7 +205,7 @@ void main() {
         await Future.delayed(const Duration(milliseconds: 100));
 
         expect(viewModel.state, VoiceLogState.error);
-        expect(viewModel.errorMessage, contains('Transcription failed'));
+        expect(viewModel.errorMessage, contains('could not transcribe'));
       });
 
       test('shows error on voice meal failure', () async {
@@ -233,7 +231,10 @@ void main() {
         await Future.delayed(const Duration(milliseconds: 100));
 
         expect(viewModel.state, VoiceLogState.error);
-        expect(viewModel.errorMessage, contains('Voice meal failed'));
+        expect(
+          viewModel.errorMessage,
+          contains('turn that recording into a meal'),
+        );
       });
 
       test('starts a new recording from error', () async {
@@ -321,7 +322,7 @@ void main() {
         await viewModel.submitText('test');
 
         expect(viewModel.state, VoiceLogState.error);
-        expect(viewModel.errorMessage, contains('network error'));
+        expect(viewModel.errorMessage, contains('could not understand'));
       });
 
       test('does nothing when text is empty', () async {
@@ -540,12 +541,14 @@ void main() {
         await viewModel.submitText('100 gramos de queso');
         await viewModel.selectCandidate(group, group.candidates[9]);
 
-        final captured = verify(
-          () => mockNutritionRepository.createProposalFromItems(
-            phrase: '100 gramos de queso',
-            items: captureAny(named: 'items'),
-          ),
-        ).captured.single as List<MealItem>;
+        final captured =
+            verify(
+                  () => mockNutritionRepository.createProposalFromItems(
+                    phrase: '100 gramos de queso',
+                    items: captureAny(named: 'items'),
+                  ),
+                ).captured.single
+                as List<MealItem>;
         expect(captured, [group.candidates[9]]);
         expect(viewModel.state, VoiceLogState.proposalReady);
         expect(viewModel.proposal, proposal);
@@ -609,12 +612,14 @@ void main() {
 
           await viewModel.selectCandidate(breadGroup, breadGroup.candidates[1]);
 
-          final captured = verify(
-            () => mockNutritionRepository.createProposalFromItems(
-              phrase: 'queso y pan',
-              items: captureAny(named: 'items'),
-            ),
-          ).captured.single as List<MealItem>;
+          final captured =
+              verify(
+                    () => mockNutritionRepository.createProposalFromItems(
+                      phrase: 'queso y pan',
+                      items: captureAny(named: 'items'),
+                    ),
+                  ).captured.single
+                  as List<MealItem>;
           expect(captured, [
             cheeseGroup.candidates[1],
             breadGroup.candidates[1],
@@ -677,12 +682,14 @@ void main() {
 
         await viewModel.selectCandidate(group, alternateCheese);
 
-        final captured = verify(
-          () => mockNutritionRepository.createProposalFromItems(
-            phrase: '100 gramos de queso',
-            items: captureAny(named: 'items'),
-          ),
-        ).captured.single as List<MealItem>;
+        final captured =
+            verify(
+                  () => mockNutritionRepository.createProposalFromItems(
+                    phrase: '100 gramos de queso',
+                    items: captureAny(named: 'items'),
+                  ),
+                ).captured.single
+                as List<MealItem>;
         expect(captured, [alternateCheese]);
         expect(viewModel.state, VoiceLogState.proposalReady);
       });

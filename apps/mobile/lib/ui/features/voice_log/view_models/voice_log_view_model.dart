@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../../../data/repositories/nutrition_repository.dart';
 import '../../../../data/services/audio_recorder_service.dart';
 import '../../../../domain/models/nutrition_models.dart';
+import '../../../core/user_visible_error.dart';
 
 enum VoiceLogState {
   idle,
@@ -97,8 +98,9 @@ class VoiceLogUiState {
       errorMessage: identical(errorMessage, _unchanged)
           ? this.errorMessage
           : errorMessage as String?,
-      message:
-          identical(message, _unchanged) ? this.message : message as String?,
+      message: identical(message, _unchanged)
+          ? this.message
+          : message as String?,
       transcript: transcript ?? this.transcript,
       recordingDuration: recordingDuration ?? this.recordingDuration,
       proposal: identical(proposal, _unchanged)
@@ -114,8 +116,9 @@ class VoiceLogUiState {
           ? this.remaining
           : remaining as NutritionSnapshot?,
       meals: identical(meals, _unchanged) ? this.meals : meals as List<Meal>?,
-      items:
-          identical(items, _unchanged) ? this.items : items as List<MealItem>?,
+      items: identical(items, _unchanged)
+          ? this.items
+          : items as List<MealItem>?,
       resolvedItems: identical(resolvedItems, _unchanged)
           ? this.resolvedItems
           : resolvedItems as List<MealItem>?,
@@ -147,8 +150,8 @@ class VoiceLogViewModel extends ChangeNotifier {
   VoiceLogViewModel({
     required NutritionRepository nutritionRepository,
     AudioRecorderService? audioRecorderService,
-  })  : _nutritionRepository = nutritionRepository,
-        _audioRecorderService = audioRecorderService ?? AudioRecorderService();
+  }) : _nutritionRepository = nutritionRepository,
+       _audioRecorderService = audioRecorderService ?? AudioRecorderService();
 
   final NutritionRepository _nutritionRepository;
   final AudioRecorderService _audioRecorderService;
@@ -279,10 +282,18 @@ class VoiceLogViewModel extends ChangeNotifier {
       if (e.code == 'permission_denied') {
         _setError('Microphone permission is required to record voice logs.');
       } else {
-        _setError('Recording failed: ${e.toString()}');
+        _setError(
+          e.message ??
+              userVisibleErrorMessage(
+                e,
+                context: UserErrorContext.voiceRecording,
+              ),
+        );
       }
     } catch (e) {
-      _setError('Recording failed: ${e.toString()}');
+      _setError(
+        userVisibleErrorMessage(e, context: UserErrorContext.voiceRecording),
+      );
     }
   }
 
@@ -300,9 +311,17 @@ class VoiceLogViewModel extends ChangeNotifier {
         _setError('No audio file was created.');
       }
     } on RecorderException catch (e) {
-      _setError(e.message ?? 'Recording failed: ${e.toString()}');
+      _setError(
+        e.message ??
+            userVisibleErrorMessage(
+              e,
+              context: UserErrorContext.voiceRecording,
+            ),
+      );
     } catch (e) {
-      _setError('Recording failed: ${e.toString()}');
+      _setError(
+        userVisibleErrorMessage(e, context: UserErrorContext.voiceRecording),
+      );
     }
   }
 
@@ -322,8 +341,9 @@ class VoiceLogViewModel extends ChangeNotifier {
         );
         _applyAgentRunResult(voiceResult.result);
       } else {
-        final transcript =
-            await _nutritionRepository.transcribeAudio(File(path));
+        final transcript = await _nutritionRepository.transcribeAudio(
+          File(path),
+        );
         _setUiState(
           _uiState.copyWith(transcript: transcript, errorMessage: null),
         );
@@ -332,8 +352,11 @@ class VoiceLogViewModel extends ChangeNotifier {
     } catch (e) {
       _setError(
         submitAfterTranscription
-            ? 'Voice meal failed: ${e.toString()}'
-            : 'Transcription failed: ${e.toString()}',
+            ? userVisibleErrorMessage(e, context: UserErrorContext.voiceMeal)
+            : userVisibleErrorMessage(
+                e,
+                context: UserErrorContext.voiceTranscription,
+              ),
       );
     } finally {
       try {
@@ -377,7 +400,9 @@ class VoiceLogViewModel extends ChangeNotifier {
       final result = await _nutritionRepository.logText(text);
       _applyAgentRunResult(result);
     } catch (error) {
-      _setError('Agent failed: ${error.toString()}');
+      _setError(
+        userVisibleErrorMessage(error, context: UserErrorContext.voiceAgent),
+      );
     }
   }
 
@@ -455,7 +480,9 @@ class VoiceLogViewModel extends ChangeNotifier {
         ),
       );
     } catch (error) {
-      _setError('Commit failed: ${error.toString()}');
+      _setError(
+        userVisibleErrorMessage(error, context: UserErrorContext.voiceCommit),
+      );
     }
   }
 
@@ -477,7 +504,12 @@ class VoiceLogViewModel extends ChangeNotifier {
         ),
       );
     } catch (error) {
-      _setError('Proposal edit failed: ${error.toString()}');
+      _setError(
+        userVisibleErrorMessage(
+          error,
+          context: UserErrorContext.voiceProposalEdit,
+        ),
+      );
     }
   }
 
@@ -495,10 +527,12 @@ class VoiceLogViewModel extends ChangeNotifier {
       return;
     }
 
-    final selectableGroups =
-        groups.where((group) => group.candidates.isNotEmpty).toList();
-    final requiredGroups =
-        selectableGroups.where(_needsCandidateSelection).toList();
+    final selectableGroups = groups
+        .where((group) => group.candidates.isNotEmpty)
+        .toList();
+    final requiredGroups = selectableGroups
+        .where(_needsCandidateSelection)
+        .toList();
     if (selectableGroups.isEmpty ||
         !requiredGroups.every(
           (group) => selections.containsKey(_candidateGroupKey(group)),
@@ -528,7 +562,12 @@ class VoiceLogViewModel extends ChangeNotifier {
         ),
       );
     } catch (error) {
-      _setError('Candidate selection failed: ${error.toString()}');
+      _setError(
+        userVisibleErrorMessage(
+          error,
+          context: UserErrorContext.voiceCandidateSelection,
+        ),
+      );
     }
   }
 

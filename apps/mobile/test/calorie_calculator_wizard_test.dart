@@ -1,5 +1,6 @@
 import 'package:cal_tracker_mobile/app/theme.dart';
 import 'package:cal_tracker_mobile/domain/models/nutrition_models.dart';
+import 'package:cal_tracker_mobile/l10n/generated/app_localizations.dart';
 import 'package:cal_tracker_mobile/ui/features/dashboard/views/calorie_target_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -121,6 +122,52 @@ void main() {
       findsNothing,
     );
   });
+
+  testWidgets('calorie target setup and wizard render Spanish strings',
+      (tester) async {
+    await tester.pumpWidget(_testApp(
+      CalorieTargetSheet(
+        initialValue: 2200,
+        estimateCalories: ({
+          required int age,
+          required String sex,
+          required double heightCm,
+          required double weightKg,
+          required String activityLevel,
+          required String goal,
+          String? pace,
+        }) async =>
+            _estimate,
+      ),
+      locale: const Locale('es'),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Configura tus calorías diarias'), findsOneWidget);
+    expect(find.text('¿No sabes cuántas calorías necesitas?'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('calorie_calculator_link')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('¿Cuál es tu sexo biológico?'), findsOneWidget);
+    expect(find.text('Continuar'), findsOneWidget);
+
+    await _tapNext(tester); // Sex.
+    expect(find.text('¿Cuándo es tu cumpleaños?'), findsOneWidget);
+    await _tapNext(tester); // Birthday.
+    await _tapNext(tester); // Height.
+    await _tapNext(tester); // Weight.
+    await _tapNext(tester); // Goal.
+
+    expect(find.text('¿Cuál es tu nivel de actividad?'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('calorie_wizard_next_button')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 1200));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Usar esta estimación'), findsOneWidget);
+  });
 }
 
 Widget _wizard({
@@ -149,8 +196,11 @@ Widget _wizard({
   );
 }
 
-Widget _testApp(Widget child) {
+Widget _testApp(Widget child, {Locale? locale}) {
   return MaterialApp(
+    locale: locale,
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
     theme: buildLightTheme(),
     home: Scaffold(body: child),
   );

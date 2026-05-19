@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../../../../domain/models/macro_distribution.dart';
 import '../../../../domain/models/nutrition_models.dart';
 import '../../../../l10n/app_localizations_context.dart';
+import '../../../../l10n/generated/app_localizations.dart';
 import '../../../core/design_system.dart';
 import 'macro_distribution_sheet.dart';
 
@@ -64,6 +65,7 @@ class _CalorieTargetSheetState extends State<CalorieTargetSheet> {
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
     final textTheme = Theme.of(context).textTheme;
+    final l10n = context.l10n;
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     final maxHeight = MediaQuery.sizeOf(context).height * 0.86;
     return Padding(
@@ -85,12 +87,12 @@ class _CalorieTargetSheetState extends State<CalorieTargetSheet> {
             ),
             const SizedBox(height: FreshSpacing.lg),
             Text(
-              'Set your daily calories',
+              l10n.calorieTargetSheetTitle,
               style: textTheme.titleLarge,
             ),
             const SizedBox(height: FreshSpacing.xs),
             Text(
-              'Choose the target you want to track each day.',
+              l10n.calorieTargetSheetSubtitle,
               style: textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
             ),
             const SizedBox(height: FreshSpacing.lg),
@@ -120,7 +122,7 @@ class _CalorieTargetSheetState extends State<CalorieTargetSheet> {
                         fontFeatures: const [FontFeature.tabularFigures()],
                       ),
                       decoration: InputDecoration(
-                        suffixText: context.l10n.commonKcal,
+                        suffixText: l10n.commonKcal,
                         errorText: _error,
                       ),
                       onChanged: (_) => setState(() {
@@ -142,13 +144,13 @@ class _CalorieTargetSheetState extends State<CalorieTargetSheet> {
             TextButton(
               key: const ValueKey('calorie_calculator_link'),
               onPressed: _showCalculator,
-              child: const Text("Don't know how many calories you need?"),
+              child: Text(l10n.calorieTargetCalculatorLink),
             ),
             const SizedBox(height: FreshSpacing.lg),
             FilledButton(
               key: const ValueKey('dashboard_save_calorie_target_button'),
               onPressed: _submit,
-              child: Text(context.l10n.commonSave),
+              child: Text(l10n.commonSave),
             ),
           ],
         ),
@@ -200,7 +202,10 @@ class _CalorieTargetSheetState extends State<CalorieTargetSheet> {
   void _submit() {
     final value = int.tryParse(_controller.text.trim());
     if (value == null || value < 800 || value > 10000) {
-      setState(() => _error = 'Enter a target from 800 to 10000 Kcal.');
+      setState(() => _error = context.l10n.calorieTargetRangeValidationError(
+            800,
+            10000,
+          ));
       return;
     }
     Navigator.of(context).pop(
@@ -218,6 +223,7 @@ class _CalculatorMacroPrompt extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
     final textTheme = Theme.of(context).textTheme;
+    final l10n = context.l10n;
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     return Padding(
       padding: EdgeInsets.fromLTRB(20, 12, 20, bottomInset + 20),
@@ -237,7 +243,7 @@ class _CalculatorMacroPrompt extends StatelessWidget {
           ),
           const SizedBox(height: FreshSpacing.lg),
           Text(
-            'Add macros?',
+            l10n.calorieMacroPromptTitle,
             style: textTheme.titleLarge?.copyWith(
               color: palette.ink,
               fontWeight: FontWeight.w800,
@@ -245,7 +251,7 @@ class _CalculatorMacroPrompt extends StatelessWidget {
           ),
           const SizedBox(height: FreshSpacing.xs),
           Text(
-            'Choose a simple protein, carb and fat split for $calories Kcal.',
+            l10n.calorieMacroPromptMessage(calories),
             style: textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
           ),
           const SizedBox(height: FreshSpacing.lg),
@@ -261,20 +267,82 @@ class _CalculatorMacroPrompt extends StatelessWidget {
                 builder: (context) => MacroDistributionSheet(
                   calories: calories,
                   presetOnly: true,
-                  title: 'Choose your macros',
+                  title: l10n.calorieCalculatorChooseYourMacrosTitle,
                 ),
               );
               if (context.mounted && config != null) {
                 Navigator.of(context).pop(config);
               }
             },
-            child: const Text('Configure'),
+            child: Text(l10n.calorieMacroPromptConfigure),
           ),
           const SizedBox(height: FreshSpacing.sm),
           TextButton(
             key: const ValueKey('calculator_macro_skip_button'),
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Skip for now'),
+            child: Text(l10n.calorieMacroPromptSkip),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class PostCalorieSaveMacroPrompt extends StatelessWidget {
+  const PostCalorieSaveMacroPrompt({super.key, required this.calories});
+
+  final int calories;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.freshPalette;
+    final textTheme = Theme.of(context).textTheme;
+    final l10n = context.l10n;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Container(
+              width: 44,
+              height: 4,
+              decoration: BoxDecoration(
+                color: palette.rule,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ),
+          const SizedBox(height: FreshSpacing.lg),
+          Text(
+            l10n.postCalorieSaveTitle,
+            style: textTheme.titleLarge?.copyWith(
+              color: palette.ink,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: FreshSpacing.xs),
+          Text(
+            l10n.postCalorieSaveTarget(calories),
+            style: textTheme.bodyMedium?.copyWith(color: palette.inkSoft),
+          ),
+          const SizedBox(height: FreshSpacing.xs),
+          Text(
+            l10n.postCalorieSaveMacroQuestion,
+            style: textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
+          ),
+          const SizedBox(height: FreshSpacing.lg),
+          FilledButton(
+            key: const ValueKey('macro_prompt_set_distribution'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(l10n.postCalorieSaveSetMacroDistribution),
+          ),
+          const SizedBox(height: FreshSpacing.sm),
+          TextButton(
+            key: const ValueKey('macro_prompt_not_now'),
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(l10n.postCalorieSaveNotNow),
           ),
         ],
       ),
@@ -365,6 +433,7 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
   @override
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
+    final l10n = context.l10n;
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     final maxHeight = MediaQuery.sizeOf(context).height * 0.94;
     final activeStep = _activeStep;
@@ -393,7 +462,7 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
                 const SizedBox(height: FreshSpacing.md),
                 FreshStatusBanner(
                   icon: Icons.error_outline_rounded,
-                  title: 'Check your details',
+                  title: l10n.calorieWizardCheckDetailsTitle,
                   message: _error!,
                   color: FreshColors.coral,
                 ),
@@ -419,7 +488,9 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
                       : 'calorie_wizard_next_button'),
                   onPressed: _primaryAction,
                   child: Text(
-                    _isResultStep ? 'Use this estimate' : 'Continue',
+                    _isResultStep
+                        ? l10n.calorieWizardUseEstimate
+                        : l10n.calorieWizardContinue,
                   ),
                 ),
               ],
@@ -660,15 +731,16 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
   }
 
   Widget _sexStep() {
+    final l10n = context.l10n;
     return _WizardQuestionPage(
-      title: 'What is your biological sex?',
-      subtitle: 'This keeps the calorie estimate aligned with the formula.',
+      title: l10n.calorieWizardSexTitle,
+      subtitle: l10n.calorieWizardSexSubtitle,
       children: [
         _WizardChoiceCard(
           key: const ValueKey('calorie_wizard_sex_male'),
           icon: Icons.male_rounded,
-          title: 'Male',
-          message: 'Use the male BMR coefficient.',
+          title: l10n.calorieWizardSexMale,
+          message: l10n.calorieWizardSexMaleMessage,
           selected: _sex == 'male',
           onTap: () => setState(() {
             _sex = 'male';
@@ -679,8 +751,8 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
         _WizardChoiceCard(
           key: const ValueKey('calorie_wizard_sex_female'),
           icon: Icons.female_rounded,
-          title: 'Female',
-          message: 'Use the female BMR coefficient.',
+          title: l10n.calorieWizardSexFemale,
+          message: l10n.calorieWizardSexFemaleMessage,
           selected: _sex == 'female',
           onTap: () => setState(() {
             _sex = 'female';
@@ -693,7 +765,7 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
 
   Widget _ageStep() {
     return _WizardQuestionPage(
-      title: "When's your birthday?",
+      title: context.l10n.calorieWizardBirthdayTitle,
       centerTitle: true,
       children: [
         _BirthdayWheelPicker(
@@ -711,12 +783,13 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
   }
 
   Widget _heightStep() {
+    final l10n = context.l10n;
     final heightCm = _heightInCm() ?? 170;
     final value = _heightMetric
         ? (double.tryParse(_heightController.text.trim()) ?? heightCm)
         : (heightCm / 2.54).clamp(48, 90).toDouble();
     return _WizardQuestionPage(
-      title: 'How tall are you?',
+      title: l10n.calorieWizardHeightTitle,
       centerTitle: true,
       children: [
         Center(
@@ -757,12 +830,13 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
   }
 
   Widget _weightStep() {
+    final l10n = context.l10n;
     final weightKg = _weightInKg() ?? 70;
     final value = _weightMetric
         ? (double.tryParse(_weightController.text.trim()) ?? weightKg)
         : (weightKg / 0.45359237).clamp(78, 551).toDouble();
     return _WizardQuestionPage(
-      title: "What's your current weight?",
+      title: l10n.calorieWizardWeightTitle,
       centerTitle: true,
       children: [
         Center(
@@ -801,11 +875,12 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
   }
 
   Widget _goalStep() {
+    final l10n = context.l10n;
     return _WizardQuestionPage(
-      title: 'What is your main goal?',
-      subtitle: 'Choose the outcome you want your target to support.',
+      title: l10n.calorieWizardGoalTitle,
+      subtitle: l10n.calorieWizardGoalSubtitle,
       children: [
-        for (final option in _goalOptions)
+        for (final option in _goalOptions(l10n))
           Padding(
             padding: const EdgeInsets.only(bottom: FreshSpacing.md),
             child: _WizardChoiceCard(
@@ -825,13 +900,15 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
   }
 
   Widget _paceStep() {
+    final l10n = context.l10n;
     final isLoss = _goal == 'lose_fat';
-    final paceOptions = isLoss ? _lossPaceOptions : _gainPaceOptions;
+    final paceOptions =
+        isLoss ? _lossPaceOptions(l10n) : _gainPaceOptions(l10n);
     return _WizardQuestionPage(
       title: isLoss
-          ? 'How fast do you want to lose weight?'
-          : 'How fast do you want to gain weight?',
-      subtitle: 'A steadier pace is easier to sustain.',
+          ? l10n.calorieWizardLossPaceTitle
+          : l10n.calorieWizardGainPaceTitle,
+      subtitle: l10n.calorieWizardPaceSubtitle,
       children: [
         for (final option in paceOptions)
           Padding(
@@ -857,11 +934,12 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
   }
 
   Widget _activityStep() {
+    final l10n = context.l10n;
     return _WizardQuestionPage(
-      title: 'What is your activity level?',
-      subtitle: 'Pick the option that best matches a normal week.',
+      title: l10n.calorieWizardActivityTitle,
+      subtitle: l10n.calorieWizardActivitySubtitle,
       children: [
-        for (final option in _activityOptions)
+        for (final option in _activityOptions(l10n))
           Padding(
             padding: const EdgeInsets.only(bottom: FreshSpacing.md),
             child: _WizardChoiceCard(
@@ -934,7 +1012,8 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
       case _WizardStep.age:
         final age = _ageFromBirthDate(_birthDate);
         if (age < 18 || age > 100) {
-          setState(() => _error = 'Choose a birthday for ages 18 to 100.');
+          setState(
+              () => _error = context.l10n.calorieWizardBirthdayValidationError);
           return false;
         }
         return true;
@@ -943,7 +1022,8 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
             ? double.tryParse(_heightController.text.trim())
             : _heightInCm();
         if (heightCm == null || heightCm < 120 || heightCm > 230) {
-          setState(() => _error = 'Enter a height from 120 to 230 cm.');
+          setState(
+              () => _error = context.l10n.calorieWizardHeightValidationError);
           return false;
         }
         return true;
@@ -952,7 +1032,8 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
             ? double.tryParse(_weightController.text.trim())
             : _weightInKg();
         if (weightKg == null || weightKg < 35 || weightKg > 250) {
-          setState(() => _error = 'Enter a weight from 35 to 250 kg.');
+          setState(
+              () => _error = context.l10n.calorieWizardWeightValidationError);
           return false;
         }
         return true;
@@ -968,8 +1049,7 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
   Future<void> _calculateEstimate() async {
     final profile = _profileValues();
     if (profile == null) {
-      setState(() =>
-          _error = 'Enter age, height, and weight in the expected ranges.');
+      setState(() => _error = context.l10n.calorieWizardProfileValidationError);
       return;
     }
     setState(() {
@@ -1062,110 +1142,109 @@ class _WizardOption {
   final IconData icon;
 }
 
-const _activityOptions = [
-  _WizardOption(
-    value: 'sedentary',
-    label: 'Sedentary',
-    message:
-        'Mostly seated, low daily movement, and 0-1 light workouts weekly.',
-    icon: Icons.weekend_rounded,
-  ),
-  _WizardOption(
-    value: 'lightly_active',
-    label: 'Lightly Active',
-    message: 'Regular walks or light exercise 1-3 days per week.',
-    icon: Icons.directions_walk_rounded,
-  ),
-  _WizardOption(
-    value: 'moderately_active',
-    label: 'Moderately Active',
-    message: 'Training 3-5 days per week or a meaningfully active routine.',
-    icon: Icons.fitness_center_rounded,
-  ),
-  _WizardOption(
-    value: 'very_active',
-    label: 'Very Active',
-    message: 'Hard exercise most days or active work plus regular training.',
-    icon: Icons.local_fire_department_rounded,
-  ),
-  _WizardOption(
-    value: 'extra_active',
-    label: 'Super Active',
-    message: 'Athlete-level workload, two-a-days, or demanding physical work.',
-    icon: Icons.speed_rounded,
-  ),
-];
+List<_WizardOption> _activityOptions(AppLocalizations l10n) => [
+      _WizardOption(
+        value: 'sedentary',
+        label: l10n.calorieWizardActivitySedentary,
+        message: l10n.calorieWizardActivitySedentaryMessage,
+        icon: Icons.weekend_rounded,
+      ),
+      _WizardOption(
+        value: 'lightly_active',
+        label: l10n.calorieWizardActivityLightlyActive,
+        message: l10n.calorieWizardActivityLightlyActiveMessage,
+        icon: Icons.directions_walk_rounded,
+      ),
+      _WizardOption(
+        value: 'moderately_active',
+        label: l10n.calorieWizardActivityModeratelyActive,
+        message: l10n.calorieWizardActivityModeratelyActiveMessage,
+        icon: Icons.fitness_center_rounded,
+      ),
+      _WizardOption(
+        value: 'very_active',
+        label: l10n.calorieWizardActivityVeryActive,
+        message: l10n.calorieWizardActivityVeryActiveMessage,
+        icon: Icons.local_fire_department_rounded,
+      ),
+      _WizardOption(
+        value: 'extra_active',
+        label: l10n.calorieWizardActivitySuperActive,
+        message: l10n.calorieWizardActivitySuperActiveMessage,
+        icon: Icons.speed_rounded,
+      ),
+    ];
 
 const _calorieWizardCardShadow = [
   BoxShadow(
-    color: Color(0x0d080907),
-    blurRadius: 22,
-    offset: Offset(0, 10),
+    color: Color(0x08080907),
+    blurRadius: 20,
+    offset: Offset(0, 7),
   ),
 ];
 
-const _goalOptions = [
-  _WizardOption(
-    value: 'lose_fat',
-    label: 'Lose Weight',
-    message: 'Estimate a deficit from maintenance.',
-    icon: Icons.flag_rounded,
-  ),
-  _WizardOption(
-    value: 'gain_muscle',
-    label: 'Gain Muscle',
-    message: 'Estimate a controlled calorie surplus.',
-    icon: Icons.fitness_center_rounded,
-  ),
-  _WizardOption(
-    value: 'maintain',
-    label: 'Maintain Weight',
-    message: 'Track around your estimated maintenance.',
-    icon: Icons.balance_rounded,
-  ),
-];
+List<_WizardOption> _goalOptions(AppLocalizations l10n) => [
+      _WizardOption(
+        value: 'lose_fat',
+        label: l10n.calorieWizardGoalLoseWeight,
+        message: l10n.calorieWizardGoalLoseWeightMessage,
+        icon: Icons.flag_rounded,
+      ),
+      _WizardOption(
+        value: 'gain_muscle',
+        label: l10n.calorieWizardGoalGainMuscle,
+        message: l10n.calorieWizardGoalGainMuscleMessage,
+        icon: Icons.fitness_center_rounded,
+      ),
+      _WizardOption(
+        value: 'maintain',
+        label: l10n.calorieWizardGoalMaintainWeight,
+        message: l10n.calorieWizardGoalMaintainWeightMessage,
+        icon: Icons.balance_rounded,
+      ),
+    ];
 
-const _lossPaceOptions = [
-  _WizardOption(
-    value: 'slow',
-    label: 'Slow',
-    message: 'Easier to maintain and better for performance.',
-    icon: Icons.eco_rounded,
-  ),
-  _WizardOption(
-    value: 'moderate',
-    label: 'Moderate',
-    message: 'Recommended default for most users.',
-    icon: Icons.check_circle_outline_rounded,
-  ),
-  _WizardOption(
-    value: 'aggressive',
-    label: 'Aggressive',
-    message: 'Larger deficit. Use only if you can recover well.',
-    icon: Icons.bolt_rounded,
-  ),
-];
+List<_WizardOption> _lossPaceOptions(AppLocalizations l10n) => [
+      _WizardOption(
+        value: 'slow',
+        label: l10n.calorieWizardPaceSlow,
+        message: l10n.calorieWizardPaceSlowMessage,
+        icon: Icons.eco_rounded,
+      ),
+      _WizardOption(
+        value: 'moderate',
+        label: l10n.calorieWizardPaceModerate,
+        message: l10n.calorieWizardPaceModerateMessage,
+        icon: Icons.check_circle_outline_rounded,
+      ),
+      _WizardOption(
+        value: 'aggressive',
+        label: l10n.calorieWizardPaceAggressive,
+        message: l10n.calorieWizardLossPaceAggressiveMessage,
+        icon: Icons.bolt_rounded,
+      ),
+    ];
 
-const _gainPaceOptions = [
-  _WizardOption(
-    value: 'lean',
-    label: 'Lean',
-    message: 'Small surplus for minimal fat gain.',
-    icon: Icons.eco_rounded,
-  ),
-  _WizardOption(
-    value: 'standard',
-    label: 'Standard',
-    message: 'Recommended default for most users gaining muscle.',
-    icon: Icons.check_circle_outline_rounded,
-  ),
-  _WizardOption(
-    value: 'aggressive',
-    label: 'Aggressive',
-    message: 'Larger surplus with higher fat-gain risk.',
-    icon: Icons.bolt_rounded,
-  ),
-];
+List<_WizardOption> _gainPaceOptions(AppLocalizations l10n) => [
+      _WizardOption(
+        value: 'lean',
+        label: l10n.calorieWizardPaceLean,
+        message: l10n.calorieWizardPaceLeanMessage,
+        icon: Icons.eco_rounded,
+      ),
+      _WizardOption(
+        value: 'standard',
+        label: l10n.calorieWizardPaceStandard,
+        message: l10n.calorieWizardPaceStandardMessage,
+        icon: Icons.check_circle_outline_rounded,
+      ),
+      _WizardOption(
+        value: 'aggressive',
+        label: l10n.calorieWizardPaceAggressive,
+        message: l10n.calorieWizardGainPaceAggressiveMessage,
+        icon: Icons.bolt_rounded,
+      ),
+    ];
 
 class _StepButton extends StatelessWidget {
   const _StepButton({
@@ -1179,9 +1258,12 @@ class _StepButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return FreshIconButton(
       icon: icon,
-      tooltip: icon == Icons.add_rounded ? 'Increase' : 'Decrease',
+      tooltip: icon == Icons.add_rounded
+          ? l10n.calorieTargetIncreaseTooltip
+          : l10n.calorieTargetDecreaseTooltip,
       onPressed: onTap,
       backgroundColor: context.freshPalette.surface,
     );
@@ -1217,7 +1299,9 @@ class _WizardTopBar extends StatelessWidget {
               ? 'calorie_wizard_back_button'
               : 'calorie_wizard_close_button'),
           icon: canGoBack ? Icons.arrow_back_rounded : Icons.close_rounded,
-          tooltip: canGoBack ? 'Back' : 'Close',
+          tooltip: canGoBack
+              ? context.l10n.calorieWizardBackTooltip
+              : context.l10n.calorieWizardCloseTooltip,
           onPressed: canGoBack ? onBack : onClose,
           backgroundColor: palette.surface,
         ),
@@ -1265,7 +1349,7 @@ class _WizardQuestionPage extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1435,9 +1519,18 @@ class _BirthdayWheelPicker extends StatelessWidget {
         children: [
           Row(
             children: [
-              _BirthdayWheelLabel(text: 'Month', color: palette.inkMuted),
-              _BirthdayWheelLabel(text: 'Day', color: palette.inkMuted),
-              _BirthdayWheelLabel(text: 'Year', color: palette.inkMuted),
+              _BirthdayWheelLabel(
+                text: context.l10n.calorieWizardBirthdayMonth,
+                color: palette.inkMuted,
+              ),
+              _BirthdayWheelLabel(
+                text: context.l10n.calorieWizardBirthdayDay,
+                color: palette.inkMuted,
+              ),
+              _BirthdayWheelLabel(
+                text: context.l10n.calorieWizardBirthdayYear,
+                color: palette.inkMuted,
+              ),
             ],
           ),
           const SizedBox(height: FreshSpacing.sm),
@@ -1446,7 +1539,7 @@ class _BirthdayWheelPicker extends StatelessWidget {
               alignment: Alignment.center,
               children: [
                 Container(
-                  height: 70,
+                  height: 52,
                   decoration: BoxDecoration(
                     border: Border.symmetric(
                       horizontal: BorderSide(color: palette.limeSoft),
@@ -1950,13 +2043,14 @@ class _LoadingPlanStep extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
     final textTheme = Theme.of(context).textTheme;
+    final l10n = context.l10n;
     return Center(
       child: SingleChildScrollView(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              'Personalizing your calorie plan...',
+              l10n.calorieWizardLoadingTitle,
               textAlign: TextAlign.center,
               style: textTheme.headlineSmall?.copyWith(
                 color: palette.ink,
@@ -1986,7 +2080,7 @@ class _LoadingPlanStep extends StatelessWidget {
             ),
             const SizedBox(height: FreshSpacing.xxl),
             Text(
-              'Building a target from your profile and activity.',
+              l10n.calorieWizardLoadingMessage,
               textAlign: TextAlign.center,
               style: textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
             ),
@@ -2006,6 +2100,7 @@ class _ResultPlanStep extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
     final textTheme = Theme.of(context).textTheme;
+    final l10n = context.l10n;
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       child: Column(
@@ -2013,7 +2108,7 @@ class _ResultPlanStep extends StatelessWidget {
         children: [
           const SizedBox(height: FreshSpacing.md),
           Text(
-            'Your personalized calorie plan is ready!',
+            l10n.calorieWizardResultTitle,
             textAlign: TextAlign.center,
             style: textTheme.headlineSmall?.copyWith(
               color: palette.ink,
@@ -2039,7 +2134,7 @@ class _ResultPlanStep extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    'Kcal',
+                    l10n.commonKcal,
                     style: textTheme.titleMedium?.copyWith(
                       color: palette.ink,
                       fontWeight: FontWeight.w800,
@@ -2062,21 +2157,23 @@ class _ResultPlanStep extends StatelessWidget {
               child: Column(
                 children: [
                   _ResultLine(
-                    label: 'BMR estimate',
-                    value: '${estimate.bmr} Kcal',
+                    label: l10n.calorieWizardResultBmr,
+                    value: l10n.caloriesValue(estimate.bmr),
                   ),
                   _ResultLine(
-                    label: 'Maintenance',
-                    value: '${estimate.maintenanceCalories} Kcal',
+                    label: l10n.calorieWizardResultMaintenance,
+                    value: l10n.caloriesValue(estimate.maintenanceCalories),
                   ),
                   _ResultLine(
-                    label: 'Target range',
-                    value:
-                        '${estimate.recommendedRangeMin}-${estimate.recommendedRangeMax} Kcal',
+                    label: l10n.calorieWizardResultTargetRange,
+                    value: l10n.calorieWizardTargetRangeValue(
+                      estimate.recommendedRangeMin,
+                      estimate.recommendedRangeMax,
+                    ),
                   ),
                   _ResultLine(
-                    label: 'Adjustment',
-                    value: '${estimate.adjustmentCalories} Kcal',
+                    label: l10n.calorieWizardResultAdjustment,
+                    value: l10n.caloriesValue(estimate.adjustmentCalories),
                   ),
                 ],
               ),
@@ -2089,7 +2186,7 @@ class _ResultPlanStep extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: FreshSpacing.sm),
                 child: FreshStatusBanner(
                   icon: Icons.info_outline_rounded,
-                  title: 'Estimate note',
+                  title: l10n.calorieWizardEstimateNoteTitle,
                   message: warning,
                   color: FreshColors.orange,
                 ),

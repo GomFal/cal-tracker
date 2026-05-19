@@ -1,5 +1,6 @@
 import 'package:cal_tracker_mobile/app/theme.dart';
 import 'package:cal_tracker_mobile/domain/models/macro_distribution.dart';
+import 'package:cal_tracker_mobile/l10n/generated/app_localizations.dart';
 import 'package:cal_tracker_mobile/ui/features/dashboard/views/macro_distribution_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -107,6 +108,77 @@ void main() {
         find.byKey(const ValueKey('macro_percentage_editor')), findsOneWidget);
   });
 
+  testWidgets('personalized save closes the full macro flow and returns config',
+      (tester) async {
+    MacroDistributionConfig? saved;
+    await tester.pumpWidget(_testApp(
+      Builder(
+        builder: (context) => FilledButton(
+          onPressed: () async {
+            saved = await showModalBottomSheet<MacroDistributionConfig>(
+              context: context,
+              isScrollControlled: true,
+              builder: (context) => const MacroDistributionSheet(
+                calories: 2000,
+              ),
+            );
+          },
+          child: const Text('Open'),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Personalized'));
+    await tester.pumpAndSettle();
+    await tester
+        .tap(find.byKey(const ValueKey('personalized_macro_save_button')));
+    await tester.pumpAndSettle();
+
+    expect(saved?.mode, MacroMode.percentage);
+    expect(saved?.source, MacroSource.custom);
+    expect(find.byKey(const ValueKey('macro_distribution_save_button')),
+        findsNothing);
+    expect(find.text('Personalized macros'), findsNothing);
+  });
+
+  testWidgets('canceling personalized macros returns to the parent picker',
+      (tester) async {
+    MacroDistributionConfig? saved;
+    await tester.pumpWidget(_testApp(
+      Builder(
+        builder: (context) => FilledButton(
+          onPressed: () async {
+            saved = await showModalBottomSheet<MacroDistributionConfig>(
+              context: context,
+              isScrollControlled: true,
+              builder: (context) => const MacroDistributionSheet(
+                calories: 2000,
+              ),
+            );
+          },
+          child: const Text('Open'),
+        ),
+      ),
+    ));
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Personalized'));
+    await tester.pumpAndSettle();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(saved, isNull);
+    expect(find.text('Personalized macros'), findsNothing);
+    expect(find.byKey(const ValueKey('macro_distribution_save_button')),
+        findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('percentage mismatch blocks save until a fix button resolves it',
       (tester) async {
     await tester.pumpWidget(_testApp(const MacroDistributionSheet(
@@ -178,12 +250,41 @@ void main() {
       find.byKey(const ValueKey('macro_calorie_mismatch_warning')),
       findsNothing,
     );
+    final proteinField = tester.widget<TextField>(
+      find.byKey(const ValueKey('macro_grams_protein_field')),
+    );
+    expect(proteinField.controller?.text, '149');
     expect(_personalizedSaveButton(tester).onPressed, isNotNull);
+  });
+
+  testWidgets('macro wizard renders Spanish strings', (tester) async {
+    await tester.pumpWidget(_testApp(
+      const MacroDistributionSheet(calories: 2000),
+      locale: const Locale('es'),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Configura tus macros'), findsOneWidget);
+    expect(find.text('Objetivo diario: 2000 Kcal'), findsOneWidget);
+    expect(find.text('Equilibrado'), findsOneWidget);
+    expect(find.text('Alta proteína'), findsOneWidget);
+    expect(find.text('Personalizados'), findsOneWidget);
+
+    await tester.tap(find.text('Personalizados'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Macros personalizados'), findsOneWidget);
+    expect(find.text('Porcentajes'), findsOneWidget);
+    expect(find.text('Gramos'), findsOneWidget);
+    expect(find.text('Guardar macros personalizados'), findsOneWidget);
   });
 }
 
-Widget _testApp(Widget child) {
+Widget _testApp(Widget child, {Locale? locale}) {
   return MaterialApp(
+    locale: locale,
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
     theme: buildLightTheme(),
     home: Scaffold(body: child),
   );

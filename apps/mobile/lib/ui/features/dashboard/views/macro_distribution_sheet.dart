@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 
 import '../../../../domain/models/macro_distribution.dart';
 import '../../../../domain/models/nutrition_models.dart';
+import '../../../../l10n/app_localizations_context.dart';
+import '../../../../l10n/generated/app_localizations.dart';
 import '../../../core/design_system.dart';
 
 class MacroDistributionSheet extends StatefulWidget {
@@ -11,13 +13,13 @@ class MacroDistributionSheet extends StatefulWidget {
     required this.calories,
     this.initialGoals,
     this.presetOnly = false,
-    this.title = 'Set your macros',
+    this.title,
   });
 
   final int calories;
   final DailyGoals? initialGoals;
   final bool presetOnly;
-  final String title;
+  final String? title;
 
   @override
   State<MacroDistributionSheet> createState() => _MacroDistributionSheetState();
@@ -48,6 +50,7 @@ class _MacroDistributionSheetState extends State<MacroDistributionSheet> {
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
     final textTheme = Theme.of(context).textTheme;
+    final l10n = context.l10n;
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     return Material(
       color: palette.screen,
@@ -70,7 +73,7 @@ class _MacroDistributionSheetState extends State<MacroDistributionSheet> {
               ),
               const SizedBox(height: FreshSpacing.lg),
               Text(
-                widget.title,
+                widget.title ?? l10n.macroSheetTitle,
                 style: textTheme.titleLarge?.copyWith(
                   color: palette.ink,
                   fontWeight: FontWeight.w800,
@@ -78,7 +81,7 @@ class _MacroDistributionSheetState extends State<MacroDistributionSheet> {
               ),
               const SizedBox(height: FreshSpacing.xs),
               Text(
-                'Daily target: ${widget.calories} Kcal',
+                l10n.macroDailyTarget(widget.calories),
                 style: textTheme.bodyMedium?.copyWith(
                   color: palette.inkMuted,
                   fontFeatures: const [FontFeature.tabularFigures()],
@@ -124,7 +127,7 @@ class _MacroDistributionSheetState extends State<MacroDistributionSheet> {
               FilledButton(
                 key: const ValueKey('macro_distribution_save_button'),
                 onPressed: _save,
-                child: const Text('Save macros'),
+                child: Text(l10n.macroSaveMacros),
               ),
             ],
           ),
@@ -151,10 +154,7 @@ class _MacroDistributionSheetState extends State<MacroDistributionSheet> {
       ),
     );
     if (!mounted || config == null) return;
-    setState(() {
-      _selectedPreset = null;
-      _personalizedConfig = config;
-    });
+    Navigator.of(context).pop(config);
   }
 
   MacroDistributionConfig _personalizedInitialConfig() {
@@ -297,6 +297,7 @@ class _PersonalizedMacroSheetState extends State<_PersonalizedMacroSheet> {
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
     final textTheme = Theme.of(context).textTheme;
+    final l10n = context.l10n;
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     return Material(
       color: palette.screen,
@@ -319,7 +320,7 @@ class _PersonalizedMacroSheetState extends State<_PersonalizedMacroSheet> {
               ),
               const SizedBox(height: FreshSpacing.lg),
               Text(
-                'Personalized macros',
+                l10n.macroPersonalizedTitle,
                 style: textTheme.titleLarge?.copyWith(
                   color: palette.ink,
                   fontWeight: FontWeight.w800,
@@ -327,7 +328,7 @@ class _PersonalizedMacroSheetState extends State<_PersonalizedMacroSheet> {
               ),
               const SizedBox(height: FreshSpacing.xs),
               Text(
-                'Daily target: ${widget.calories} Kcal',
+                l10n.macroDailyTarget(widget.calories),
                 style: textTheme.bodyMedium?.copyWith(
                   color: palette.inkMuted,
                   fontFeatures: const [FontFeature.tabularFigures()],
@@ -358,7 +359,7 @@ class _PersonalizedMacroSheetState extends State<_PersonalizedMacroSheet> {
               FilledButton(
                 key: const ValueKey('personalized_macro_save_button'),
                 onPressed: _canSave ? _save : null,
-                child: const Text('Save personalized macros'),
+                child: Text(l10n.macroSavePersonalized),
               ),
             ],
           ),
@@ -368,6 +369,7 @@ class _PersonalizedMacroSheetState extends State<_PersonalizedMacroSheet> {
   }
 
   Widget _percentageEditor() {
+    final l10n = context.l10n;
     final total = _percentages.total;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -380,7 +382,7 @@ class _PersonalizedMacroSheetState extends State<_PersonalizedMacroSheet> {
             children: [
               _MacroNumberField(
                 fieldKey: const ValueKey('macro_percentage_protein_field'),
-                label: 'Protein',
+                label: l10n.commonProtein,
                 unit: '%',
                 controller: _proteinPctController,
                 onChanged: (value) => _setPercentage('protein', value),
@@ -388,7 +390,7 @@ class _PersonalizedMacroSheetState extends State<_PersonalizedMacroSheet> {
               const SizedBox(height: FreshSpacing.md),
               _MacroNumberField(
                 fieldKey: const ValueKey('macro_percentage_carbs_field'),
-                label: 'Carbs',
+                label: l10n.commonCarbs,
                 unit: '%',
                 controller: _carbsPctController,
                 onChanged: (value) => _setPercentage('carbs', value),
@@ -396,7 +398,7 @@ class _PersonalizedMacroSheetState extends State<_PersonalizedMacroSheet> {
               const SizedBox(height: FreshSpacing.md),
               _MacroNumberField(
                 fieldKey: const ValueKey('macro_percentage_fat_field'),
-                label: 'Fat',
+                label: l10n.commonFat,
                 unit: '%',
                 controller: _fatPctController,
                 onChanged: (value) => _setPercentage('fat', value),
@@ -409,9 +411,8 @@ class _PersonalizedMacroSheetState extends State<_PersonalizedMacroSheet> {
           FreshStatusBanner(
             key: const ValueKey('macro_percentage_total_warning'),
             icon: Icons.error_outline_rounded,
-            title: 'Percentages must total 100%',
-            message:
-                'These add up to $total%. Adjust one macro or reset to balanced before saving.',
+            title: l10n.macroPercentagesMustTotal,
+            message: l10n.macroPercentagesTotalMessage(total),
             color: FreshColors.coral,
           ),
           const SizedBox(height: FreshSpacing.sm),
@@ -424,26 +425,26 @@ class _PersonalizedMacroSheetState extends State<_PersonalizedMacroSheet> {
                 onPressed: _canAdjustPercentage('protein')
                     ? () => _adjustPercentage('protein')
                     : null,
-                child: const Text('Adjust protein'),
+                child: Text(l10n.macroAdjustProtein),
               ),
               OutlinedButton(
                 key: const ValueKey('macro_percentage_adjust_carbs'),
                 onPressed: _canAdjustPercentage('carbs')
                     ? () => _adjustPercentage('carbs')
                     : null,
-                child: const Text('Adjust carbs'),
+                child: Text(l10n.macroAdjustCarbs),
               ),
               OutlinedButton(
                 key: const ValueKey('macro_percentage_adjust_fat'),
                 onPressed: _canAdjustPercentage('fat')
                     ? () => _adjustPercentage('fat')
                     : null,
-                child: const Text('Adjust fat'),
+                child: Text(l10n.macroAdjustFat),
               ),
               OutlinedButton(
                 key: const ValueKey('macro_percentage_reset_balanced'),
                 onPressed: _resetBalancedPercentages,
-                child: const Text('Reset balanced'),
+                child: Text(l10n.macroResetBalanced),
               ),
             ],
           ),
@@ -453,6 +454,7 @@ class _PersonalizedMacroSheetState extends State<_PersonalizedMacroSheet> {
   }
 
   Widget _gramsEditor() {
+    final l10n = context.l10n;
     final grams = _grams;
     final gramsWithinLimits = areMacroGramsWithinLimits(grams);
     final delta = calorieDeltaKcal(widget.calories, grams);
@@ -468,7 +470,7 @@ class _PersonalizedMacroSheetState extends State<_PersonalizedMacroSheet> {
             children: [
               _MacroNumberField(
                 fieldKey: const ValueKey('macro_grams_protein_field'),
-                label: 'Protein',
+                label: l10n.commonProtein,
                 unit: 'g',
                 controller: _proteinGramsController,
                 onChanged: (_) => setState(() {}),
@@ -476,7 +478,7 @@ class _PersonalizedMacroSheetState extends State<_PersonalizedMacroSheet> {
               const SizedBox(height: FreshSpacing.md),
               _MacroNumberField(
                 fieldKey: const ValueKey('macro_grams_carbs_field'),
-                label: 'Carbs',
+                label: l10n.commonCarbs,
                 unit: 'g',
                 controller: _carbsGramsController,
                 onChanged: (_) => setState(() {}),
@@ -484,7 +486,7 @@ class _PersonalizedMacroSheetState extends State<_PersonalizedMacroSheet> {
               const SizedBox(height: FreshSpacing.md),
               _MacroNumberField(
                 fieldKey: const ValueKey('macro_grams_fat_field'),
-                label: 'Fat',
+                label: l10n.commonFat,
                 unit: 'g',
                 controller: _fatGramsController,
                 onChanged: (_) => setState(() {}),
@@ -494,11 +496,11 @@ class _PersonalizedMacroSheetState extends State<_PersonalizedMacroSheet> {
         ),
         if (!gramsWithinLimits) ...[
           const SizedBox(height: FreshSpacing.md),
-          const FreshStatusBanner(
-            key: ValueKey('macro_grams_limit_warning'),
+          FreshStatusBanner(
+            key: const ValueKey('macro_grams_limit_warning'),
             icon: Icons.error_outline_rounded,
-            title: 'Macro grams are too high',
-            message: 'Each macro target must be 2000 g or less.',
+            title: l10n.macroGramsTooHigh,
+            message: l10n.macroGramsTooHighMessage,
             color: FreshColors.coral,
           ),
         ] else if (warning != MacroCalorieWarningLevel.none) ...[
@@ -509,10 +511,17 @@ class _PersonalizedMacroSheetState extends State<_PersonalizedMacroSheet> {
                 ? Icons.info_outline_rounded
                 : Icons.error_outline_rounded,
             title: warning == MacroCalorieWarningLevel.soft
-                ? 'Small calorie mismatch'
-                : 'Macros do not match calories',
-            message:
-                'These grams add up to ${macroCaloriesFromGrams(grams)} Kcal, ${delta.abs()} Kcal ${delta > 0 ? 'over' : 'under'} your target.',
+                ? l10n.macroSmallCalorieMismatch
+                : l10n.macroCaloriesDoNotMatch,
+            message: delta > 0
+                ? l10n.macroGramMismatchOverMessage(
+                    macroCaloriesFromGrams(grams),
+                    delta.abs(),
+                  )
+                : l10n.macroGramMismatchUnderMessage(
+                    macroCaloriesFromGrams(grams),
+                    delta.abs(),
+                  ),
             color: warning == MacroCalorieWarningLevel.soft
                 ? FreshColors.orange
                 : FreshColors.coral,
@@ -527,26 +536,26 @@ class _PersonalizedMacroSheetState extends State<_PersonalizedMacroSheet> {
                 onPressed: _canAdjustGrams('protein')
                     ? () => _adjustGramsToCalories('protein')
                     : null,
-                child: const Text('Adjust protein'),
+                child: Text(l10n.macroAdjustProtein),
               ),
               OutlinedButton(
                 key: const ValueKey('macro_warning_adjust_carbs'),
                 onPressed: _canAdjustGrams('carbs')
                     ? () => _adjustGramsToCalories('carbs')
                     : null,
-                child: const Text('Adjust carbs'),
+                child: Text(l10n.macroAdjustCarbs),
               ),
               OutlinedButton(
                 key: const ValueKey('macro_warning_adjust_fat'),
                 onPressed: _canAdjustGrams('fat')
                     ? () => _adjustGramsToCalories('fat')
                     : null,
-                child: const Text('Adjust fat'),
+                child: Text(l10n.macroAdjustFat),
               ),
               OutlinedButton(
                 key: const ValueKey('macro_warning_recalculate_percentages'),
                 onPressed: _usePercentages,
-                child: const Text('Use percentages'),
+                child: Text(l10n.macroUsePercentages),
               ),
             ],
           ),
@@ -720,15 +729,16 @@ class _PersonalizedMacroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
     final textTheme = Theme.of(context).textTheme;
+    final l10n = context.l10n;
     final config = this.config;
     final primary = config == null
-        ? 'Create your own split'
-        : _primarySummary(config, calories);
+        ? l10n.macroCreateOwnSplit
+        : _primarySummary(config, calories, l10n);
     final secondary = config == null
-        ? 'Percentages or grams'
+        ? l10n.macroPercentagesOrGrams
         : config.mode == MacroMode.percentage
-            ? 'Personalized percentages'
-            : 'Personalized grams';
+            ? l10n.macroPersonalizedPercentages
+            : l10n.macroPersonalizedGrams;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -773,7 +783,7 @@ class _PersonalizedMacroCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Personalized',
+                      l10n.macroPersonalized,
                       style: textTheme.titleSmall?.copyWith(
                         color: palette.ink,
                         fontWeight: FontWeight.w800,
@@ -821,14 +831,25 @@ class _PersonalizedMacroCard extends StatelessWidget {
     );
   }
 
-  String _primarySummary(MacroDistributionConfig config, int calories) {
+  String _primarySummary(
+    MacroDistributionConfig config,
+    int calories,
+    AppLocalizations l10n,
+  ) {
     if (config.mode == MacroMode.grams && config.grams != null) {
       final grams = config.grams!;
-      return '${_formatGramValue(grams.proteinGrams)}g protein · ${_formatGramValue(grams.carbsGrams)}g carbs · ${_formatGramValue(grams.fatGrams)}g fat';
+      return _macroGramLine(l10n, grams);
     }
     final percentages = config.percentages ?? MacroPreset.balanced.percentages;
     final grams = gramsFromPercentages(calories, percentages);
-    return '${percentages.proteinPct}% protein · ${percentages.carbsPct}% carbs · ${percentages.fatPct}% fat (${grams.proteinGrams.round()}g · ${grams.carbsGrams.round()}g · ${grams.fatGrams.round()}g)';
+    return l10n.macroPercentagesWithGramsSummary(
+      _macroPercentLine(l10n, percentages),
+      l10n.macroGramTriplet(
+        _formatGramValue(grams.proteinGrams),
+        _formatGramValue(grams.carbsGrams),
+        _formatGramValue(grams.fatGrams),
+      ),
+    );
   }
 }
 
@@ -852,11 +873,10 @@ class MacroPresetCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
     final textTheme = Theme.of(context).textTheme;
+    final l10n = context.l10n;
     final grams = gramsFromPercentages(calories, preset.percentages);
-    final gramLine =
-        '${grams.proteinGrams.round()}g protein · ${grams.carbsGrams.round()}g carbs · ${grams.fatGrams.round()}g fat';
-    final percentLine =
-        '${preset.proteinPct}% protein · ${preset.carbsPct}% carbs · ${preset.fatPct}% fat';
+    final gramLine = _macroGramLine(l10n, grams);
+    final percentLine = _macroPercentLine(l10n, preset.percentages);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -901,7 +921,7 @@ class MacroPresetCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      preset.label,
+                      _localizedPresetLabel(l10n, preset),
                       style: textTheme.titleSmall?.copyWith(
                         color: palette.ink,
                         fontWeight: FontWeight.w800,
@@ -973,6 +993,7 @@ class _MacroModeToggle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
+    final l10n = context.l10n;
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
@@ -984,7 +1005,7 @@ class _MacroModeToggle extends StatelessWidget {
           Expanded(
             child: _MacroModeSegment(
               key: const ValueKey('macro_mode_percentage'),
-              label: 'Percentages',
+              label: l10n.macroPercentagesTab,
               selected: mode == MacroMode.percentage,
               onTap: () => onChanged(MacroMode.percentage),
             ),
@@ -992,7 +1013,7 @@ class _MacroModeToggle extends StatelessWidget {
           Expanded(
             child: _MacroModeSegment(
               key: const ValueKey('macro_mode_grams'),
-              label: 'Grams',
+              label: l10n.macroGramsTab,
               selected: mode == MacroMode.grams,
               onTap: () => onChanged(MacroMode.grams),
             ),
@@ -1096,6 +1117,35 @@ class _MacroNumberField extends StatelessWidget {
 }
 
 String _formatGramValue(num value) {
-  if ((value - value.round()).abs() < 0.01) return value.round().toString();
-  return value.toStringAsFixed(1);
+  return value.round().toString();
+}
+
+String _macroGramLine(AppLocalizations l10n, MacroGrams grams) {
+  return [
+    l10n.macroProteinGramsSummary(_formatGramValue(grams.proteinGrams)),
+    l10n.macroCarbsGramsSummary(_formatGramValue(grams.carbsGrams)),
+    l10n.macroFatGramsSummary(_formatGramValue(grams.fatGrams)),
+  ].join(' · ');
+}
+
+String _macroPercentLine(
+  AppLocalizations l10n,
+  MacroPercentages percentages,
+) {
+  return [
+    l10n.macroProteinPercentSummary(percentages.proteinPct),
+    l10n.macroCarbsPercentSummary(percentages.carbsPct),
+    l10n.macroFatPercentSummary(percentages.fatPct),
+  ].join(' · ');
+}
+
+String _localizedPresetLabel(AppLocalizations l10n, MacroPreset preset) {
+  switch (preset) {
+    case MacroPreset.balanced:
+      return l10n.macroPresetBalanced;
+    case MacroPreset.highProtein:
+      return l10n.macroPresetHighProtein;
+    case MacroPreset.lowerCarb:
+      return l10n.macroPresetLowerCarb;
+  }
 }

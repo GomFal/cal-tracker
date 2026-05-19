@@ -109,12 +109,271 @@
       }
     }
   },
+  "settingsNotSet": "Not set",
   "settingsLanguageTitle": "Language",
   "settingsLanguageSubtitleEnglish": "English",
   "settingsLanguageSubtitleSpanish": "Español",
   "settingsLanguageSheetTitle": "Choose language",
   "settingsLanguageEnglish": "English",
   "settingsLanguageSpanish": "Español",
+  "settingsMacroRequiresCaloriesTitle": "Set calories first",
+  "settingsMacroRequiresCaloriesMessage": "Configure your daily calories before setting a macro distribution.",
+  "settingsMacroRequiresCaloriesSetNow": "Set your calories now",
+  "settingsMacroRequiresCaloriesSkip": "Skip for now",
+  "calorieTargetSheetTitle": "Set your daily calories",
+  "calorieTargetSheetSubtitle": "Choose the target you want to track each day.",
+  "calorieTargetCalculatorLink": "Don't know how many calories you need?",
+  "calorieTargetRangeValidationError": "Enter a target from {min} to {max} Kcal.",
+  "@calorieTargetRangeValidationError": {
+    "placeholders": {
+      "min": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "calorieTargetIncreaseTooltip": "Increase",
+  "calorieTargetDecreaseTooltip": "Decrease",
+  "calorieSetupHeadlinePrefix": "Set up your",
+  "calorieSetupHeadlineMain": "daily calories",
+  "calorieSetupHeadlineBadge": "Here.",
+  "calorieCouldNotSaveCalories": "Couldn't save your calories. Please try again.",
+  "calorieCouldNotSaveMacros": "Couldn't save your macros. Please try again.",
+  "postCalorieSaveTitle": "Calories saved",
+  "postCalorieSaveTarget": "Your daily target is {calories} Kcal.",
+  "@postCalorieSaveTarget": {
+    "placeholders": {
+      "calories": {
+        "type": "int"
+      }
+    }
+  },
+  "postCalorieSaveMacroQuestion": "Want to track protein, carbs and fats too?",
+  "postCalorieSaveSetMacroDistribution": "Set macro distribution",
+  "postCalorieSaveNotNow": "Not now",
+  "calorieMacroPromptTitle": "Add macros?",
+  "calorieMacroPromptMessage": "Choose a simple protein, carb and fat split for {calories} Kcal.",
+  "@calorieMacroPromptMessage": {
+    "placeholders": {
+      "calories": {
+        "type": "int"
+      }
+    }
+  },
+  "calorieMacroPromptConfigure": "Configure",
+  "calorieMacroPromptSkip": "Skip for now",
+  "calorieCalculatorChooseYourMacrosTitle": "Choose your macros",
+  "calorieWizardCheckDetailsTitle": "Check your details",
+  "calorieWizardContinue": "Continue",
+  "calorieWizardUseEstimate": "Use this estimate",
+  "calorieWizardSexTitle": "What is your biological sex?",
+  "calorieWizardSexSubtitle": "This keeps the calorie estimate aligned with the formula.",
+  "calorieWizardSexMale": "Male",
+  "calorieWizardSexMaleMessage": "Use the male BMR coefficient.",
+  "calorieWizardSexFemale": "Female",
+  "calorieWizardSexFemaleMessage": "Use the female BMR coefficient.",
+  "calorieWizardBirthdayTitle": "When's your birthday?",
+  "calorieWizardBirthdayMonth": "Month",
+  "calorieWizardBirthdayDay": "Day",
+  "calorieWizardBirthdayYear": "Year",
+  "calorieWizardBirthdayValidationError": "Choose a birthday for ages 18 to 100.",
+  "calorieWizardHeightTitle": "How tall are you?",
+  "calorieWizardHeightValidationError": "Enter a height from 120 to 230 cm.",
+  "calorieWizardWeightTitle": "What's your current weight?",
+  "calorieWizardWeightValidationError": "Enter a weight from 35 to 250 kg.",
+  "calorieWizardProfileValidationError": "Enter age, height, and weight in the expected ranges.",
+  "calorieWizardGoalTitle": "What is your main goal?",
+  "calorieWizardGoalSubtitle": "Choose the outcome you want your target to support.",
+  "calorieWizardGoalLoseWeight": "Lose Weight",
+  "calorieWizardGoalLoseWeightMessage": "Estimate a deficit from maintenance.",
+  "calorieWizardGoalGainMuscle": "Gain Muscle",
+  "calorieWizardGoalGainMuscleMessage": "Estimate a controlled calorie surplus.",
+  "calorieWizardGoalMaintainWeight": "Maintain Weight",
+  "calorieWizardGoalMaintainWeightMessage": "Track around your estimated maintenance.",
+  "calorieWizardLossPaceTitle": "How fast do you want to lose weight?",
+  "calorieWizardGainPaceTitle": "How fast do you want to gain weight?",
+  "calorieWizardPaceSubtitle": "A steadier pace is easier to sustain.",
+  "calorieWizardPaceSlow": "Slow",
+  "calorieWizardPaceSlowMessage": "Easier to maintain and better for performance.",
+  "calorieWizardPaceModerate": "Moderate",
+  "calorieWizardPaceModerateMessage": "Recommended default for most users.",
+  "calorieWizardPaceAggressive": "Aggressive",
+  "calorieWizardLossPaceAggressiveMessage": "Larger deficit. Use only if you can recover well.",
+  "calorieWizardPaceLean": "Lean",
+  "calorieWizardPaceLeanMessage": "Small surplus for minimal fat gain.",
+  "calorieWizardPaceStandard": "Standard",
+  "calorieWizardPaceStandardMessage": "Recommended default for most users gaining muscle.",
+  "calorieWizardGainPaceAggressiveMessage": "Larger surplus with higher fat-gain risk.",
+  "calorieWizardActivityTitle": "What is your activity level?",
+  "calorieWizardActivitySubtitle": "Pick the option that best matches a normal week.",
+  "calorieWizardActivitySedentary": "Sedentary",
+  "calorieWizardActivitySedentaryMessage": "Mostly seated, low daily movement, and 0-1 light workouts weekly.",
+  "calorieWizardActivityLightlyActive": "Lightly Active",
+  "calorieWizardActivityLightlyActiveMessage": "Regular walks or light exercise 1-3 days per week.",
+  "calorieWizardActivityModeratelyActive": "Moderately Active",
+  "calorieWizardActivityModeratelyActiveMessage": "Training 3-5 days per week or a meaningfully active routine.",
+  "calorieWizardActivityVeryActive": "Very Active",
+  "calorieWizardActivityVeryActiveMessage": "Hard exercise most days or active work plus regular training.",
+  "calorieWizardActivitySuperActive": "Super Active",
+  "calorieWizardActivitySuperActiveMessage": "Athlete-level workload, two-a-days, or demanding physical work.",
+  "calorieWizardBackTooltip": "Back",
+  "calorieWizardCloseTooltip": "Close",
+  "calorieWizardLoadingTitle": "Personalizing your calorie plan...",
+  "calorieWizardLoadingMessage": "Building a target from your profile and activity.",
+  "calorieWizardResultTitle": "Your personalized calorie plan is ready!",
+  "calorieWizardResultBmr": "BMR estimate",
+  "calorieWizardResultMaintenance": "Maintenance",
+  "calorieWizardResultTargetRange": "Target range",
+  "calorieWizardResultAdjustment": "Adjustment",
+  "calorieWizardTargetRangeValue": "{min}-{max} Kcal",
+  "@calorieWizardTargetRangeValue": {
+    "placeholders": {
+      "min": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "calorieWizardEstimateNoteTitle": "Estimate note",
+  "macroSheetTitle": "Set your macros",
+  "macroDailyTarget": "Daily target: {calories} Kcal",
+  "@macroDailyTarget": {
+    "placeholders": {
+      "calories": {
+        "type": "int"
+      }
+    }
+  },
+  "macroSaveMacros": "Save macros",
+  "macroPersonalizedTitle": "Personalized macros",
+  "macroSavePersonalized": "Save personalized macros",
+  "macroPercentagesTab": "Percentages",
+  "macroGramsTab": "Grams",
+  "macroPresetBalanced": "Balanced",
+  "macroPresetHighProtein": "High protein",
+  "macroPresetLowerCarb": "Lower carb",
+  "macroPersonalized": "Personalized",
+  "macroCreateOwnSplit": "Create your own split",
+  "macroPercentagesOrGrams": "Percentages or grams",
+  "macroPersonalizedPercentages": "Personalized percentages",
+  "macroPersonalizedGrams": "Personalized grams",
+  "macroProteinPercentSummary": "{percent}% protein",
+  "@macroProteinPercentSummary": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "macroCarbsPercentSummary": "{percent}% carbs",
+  "@macroCarbsPercentSummary": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "macroFatPercentSummary": "{percent}% fat",
+  "@macroFatPercentSummary": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "macroProteinGramsSummary": "{grams}g protein",
+  "@macroProteinGramsSummary": {
+    "placeholders": {
+      "grams": {
+        "type": "String"
+      }
+    }
+  },
+  "macroCarbsGramsSummary": "{grams}g carbs",
+  "@macroCarbsGramsSummary": {
+    "placeholders": {
+      "grams": {
+        "type": "String"
+      }
+    }
+  },
+  "macroFatGramsSummary": "{grams}g fat",
+  "@macroFatGramsSummary": {
+    "placeholders": {
+      "grams": {
+        "type": "String"
+      }
+    }
+  },
+  "macroGramTriplet": "{protein}g · {carbs}g · {fat}g",
+  "@macroGramTriplet": {
+    "placeholders": {
+      "protein": {
+        "type": "String"
+      },
+      "carbs": {
+        "type": "String"
+      },
+      "fat": {
+        "type": "String"
+      }
+    }
+  },
+  "macroPercentagesWithGramsSummary": "{percentages} ({grams})",
+  "@macroPercentagesWithGramsSummary": {
+    "placeholders": {
+      "percentages": {
+        "type": "String"
+      },
+      "grams": {
+        "type": "String"
+      }
+    }
+  },
+  "macroPercentagesMustTotal": "Percentages must total 100%",
+  "macroPercentagesTotalMessage": "These add up to {total}%. Adjust one macro or reset to balanced before saving.",
+  "@macroPercentagesTotalMessage": {
+    "placeholders": {
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "macroAdjustProtein": "Adjust protein",
+  "macroAdjustCarbs": "Adjust carbs",
+  "macroAdjustFat": "Adjust fat",
+  "macroResetBalanced": "Reset balanced",
+  "macroGramsTooHigh": "Macro grams are too high",
+  "macroGramsTooHighMessage": "Each macro target must be 2000 g or less.",
+  "macroSmallCalorieMismatch": "Small calorie mismatch",
+  "macroCaloriesDoNotMatch": "Macros do not match calories",
+  "macroGramMismatchOverMessage": "These grams add up to {macroCalories} Kcal, {delta} Kcal over your target.",
+  "@macroGramMismatchOverMessage": {
+    "placeholders": {
+      "macroCalories": {
+        "type": "int"
+      },
+      "delta": {
+        "type": "int"
+      }
+    }
+  },
+  "macroGramMismatchUnderMessage": "These grams add up to {macroCalories} Kcal, {delta} Kcal under your target.",
+  "@macroGramMismatchUnderMessage": {
+    "placeholders": {
+      "macroCalories": {
+        "type": "int"
+      },
+      "delta": {
+        "type": "int"
+      }
+    }
+  },
+  "macroUsePercentages": "Use percentages",
   "dashboardCouldNotLoadToday": "Could not load today",
   "dashboardGreetingMorning": "Good morning!",
   "dashboardGreetingAfternoon": "Good afternoon!",

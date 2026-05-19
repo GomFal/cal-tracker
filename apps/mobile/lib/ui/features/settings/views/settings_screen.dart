@@ -5,10 +5,12 @@ import '../../../../app/locale_view_model.dart';
 import '../../../../domain/models/macro_distribution.dart';
 import '../../../../domain/models/nutrition_models.dart';
 import '../../../../l10n/app_localizations_context.dart';
+import '../../../../l10n/generated/app_localizations.dart';
 import '../../../core/content_frame.dart';
 import '../../../core/design_system.dart';
 import '../../auth/view_models/auth_view_model.dart';
 import '../../dashboard/view_models/dashboard_view_model.dart';
+import '../../dashboard/views/calorie_target_sheet.dart';
 import '../../dashboard/views/macro_distribution_sheet.dart';
 import '../../meal_history/view_models/meal_history_view_model.dart';
 import '../view_models/settings_view_model.dart';
@@ -137,23 +139,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             icon: Icons.flag_rounded,
             color: FreshColors.orange,
             title: l10n.settingsCalorieTarget,
-            subtitle: l10n.settingsCalorieTargetSubtitle(
-              goals?.target.calories ?? 2200,
-            ),
+            subtitle: goals?.calorieTargetConfigured == true
+                ? l10n.settingsCalorieTargetSubtitle(
+                    goals?.target.calories ?? 2200,
+                  )
+                : l10n.settingsNotSet,
             onTap: settings.isLoading
                 ? null
-                : () => _editGoal(
-                      context,
-                      title: l10n.settingsCalorieTarget,
-                      fieldKey: const ValueKey('calorie_target_field'),
-                      initialValue: goals?.target.calories ?? 2200,
-                      unit: l10n.commonKcal,
-                      minValue: 800,
-                      maxValue: 10000,
-                      onSave: (value) => context
-                          .read<SettingsViewModel>()
-                          .updateGoals(calories: value),
-                    ),
+                : () => _showCalorieTargetSheet(context, goals),
           ),
           const SizedBox(height: FreshSpacing.md),
           _SettingsGoalRow(
@@ -161,10 +154,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             icon: Icons.pie_chart_rounded,
             color: FreshColors.leaf,
             title: 'Macro distribution',
-            subtitle: _macroDistributionSubtitle(goals),
+            subtitle: _macroDistributionSubtitle(l10n, goals),
             onTap: settings.isLoading
                 ? null
-                : () => _showMacroDistributionSheet(context, goals),
+                : () => _showMacroDistributionEntry(context, goals),
           ),
           const SizedBox(height: FreshSpacing.md),
           _SettingsGoalRow(
@@ -220,11 +213,71 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ]);
   }
 
-  Future<void> _showMacroDistributionSheet(
+  Future<void> _showCalorieTargetSheet(
     BuildContext context,
     DailyGoals? goals,
   ) async {
-    final calories = goals?.target.calories ?? 2200;
+    final selection = await showModalBottomSheet<CalorieTargetSelection>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) => CalorieTargetSheet(
+        initialValue: goals?.target.calories ?? 2200,
+        estimateCalories: context.read<DashboardViewModel>().estimateCalories,
+      ),
+    );
+    if (!context.mounted || selection == null) return;
+    final updated = await context.read<SettingsViewModel>().updateGoals(
+          calories: selection.calories,
+          calorieTargetSource: selection.source,
+          macroConfig: selection.macroConfig,
+          macroCalorieTarget: selection.calories,
+        );
+    if (!context.mounted || updated == null) return;
+    await _refreshGoalConsumers(context, forceDashboardRefresh: true);
+    if (!context.mounted ||
+        selection.source != 'manual' ||
+        selection.macroConfig != null) {
+      return;
+    }
+    final shouldConfigure = await showModalBottomSheet<bool>(
+          context: context,
+          useSafeArea: true,
+          builder: (context) => PostCalorieSaveMacroPrompt(
+            calories: selection.calories,
+          ),
+        ) ??
+        false;
+    if (!context.mounted || !shouldConfigure) return;
+    await _showMacroDistributionSheet(
+      context,
+      updated,
+      caloriesOverride: selection.calories,
+    );
+  }
+
+  Future<void> _showMacroDistributionEntry(
+    BuildContext context,
+    DailyGoals? goals,
+  ) async {
+    if (goals?.calorieTargetConfigured == true) {
+      await _showMacroDistributionSheet(context, goals);
+      return;
+    }
+    final shouldSetCalories = await showModalBottomSheet<bool>(
+          context: context,
+          useSafeArea: true,
+          builder: (context) => const _MacroRequiresCaloriesSheet(),
+        ) ??
+        false;
+    if (!context.mounted || !shouldSetCalories) return;
+    await _showCalorieTargetSheet(context, goals);
+  }
+
+  Future<void> _showMacroDistributionSheet(
+      BuildContext context, DailyGoals? goals,
+      {int? caloriesOverride}) async {
+    final calories = caloriesOverride ?? goals?.target.calories ?? 2200;
     final macroConfig = await showModalBottomSheet<MacroDistributionConfig>(
       context: context,
       isScrollControlled: true,
@@ -240,15 +293,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
           macroCalorieTarget: calories,
         );
     if (!context.mounted || updated == null) return;
-    await Future.wait([
-      context.read<DashboardViewModel>().load(forceRefresh: true),
+    await _refreshGoalConsumers(context, forceDashboardRefresh: true);
+  }
+
+  Future<void> _refreshGoalConsumers(
+    BuildContext context, {
+    bool forceDashboardRefresh = false,
+  }) {
+    return Future.wait([
+      context.read<DashboardViewModel>().load(
+            forceRefresh: forceDashboardRefresh,
+          ),
       context.read<SettingsViewModel>().load(),
       context.read<MealHistoryViewModel>().load(),
     ]);
   }
 
-  String _macroDistributionSubtitle(DailyGoals? goals) {
-    if (goals?.macroMode == null) return 'Not set';
+  String _macroDistributionSubtitle(AppLocalizations l10n, DailyGoals? goals) {
+    if (goals?.calorieTargetConfigured != true || goals?.macroMode == null) {
+      return l10n.settingsNotSet;
+    }
     final preset = goals!.macroPreset;
     if (preset != null) {
       return '${preset.label}: ${preset.proteinPct}% protein, ${preset.carbsPct}% carbs, ${preset.fatPct}% fat';
@@ -343,6 +407,61 @@ class _LanguageOption extends StatelessWidget {
           ),
           if (selected)
             Icon(Icons.check_rounded, color: context.freshPalette.limeDeep),
+        ],
+      ),
+    );
+  }
+}
+
+class _MacroRequiresCaloriesSheet extends StatelessWidget {
+  const _MacroRequiresCaloriesSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.freshPalette;
+    final textTheme = Theme.of(context).textTheme;
+    final l10n = context.l10n;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Container(
+              width: 44,
+              height: 4,
+              decoration: BoxDecoration(
+                color: palette.rule,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ),
+          const SizedBox(height: FreshSpacing.lg),
+          Text(
+            l10n.settingsMacroRequiresCaloriesTitle,
+            style: textTheme.titleLarge?.copyWith(
+              color: palette.ink,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: FreshSpacing.xs),
+          Text(
+            l10n.settingsMacroRequiresCaloriesMessage,
+            style: textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
+          ),
+          const SizedBox(height: FreshSpacing.lg),
+          FilledButton(
+            key: const ValueKey('macro_requires_calories_set_now'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(l10n.settingsMacroRequiresCaloriesSetNow),
+          ),
+          const SizedBox(height: FreshSpacing.sm),
+          TextButton(
+            key: const ValueKey('macro_requires_calories_skip'),
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(l10n.settingsMacroRequiresCaloriesSkip),
+          ),
         ],
       ),
     );

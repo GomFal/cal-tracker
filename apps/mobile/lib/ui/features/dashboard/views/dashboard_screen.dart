@@ -125,8 +125,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (!context.mounted) return;
     if (!saved) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Couldn't save your calories. Please try again."),
+        SnackBar(
+          content: Text(context.l10n.calorieCouldNotSaveCalories),
         ),
       );
       return;
@@ -144,7 +144,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final shouldConfigure = await showModalBottomSheet<bool>(
           context: context,
           useSafeArea: true,
-          builder: (context) => _PostCalorieSaveMacroPrompt(
+          builder: (context) => PostCalorieSaveMacroPrompt(
             calories: selection.calories,
           ),
         ) ??
@@ -156,7 +156,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       useSafeArea: true,
       builder: (context) => MacroDistributionSheet(
         calories: selection.calories,
-        title: 'Set your macros',
       ),
     );
     if (!context.mounted || macroConfig == null) return;
@@ -168,8 +167,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (!context.mounted) return;
     if (!macroSaved) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Couldn't save your macros. Please try again."),
+        SnackBar(
+          content: Text(context.l10n.calorieCouldNotSaveMacros),
         ),
       );
       return;
@@ -178,67 +177,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       context.read<MealHistoryViewModel>().load(),
       context.read<SettingsViewModel>().load(),
     ]);
-  }
-}
-
-class _PostCalorieSaveMacroPrompt extends StatelessWidget {
-  const _PostCalorieSaveMacroPrompt({required this.calories});
-
-  final int calories;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.freshPalette;
-    final textTheme = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Center(
-            child: Container(
-              width: 44,
-              height: 4,
-              decoration: BoxDecoration(
-                color: palette.rule,
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-          ),
-          const SizedBox(height: FreshSpacing.lg),
-          Text(
-            'Calories saved',
-            style: textTheme.titleLarge?.copyWith(
-              color: palette.ink,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: FreshSpacing.xs),
-          Text(
-            'Your daily target is $calories Kcal.',
-            style: textTheme.bodyMedium?.copyWith(color: palette.inkSoft),
-          ),
-          const SizedBox(height: FreshSpacing.xs),
-          Text(
-            'Want to track protein, carbs and fats too?',
-            style: textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
-          ),
-          const SizedBox(height: FreshSpacing.lg),
-          FilledButton(
-            key: const ValueKey('macro_prompt_set_distribution'),
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Set macro distribution'),
-          ),
-          const SizedBox(height: FreshSpacing.sm),
-          TextButton(
-            key: const ValueKey('macro_prompt_not_now'),
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Not now'),
-          ),
-        ],
-      ),
-    );
   }
 }
 
@@ -468,7 +406,10 @@ class _CalorieSetupProgressCard extends StatelessWidget {
                         FittedBox(
                           fit: BoxFit.scaleDown,
                           alignment: Alignment.centerLeft,
-                          child: Text('Set up your', style: titleStyle),
+                          child: Text(
+                            l10n.calorieSetupHeadlinePrefix,
+                            style: titleStyle,
+                          ),
                         ),
                         const SizedBox(height: 8),
                         FittedBox(
@@ -478,7 +419,10 @@ class _CalorieSetupProgressCard extends StatelessWidget {
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              Text('daily calories', style: titleStyle),
+                              Text(
+                                l10n.calorieSetupHeadlineMain,
+                                style: titleStyle,
+                              ),
                               const SizedBox(width: 10),
                               Container(
                                 padding: const EdgeInsets.symmetric(
@@ -491,7 +435,7 @@ class _CalorieSetupProgressCard extends StatelessWidget {
                                   borderRadius: BorderRadius.circular(18),
                                 ),
                                 child: Text(
-                                  'Here.',
+                                  l10n.calorieSetupHeadlineBadge,
                                   style: titleStyle?.copyWith(
                                     color: palette.leaf,
                                   ),

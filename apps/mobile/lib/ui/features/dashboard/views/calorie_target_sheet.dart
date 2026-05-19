@@ -3,18 +3,22 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../domain/models/macro_distribution.dart';
 import '../../../../domain/models/nutrition_models.dart';
 import '../../../../l10n/app_localizations_context.dart';
 import '../../../core/design_system.dart';
+import 'macro_distribution_sheet.dart';
 
 class CalorieTargetSelection {
   const CalorieTargetSelection({
     required this.calories,
     required this.source,
+    this.macroConfig,
   });
 
   final int calories;
   final String source;
+  final MacroDistributionConfig? macroConfig;
 }
 
 class CalorieTargetSheet extends StatefulWidget {
@@ -174,10 +178,21 @@ class _CalorieTargetSheetState extends State<CalorieTargetSheet> {
       ),
     );
     if (estimate == null || !mounted) return;
+    final macroConfig = await showModalBottomSheet<MacroDistributionConfig>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      useRootNavigator: true,
+      builder: (context) => _CalculatorMacroPrompt(
+        calories: estimate.targetCalories,
+      ),
+    );
+    if (!mounted) return;
     Navigator.of(context).pop(
       CalorieTargetSelection(
         calories: estimate.targetCalories,
         source: 'calculator',
+        macroConfig: macroConfig,
       ),
     );
   }
@@ -190,6 +205,79 @@ class _CalorieTargetSheetState extends State<CalorieTargetSheet> {
     }
     Navigator.of(context).pop(
       CalorieTargetSelection(calories: value, source: _source),
+    );
+  }
+}
+
+class _CalculatorMacroPrompt extends StatelessWidget {
+  const _CalculatorMacroPrompt({required this.calories});
+
+  final int calories;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.freshPalette;
+    final textTheme = Theme.of(context).textTheme;
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 12, 20, bottomInset + 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Container(
+              width: 44,
+              height: 4,
+              decoration: BoxDecoration(
+                color: palette.rule,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ),
+          const SizedBox(height: FreshSpacing.lg),
+          Text(
+            'Add macros?',
+            style: textTheme.titleLarge?.copyWith(
+              color: palette.ink,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: FreshSpacing.xs),
+          Text(
+            'Choose a simple protein, carb and fat split for $calories Kcal.',
+            style: textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
+          ),
+          const SizedBox(height: FreshSpacing.lg),
+          FilledButton(
+            key: const ValueKey('calculator_macro_configure_button'),
+            onPressed: () async {
+              final config =
+                  await showModalBottomSheet<MacroDistributionConfig>(
+                context: context,
+                isScrollControlled: true,
+                useSafeArea: true,
+                useRootNavigator: true,
+                builder: (context) => MacroDistributionSheet(
+                  calories: calories,
+                  presetOnly: true,
+                  title: 'Choose your macros',
+                ),
+              );
+              if (context.mounted && config != null) {
+                Navigator.of(context).pop(config);
+              }
+            },
+            child: const Text('Configure'),
+          ),
+          const SizedBox(height: FreshSpacing.sm),
+          TextButton(
+            key: const ValueKey('calculator_macro_skip_button'),
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Skip for now'),
+          ),
+        ],
+      ),
     );
   }
 }

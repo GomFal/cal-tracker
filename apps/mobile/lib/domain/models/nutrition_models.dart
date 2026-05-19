@@ -1,3 +1,5 @@
+import 'macro_distribution.dart';
+
 class NutritionSnapshot {
   const NutritionSnapshot({
     required this.calories,
@@ -28,6 +30,14 @@ class DailyGoals {
     required this.hydrationGoalGlasses,
     required this.calorieTargetConfigured,
     required this.calorieTargetSource,
+    this.macroMode,
+    this.macroSource,
+    this.macroPreset,
+    this.proteinPct,
+    this.carbsPct,
+    this.fatPct,
+    this.macroCalories,
+    this.calorieDeltaKcal,
   });
 
   final String date;
@@ -35,6 +45,14 @@ class DailyGoals {
   final int hydrationGoalGlasses;
   final bool calorieTargetConfigured;
   final String calorieTargetSource;
+  final MacroMode? macroMode;
+  final MacroSource? macroSource;
+  final MacroPreset? macroPreset;
+  final int? proteinPct;
+  final int? carbsPct;
+  final int? fatPct;
+  final int? macroCalories;
+  final int? calorieDeltaKcal;
 
   factory DailyGoals.fromJson(Map<String, Object?> json) {
     return DailyGoals(
@@ -45,6 +63,14 @@ class DailyGoals {
           (json['hydrationGoalGlasses'] as num? ?? 12).toInt(),
       calorieTargetConfigured: json['calorieTargetConfigured'] as bool? ?? true,
       calorieTargetSource: json['calorieTargetSource'] as String? ?? 'manual',
+      macroMode: MacroMode.fromApi(json['macroMode'] as String?),
+      macroSource: MacroSource.fromApi(json['macroSource'] as String?),
+      macroPreset: MacroPreset.fromApi(json['macroPreset'] as String?),
+      proteinPct: (json['proteinPct'] as num?)?.toInt(),
+      carbsPct: (json['carbsPct'] as num?)?.toInt(),
+      fatPct: (json['fatPct'] as num?)?.toInt(),
+      macroCalories: (json['macroCalories'] as num?)?.toInt(),
+      calorieDeltaKcal: (json['calorieDeltaKcal'] as num?)?.toInt(),
     );
   }
 }
@@ -476,6 +502,14 @@ class DailySummary {
     required this.hydrationGoalGlasses,
     required this.calorieTargetConfigured,
     required this.calorieTargetSource,
+    this.macroMode,
+    this.macroSource,
+    this.macroPreset,
+    this.proteinPct,
+    this.carbsPct,
+    this.fatPct,
+    this.macroCalories,
+    this.calorieDeltaKcal,
     required this.meals,
   });
 
@@ -486,6 +520,14 @@ class DailySummary {
   final int hydrationGoalGlasses;
   final bool calorieTargetConfigured;
   final String calorieTargetSource;
+  final MacroMode? macroMode;
+  final MacroSource? macroSource;
+  final MacroPreset? macroPreset;
+  final int? proteinPct;
+  final int? carbsPct;
+  final int? fatPct;
+  final int? macroCalories;
+  final int? calorieDeltaKcal;
   final List<Meal> meals;
 
   factory DailySummary.fromJson(Map<String, Object?> json) {
@@ -501,6 +543,14 @@ class DailySummary {
           (json['hydrationGoalGlasses'] as num? ?? 12).toInt(),
       calorieTargetConfigured: json['calorieTargetConfigured'] as bool? ?? true,
       calorieTargetSource: json['calorieTargetSource'] as String? ?? 'manual',
+      macroMode: MacroMode.fromApi(json['macroMode'] as String?),
+      macroSource: MacroSource.fromApi(json['macroSource'] as String?),
+      macroPreset: MacroPreset.fromApi(json['macroPreset'] as String?),
+      proteinPct: (json['proteinPct'] as num?)?.toInt(),
+      carbsPct: (json['carbsPct'] as num?)?.toInt(),
+      fatPct: (json['fatPct'] as num?)?.toInt(),
+      macroCalories: (json['macroCalories'] as num?)?.toInt(),
+      calorieDeltaKcal: (json['calorieDeltaKcal'] as num?)?.toInt(),
       meals: (json['meals'] as List<Object?>)
           .cast<Map<String, Object?>>()
           .map(Meal.fromJson)

@@ -1,7 +1,8 @@
-import { defaultUserScopes, type CalorieTargetSource, type DailyGoals, type Meal, type MealItem, type MealLabel, type MealProposal, type MealTemplate, type NutritionSnapshot, type PermissionScope } from "@cal-tracker/contracts";
+import { defaultUserScopes, type CalorieTargetSource, type DailyGoals, type MacroGoalMetadata, type Meal, type MealItem, type MealLabel, type MealProposal, type MealTemplate, type NutritionSnapshot, type PermissionScope } from "@cal-tracker/contracts";
 import { sql as dbSql, type SQL } from "drizzle-orm";
 import { createDbClient, type AppDb, type AppDbClient } from "../db/client.js";
 import { newId } from "../utils/ids.js";
+import { applyMacroGoalUpdate } from "../utils/macroGoals.js";
 import { withSpan, withSyncSpan } from "../observability/profiler.js";
 import { normalizeText } from "../utils/normalize.js";
 import { subtractNutrition, sumNutrition } from "../utils/nutrition.js";
@@ -22,6 +23,7 @@ import type {
   StoredSession,
   StoredUser,
   UpsertFoodItemEmbeddingInput,
+  UpdateDailyGoalsInput,
   UserFoodPreference
 } from "./types.js";
 
@@ -689,11 +691,15 @@ export class PostgresRepository implements AppRepository {
     const [inserted] = await this.execute(dbSql`
       INSERT INTO daily_goal_snapshots (
         user_id, target_date, calories, protein_grams, carbs_grams, fat_grams, hydration_goal_glasses,
-        calorie_target_configured, calorie_target_source, calorie_target_configured_at
+        calorie_target_configured, calorie_target_source, calorie_target_configured_at,
+        macro_mode, macro_source, macro_preset, protein_pct, carbs_pct, fat_pct, macro_calories, calorie_delta_kcal
       )
       VALUES (
         ${userId}, ${date}, ${current.target.calories}, ${current.target.proteinGrams}, ${current.target.carbsGrams}, ${current.target.fatGrams}, ${current.hydrationGoalGlasses},
-        ${current.calorieTargetConfigured}, ${current.calorieTargetSource}, ${current.calorieTargetConfiguredAt ?? null}
+        ${current.calorieTargetConfigured}, ${current.calorieTargetSource}, ${current.calorieTargetConfiguredAt ?? null},
+        ${current.macroMode ?? null}, ${current.macroSource ?? null}, ${current.macroPreset ?? null},
+        ${current.proteinPct ?? null}, ${current.carbsPct ?? null}, ${current.fatPct ?? null},
+        ${current.macroCalories ?? null}, ${current.calorieDeltaKcal ?? null}
       )
       ON CONFLICT (user_id, target_date) DO NOTHING
       RETURNING *
@@ -707,27 +713,33 @@ export class PostgresRepository implements AppRepository {
     return mapDailyGoals(row);
   }
 
-  async updateDailyGoals(userId: string, input: { date: string; calories?: number; hydrationGoalGlasses?: number; calorieTargetSource?: CalorieTargetSource }): Promise<DailyGoals> {
+  async updateDailyGoals(userId: string, input: UpdateDailyGoalsInput): Promise<DailyGoals> {
     return this.db.transaction(async (tx) => {
       const current = await this.getCurrentGoals(userId, tx);
       for (const snapshotDate of previousDatesInWeek(input.date)) {
         await executeRows(tx, dbSql`
           INSERT INTO daily_goal_snapshots (
             user_id, target_date, calories, protein_grams, carbs_grams, fat_grams, hydration_goal_glasses,
-            calorie_target_configured, calorie_target_source, calorie_target_configured_at
+            calorie_target_configured, calorie_target_source, calorie_target_configured_at,
+            macro_mode, macro_source, macro_preset, protein_pct, carbs_pct, fat_pct, macro_calories, calorie_delta_kcal
           )
           VALUES (
             ${userId}, ${snapshotDate}, ${current.target.calories}, ${current.target.proteinGrams}, ${current.target.carbsGrams}, ${current.target.fatGrams}, ${current.hydrationGoalGlasses},
-            ${current.calorieTargetConfigured}, ${current.calorieTargetSource}, ${current.calorieTargetConfiguredAt ?? null}
+            ${current.calorieTargetConfigured}, ${current.calorieTargetSource}, ${current.calorieTargetConfiguredAt ?? null},
+            ${current.macroMode ?? null}, ${current.macroSource ?? null}, ${current.macroPreset ?? null},
+            ${current.proteinPct ?? null}, ${current.carbsPct ?? null}, ${current.fatPct ?? null},
+            ${current.macroCalories ?? null}, ${current.calorieDeltaKcal ?? null}
           )
           ON CONFLICT (user_id, target_date) DO NOTHING
         `);
       }
 
-      const nextTarget = {
-        ...current.target,
-        calories: input.calories ?? current.target.calories
-      };
+      const { target: nextTarget, metadata: nextMacroMetadata } = applyMacroGoalUpdate(
+        current.target,
+        current,
+        input,
+        input.calories ?? current.target.calories
+      );
       const nextHydration = input.hydrationGoalGlasses ?? current.hydrationGoalGlasses;
       const calorieTargetWasUpdated = input.calories !== undefined;
       const nextConfigured = calorieTargetWasUpdated ? true : current.calorieTargetConfigured;
@@ -736,11 +748,17 @@ export class PostgresRepository implements AppRepository {
       await executeRows(tx, dbSql`
         INSERT INTO nutrition_targets (
           user_id, calories, protein_grams, carbs_grams, fat_grams, hydration_goal_glasses,
-          calorie_target_configured, calorie_target_source, calorie_target_configured_at, updated_at
+          calorie_target_configured, calorie_target_source, calorie_target_configured_at,
+          macro_mode, macro_source, macro_preset, protein_pct, carbs_pct, fat_pct, macro_calories, calorie_delta_kcal,
+          updated_at
         )
         VALUES (
           ${userId}, ${nextTarget.calories}, ${nextTarget.proteinGrams}, ${nextTarget.carbsGrams}, ${nextTarget.fatGrams}, ${nextHydration},
-          ${nextConfigured}, ${nextSource}, ${nextConfiguredAt ?? null}, now()
+          ${nextConfigured}, ${nextSource}, ${nextConfiguredAt ?? null},
+          ${nextMacroMetadata.macroMode ?? null}, ${nextMacroMetadata.macroSource ?? null}, ${nextMacroMetadata.macroPreset ?? null},
+          ${nextMacroMetadata.proteinPct ?? null}, ${nextMacroMetadata.carbsPct ?? null}, ${nextMacroMetadata.fatPct ?? null},
+          ${nextMacroMetadata.macroCalories ?? null}, ${nextMacroMetadata.calorieDeltaKcal ?? null},
+          now()
         )
         ON CONFLICT (user_id) DO UPDATE
         SET calories = EXCLUDED.calories,
@@ -751,16 +769,30 @@ export class PostgresRepository implements AppRepository {
             calorie_target_configured = EXCLUDED.calorie_target_configured,
             calorie_target_source = EXCLUDED.calorie_target_source,
             calorie_target_configured_at = EXCLUDED.calorie_target_configured_at,
+            macro_mode = EXCLUDED.macro_mode,
+            macro_source = EXCLUDED.macro_source,
+            macro_preset = EXCLUDED.macro_preset,
+            protein_pct = EXCLUDED.protein_pct,
+            carbs_pct = EXCLUDED.carbs_pct,
+            fat_pct = EXCLUDED.fat_pct,
+            macro_calories = EXCLUDED.macro_calories,
+            calorie_delta_kcal = EXCLUDED.calorie_delta_kcal,
             updated_at = now()
       `);
       const [row] = await executeRows(tx, dbSql`
         INSERT INTO daily_goal_snapshots (
           user_id, target_date, calories, protein_grams, carbs_grams, fat_grams, hydration_goal_glasses,
-          calorie_target_configured, calorie_target_source, calorie_target_configured_at, updated_at
+          calorie_target_configured, calorie_target_source, calorie_target_configured_at,
+          macro_mode, macro_source, macro_preset, protein_pct, carbs_pct, fat_pct, macro_calories, calorie_delta_kcal,
+          updated_at
         )
         VALUES (
           ${userId}, ${input.date}, ${nextTarget.calories}, ${nextTarget.proteinGrams}, ${nextTarget.carbsGrams}, ${nextTarget.fatGrams}, ${nextHydration},
-          ${nextConfigured}, ${nextSource}, ${nextConfiguredAt ?? null}, now()
+          ${nextConfigured}, ${nextSource}, ${nextConfiguredAt ?? null},
+          ${nextMacroMetadata.macroMode ?? null}, ${nextMacroMetadata.macroSource ?? null}, ${nextMacroMetadata.macroPreset ?? null},
+          ${nextMacroMetadata.proteinPct ?? null}, ${nextMacroMetadata.carbsPct ?? null}, ${nextMacroMetadata.fatPct ?? null},
+          ${nextMacroMetadata.macroCalories ?? null}, ${nextMacroMetadata.calorieDeltaKcal ?? null},
+          now()
         )
         ON CONFLICT (user_id, target_date) DO UPDATE
         SET calories = EXCLUDED.calories,
@@ -771,6 +803,14 @@ export class PostgresRepository implements AppRepository {
             calorie_target_configured = EXCLUDED.calorie_target_configured,
             calorie_target_source = EXCLUDED.calorie_target_source,
             calorie_target_configured_at = EXCLUDED.calorie_target_configured_at,
+            macro_mode = EXCLUDED.macro_mode,
+            macro_source = EXCLUDED.macro_source,
+            macro_preset = EXCLUDED.macro_preset,
+            protein_pct = EXCLUDED.protein_pct,
+            carbs_pct = EXCLUDED.carbs_pct,
+            fat_pct = EXCLUDED.fat_pct,
+            macro_calories = EXCLUDED.macro_calories,
+            calorie_delta_kcal = EXCLUDED.calorie_delta_kcal,
             updated_at = now()
         RETURNING *
       `);
@@ -897,6 +937,14 @@ export class PostgresRepository implements AppRepository {
       hydrationGoalGlasses: goals.hydrationGoalGlasses,
       calorieTargetConfigured: goals.calorieTargetConfigured,
       calorieTargetSource: goals.calorieTargetSource,
+      macroMode: goals.macroMode,
+      macroSource: goals.macroSource,
+      macroPreset: goals.macroPreset,
+      proteinPct: goals.proteinPct,
+      carbsPct: goals.carbsPct,
+      fatPct: goals.fatPct,
+      macroCalories: goals.macroCalories,
+      calorieDeltaKcal: goals.calorieDeltaKcal,
       meals
     };
   }
@@ -1114,7 +1162,8 @@ export class PostgresRepository implements AppRepository {
       hydrationGoalGlasses: Number(row.hydration_goal_glasses ?? 12),
       calorieTargetConfigured: Boolean(row.calorie_target_configured),
       calorieTargetSource: parseCalorieTargetSource(row.calorie_target_source),
-      calorieTargetConfiguredAt: row.calorie_target_configured_at ? toIso(row.calorie_target_configured_at) : undefined
+      calorieTargetConfiguredAt: row.calorie_target_configured_at ? toIso(row.calorie_target_configured_at) : undefined,
+      ...mapMacroMetadata(row)
     };
   }
 
@@ -1312,12 +1361,38 @@ function mapDailyGoals(row: Record<string, unknown>): DailyGoals {
     target: mapNutrition(row),
     hydrationGoalGlasses: Number(row.hydration_goal_glasses ?? 12),
     calorieTargetConfigured: Boolean(row.calorie_target_configured),
-    calorieTargetSource: parseCalorieTargetSource(row.calorie_target_source)
+    calorieTargetSource: parseCalorieTargetSource(row.calorie_target_source),
+    ...mapMacroMetadata(row)
   };
 }
 
 function parseCalorieTargetSource(value: unknown): CalorieTargetSource {
   return value === "manual" || value === "calculator" || value === "default" ? value : "default";
+}
+
+function mapMacroMetadata(row: Record<string, unknown>): MacroGoalMetadata {
+  return {
+    macroMode: parseMacroMode(row.macro_mode),
+    macroSource: parseMacroSource(row.macro_source),
+    macroPreset: parseMacroPreset(row.macro_preset),
+    proteinPct: optionalNumber(row.protein_pct),
+    carbsPct: optionalNumber(row.carbs_pct),
+    fatPct: optionalNumber(row.fat_pct),
+    macroCalories: optionalNumber(row.macro_calories),
+    calorieDeltaKcal: optionalNumber(row.calorie_delta_kcal)
+  };
+}
+
+function parseMacroMode(value: unknown): MacroGoalMetadata["macroMode"] {
+  return value === "percentage" || value === "grams" ? value : undefined;
+}
+
+function parseMacroSource(value: unknown): MacroGoalMetadata["macroSource"] {
+  return value === "preset" || value === "custom" ? value : undefined;
+}
+
+function parseMacroPreset(value: unknown): MacroGoalMetadata["macroPreset"] {
+  return value === "balanced" || value === "high_protein" || value === "lower_carb" ? value : undefined;
 }
 
 function mapMealLabel(row: Record<string, unknown>): MealLabel | null {
@@ -1396,6 +1471,10 @@ function toDateOnly(value: unknown): string {
 
 function optionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function optionalNumber(value: unknown): number | undefined {
+  return value == null ? undefined : Number(value);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

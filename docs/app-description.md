@@ -1000,6 +1000,7 @@ Scope:
 * The Bun + TypeScript backend owns registration, login, logout, session issuance, session validation, refresh/rotation, password reset, and account deletion.
 * PostgreSQL stores users, password credentials, session records, password reset tokens, and security audit events.
 * Flutter authenticates only through backend API endpoints and stores session material using platform secure storage.
+* On mobile startup, Flutter holds the protected initial route while it validates saved session material with `/v1/auth/me`; it shows authentication only after validation or refresh fails, or when no saved tokens exist.
 * Backend routes derive the application user from the validated session. Request bodies must not provide trusted user identity.
 * The action executor receives identity through `ActionContext.actorUserId`.
 

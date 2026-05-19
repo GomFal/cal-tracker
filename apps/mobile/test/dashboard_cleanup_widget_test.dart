@@ -7,6 +7,7 @@ import 'package:cal_tracker_mobile/data/services/api_config.dart';
 import 'package:cal_tracker_mobile/data/services/app_preferences_repository.dart';
 import 'package:cal_tracker_mobile/data/services/secure_token_storage.dart';
 import 'package:cal_tracker_mobile/domain/models/auth_models.dart';
+import 'package:cal_tracker_mobile/domain/models/macro_distribution.dart';
 import 'package:cal_tracker_mobile/domain/models/nutrition_models.dart';
 import 'package:cal_tracker_mobile/generated/api/cal_tracker_api.dart';
 import 'package:cal_tracker_mobile/l10n/generated/app_localizations.dart';
@@ -196,6 +197,10 @@ void main() {
 
     expect(nutritionRepository.updatedCalories, 1900);
     expect(nutritionRepository.updateSource, 'manual');
+    expect(find.text('Calories saved'), findsOneWidget);
+    expect(find.byKey(const ValueKey('macro_prompt_not_now')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('macro_prompt_not_now')));
+    await tester.pumpAndSettle();
     expect(find.text('Set up your'), findsNothing);
     expect(find.text('daily calories'), findsNothing);
     expect(find.text('Here.'), findsNothing);
@@ -298,6 +303,8 @@ class _FakeNutritionRepository extends NutritionRepository {
     int? calories,
     int? hydrationGoalGlasses,
     String? calorieTargetSource,
+    MacroDistributionConfig? macroConfig,
+    int? macroCalorieTarget,
   }) async {
     updatedCalories = calories;
     updateSource = calorieTargetSource;

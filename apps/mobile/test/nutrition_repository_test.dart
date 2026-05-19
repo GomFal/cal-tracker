@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:cal_tracker_mobile/data/repositories/nutrition_repository.dart';
+import 'package:cal_tracker_mobile/domain/models/macro_distribution.dart';
 import 'package:cal_tracker_mobile/generated/api/cal_tracker_api.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -110,6 +111,59 @@ void main() {
       expect(result.traceId, 'trace-1');
       expect(result.result.kind, 'proposal');
       expect(result.result.proposal?.title, 'Bread');
+    });
+
+    test('sends macro preset fields when updating daily goals', () async {
+      final apiClient = MockCalTrackerApiClient();
+      final repository = NutritionRepository(apiClient: apiClient);
+      Map<String, Object?>? capturedMacroFields;
+      when(
+        () => apiClient.updateDailyGoals(
+          date: any(named: 'date'),
+          calories: any(named: 'calories'),
+          hydrationGoalGlasses: any(named: 'hydrationGoalGlasses'),
+          calorieTargetSource: any(named: 'calorieTargetSource'),
+          macroFields: any(named: 'macroFields'),
+        ),
+      ).thenAnswer((invocation) async {
+        capturedMacroFields =
+            invocation.namedArguments[#macroFields] as Map<String, Object?>?;
+        return {
+          'goals': {
+            'date': '2026-05-18',
+            'target': {
+              'calories': 2000,
+              'proteinGrams': 175,
+              'carbsGrams': 175,
+              'fatGrams': 67,
+            },
+            'hydrationGoalGlasses': 12,
+            'calorieTargetConfigured': true,
+            'calorieTargetSource': 'calculator',
+            'macroMode': 'percentage',
+            'macroSource': 'preset',
+            'macroPreset': 'high_protein',
+            'proteinPct': 35,
+            'carbsPct': 35,
+            'fatPct': 30,
+          },
+        };
+      });
+
+      final goals = await repository.updateDailyGoals(
+        date: '2026-05-18',
+        calories: 2000,
+        calorieTargetSource: 'calculator',
+        macroConfig: MacroDistributionConfig.preset(MacroPreset.highProtein),
+        macroCalorieTarget: 2000,
+      );
+
+      expect(capturedMacroFields, containsPair('macroMode', 'percentage'));
+      expect(capturedMacroFields, containsPair('macroSource', 'preset'));
+      expect(capturedMacroFields, containsPair('macroPreset', 'high_protein'));
+      expect(capturedMacroFields, containsPair('proteinPct', 35));
+      expect(capturedMacroFields, containsPair('macroCalories', 2003));
+      expect(goals.macroPreset, MacroPreset.highProtein);
     });
   });
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../../data/repositories/nutrition_repository.dart';
+import '../../../../domain/models/macro_distribution.dart';
 import '../../../../domain/models/nutrition_models.dart';
 
 class DashboardViewModel extends ChangeNotifier {
@@ -78,13 +79,15 @@ class DashboardViewModel extends ChangeNotifier {
   }
 
   Future<bool> updateCalorieTarget(int calories,
-      {String source = 'manual'}) async {
+      {String source = 'manual', MacroDistributionConfig? macroConfig}) async {
     _isLoading = true;
     notifyListeners();
     try {
       await _nutritionRepository.updateDailyGoals(
         calories: calories,
         calorieTargetSource: source,
+        macroConfig: macroConfig,
+        macroCalorieTarget: calories,
       );
       _summary = await _nutritionRepository.getDailySummary();
       _error = null;

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../app/dark_mode_toggle.dart';
+import '../../../../domain/models/macro_distribution.dart';
 import '../../../../domain/models/nutrition_models.dart';
 import '../../../../l10n/app_localizations_context.dart';
 import '../../../../l10n/meal_label_localizations.dart';
@@ -14,6 +15,7 @@ import '../../settings/view_models/settings_view_model.dart';
 import '../dashboard_time_labels.dart';
 import '../view_models/dashboard_view_model.dart';
 import 'calorie_target_sheet.dart';
+import 'macro_distribution_sheet.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -115,15 +117,128 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
     );
     if (!context.mounted || selection == null) return;
-    await viewModel.updateCalorieTarget(
+    final saved = await viewModel.updateCalorieTarget(
       selection.calories,
       source: selection.source,
+      macroConfig: selection.macroConfig,
     );
+    if (!context.mounted) return;
+    if (!saved) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Couldn't save your calories. Please try again."),
+        ),
+      );
+      return;
+    }
     if (!context.mounted) return;
     await Future.wait([
       context.read<MealHistoryViewModel>().load(),
       context.read<SettingsViewModel>().load(),
     ]);
+    if (!context.mounted ||
+        selection.source != 'manual' ||
+        selection.macroConfig != null) {
+      return;
+    }
+    final shouldConfigure = await showModalBottomSheet<bool>(
+          context: context,
+          useSafeArea: true,
+          builder: (context) => _PostCalorieSaveMacroPrompt(
+            calories: selection.calories,
+          ),
+        ) ??
+        false;
+    if (!context.mounted || !shouldConfigure) return;
+    final macroConfig = await showModalBottomSheet<MacroDistributionConfig>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) => MacroDistributionSheet(
+        calories: selection.calories,
+        title: 'Set your macros',
+      ),
+    );
+    if (!context.mounted || macroConfig == null) return;
+    final macroSaved = await viewModel.updateCalorieTarget(
+      selection.calories,
+      source: selection.source,
+      macroConfig: macroConfig,
+    );
+    if (!context.mounted) return;
+    if (!macroSaved) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Couldn't save your macros. Please try again."),
+        ),
+      );
+      return;
+    }
+    await Future.wait([
+      context.read<MealHistoryViewModel>().load(),
+      context.read<SettingsViewModel>().load(),
+    ]);
+  }
+}
+
+class _PostCalorieSaveMacroPrompt extends StatelessWidget {
+  const _PostCalorieSaveMacroPrompt({required this.calories});
+
+  final int calories;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.freshPalette;
+    final textTheme = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Container(
+              width: 44,
+              height: 4,
+              decoration: BoxDecoration(
+                color: palette.rule,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ),
+          const SizedBox(height: FreshSpacing.lg),
+          Text(
+            'Calories saved',
+            style: textTheme.titleLarge?.copyWith(
+              color: palette.ink,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: FreshSpacing.xs),
+          Text(
+            'Your daily target is $calories Kcal.',
+            style: textTheme.bodyMedium?.copyWith(color: palette.inkSoft),
+          ),
+          const SizedBox(height: FreshSpacing.xs),
+          Text(
+            'Want to track protein, carbs and fats too?',
+            style: textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
+          ),
+          const SizedBox(height: FreshSpacing.lg),
+          FilledButton(
+            key: const ValueKey('macro_prompt_set_distribution'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Set macro distribution'),
+          ),
+          const SizedBox(height: FreshSpacing.sm),
+          TextButton(
+            key: const ValueKey('macro_prompt_not_now'),
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Not now'),
+          ),
+        ],
+      ),
+    );
   }
 }
 

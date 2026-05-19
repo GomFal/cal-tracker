@@ -129,7 +129,18 @@ export function createApp(input: {
       date,
       calories: body.calories,
       hydrationGoalGlasses: body.hydrationGoalGlasses,
-      calorieTargetSource: body.calorieTargetSource
+      calorieTargetSource: body.calorieTargetSource,
+      macroMode: body.macroMode,
+      macroSource: body.macroSource,
+      macroPreset: body.macroPreset,
+      proteinPct: body.proteinPct,
+      carbsPct: body.carbsPct,
+      fatPct: body.fatPct,
+      proteinGrams: body.proteinGrams,
+      carbsGrams: body.carbsGrams,
+      fatGrams: body.fatGrams,
+      macroCalories: body.macroCalories,
+      calorieDeltaKcal: body.calorieDeltaKcal
     });
     const summary = await repository.getDailySummary(user.id, date);
     return c.json({ goals, summary });

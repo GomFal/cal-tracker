@@ -231,6 +231,72 @@
               "calculator",
               "default"
             ]
+          },
+          "macroMode": {
+            "type": "string",
+            "enum": [
+              "percentage",
+              "grams"
+            ]
+          },
+          "macroSource": {
+            "type": "string",
+            "enum": [
+              "preset",
+              "custom"
+            ]
+          },
+          "macroPreset": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "balanced",
+                  "high_protein",
+                  "lower_carb"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "proteinPct": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "carbsPct": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "fatPct": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "proteinGrams": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 2000
+          },
+          "carbsGrams": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 2000
+          },
+          "fatGrams": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 2000
+          },
+          "macroCalories": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "calorieDeltaKcal": {
+            "type": "integer"
           }
         },
         "additionalProperties": false
@@ -286,6 +352,106 @@
                   "manual",
                   "calculator",
                   "default"
+                ]
+              },
+              "macroMode": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "percentage",
+                      "grams"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "macroSource": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "preset",
+                      "custom"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "macroPreset": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "balanced",
+                      "high_protein",
+                      "lower_carb"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "proteinPct": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "carbsPct": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "fatPct": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "macroCalories": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "calorieDeltaKcal": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
                 ]
               }
             },
@@ -402,6 +568,106 @@
                   "manual",
                   "calculator",
                   "default"
+                ]
+              },
+              "macroMode": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "percentage",
+                      "grams"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "macroSource": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "preset",
+                      "custom"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "macroPreset": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "balanced",
+                      "high_protein",
+                      "lower_carb"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "proteinPct": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "carbsPct": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "fatPct": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "macroCalories": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "calorieDeltaKcal": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
                 ]
               },
               "meals": {
@@ -1378,6 +1644,106 @@
                   "manual",
                   "calculator",
                   "default"
+                ]
+              },
+              "macroMode": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "percentage",
+                      "grams"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "macroSource": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "preset",
+                      "custom"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "macroPreset": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "balanced",
+                      "high_protein",
+                      "lower_carb"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "proteinPct": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "carbsPct": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "fatPct": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "macroCalories": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "calorieDeltaKcal": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
                 ]
               },
               "meals": {
@@ -6003,6 +6369,106 @@
                   "manual",
                   "calculator",
                   "default"
+                ]
+              },
+              "macroMode": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "percentage",
+                      "grams"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "macroSource": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "preset",
+                      "custom"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "macroPreset": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "balanced",
+                      "high_protein",
+                      "lower_carb"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "proteinPct": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "carbsPct": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "fatPct": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "macroCalories": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "calorieDeltaKcal": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
                 ]
               },
               "meals": {

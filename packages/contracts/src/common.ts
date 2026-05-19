@@ -11,13 +11,28 @@ export const nutritionSnapshotSchema = z.object({
 });
 
 export const calorieTargetSourceSchema = z.enum(["manual", "calculator", "default"]);
+export const macroModeSchema = z.enum(["percentage", "grams"]);
+export const macroSourceSchema = z.enum(["preset", "custom"]);
+export const macroPresetSchema = z.enum(["balanced", "high_protein", "lower_carb"]);
+
+export const macroGoalMetadataSchema = z.object({
+  macroMode: macroModeSchema.nullable().optional(),
+  macroSource: macroSourceSchema.nullable().optional(),
+  macroPreset: macroPresetSchema.nullable().optional(),
+  proteinPct: z.number().int().min(0).max(100).nullable().optional(),
+  carbsPct: z.number().int().min(0).max(100).nullable().optional(),
+  fatPct: z.number().int().min(0).max(100).nullable().optional(),
+  macroCalories: z.number().int().nonnegative().nullable().optional(),
+  calorieDeltaKcal: z.number().int().nullable().optional()
+});
 
 export const dailyGoalsSchema = z.object({
   date: z.string(),
   target: nutritionSnapshotSchema,
   hydrationGoalGlasses: z.number().int().min(1).max(40),
   calorieTargetConfigured: z.boolean(),
-  calorieTargetSource: calorieTargetSourceSchema
+  calorieTargetSource: calorieTargetSourceSchema,
+  ...macroGoalMetadataSchema.shape
 });
 
 export const foodResolutionProvenanceSchema = z.object({
@@ -154,6 +169,7 @@ export const dailySummarySchema = z.object({
   hydrationGoalGlasses: z.number().int().min(1).max(40),
   calorieTargetConfigured: z.boolean(),
   calorieTargetSource: calorieTargetSourceSchema,
+  ...macroGoalMetadataSchema.shape,
   meals: z.array(mealSchema)
 });
 
@@ -168,6 +184,10 @@ export const mealTemplateSchema = z.object({
 
 export type NutritionSnapshot = z.infer<typeof nutritionSnapshotSchema>;
 export type CalorieTargetSource = z.infer<typeof calorieTargetSourceSchema>;
+export type MacroMode = z.infer<typeof macroModeSchema>;
+export type MacroSource = z.infer<typeof macroSourceSchema>;
+export type MacroPreset = z.infer<typeof macroPresetSchema>;
+export type MacroGoalMetadata = z.infer<typeof macroGoalMetadataSchema>;
 export type DailyGoals = z.infer<typeof dailyGoalsSchema>;
 export type FoodResolutionProvenance = z.infer<typeof foodResolutionProvenanceSchema>;
 export type FoodPortionChoice = z.infer<typeof foodPortionChoiceSchema>;

@@ -73,6 +73,7 @@ class CalTrackerApiClient {
     int? calories,
     int? hydrationGoalGlasses,
     String? calorieTargetSource,
+    Map<String, Object?>? macroFields,
   }) {
     return _put('/v1/goals', {
       if (date != null) 'date': date,
@@ -81,6 +82,7 @@ class CalTrackerApiClient {
         'hydrationGoalGlasses': hydrationGoalGlasses,
       if (calorieTargetSource != null)
         'calorieTargetSource': calorieTargetSource,
+      if (macroFields != null) ...macroFields,
     });
   }
 

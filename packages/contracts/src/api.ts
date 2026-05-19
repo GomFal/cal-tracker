@@ -4,6 +4,9 @@ import {
   dailyGoalsSchema,
   dailySummarySchema,
   foodCandidateSchema,
+  macroModeSchema,
+  macroPresetSchema,
+  macroSourceSchema,
   mealItemSchema,
   mealProposalSchema,
   mealSchema,
@@ -93,11 +96,73 @@ export const goalsUpdateSchema = z.object({
   date: z.string().optional(),
   calories: z.number().int().min(800).max(10000).optional(),
   hydrationGoalGlasses: z.number().int().min(1).max(40).optional(),
-  calorieTargetSource: calorieTargetSourceSchema.optional()
-}).refine(
-  (value) => value.calories !== undefined || value.hydrationGoalGlasses !== undefined,
-  "calories or hydrationGoalGlasses is required"
-);
+  calorieTargetSource: calorieTargetSourceSchema.optional(),
+  macroMode: macroModeSchema.optional(),
+  macroSource: macroSourceSchema.optional(),
+  macroPreset: macroPresetSchema.nullable().optional(),
+  proteinPct: z.number().int().min(0).max(100).optional(),
+  carbsPct: z.number().int().min(0).max(100).optional(),
+  fatPct: z.number().int().min(0).max(100).optional(),
+  proteinGrams: z.number().nonnegative().max(2000).optional(),
+  carbsGrams: z.number().nonnegative().max(2000).optional(),
+  fatGrams: z.number().nonnegative().max(2000).optional(),
+  macroCalories: z.number().int().nonnegative().optional(),
+  calorieDeltaKcal: z.number().int().optional()
+}).superRefine((value, ctx) => {
+  const hasMacroField = value.macroMode !== undefined ||
+    value.macroSource !== undefined ||
+    value.macroPreset !== undefined ||
+    value.proteinPct !== undefined ||
+    value.carbsPct !== undefined ||
+    value.fatPct !== undefined ||
+    value.proteinGrams !== undefined ||
+    value.carbsGrams !== undefined ||
+    value.fatGrams !== undefined ||
+    value.macroCalories !== undefined ||
+    value.calorieDeltaKcal !== undefined;
+  if (value.calories === undefined && value.hydrationGoalGlasses === undefined && !hasMacroField) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "calories, hydrationGoalGlasses, or macro fields are required"
+    });
+  }
+  if (!hasMacroField) return;
+  if (value.macroMode === undefined) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["macroMode"],
+      message: "macroMode is required when macro fields are provided"
+    });
+    return;
+  }
+  if (value.macroMode === "percentage") {
+    if (value.proteinPct === undefined || value.carbsPct === undefined || value.fatPct === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["proteinPct"],
+        message: "proteinPct, carbsPct, and fatPct are required in percentage mode"
+      });
+      return;
+    }
+    const total = value.proteinPct + value.carbsPct + value.fatPct;
+    if (total !== 100) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["proteinPct"],
+        message: "macro percentages must total 100"
+      });
+    }
+  }
+  if (value.macroMode === "grams") {
+    if (value.proteinGrams === undefined || value.carbsGrams === undefined || value.fatGrams === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["proteinGrams"],
+        message: "proteinGrams, carbsGrams, and fatGrams are required in grams mode"
+      });
+    }
+  }
+});
 
 export const calorieEstimateRequestSchema = z.object({
   age: z.number().int().min(18).max(100),

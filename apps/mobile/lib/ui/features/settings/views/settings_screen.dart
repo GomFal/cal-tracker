@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../app/locale_view_model.dart';
+import '../../../../domain/models/macro_distribution.dart';
+import '../../../../domain/models/nutrition_models.dart';
 import '../../../../l10n/app_localizations_context.dart';
 import '../../../core/content_frame.dart';
 import '../../../core/design_system.dart';
 import '../../auth/view_models/auth_view_model.dart';
 import '../../dashboard/view_models/dashboard_view_model.dart';
+import '../../dashboard/views/macro_distribution_sheet.dart';
 import '../../meal_history/view_models/meal_history_view_model.dart';
 import '../view_models/settings_view_model.dart';
 
@@ -154,6 +157,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: FreshSpacing.md),
           _SettingsGoalRow(
+            key: const ValueKey('macro_distribution_row'),
+            icon: Icons.pie_chart_rounded,
+            color: FreshColors.leaf,
+            title: 'Macro distribution',
+            subtitle: _macroDistributionSubtitle(goals),
+            onTap: settings.isLoading
+                ? null
+                : () => _showMacroDistributionSheet(context, goals),
+          ),
+          const SizedBox(height: FreshSpacing.md),
+          _SettingsGoalRow(
             key: const ValueKey('language_settings_row'),
             icon: Icons.translate_rounded,
             color: FreshColors.mint,
@@ -204,6 +218,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context.read<DashboardViewModel>().load(),
       context.read<MealHistoryViewModel>().load(),
     ]);
+  }
+
+  Future<void> _showMacroDistributionSheet(
+    BuildContext context,
+    DailyGoals? goals,
+  ) async {
+    final calories = goals?.target.calories ?? 2200;
+    final macroConfig = await showModalBottomSheet<MacroDistributionConfig>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) => MacroDistributionSheet(
+        calories: calories,
+        initialGoals: goals,
+      ),
+    );
+    if (!context.mounted || macroConfig == null) return;
+    final updated = await context.read<SettingsViewModel>().updateGoals(
+          macroConfig: macroConfig,
+          macroCalorieTarget: calories,
+        );
+    if (!context.mounted || updated == null) return;
+    await Future.wait([
+      context.read<DashboardViewModel>().load(forceRefresh: true),
+      context.read<SettingsViewModel>().load(),
+      context.read<MealHistoryViewModel>().load(),
+    ]);
+  }
+
+  String _macroDistributionSubtitle(DailyGoals? goals) {
+    if (goals?.macroMode == null) return 'Not set';
+    final preset = goals!.macroPreset;
+    if (preset != null) {
+      return '${preset.label}: ${preset.proteinPct}% protein, ${preset.carbsPct}% carbs, ${preset.fatPct}% fat';
+    }
+    if (goals.macroMode == MacroMode.percentage &&
+        goals.proteinPct != null &&
+        goals.carbsPct != null &&
+        goals.fatPct != null) {
+      return '${goals.proteinPct}% protein, ${goals.carbsPct}% carbs, ${goals.fatPct}% fat';
+    }
+    return '${goals.target.proteinGrams.round()}g protein, ${goals.target.carbsGrams.round()}g carbs, ${goals.target.fatGrams.round()}g fat';
   }
 
   Future<void> _showLanguageSheet(BuildContext context) {

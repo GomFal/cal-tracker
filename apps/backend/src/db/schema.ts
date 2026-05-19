@@ -73,6 +73,14 @@ export const nutritionTargets = pgTable("nutrition_targets", {
   calorieTargetConfigured: boolean("calorie_target_configured").notNull().default(false),
   calorieTargetSource: text("calorie_target_source").notNull().default("default"),
   calorieTargetConfiguredAt: timestamp("calorie_target_configured_at", { withTimezone: true }),
+  macroMode: text("macro_mode"),
+  macroSource: text("macro_source"),
+  macroPreset: text("macro_preset"),
+  proteinPct: integer("protein_pct"),
+  carbsPct: integer("carbs_pct"),
+  fatPct: integer("fat_pct"),
+  macroCalories: integer("macro_calories"),
+  calorieDeltaKcal: integer("calorie_delta_kcal"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
 });
 
@@ -87,6 +95,14 @@ export const dailyGoalSnapshots = pgTable("daily_goal_snapshots", {
   calorieTargetConfigured: boolean("calorie_target_configured").notNull().default(false),
   calorieTargetSource: text("calorie_target_source").notNull().default("default"),
   calorieTargetConfiguredAt: timestamp("calorie_target_configured_at", { withTimezone: true }),
+  macroMode: text("macro_mode"),
+  macroSource: text("macro_source"),
+  macroPreset: text("macro_preset"),
+  proteinPct: integer("protein_pct"),
+  carbsPct: integer("carbs_pct"),
+  fatPct: integer("fat_pct"),
+  macroCalories: integer("macro_calories"),
+  calorieDeltaKcal: integer("calorie_delta_kcal"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
 }, (table) => [

@@ -20,6 +20,9 @@ GoRouter buildRouter(AuthViewModel authViewModel) {
     refreshListenable: authViewModel,
     redirect: (context, state) {
       final isAuthRoute = state.matchedLocation == '/auth';
+      if (authViewModel.isRestoring) {
+        return isAuthRoute ? '/dashboard' : null;
+      }
       if (!authViewModel.hasSession && !isAuthRoute) {
         return '/auth';
       }
@@ -35,11 +38,16 @@ GoRouter buildRouter(AuthViewModel authViewModel) {
       ),
       GoRoute(
         path: '/meal/create',
-        builder: (context, state) => const MealCreateScreen(),
+        builder: (context, state) => _AuthRestoreGate(
+          authViewModel: authViewModel,
+          child: const MealCreateScreen(),
+        ),
       ),
       StatefulShellRoute(
-        builder: (context, state, navigationShell) =>
-            AppShell(navigationShell: navigationShell),
+        builder: (context, state, navigationShell) => _AuthRestoreGate(
+          authViewModel: authViewModel,
+          child: AppShell(navigationShell: navigationShell),
+        ),
         navigatorContainerBuilder: (context, navigationShell, children) {
           return SlidingBranchContainer(
             currentIndex: navigationShell.currentIndex,
@@ -51,8 +59,13 @@ GoRouter buildRouter(AuthViewModel authViewModel) {
             routes: [
               GoRoute(
                 path: '/dashboard',
-                pageBuilder: (context, state) =>
-                    _tabPage(state, const DashboardScreen()),
+                pageBuilder: (context, state) => _tabPage(
+                  state,
+                  _AuthRestoreGate(
+                    authViewModel: authViewModel,
+                    child: const DashboardScreen(),
+                  ),
+                ),
               ),
             ],
           ),
@@ -60,8 +73,13 @@ GoRouter buildRouter(AuthViewModel authViewModel) {
             routes: [
               GoRoute(
                 path: '/history',
-                pageBuilder: (context, state) =>
-                    _tabPage(state, const MealHistoryScreen()),
+                pageBuilder: (context, state) => _tabPage(
+                  state,
+                  _AuthRestoreGate(
+                    authViewModel: authViewModel,
+                    child: const MealHistoryScreen(),
+                  ),
+                ),
               ),
             ],
           ),
@@ -69,8 +87,13 @@ GoRouter buildRouter(AuthViewModel authViewModel) {
             routes: [
               GoRoute(
                 path: '/templates',
-                pageBuilder: (context, state) =>
-                    _tabPage(state, const MealTemplatesScreen()),
+                pageBuilder: (context, state) => _tabPage(
+                  state,
+                  _AuthRestoreGate(
+                    authViewModel: authViewModel,
+                    child: const MealTemplatesScreen(),
+                  ),
+                ),
               ),
             ],
           ),
@@ -78,8 +101,13 @@ GoRouter buildRouter(AuthViewModel authViewModel) {
             routes: [
               GoRoute(
                 path: '/settings',
-                pageBuilder: (context, state) =>
-                    _tabPage(state, const SettingsScreen()),
+                pageBuilder: (context, state) => _tabPage(
+                  state,
+                  _AuthRestoreGate(
+                    authViewModel: authViewModel,
+                    child: const SettingsScreen(),
+                  ),
+                ),
               ),
             ],
           ),
@@ -91,6 +119,40 @@ GoRouter buildRouter(AuthViewModel authViewModel) {
           child: Text(state.error?.message ?? context.l10n.routeNotFound)),
     ),
   );
+}
+
+class _AuthRestoreGate extends StatelessWidget {
+  const _AuthRestoreGate({
+    required this.authViewModel,
+    required this.child,
+  });
+
+  final AuthViewModel authViewModel;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: authViewModel,
+      builder: (context, _) {
+        if (authViewModel.hasSession) return child;
+        if (!authViewModel.isRestoring) {
+          return const Scaffold(
+            body: SizedBox.shrink(key: ValueKey('auth_blocked_gate')),
+          );
+        }
+        return const Scaffold(
+          body: Center(
+            child: SizedBox.square(
+              key: ValueKey('auth_restore_gate'),
+              dimension: 32,
+              child: CircularProgressIndicator(strokeWidth: 3),
+            ),
+          ),
+        );
+      },
+    );
+  }
 }
 
 Page<void> _tabPage(GoRouterState state, Widget child) {

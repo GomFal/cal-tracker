@@ -15,6 +15,20 @@
       "when": 1779100338492,
       "tag": "0001_food_search_documents_sync",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1779131168133,
+      "tag": "0002_macro_goal_metadata",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1779220433132,
+      "tag": "0003_clear_unconfigured_macro_targets",
+      "breakpoints": true
     }
   ]
 }

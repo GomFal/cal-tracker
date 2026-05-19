@@ -3,16 +3,24 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../domain/models/macro_distribution.dart';
 import '../../../../domain/models/nutrition_models.dart';
 import '../../../../l10n/app_localizations_context.dart';
+import '../../../../l10n/generated/app_localizations.dart';
 import '../../../core/design_system.dart';
 import '../../../core/user_visible_error.dart';
+import 'macro_distribution_sheet.dart';
 
 class CalorieTargetSelection {
-  const CalorieTargetSelection({required this.calories, required this.source});
+  const CalorieTargetSelection({
+    required this.calories,
+    required this.source,
+    this.macroConfig,
+  });
 
   final int calories;
   final String source;
+  final MacroDistributionConfig? macroConfig;
 }
 
 class CalorieTargetSheet extends StatefulWidget {
@@ -31,8 +39,7 @@ class CalorieTargetSheet extends StatefulWidget {
     required String activityLevel,
     required String goal,
     String? pace,
-  })
-  estimateCalories;
+  }) estimateCalories;
 
   @override
   State<CalorieTargetSheet> createState() => _CalorieTargetSheetState();
@@ -59,6 +66,7 @@ class _CalorieTargetSheetState extends State<CalorieTargetSheet> {
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
     final textTheme = Theme.of(context).textTheme;
+    final l10n = context.l10n;
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     final maxHeight = MediaQuery.sizeOf(context).height * 0.86;
     return Padding(
@@ -79,10 +87,13 @@ class _CalorieTargetSheetState extends State<CalorieTargetSheet> {
               ),
             ),
             const SizedBox(height: FreshSpacing.lg),
-            Text('Set your daily calories', style: textTheme.titleLarge),
+            Text(
+              l10n.calorieTargetSheetTitle,
+              style: textTheme.titleLarge,
+            ),
             const SizedBox(height: FreshSpacing.xs),
             Text(
-              'Choose the target you want to track each day.',
+              l10n.calorieTargetSheetSubtitle,
               style: textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
             ),
             const SizedBox(height: FreshSpacing.lg),
@@ -104,13 +115,15 @@ class _CalorieTargetSheetState extends State<CalorieTargetSheet> {
                       controller: _controller,
                       textAlign: TextAlign.center,
                       keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                      ],
                       style: textTheme.displaySmall?.copyWith(
                         fontWeight: FontWeight.w800,
                         fontFeatures: const [FontFeature.tabularFigures()],
                       ),
                       decoration: InputDecoration(
-                        suffixText: context.l10n.commonKcal,
+                        suffixText: l10n.commonKcal,
                         errorText: _error,
                       ),
                       onChanged: (_) => setState(() {
@@ -132,13 +145,13 @@ class _CalorieTargetSheetState extends State<CalorieTargetSheet> {
             TextButton(
               key: const ValueKey('calorie_calculator_link'),
               onPressed: _showCalculator,
-              child: const Text("Don't know how many calories you need?"),
+              child: Text(l10n.calorieTargetCalculatorLink),
             ),
             const SizedBox(height: FreshSpacing.lg),
             FilledButton(
               key: const ValueKey('dashboard_save_calorie_target_button'),
               onPressed: _submit,
-              child: Text(context.l10n.commonSave),
+              child: Text(l10n.commonSave),
             ),
           ],
         ),
@@ -163,14 +176,26 @@ class _CalorieTargetSheetState extends State<CalorieTargetSheet> {
       isScrollControlled: true,
       useSafeArea: true,
       useRootNavigator: true,
-      builder: (context) =>
-          CalorieCalculatorWizard(estimateCalories: widget.estimateCalories),
+      builder: (context) => CalorieCalculatorWizard(
+        estimateCalories: widget.estimateCalories,
+      ),
     );
     if (estimate == null || !mounted) return;
+    final macroConfig = await showModalBottomSheet<MacroDistributionConfig>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      useRootNavigator: true,
+      builder: (context) => _CalculatorMacroPrompt(
+        calories: estimate.targetCalories,
+      ),
+    );
+    if (!mounted) return;
     Navigator.of(context).pop(
       CalorieTargetSelection(
         calories: estimate.targetCalories,
         source: 'calculator',
+        macroConfig: macroConfig,
       ),
     );
   }
@@ -178,17 +203,159 @@ class _CalorieTargetSheetState extends State<CalorieTargetSheet> {
   void _submit() {
     final value = int.tryParse(_controller.text.trim());
     if (value == null || value < 800 || value > 10000) {
-      setState(() => _error = 'Enter a target from 800 to 10000 Kcal.');
+      setState(() => _error = context.l10n.calorieTargetRangeValidationError(
+            800,
+            10000,
+          ));
       return;
     }
-    Navigator.of(
-      context,
-    ).pop(CalorieTargetSelection(calories: value, source: _source));
+    Navigator.of(context).pop(
+      CalorieTargetSelection(calories: value, source: _source),
+    );
+  }
+}
+
+class _CalculatorMacroPrompt extends StatelessWidget {
+  const _CalculatorMacroPrompt({required this.calories});
+
+  final int calories;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.freshPalette;
+    final textTheme = Theme.of(context).textTheme;
+    final l10n = context.l10n;
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 12, 20, bottomInset + 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Container(
+              width: 44,
+              height: 4,
+              decoration: BoxDecoration(
+                color: palette.rule,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ),
+          const SizedBox(height: FreshSpacing.lg),
+          Text(
+            l10n.calorieMacroPromptTitle,
+            style: textTheme.titleLarge?.copyWith(
+              color: palette.ink,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: FreshSpacing.xs),
+          Text(
+            l10n.calorieMacroPromptMessage(calories),
+            style: textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
+          ),
+          const SizedBox(height: FreshSpacing.lg),
+          FilledButton(
+            key: const ValueKey('calculator_macro_configure_button'),
+            onPressed: () async {
+              final config =
+                  await showModalBottomSheet<MacroDistributionConfig>(
+                context: context,
+                isScrollControlled: true,
+                useSafeArea: true,
+                useRootNavigator: true,
+                builder: (context) => MacroDistributionSheet(
+                  calories: calories,
+                  presetOnly: true,
+                  title: l10n.calorieCalculatorChooseYourMacrosTitle,
+                ),
+              );
+              if (context.mounted && config != null) {
+                Navigator.of(context).pop(config);
+              }
+            },
+            child: Text(l10n.calorieMacroPromptConfigure),
+          ),
+          const SizedBox(height: FreshSpacing.sm),
+          TextButton(
+            key: const ValueKey('calculator_macro_skip_button'),
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(l10n.calorieMacroPromptSkip),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class PostCalorieSaveMacroPrompt extends StatelessWidget {
+  const PostCalorieSaveMacroPrompt({super.key, required this.calories});
+
+  final int calories;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.freshPalette;
+    final textTheme = Theme.of(context).textTheme;
+    final l10n = context.l10n;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Container(
+              width: 44,
+              height: 4,
+              decoration: BoxDecoration(
+                color: palette.rule,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ),
+          const SizedBox(height: FreshSpacing.lg),
+          Text(
+            l10n.postCalorieSaveTitle,
+            style: textTheme.titleLarge?.copyWith(
+              color: palette.ink,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: FreshSpacing.xs),
+          Text(
+            l10n.postCalorieSaveTarget(calories),
+            style: textTheme.bodyMedium?.copyWith(color: palette.inkSoft),
+          ),
+          const SizedBox(height: FreshSpacing.xs),
+          Text(
+            l10n.postCalorieSaveMacroQuestion,
+            style: textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
+          ),
+          const SizedBox(height: FreshSpacing.lg),
+          FilledButton(
+            key: const ValueKey('macro_prompt_set_distribution'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(l10n.postCalorieSaveSetMacroDistribution),
+          ),
+          const SizedBox(height: FreshSpacing.sm),
+          TextButton(
+            key: const ValueKey('macro_prompt_not_now'),
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(l10n.postCalorieSaveNotNow),
+          ),
+        ],
+      ),
+    );
   }
 }
 
 class CalorieCalculatorWizard extends StatefulWidget {
-  const CalorieCalculatorWizard({super.key, required this.estimateCalories});
+  const CalorieCalculatorWizard({
+    super.key,
+    required this.estimateCalories,
+  });
 
   final Future<CalorieEstimate> Function({
     required int age,
@@ -198,15 +365,23 @@ class CalorieCalculatorWizard extends StatefulWidget {
     required String activityLevel,
     required String goal,
     String? pace,
-  })
-  estimateCalories;
+  }) estimateCalories;
 
   @override
   State<CalorieCalculatorWizard> createState() =>
       _CalorieCalculatorWizardState();
 }
 
-enum _WizardStep { sex, age, height, weight, goal, pace, activity, result }
+enum _WizardStep {
+  sex,
+  age,
+  height,
+  weight,
+  goal,
+  pace,
+  activity,
+  result,
+}
 
 class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
   final _heightController = TextEditingController(text: '170');
@@ -234,12 +409,10 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
   void initState() {
     super.initState();
     _birthDate = _defaultBirthDate();
-    _birthMonthController = FixedExtentScrollController(
-      initialItem: _birthDate.month - 1,
-    );
-    _birthDayController = FixedExtentScrollController(
-      initialItem: _birthDate.day - 1,
-    );
+    _birthMonthController =
+        FixedExtentScrollController(initialItem: _birthDate.month - 1);
+    _birthDayController =
+        FixedExtentScrollController(initialItem: _birthDate.day - 1);
     _birthYearController = FixedExtentScrollController(
       initialItem: _birthDate.year - _oldestAllowedBirthDate().year,
     );
@@ -261,6 +434,7 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
   @override
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
+    final l10n = context.l10n;
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     final maxHeight = MediaQuery.sizeOf(context).height * 0.94;
     final activeStep = _activeStep;
@@ -271,7 +445,7 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
       child: AnimatedPadding(
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOut,
-        padding: EdgeInsets.fromLTRB(20, 10, 20, bottomInset + 16),
+        padding: EdgeInsets.fromLTRB(24, 10, 24, bottomInset + 16),
         child: SizedBox(
           height: maxHeight,
           child: Column(
@@ -289,7 +463,7 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
                 const SizedBox(height: FreshSpacing.md),
                 FreshStatusBanner(
                   icon: Icons.error_outline_rounded,
-                  title: 'Check your details',
+                  title: l10n.calorieWizardCheckDetailsTitle,
                   message: _error!,
                   color: FreshColors.coral,
                 ),
@@ -302,22 +476,23 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
                   switchOutCurve: Curves.easeInCubic,
                   child: KeyedSubtree(
                     key: ValueKey(_isLoading ? 'loading' : activeStep.name),
-                    child: _isLoading
-                        ? const _LoadingPlanStep()
-                        : _bodyForStep(),
+                    child:
+                        _isLoading ? const _LoadingPlanStep() : _bodyForStep(),
                   ),
                 ),
               ),
               if (!_isLoading) ...[
                 const SizedBox(height: FreshSpacing.lg),
                 FilledButton(
-                  key: ValueKey(
-                    _isResultStep
-                        ? 'calorie_wizard_use_estimate_button'
-                        : 'calorie_wizard_next_button',
-                  ),
+                  key: ValueKey(_isResultStep
+                      ? 'calorie_wizard_use_estimate_button'
+                      : 'calorie_wizard_next_button'),
                   onPressed: _primaryAction,
-                  child: Text(_isResultStep ? 'Use this estimate' : 'Continue'),
+                  child: Text(
+                    _isResultStep
+                        ? l10n.calorieWizardUseEstimate
+                        : l10n.calorieWizardContinue,
+                  ),
                 ),
               ],
             ],
@@ -444,8 +619,7 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
   int _ageFromBirthDate(DateTime birthDate) {
     final today = _today();
     var age = today.year - birthDate.year;
-    final hadBirthdayThisYear =
-        today.month > birthDate.month ||
+    final hadBirthdayThisYear = today.month > birthDate.month ||
         (today.month == birthDate.month && today.day >= birthDate.day);
     if (!hadBirthdayThisYear) age -= 1;
     return age;
@@ -473,8 +647,7 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
       month: requestedMonth,
       day: requestedDay,
     );
-    final needsWheelSync =
-        next.year != requestedYear ||
+    final needsWheelSync = next.year != requestedYear ||
         next.month != requestedMonth ||
         next.day != requestedDay;
     setState(() {
@@ -559,15 +732,16 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
   }
 
   Widget _sexStep() {
+    final l10n = context.l10n;
     return _WizardQuestionPage(
-      title: 'What is your biological sex?',
-      subtitle: 'This keeps the calorie estimate aligned with the formula.',
+      title: l10n.calorieWizardSexTitle,
+      subtitle: l10n.calorieWizardSexSubtitle,
       children: [
         _WizardChoiceCard(
           key: const ValueKey('calorie_wizard_sex_male'),
           icon: Icons.male_rounded,
-          title: 'Male',
-          message: 'Use the male BMR coefficient.',
+          title: l10n.calorieWizardSexMale,
+          message: l10n.calorieWizardSexMaleMessage,
           selected: _sex == 'male',
           onTap: () => setState(() {
             _sex = 'male';
@@ -578,8 +752,8 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
         _WizardChoiceCard(
           key: const ValueKey('calorie_wizard_sex_female'),
           icon: Icons.female_rounded,
-          title: 'Female',
-          message: 'Use the female BMR coefficient.',
+          title: l10n.calorieWizardSexFemale,
+          message: l10n.calorieWizardSexFemaleMessage,
           selected: _sex == 'female',
           onTap: () => setState(() {
             _sex = 'female';
@@ -592,7 +766,7 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
 
   Widget _ageStep() {
     return _WizardQuestionPage(
-      title: "When's your birthday?",
+      title: context.l10n.calorieWizardBirthdayTitle,
       centerTitle: true,
       children: [
         _BirthdayWheelPicker(
@@ -610,12 +784,13 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
   }
 
   Widget _heightStep() {
+    final l10n = context.l10n;
     final heightCm = _heightInCm() ?? 170;
     final value = _heightMetric
         ? (double.tryParse(_heightController.text.trim()) ?? heightCm)
         : (heightCm / 2.54).clamp(48, 90).toDouble();
     return _WizardQuestionPage(
-      title: 'How tall are you?',
+      title: l10n.calorieWizardHeightTitle,
       centerTitle: true,
       children: [
         Center(
@@ -656,12 +831,13 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
   }
 
   Widget _weightStep() {
+    final l10n = context.l10n;
     final weightKg = _weightInKg() ?? 70;
     final value = _weightMetric
         ? (double.tryParse(_weightController.text.trim()) ?? weightKg)
         : (weightKg / 0.45359237).clamp(78, 551).toDouble();
     return _WizardQuestionPage(
-      title: "What's your current weight?",
+      title: l10n.calorieWizardWeightTitle,
       centerTitle: true,
       children: [
         Center(
@@ -700,11 +876,12 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
   }
 
   Widget _goalStep() {
+    final l10n = context.l10n;
     return _WizardQuestionPage(
-      title: 'What is your main goal?',
-      subtitle: 'Choose the outcome you want your target to support.',
+      title: l10n.calorieWizardGoalTitle,
+      subtitle: l10n.calorieWizardGoalSubtitle,
       children: [
-        for (final option in _goalOptions)
+        for (final option in _goalOptions(l10n))
           Padding(
             padding: const EdgeInsets.only(bottom: FreshSpacing.md),
             child: _WizardChoiceCard(
@@ -724,13 +901,15 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
   }
 
   Widget _paceStep() {
+    final l10n = context.l10n;
     final isLoss = _goal == 'lose_fat';
-    final paceOptions = isLoss ? _lossPaceOptions : _gainPaceOptions;
+    final paceOptions =
+        isLoss ? _lossPaceOptions(l10n) : _gainPaceOptions(l10n);
     return _WizardQuestionPage(
       title: isLoss
-          ? 'How fast do you want to lose weight?'
-          : 'How fast do you want to gain weight?',
-      subtitle: 'A steadier pace is easier to sustain.',
+          ? l10n.calorieWizardLossPaceTitle
+          : l10n.calorieWizardGainPaceTitle,
+      subtitle: l10n.calorieWizardPaceSubtitle,
       children: [
         for (final option in paceOptions)
           Padding(
@@ -756,11 +935,12 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
   }
 
   Widget _activityStep() {
+    final l10n = context.l10n;
     return _WizardQuestionPage(
-      title: 'What is your activity level?',
-      subtitle: 'Pick the option that best matches a normal week.',
+      title: l10n.calorieWizardActivityTitle,
+      subtitle: l10n.calorieWizardActivitySubtitle,
       children: [
-        for (final option in _activityOptions)
+        for (final option in _activityOptions(l10n))
           Padding(
             padding: const EdgeInsets.only(bottom: FreshSpacing.md),
             child: _WizardChoiceCard(
@@ -833,7 +1013,8 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
       case _WizardStep.age:
         final age = _ageFromBirthDate(_birthDate);
         if (age < 18 || age > 100) {
-          setState(() => _error = 'Choose a birthday for ages 18 to 100.');
+          setState(
+              () => _error = context.l10n.calorieWizardBirthdayValidationError);
           return false;
         }
         return true;
@@ -842,7 +1023,8 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
             ? double.tryParse(_heightController.text.trim())
             : _heightInCm();
         if (heightCm == null || heightCm < 120 || heightCm > 230) {
-          setState(() => _error = 'Enter a height from 120 to 230 cm.');
+          setState(
+              () => _error = context.l10n.calorieWizardHeightValidationError);
           return false;
         }
         return true;
@@ -851,7 +1033,8 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
             ? double.tryParse(_weightController.text.trim())
             : _weightInKg();
         if (weightKg == null || weightKg < 35 || weightKg > 250) {
-          setState(() => _error = 'Enter a weight from 35 to 250 kg.');
+          setState(
+              () => _error = context.l10n.calorieWizardWeightValidationError);
           return false;
         }
         return true;
@@ -867,9 +1050,7 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
   Future<void> _calculateEstimate() async {
     final profile = _profileValues();
     if (profile == null) {
-      setState(
-        () => _error = 'Enter age, height, and weight in the expected ranges.',
-      );
+      setState(() => _error = context.l10n.calorieWizardProfileValidationError);
       return;
     }
     setState(() {
@@ -967,120 +1148,128 @@ class _WizardOption {
   final IconData icon;
 }
 
-const _activityOptions = [
-  _WizardOption(
-    value: 'sedentary',
-    label: 'Sedentary',
-    message:
-        'Mostly seated, low daily movement, and 0-1 light workouts weekly.',
-    icon: Icons.weekend_rounded,
-  ),
-  _WizardOption(
-    value: 'lightly_active',
-    label: 'Lightly Active',
-    message: 'Regular walks or light exercise 1-3 days per week.',
-    icon: Icons.directions_walk_rounded,
-  ),
-  _WizardOption(
-    value: 'moderately_active',
-    label: 'Moderately Active',
-    message: 'Training 3-5 days per week or a meaningfully active routine.',
-    icon: Icons.fitness_center_rounded,
-  ),
-  _WizardOption(
-    value: 'very_active',
-    label: 'Very Active',
-    message: 'Hard exercise most days or active work plus regular training.',
-    icon: Icons.local_fire_department_rounded,
-  ),
-  _WizardOption(
-    value: 'extra_active',
-    label: 'Super Active',
-    message: 'Athlete-level workload, two-a-days, or demanding physical work.',
-    icon: Icons.speed_rounded,
+List<_WizardOption> _activityOptions(AppLocalizations l10n) => [
+      _WizardOption(
+        value: 'sedentary',
+        label: l10n.calorieWizardActivitySedentary,
+        message: l10n.calorieWizardActivitySedentaryMessage,
+        icon: Icons.weekend_rounded,
+      ),
+      _WizardOption(
+        value: 'lightly_active',
+        label: l10n.calorieWizardActivityLightlyActive,
+        message: l10n.calorieWizardActivityLightlyActiveMessage,
+        icon: Icons.directions_walk_rounded,
+      ),
+      _WizardOption(
+        value: 'moderately_active',
+        label: l10n.calorieWizardActivityModeratelyActive,
+        message: l10n.calorieWizardActivityModeratelyActiveMessage,
+        icon: Icons.fitness_center_rounded,
+      ),
+      _WizardOption(
+        value: 'very_active',
+        label: l10n.calorieWizardActivityVeryActive,
+        message: l10n.calorieWizardActivityVeryActiveMessage,
+        icon: Icons.local_fire_department_rounded,
+      ),
+      _WizardOption(
+        value: 'extra_active',
+        label: l10n.calorieWizardActivitySuperActive,
+        message: l10n.calorieWizardActivitySuperActiveMessage,
+        icon: Icons.speed_rounded,
+      ),
+    ];
+
+const _calorieWizardCardShadow = [
+  BoxShadow(
+    color: Color(0x08080907),
+    blurRadius: 20,
+    offset: Offset(0, 7),
   ),
 ];
 
-const _goalOptions = [
-  _WizardOption(
-    value: 'lose_fat',
-    label: 'Lose Weight',
-    message: 'Estimate a deficit from maintenance.',
-    icon: Icons.flag_rounded,
-  ),
-  _WizardOption(
-    value: 'gain_muscle',
-    label: 'Gain Muscle',
-    message: 'Estimate a controlled calorie surplus.',
-    icon: Icons.fitness_center_rounded,
-  ),
-  _WizardOption(
-    value: 'maintain',
-    label: 'Maintain Weight',
-    message: 'Track around your estimated maintenance.',
-    icon: Icons.balance_rounded,
-  ),
-  _WizardOption(
-    value: 'recomposition',
-    label: 'Improve Nutrition',
-    message: 'Start near maintenance while you train consistently.',
-    icon: Icons.auto_graph_rounded,
-  ),
-];
+List<_WizardOption> _goalOptions(AppLocalizations l10n) => [
+      _WizardOption(
+        value: 'lose_fat',
+        label: l10n.calorieWizardGoalLoseWeight,
+        message: l10n.calorieWizardGoalLoseWeightMessage,
+        icon: Icons.flag_rounded,
+      ),
+      _WizardOption(
+        value: 'gain_muscle',
+        label: l10n.calorieWizardGoalGainMuscle,
+        message: l10n.calorieWizardGoalGainMuscleMessage,
+        icon: Icons.fitness_center_rounded,
+      ),
+      _WizardOption(
+        value: 'maintain',
+        label: l10n.calorieWizardGoalMaintainWeight,
+        message: l10n.calorieWizardGoalMaintainWeightMessage,
+        icon: Icons.balance_rounded,
+      ),
+    ];
 
-const _lossPaceOptions = [
-  _WizardOption(
-    value: 'slow',
-    label: 'Slow',
-    message: 'Easier to maintain and better for performance.',
-    icon: Icons.eco_rounded,
-  ),
-  _WizardOption(
-    value: 'moderate',
-    label: 'Moderate',
-    message: 'Recommended default for most users.',
-    icon: Icons.check_circle_outline_rounded,
-  ),
-  _WizardOption(
-    value: 'aggressive',
-    label: 'Aggressive',
-    message: 'Larger deficit. Use only if you can recover well.',
-    icon: Icons.bolt_rounded,
-  ),
-];
+List<_WizardOption> _lossPaceOptions(AppLocalizations l10n) => [
+      _WizardOption(
+        value: 'slow',
+        label: l10n.calorieWizardPaceSlow,
+        message: l10n.calorieWizardPaceSlowMessage,
+        icon: Icons.eco_rounded,
+      ),
+      _WizardOption(
+        value: 'moderate',
+        label: l10n.calorieWizardPaceModerate,
+        message: l10n.calorieWizardPaceModerateMessage,
+        icon: Icons.check_circle_outline_rounded,
+      ),
+      _WizardOption(
+        value: 'aggressive',
+        label: l10n.calorieWizardPaceAggressive,
+        message: l10n.calorieWizardLossPaceAggressiveMessage,
+        icon: Icons.bolt_rounded,
+      ),
+    ];
 
-const _gainPaceOptions = [
-  _WizardOption(
-    value: 'lean',
-    label: 'Lean',
-    message: 'Small surplus for minimal fat gain.',
-    icon: Icons.eco_rounded,
-  ),
-  _WizardOption(
-    value: 'standard',
-    label: 'Standard',
-    message: 'Recommended default for most users gaining muscle.',
-    icon: Icons.check_circle_outline_rounded,
-  ),
-  _WizardOption(
-    value: 'aggressive',
-    label: 'Aggressive',
-    message: 'Larger surplus with higher fat-gain risk.',
-    icon: Icons.bolt_rounded,
-  ),
-];
+List<_WizardOption> _gainPaceOptions(AppLocalizations l10n) => [
+      _WizardOption(
+        value: 'lean',
+        label: l10n.calorieWizardPaceLean,
+        message: l10n.calorieWizardPaceLeanMessage,
+        icon: Icons.eco_rounded,
+      ),
+      _WizardOption(
+        value: 'standard',
+        label: l10n.calorieWizardPaceStandard,
+        message: l10n.calorieWizardPaceStandardMessage,
+        icon: Icons.check_circle_outline_rounded,
+      ),
+      _WizardOption(
+        value: 'aggressive',
+        label: l10n.calorieWizardPaceAggressive,
+        message: l10n.calorieWizardGainPaceAggressiveMessage,
+        icon: Icons.bolt_rounded,
+      ),
+    ];
 
 class _StepButton extends StatelessWidget {
-  const _StepButton({super.key, required this.icon, required this.onTap});
+  const _StepButton({
+    super.key,
+    required this.icon,
+    required this.onTap,
+  });
 
   final IconData icon;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return FreshIconButton(
       icon: icon,
-      tooltip: icon == Icons.add_rounded ? 'Increase' : 'Decrease',
+      tooltip: icon == Icons.add_rounded
+          ? l10n.calorieTargetIncreaseTooltip
+          : l10n.calorieTargetDecreaseTooltip,
       onPressed: onTap,
       backgroundColor: context.freshPalette.surface,
     );
@@ -1112,13 +1301,13 @@ class _WizardTopBar extends StatelessWidget {
     return Row(
       children: [
         FreshIconButton(
-          key: ValueKey(
-            canGoBack
-                ? 'calorie_wizard_back_button'
-                : 'calorie_wizard_close_button',
-          ),
+          key: ValueKey(canGoBack
+              ? 'calorie_wizard_back_button'
+              : 'calorie_wizard_close_button'),
           icon: canGoBack ? Icons.arrow_back_rounded : Icons.close_rounded,
-          tooltip: canGoBack ? 'Back' : 'Close',
+          tooltip: canGoBack
+              ? context.l10n.calorieWizardBackTooltip
+              : context.l10n.calorieWizardCloseTooltip,
           onPressed: canGoBack ? onBack : onClose,
           backgroundColor: palette.surface,
         ),
@@ -1166,6 +1355,7 @@ class _WizardQuestionPage extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1234,13 +1424,7 @@ class _WizardChoiceCard extends StatelessWidget {
               color: selected ? palette.lime : palette.ruleSoft,
               width: selected ? 2 : 1,
             ),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x17080907),
-                blurRadius: 28,
-                offset: Offset(0, 14),
-              ),
-            ],
+            boxShadow: _calorieWizardCardShadow,
           ),
           child: Row(
             children: [
@@ -1293,7 +1477,11 @@ class _WizardChoiceCard extends StatelessWidget {
                   ),
                 ),
                 child: selected
-                    ? Icon(Icons.check_rounded, color: palette.ink, size: 18)
+                    ? Icon(
+                        Icons.check_rounded,
+                        color: palette.ink,
+                        size: 18,
+                      )
                     : null,
               ),
             ],
@@ -1337,9 +1525,18 @@ class _BirthdayWheelPicker extends StatelessWidget {
         children: [
           Row(
             children: [
-              _BirthdayWheelLabel(text: 'Month', color: palette.inkMuted),
-              _BirthdayWheelLabel(text: 'Day', color: palette.inkMuted),
-              _BirthdayWheelLabel(text: 'Year', color: palette.inkMuted),
+              _BirthdayWheelLabel(
+                text: context.l10n.calorieWizardBirthdayMonth,
+                color: palette.inkMuted,
+              ),
+              _BirthdayWheelLabel(
+                text: context.l10n.calorieWizardBirthdayDay,
+                color: palette.inkMuted,
+              ),
+              _BirthdayWheelLabel(
+                text: context.l10n.calorieWizardBirthdayYear,
+                color: palette.inkMuted,
+              ),
             ],
           ),
           const SizedBox(height: FreshSpacing.sm),
@@ -1348,7 +1545,7 @@ class _BirthdayWheelPicker extends StatelessWidget {
               alignment: Alignment.center,
               children: [
                 Container(
-                  height: 70,
+                  height: 52,
                   decoration: BoxDecoration(
                     border: Border.symmetric(
                       horizontal: BorderSide(color: palette.limeSoft),
@@ -1368,10 +1565,8 @@ class _BirthdayWheelPicker extends StatelessWidget {
                     _BirthdayWheel(
                       key: const ValueKey('calorie_wizard_birth_day_wheel'),
                       controller: dayController,
-                      values: List<int>.generate(
-                        _dayCount,
-                        (index) => index + 1,
-                      ),
+                      values:
+                          List<int>.generate(_dayCount, (index) => index + 1),
                       selectedValue: selectedDate.day,
                       format: (value) => value.toString().padLeft(2, '0'),
                       onChanged: onDayChanged,
@@ -1396,7 +1591,10 @@ class _BirthdayWheelPicker extends StatelessWidget {
 }
 
 class _BirthdayWheelLabel extends StatelessWidget {
-  const _BirthdayWheelLabel({required this.text, required this.color});
+  const _BirthdayWheelLabel({
+    required this.text,
+    required this.color,
+  });
 
   final String text;
   final Color color;
@@ -1408,9 +1606,9 @@ class _BirthdayWheelLabel extends StatelessWidget {
         text,
         textAlign: TextAlign.center,
         style: Theme.of(context).textTheme.labelLarge?.copyWith(
-          color: color,
-          fontWeight: FontWeight.w600,
-        ),
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
       ),
     );
   }
@@ -1458,12 +1656,10 @@ class _BirthdayWheel extends StatelessWidget {
                 style:
                     (selected ? textTheme.headlineSmall : textTheme.titleLarge)
                         ?.copyWith(
-                          color: selected ? palette.lime : palette.inkMuted,
-                          fontWeight: selected
-                              ? FontWeight.w800
-                              : FontWeight.w500,
-                          fontFeatures: const [FontFeature.tabularFigures()],
-                        ),
+                  color: selected ? palette.lime : palette.inkMuted,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
               ),
             );
           },
@@ -1560,9 +1756,9 @@ class _CompactUnitSegment extends StatelessWidget {
           child: Text(
             label,
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              color: palette.ink,
-              fontWeight: FontWeight.w800,
-            ),
+                  color: palette.ink,
+                  fontWeight: FontWeight.w800,
+                ),
           ),
         ),
       ),
@@ -1571,7 +1767,10 @@ class _CompactUnitSegment extends StatelessWidget {
 }
 
 class _MeasurementValueDisplay extends StatelessWidget {
-  const _MeasurementValueDisplay({required this.value, required this.unit});
+  const _MeasurementValueDisplay({
+    required this.value,
+    required this.unit,
+  });
 
   final String value;
   final String unit;
@@ -1642,8 +1841,7 @@ class _SlidingRulerScaleState extends State<_SlidingRulerScale> {
   double? _lastCommittedValue;
 
   double _snap(double rawValue) {
-    final snapped =
-        widget.min +
+    final snapped = widget.min +
         (((rawValue - widget.min) / widget.valueStep).round() *
             widget.valueStep);
     return snapped.clamp(widget.min, widget.max).toDouble();
@@ -1687,9 +1885,8 @@ class _SlidingRulerScaleState extends State<_SlidingRulerScale> {
 
           void updateFromDrag(double dx) {
             _dragOffset += dx;
-            final rawValue = _clamp(
-              (_dragStartValue ?? widget.value) - (_dragOffset * unitsPerPixel),
-            );
+            final rawValue = _clamp((_dragStartValue ?? widget.value) -
+                (_dragOffset * unitsPerPixel));
             setState(() => _visualValue = rawValue);
             _commitValue(rawValue);
           }
@@ -1852,13 +2049,14 @@ class _LoadingPlanStep extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
     final textTheme = Theme.of(context).textTheme;
+    final l10n = context.l10n;
     return Center(
       child: SingleChildScrollView(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              'Personalizing your calorie plan...',
+              l10n.calorieWizardLoadingTitle,
               textAlign: TextAlign.center,
               style: textTheme.headlineSmall?.copyWith(
                 color: palette.ink,
@@ -1888,7 +2086,7 @@ class _LoadingPlanStep extends StatelessWidget {
             ),
             const SizedBox(height: FreshSpacing.xxl),
             Text(
-              'Building a target from your profile and activity.',
+              l10n.calorieWizardLoadingMessage,
               textAlign: TextAlign.center,
               style: textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
             ),
@@ -1908,6 +2106,7 @@ class _ResultPlanStep extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
     final textTheme = Theme.of(context).textTheme;
+    final l10n = context.l10n;
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       child: Column(
@@ -1915,7 +2114,7 @@ class _ResultPlanStep extends StatelessWidget {
         children: [
           const SizedBox(height: FreshSpacing.md),
           Text(
-            'Your personalized calorie plan is ready!',
+            l10n.calorieWizardResultTitle,
             textAlign: TextAlign.center,
             style: textTheme.headlineSmall?.copyWith(
               color: palette.ink,
@@ -1941,7 +2140,7 @@ class _ResultPlanStep extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    'Kcal',
+                    l10n.commonKcal,
                     style: textTheme.titleMedium?.copyWith(
                       color: palette.ink,
                       fontWeight: FontWeight.w800,
@@ -1952,30 +2151,38 @@ class _ResultPlanStep extends StatelessWidget {
             ),
           ),
           const SizedBox(height: FreshSpacing.xxl),
-          FreshCard(
+          DecoratedBox(
             key: const ValueKey('calorie_wizard_result_card'),
-            color: palette.surface,
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                _ResultLine(
-                  label: 'BMR estimate',
-                  value: '${estimate.bmr} Kcal',
-                ),
-                _ResultLine(
-                  label: 'Maintenance',
-                  value: '${estimate.maintenanceCalories} Kcal',
-                ),
-                _ResultLine(
-                  label: 'Target range',
-                  value:
-                      '${estimate.recommendedRangeMin}-${estimate.recommendedRangeMax} Kcal',
-                ),
-                _ResultLine(
-                  label: 'Adjustment',
-                  value: '${estimate.adjustmentCalories} Kcal',
-                ),
-              ],
+            decoration: BoxDecoration(
+              color: palette.surface,
+              borderRadius: BorderRadius.circular(FreshRadii.lg),
+              boxShadow: _calorieWizardCardShadow,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  _ResultLine(
+                    label: l10n.calorieWizardResultBmr,
+                    value: l10n.caloriesValue(estimate.bmr),
+                  ),
+                  _ResultLine(
+                    label: l10n.calorieWizardResultMaintenance,
+                    value: l10n.caloriesValue(estimate.maintenanceCalories),
+                  ),
+                  _ResultLine(
+                    label: l10n.calorieWizardResultTargetRange,
+                    value: l10n.calorieWizardTargetRangeValue(
+                      estimate.recommendedRangeMin,
+                      estimate.recommendedRangeMax,
+                    ),
+                  ),
+                  _ResultLine(
+                    label: l10n.calorieWizardResultAdjustment,
+                    value: l10n.caloriesValue(estimate.adjustmentCalories),
+                  ),
+                ],
+              ),
             ),
           ),
           if (estimate.warnings.isNotEmpty) ...[
@@ -1985,7 +2192,7 @@ class _ResultPlanStep extends StatelessWidget {
                 padding: const EdgeInsets.only(bottom: FreshSpacing.sm),
                 child: FreshStatusBanner(
                   icon: Icons.info_outline_rounded,
-                  title: 'Estimate note',
+                  title: l10n.calorieWizardEstimateNoteTitle,
                   message: warning,
                   color: FreshColors.orange,
                 ),
@@ -2102,7 +2309,10 @@ class _ProgressRingPainter extends CustomPainter {
 }
 
 class _ResultLine extends StatelessWidget {
-  const _ResultLine({required this.label, required this.value});
+  const _ResultLine({
+    required this.label,
+    required this.value,
+  });
 
   final String label;
   final String value;
@@ -2117,9 +2327,10 @@ class _ResultLine extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
+              style: Theme.of(context)
+                  .textTheme
+                  .bodyMedium
+                  ?.copyWith(color: palette.inkMuted),
             ),
           ),
           Text(

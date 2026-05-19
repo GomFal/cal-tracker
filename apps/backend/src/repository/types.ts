@@ -3,6 +3,9 @@ import type {
   CalorieTargetSource,
   DailySummary,
   DailyGoals,
+  MacroMode,
+  MacroPreset,
+  MacroSource,
   Meal,
   MealItem,
   MealLabel,
@@ -15,6 +18,24 @@ import type {
 export type StoredUser = AuthUser & {
   passwordHash?: string;
   scopes: PermissionScope[];
+};
+
+export type UpdateDailyGoalsInput = {
+  date: string;
+  calories?: number;
+  hydrationGoalGlasses?: number;
+  calorieTargetSource?: CalorieTargetSource;
+  macroMode?: MacroMode;
+  macroSource?: MacroSource;
+  macroPreset?: MacroPreset | null;
+  proteinPct?: number;
+  carbsPct?: number;
+  fatPct?: number;
+  proteinGrams?: number;
+  carbsGrams?: number;
+  fatGrams?: number;
+  macroCalories?: number;
+  calorieDeltaKcal?: number;
 };
 
 export type AuthIdentityProvider = "google";
@@ -211,7 +232,7 @@ export interface AppRepository {
 
   getNutritionTarget(userId: string): Promise<NutritionSnapshot>;
   getDailyGoals(userId: string, date: string): Promise<DailyGoals>;
-  updateDailyGoals(userId: string, input: { date: string; calories?: number; hydrationGoalGlasses?: number; calorieTargetSource?: CalorieTargetSource }): Promise<DailyGoals>;
+  updateDailyGoals(userId: string, input: UpdateDailyGoalsInput): Promise<DailyGoals>;
   listMeals(userId: string, limit?: number): Promise<Meal[]>;
   getMeal(userId: string, mealId: string): Promise<Meal | undefined>;
   createProposal(userId: string, proposal: Omit<MealProposal, "id" | "createdAt">): Promise<MealProposal>;

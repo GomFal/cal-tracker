@@ -494,6 +494,12 @@ abstract class AppLocalizations {
   /// **'Enter {min}-{max}.'**
   String settingsGoalRangeError(int min, int max);
 
+  /// No description provided for @settingsNotSet.
+  ///
+  /// In en, this message translates to:
+  /// **'Not set'**
+  String get settingsNotSet;
+
   /// No description provided for @settingsLanguageTitle.
   ///
   /// In en, this message translates to:
@@ -529,6 +535,756 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Español'**
   String get settingsLanguageSpanish;
+
+  /// No description provided for @settingsMacroRequiresCaloriesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Set calories first'**
+  String get settingsMacroRequiresCaloriesTitle;
+
+  /// No description provided for @settingsMacroRequiresCaloriesMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure your daily calories before setting a macro distribution.'**
+  String get settingsMacroRequiresCaloriesMessage;
+
+  /// No description provided for @settingsMacroRequiresCaloriesSetNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Set your calories now'**
+  String get settingsMacroRequiresCaloriesSetNow;
+
+  /// No description provided for @settingsMacroRequiresCaloriesSkip.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip for now'**
+  String get settingsMacroRequiresCaloriesSkip;
+
+  /// No description provided for @calorieTargetSheetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Set your daily calories'**
+  String get calorieTargetSheetTitle;
+
+  /// No description provided for @calorieTargetSheetSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the target you want to track each day.'**
+  String get calorieTargetSheetSubtitle;
+
+  /// No description provided for @calorieTargetCalculatorLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Don\'t know how many calories you need?'**
+  String get calorieTargetCalculatorLink;
+
+  /// No description provided for @calorieTargetRangeValidationError.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a target from {min} to {max} Kcal.'**
+  String calorieTargetRangeValidationError(int min, int max);
+
+  /// No description provided for @calorieTargetIncreaseTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Increase'**
+  String get calorieTargetIncreaseTooltip;
+
+  /// No description provided for @calorieTargetDecreaseTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Decrease'**
+  String get calorieTargetDecreaseTooltip;
+
+  /// No description provided for @calorieSetupHeadlinePrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up your'**
+  String get calorieSetupHeadlinePrefix;
+
+  /// No description provided for @calorieSetupHeadlineMain.
+  ///
+  /// In en, this message translates to:
+  /// **'daily calories'**
+  String get calorieSetupHeadlineMain;
+
+  /// No description provided for @calorieSetupHeadlineBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Here.'**
+  String get calorieSetupHeadlineBadge;
+
+  /// No description provided for @calorieCouldNotSaveCalories.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t save your calories. Please try again.'**
+  String get calorieCouldNotSaveCalories;
+
+  /// No description provided for @calorieCouldNotSaveMacros.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t save your macros. Please try again.'**
+  String get calorieCouldNotSaveMacros;
+
+  /// No description provided for @postCalorieSaveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Calories saved'**
+  String get postCalorieSaveTitle;
+
+  /// No description provided for @postCalorieSaveTarget.
+  ///
+  /// In en, this message translates to:
+  /// **'Your daily target is {calories} Kcal.'**
+  String postCalorieSaveTarget(int calories);
+
+  /// No description provided for @postCalorieSaveMacroQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Want to track protein, carbs and fats too?'**
+  String get postCalorieSaveMacroQuestion;
+
+  /// No description provided for @postCalorieSaveSetMacroDistribution.
+  ///
+  /// In en, this message translates to:
+  /// **'Set macro distribution'**
+  String get postCalorieSaveSetMacroDistribution;
+
+  /// No description provided for @postCalorieSaveNotNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get postCalorieSaveNotNow;
+
+  /// No description provided for @calorieMacroPromptTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add macros?'**
+  String get calorieMacroPromptTitle;
+
+  /// No description provided for @calorieMacroPromptMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a simple protein, carb and fat split for {calories} Kcal.'**
+  String calorieMacroPromptMessage(int calories);
+
+  /// No description provided for @calorieMacroPromptConfigure.
+  ///
+  /// In en, this message translates to:
+  /// **'Configure'**
+  String get calorieMacroPromptConfigure;
+
+  /// No description provided for @calorieMacroPromptSkip.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip for now'**
+  String get calorieMacroPromptSkip;
+
+  /// No description provided for @calorieCalculatorChooseYourMacrosTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose your macros'**
+  String get calorieCalculatorChooseYourMacrosTitle;
+
+  /// No description provided for @calorieWizardCheckDetailsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Check your details'**
+  String get calorieWizardCheckDetailsTitle;
+
+  /// No description provided for @calorieWizardContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get calorieWizardContinue;
+
+  /// No description provided for @calorieWizardUseEstimate.
+  ///
+  /// In en, this message translates to:
+  /// **'Use this estimate'**
+  String get calorieWizardUseEstimate;
+
+  /// No description provided for @calorieWizardSexTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What is your biological sex?'**
+  String get calorieWizardSexTitle;
+
+  /// No description provided for @calorieWizardSexSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'This keeps the calorie estimate aligned with the formula.'**
+  String get calorieWizardSexSubtitle;
+
+  /// No description provided for @calorieWizardSexMale.
+  ///
+  /// In en, this message translates to:
+  /// **'Male'**
+  String get calorieWizardSexMale;
+
+  /// No description provided for @calorieWizardSexMaleMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the male BMR coefficient.'**
+  String get calorieWizardSexMaleMessage;
+
+  /// No description provided for @calorieWizardSexFemale.
+  ///
+  /// In en, this message translates to:
+  /// **'Female'**
+  String get calorieWizardSexFemale;
+
+  /// No description provided for @calorieWizardSexFemaleMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the female BMR coefficient.'**
+  String get calorieWizardSexFemaleMessage;
+
+  /// No description provided for @calorieWizardBirthdayTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'When\'s your birthday?'**
+  String get calorieWizardBirthdayTitle;
+
+  /// No description provided for @calorieWizardBirthdayMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'Month'**
+  String get calorieWizardBirthdayMonth;
+
+  /// No description provided for @calorieWizardBirthdayDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Day'**
+  String get calorieWizardBirthdayDay;
+
+  /// No description provided for @calorieWizardBirthdayYear.
+  ///
+  /// In en, this message translates to:
+  /// **'Year'**
+  String get calorieWizardBirthdayYear;
+
+  /// No description provided for @calorieWizardBirthdayValidationError.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a birthday for ages 18 to 100.'**
+  String get calorieWizardBirthdayValidationError;
+
+  /// No description provided for @calorieWizardHeightTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How tall are you?'**
+  String get calorieWizardHeightTitle;
+
+  /// No description provided for @calorieWizardHeightValidationError.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a height from 120 to 230 cm.'**
+  String get calorieWizardHeightValidationError;
+
+  /// No description provided for @calorieWizardWeightTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What\'s your current weight?'**
+  String get calorieWizardWeightTitle;
+
+  /// No description provided for @calorieWizardWeightValidationError.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a weight from 35 to 250 kg.'**
+  String get calorieWizardWeightValidationError;
+
+  /// No description provided for @calorieWizardProfileValidationError.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter age, height, and weight in the expected ranges.'**
+  String get calorieWizardProfileValidationError;
+
+  /// No description provided for @calorieWizardGoalTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What is your main goal?'**
+  String get calorieWizardGoalTitle;
+
+  /// No description provided for @calorieWizardGoalSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the outcome you want your target to support.'**
+  String get calorieWizardGoalSubtitle;
+
+  /// No description provided for @calorieWizardGoalLoseWeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Lose Weight'**
+  String get calorieWizardGoalLoseWeight;
+
+  /// No description provided for @calorieWizardGoalLoseWeightMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimate a deficit from maintenance.'**
+  String get calorieWizardGoalLoseWeightMessage;
+
+  /// No description provided for @calorieWizardGoalGainMuscle.
+  ///
+  /// In en, this message translates to:
+  /// **'Gain Muscle'**
+  String get calorieWizardGoalGainMuscle;
+
+  /// No description provided for @calorieWizardGoalGainMuscleMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimate a controlled calorie surplus.'**
+  String get calorieWizardGoalGainMuscleMessage;
+
+  /// No description provided for @calorieWizardGoalMaintainWeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Maintain Weight'**
+  String get calorieWizardGoalMaintainWeight;
+
+  /// No description provided for @calorieWizardGoalMaintainWeightMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Track around your estimated maintenance.'**
+  String get calorieWizardGoalMaintainWeightMessage;
+
+  /// No description provided for @calorieWizardLossPaceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How fast do you want to lose weight?'**
+  String get calorieWizardLossPaceTitle;
+
+  /// No description provided for @calorieWizardGainPaceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How fast do you want to gain weight?'**
+  String get calorieWizardGainPaceTitle;
+
+  /// No description provided for @calorieWizardPaceSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'A steadier pace is easier to sustain.'**
+  String get calorieWizardPaceSubtitle;
+
+  /// No description provided for @calorieWizardPaceSlow.
+  ///
+  /// In en, this message translates to:
+  /// **'Slow'**
+  String get calorieWizardPaceSlow;
+
+  /// No description provided for @calorieWizardPaceSlowMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Easier to maintain and better for performance.'**
+  String get calorieWizardPaceSlowMessage;
+
+  /// No description provided for @calorieWizardPaceModerate.
+  ///
+  /// In en, this message translates to:
+  /// **'Moderate'**
+  String get calorieWizardPaceModerate;
+
+  /// No description provided for @calorieWizardPaceModerateMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Recommended default for most users.'**
+  String get calorieWizardPaceModerateMessage;
+
+  /// No description provided for @calorieWizardPaceAggressive.
+  ///
+  /// In en, this message translates to:
+  /// **'Aggressive'**
+  String get calorieWizardPaceAggressive;
+
+  /// No description provided for @calorieWizardLossPaceAggressiveMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Larger deficit. Use only if you can recover well.'**
+  String get calorieWizardLossPaceAggressiveMessage;
+
+  /// No description provided for @calorieWizardPaceLean.
+  ///
+  /// In en, this message translates to:
+  /// **'Lean'**
+  String get calorieWizardPaceLean;
+
+  /// No description provided for @calorieWizardPaceLeanMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Small surplus for minimal fat gain.'**
+  String get calorieWizardPaceLeanMessage;
+
+  /// No description provided for @calorieWizardPaceStandard.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard'**
+  String get calorieWizardPaceStandard;
+
+  /// No description provided for @calorieWizardPaceStandardMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Recommended default for most users gaining muscle.'**
+  String get calorieWizardPaceStandardMessage;
+
+  /// No description provided for @calorieWizardGainPaceAggressiveMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Larger surplus with higher fat-gain risk.'**
+  String get calorieWizardGainPaceAggressiveMessage;
+
+  /// No description provided for @calorieWizardActivityTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What is your activity level?'**
+  String get calorieWizardActivityTitle;
+
+  /// No description provided for @calorieWizardActivitySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick the option that best matches a normal week.'**
+  String get calorieWizardActivitySubtitle;
+
+  /// No description provided for @calorieWizardActivitySedentary.
+  ///
+  /// In en, this message translates to:
+  /// **'Sedentary'**
+  String get calorieWizardActivitySedentary;
+
+  /// No description provided for @calorieWizardActivitySedentaryMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Mostly seated, low daily movement, and 0-1 light workouts weekly.'**
+  String get calorieWizardActivitySedentaryMessage;
+
+  /// No description provided for @calorieWizardActivityLightlyActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Lightly Active'**
+  String get calorieWizardActivityLightlyActive;
+
+  /// No description provided for @calorieWizardActivityLightlyActiveMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Regular walks or light exercise 1-3 days per week.'**
+  String get calorieWizardActivityLightlyActiveMessage;
+
+  /// No description provided for @calorieWizardActivityModeratelyActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Moderately Active'**
+  String get calorieWizardActivityModeratelyActive;
+
+  /// No description provided for @calorieWizardActivityModeratelyActiveMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Training 3-5 days per week or a meaningfully active routine.'**
+  String get calorieWizardActivityModeratelyActiveMessage;
+
+  /// No description provided for @calorieWizardActivityVeryActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Very Active'**
+  String get calorieWizardActivityVeryActive;
+
+  /// No description provided for @calorieWizardActivityVeryActiveMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Hard exercise most days or active work plus regular training.'**
+  String get calorieWizardActivityVeryActiveMessage;
+
+  /// No description provided for @calorieWizardActivitySuperActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Super Active'**
+  String get calorieWizardActivitySuperActive;
+
+  /// No description provided for @calorieWizardActivitySuperActiveMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Athlete-level workload, two-a-days, or demanding physical work.'**
+  String get calorieWizardActivitySuperActiveMessage;
+
+  /// No description provided for @calorieWizardBackTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get calorieWizardBackTooltip;
+
+  /// No description provided for @calorieWizardCloseTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get calorieWizardCloseTooltip;
+
+  /// No description provided for @calorieWizardLoadingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Personalizing your calorie plan...'**
+  String get calorieWizardLoadingTitle;
+
+  /// No description provided for @calorieWizardLoadingMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Building a target from your profile and activity.'**
+  String get calorieWizardLoadingMessage;
+
+  /// No description provided for @calorieWizardResultTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your personalized calorie plan is ready!'**
+  String get calorieWizardResultTitle;
+
+  /// No description provided for @calorieWizardResultBmr.
+  ///
+  /// In en, this message translates to:
+  /// **'BMR estimate'**
+  String get calorieWizardResultBmr;
+
+  /// No description provided for @calorieWizardResultMaintenance.
+  ///
+  /// In en, this message translates to:
+  /// **'Maintenance'**
+  String get calorieWizardResultMaintenance;
+
+  /// No description provided for @calorieWizardResultTargetRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Target range'**
+  String get calorieWizardResultTargetRange;
+
+  /// No description provided for @calorieWizardResultAdjustment.
+  ///
+  /// In en, this message translates to:
+  /// **'Adjustment'**
+  String get calorieWizardResultAdjustment;
+
+  /// No description provided for @calorieWizardTargetRangeValue.
+  ///
+  /// In en, this message translates to:
+  /// **'{min}-{max} Kcal'**
+  String calorieWizardTargetRangeValue(int min, int max);
+
+  /// No description provided for @calorieWizardEstimateNoteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Estimate note'**
+  String get calorieWizardEstimateNoteTitle;
+
+  /// No description provided for @macroSheetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Set your macros'**
+  String get macroSheetTitle;
+
+  /// No description provided for @macroDailyTarget.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily target: {calories} Kcal'**
+  String macroDailyTarget(int calories);
+
+  /// No description provided for @macroSaveMacros.
+  ///
+  /// In en, this message translates to:
+  /// **'Save macros'**
+  String get macroSaveMacros;
+
+  /// No description provided for @macroPersonalizedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Personalized macros'**
+  String get macroPersonalizedTitle;
+
+  /// No description provided for @macroSavePersonalized.
+  ///
+  /// In en, this message translates to:
+  /// **'Save personalized macros'**
+  String get macroSavePersonalized;
+
+  /// No description provided for @macroPercentagesTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Percentages'**
+  String get macroPercentagesTab;
+
+  /// No description provided for @macroGramsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Grams'**
+  String get macroGramsTab;
+
+  /// No description provided for @macroPresetBalanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Balanced'**
+  String get macroPresetBalanced;
+
+  /// No description provided for @macroPresetHighProtein.
+  ///
+  /// In en, this message translates to:
+  /// **'High protein'**
+  String get macroPresetHighProtein;
+
+  /// No description provided for @macroPresetLowerCarb.
+  ///
+  /// In en, this message translates to:
+  /// **'Lower carb'**
+  String get macroPresetLowerCarb;
+
+  /// No description provided for @macroPersonalized.
+  ///
+  /// In en, this message translates to:
+  /// **'Personalized'**
+  String get macroPersonalized;
+
+  /// No description provided for @macroCreateOwnSplit.
+  ///
+  /// In en, this message translates to:
+  /// **'Create your own split'**
+  String get macroCreateOwnSplit;
+
+  /// No description provided for @macroPercentagesOrGrams.
+  ///
+  /// In en, this message translates to:
+  /// **'Percentages or grams'**
+  String get macroPercentagesOrGrams;
+
+  /// No description provided for @macroPersonalizedPercentages.
+  ///
+  /// In en, this message translates to:
+  /// **'Personalized percentages'**
+  String get macroPersonalizedPercentages;
+
+  /// No description provided for @macroPersonalizedGrams.
+  ///
+  /// In en, this message translates to:
+  /// **'Personalized grams'**
+  String get macroPersonalizedGrams;
+
+  /// No description provided for @macroProteinPercentSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'{percent}% protein'**
+  String macroProteinPercentSummary(int percent);
+
+  /// No description provided for @macroCarbsPercentSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'{percent}% carbs'**
+  String macroCarbsPercentSummary(int percent);
+
+  /// No description provided for @macroFatPercentSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'{percent}% fat'**
+  String macroFatPercentSummary(int percent);
+
+  /// No description provided for @macroProteinGramsSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'{grams}g protein'**
+  String macroProteinGramsSummary(String grams);
+
+  /// No description provided for @macroCarbsGramsSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'{grams}g carbs'**
+  String macroCarbsGramsSummary(String grams);
+
+  /// No description provided for @macroFatGramsSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'{grams}g fat'**
+  String macroFatGramsSummary(String grams);
+
+  /// No description provided for @macroGramTriplet.
+  ///
+  /// In en, this message translates to:
+  /// **'{protein}g · {carbs}g · {fat}g'**
+  String macroGramTriplet(String protein, String carbs, String fat);
+
+  /// No description provided for @macroPercentagesWithGramsSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'{percentages} ({grams})'**
+  String macroPercentagesWithGramsSummary(String percentages, String grams);
+
+  /// No description provided for @macroPercentagesMustTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Percentages must total 100%'**
+  String get macroPercentagesMustTotal;
+
+  /// No description provided for @macroPercentagesTotalMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'These add up to {total}%. Adjust one macro or reset to balanced before saving.'**
+  String macroPercentagesTotalMessage(int total);
+
+  /// No description provided for @macroAdjustProtein.
+  ///
+  /// In en, this message translates to:
+  /// **'Adjust protein'**
+  String get macroAdjustProtein;
+
+  /// No description provided for @macroAdjustCarbs.
+  ///
+  /// In en, this message translates to:
+  /// **'Adjust carbs'**
+  String get macroAdjustCarbs;
+
+  /// No description provided for @macroAdjustFat.
+  ///
+  /// In en, this message translates to:
+  /// **'Adjust fat'**
+  String get macroAdjustFat;
+
+  /// No description provided for @macroResetBalanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset balanced'**
+  String get macroResetBalanced;
+
+  /// No description provided for @macroGramsTooHigh.
+  ///
+  /// In en, this message translates to:
+  /// **'Macro grams are too high'**
+  String get macroGramsTooHigh;
+
+  /// No description provided for @macroGramsTooHighMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Each macro target must be 2000 g or less.'**
+  String get macroGramsTooHighMessage;
+
+  /// No description provided for @macroSmallCalorieMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Small calorie mismatch'**
+  String get macroSmallCalorieMismatch;
+
+  /// No description provided for @macroCaloriesDoNotMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Macros do not match calories'**
+  String get macroCaloriesDoNotMatch;
+
+  /// No description provided for @macroGramMismatchOverMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'These grams add up to {macroCalories} Kcal, {delta} Kcal over your target.'**
+  String macroGramMismatchOverMessage(int macroCalories, int delta);
+
+  /// No description provided for @macroGramMismatchUnderMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'These grams add up to {macroCalories} Kcal, {delta} Kcal under your target.'**
+  String macroGramMismatchUnderMessage(int macroCalories, int delta);
+
+  /// No description provided for @macroUsePercentages.
+  ///
+  /// In en, this message translates to:
+  /// **'Use percentages'**
+  String get macroUsePercentages;
 
   /// No description provided for @dashboardCouldNotLoadToday.
   ///

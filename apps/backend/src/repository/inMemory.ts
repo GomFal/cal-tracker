@@ -1,6 +1,7 @@
-import { defaultUserScopes, type CalorieTargetSource, type DailyGoals, type Meal, type MealItem, type MealLabel, type MealProposal, type MealTemplate, type NutritionSnapshot } from "@cal-tracker/contracts";
+import { defaultUserScopes, type CalorieTargetSource, type DailyGoals, type MacroGoalMetadata, type Meal, type MealItem, type MealLabel, type MealProposal, type MealTemplate, type NutritionSnapshot } from "@cal-tracker/contracts";
 import { newId } from "../utils/ids.js";
 import { normalizeText } from "../utils/normalize.js";
+import { applyMacroGoalUpdate } from "../utils/macroGoals.js";
 import { subtractNutrition, sumNutrition } from "../utils/nutrition.js";
 import type {
   ActionCallRecord,
@@ -18,7 +19,8 @@ import type {
   StoredSession,
   StoredUser,
   UpsertFoodItemEmbeddingInput,
-  UserFoodPreference
+  UserFoodPreference,
+  UpdateDailyGoalsInput
 } from "./types.js";
 
 const ACTIVE_EMBEDDING_MODEL: EmbeddingModelRecord = {
@@ -45,6 +47,7 @@ export class InMemoryRepository implements AppRepository {
   private hydrationGoals = new Map<string, number>();
   private calorieTargetConfigured = new Map<string, boolean>();
   private calorieTargetSources = new Map<string, CalorieTargetSource>();
+  private macroGoalMetadata = new Map<string, MacroGoalMetadata>();
   private dailyGoalSnapshots = new Map<string, DailyGoals>();
   private proposals = new Map<string, MealProposal & { userId: string }>();
   private meals = new Map<string, Meal & { userId: string }>();
@@ -74,7 +77,7 @@ export class InMemoryRepository implements AppRepository {
       scopes: input.scopes ?? defaultUserScopes
     };
     this.users.set(user.id, user);
-    this.targets.set(user.id, { calories: 2200, proteinGrams: 160, carbsGrams: 240, fatGrams: 70 });
+    this.targets.set(user.id, { calories: 2200, proteinGrams: 0, carbsGrams: 0, fatGrams: 0 });
     this.hydrationGoals.set(user.id, 12);
     this.calorieTargetConfigured.set(user.id, false);
     this.calorieTargetSources.set(user.id, "default");
@@ -317,7 +320,7 @@ export class InMemoryRepository implements AppRepository {
   }
 
   async getNutritionTarget(userId: string): Promise<NutritionSnapshot> {
-    return this.targets.get(userId) ?? { calories: 2200, proteinGrams: 160, carbsGrams: 240, fatGrams: 70 };
+    return this.targets.get(userId) ?? { calories: 2200, proteinGrams: 0, carbsGrams: 0, fatGrams: 0 };
   }
 
   async getDailyGoals(userId: string, date: string): Promise<DailyGoals> {
@@ -326,27 +329,33 @@ export class InMemoryRepository implements AppRepository {
       hydrationGoalGlasses: this.hydrationGoals.get(userId) ?? 12,
       calorieTargetConfigured: this.calorieTargetConfigured.get(userId) ?? false,
       calorieTargetSource: this.calorieTargetSources.get(userId) ?? "default",
+      ...this.currentMacroMetadata(userId),
     });
   }
 
-  async updateDailyGoals(userId: string, input: { date: string; calories?: number; hydrationGoalGlasses?: number; calorieTargetSource?: CalorieTargetSource }): Promise<DailyGoals> {
+  async updateDailyGoals(userId: string, input: UpdateDailyGoalsInput): Promise<DailyGoals> {
     const currentTarget = await this.getNutritionTarget(userId);
     const currentHydration = this.hydrationGoals.get(userId) ?? 12;
     const currentConfigured = this.calorieTargetConfigured.get(userId) ?? false;
     const currentSource = this.calorieTargetSources.get(userId) ?? "default";
+    const currentMetadata = this.currentMacroMetadata(userId);
     for (const date of previousDatesInWeek(input.date)) {
       this.ensureDailyGoalSnapshot(userId, date, {
         target: currentTarget,
         hydrationGoalGlasses: currentHydration,
         calorieTargetConfigured: currentConfigured,
         calorieTargetSource: currentSource,
+        ...currentMetadata,
       });
     }
 
-    const nextTarget = {
-      ...currentTarget,
-      calories: input.calories ?? currentTarget.calories,
-    };
+    const { target: nextTarget, metadata: nextMetadata } =
+        applyMacroGoalUpdate(
+          currentTarget,
+          currentMetadata,
+          input,
+          input.calories ?? currentTarget.calories,
+        );
     const nextHydration = input.hydrationGoalGlasses ?? currentHydration;
     const nextConfigured = input.calories === undefined ? currentConfigured : true;
     const nextSource = input.calories === undefined ? currentSource : input.calorieTargetSource ?? "manual";
@@ -354,12 +363,14 @@ export class InMemoryRepository implements AppRepository {
     this.hydrationGoals.set(userId, nextHydration);
     this.calorieTargetConfigured.set(userId, nextConfigured);
     this.calorieTargetSources.set(userId, nextSource);
+    this.macroGoalMetadata.set(userId, nextMetadata);
     const goals = {
       date: input.date,
       target: nextTarget,
       hydrationGoalGlasses: nextHydration,
       calorieTargetConfigured: nextConfigured,
       calorieTargetSource: nextSource,
+      ...nextMetadata,
     };
     this.dailyGoalSnapshots.set(dailyGoalKey(userId, input.date), goals);
     return goals;
@@ -451,6 +462,14 @@ export class InMemoryRepository implements AppRepository {
       hydrationGoalGlasses: goals.hydrationGoalGlasses,
       calorieTargetConfigured: goals.calorieTargetConfigured,
       calorieTargetSource: goals.calorieTargetSource,
+      macroMode: goals.macroMode,
+      macroSource: goals.macroSource,
+      macroPreset: goals.macroPreset,
+      proteinPct: goals.proteinPct,
+      carbsPct: goals.carbsPct,
+      fatPct: goals.fatPct,
+      macroCalories: goals.macroCalories,
+      calorieDeltaKcal: goals.calorieDeltaKcal,
       meals
     };
   }
@@ -541,6 +560,10 @@ export class InMemoryRepository implements AppRepository {
     const snapshot = { date, ...goals };
     this.dailyGoalSnapshots.set(key, snapshot);
     return snapshot;
+  }
+
+  private currentMacroMetadata(userId: string): MacroGoalMetadata {
+    return this.macroGoalMetadata.get(userId) ?? {};
   }
 
 }

@@ -28,21 +28,28 @@ class CalTrackerBootstrap extends StatelessWidget {
     super.key,
     this.apiConfig = const ApiConfig.fromEnvironment(),
     this.preferencesRepository,
+    this.authRepository,
+    this.nutritionRepository,
+    this.tokenStorage,
   });
 
   final ApiConfig apiConfig;
   final AppPreferencesRepository? preferencesRepository;
+  final AuthRepository? authRepository;
+  final NutritionRepository? nutritionRepository;
+  final TokenStorage? tokenStorage;
 
   @override
   Widget build(BuildContext context) {
-    const tokenStorage = SecureTokenStorage();
+    final tokenStorage = this.tokenStorage ?? const SecureTokenStorage();
     final apiClient = CalTrackerApiClient(
       config: apiConfig,
       tokenStorage: tokenStorage,
     );
-    final authRepository =
+    final authRepository = this.authRepository ??
         AuthRepository(apiClient: apiClient, tokenStorage: tokenStorage);
-    final nutritionRepository = NutritionRepository(apiClient: apiClient);
+    final nutritionRepository =
+        this.nutritionRepository ?? NutritionRepository(apiClient: apiClient);
     final preferencesRepository = this.preferencesRepository ??
         AppPreferencesRepository(
           storage: AppPreferencesStorage(),

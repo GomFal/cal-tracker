@@ -77,6 +77,8 @@ Use this testing pyramid for mobile work:
 
 For Flutter UI changes, prefer widget tests over Patrol. A new screen, form, modal, navigation path, swipe action, or stateful component should normally add or update `apps/mobile/test/...` coverage with fake repositories or mocked platform services. Do not call the real backend from widget tests, and avoid mocking HTTP in every screen test; prefer injecting a fake repository/ViewModel at the Provider boundary. Mock the generated API client only in repository tests, and mock platform channels/services only for plugin-facing service tests.
 
+Every new Flutter UI feature must update all ARB language files with precise English and Spanish strings and regenerate the localization output before verification.
+
 Widget tests should use stable keys, semantics labels, and visible text. For tap/drag targets that may also exist offstage or underneath another widget, use `.hitTestable()` or `tester.ensureVisible(...)` before the interaction. `apps/mobile/test/flutter_test_config.dart` makes hit-test warnings fatal, so a tap on a covered/offscreen/disabled target should fail the test instead of only logging a warning.
 
 Use **Patrol** for critical device-backed flows only. Good Patrol candidates are app startup smoke, one happy-path auth/backend journey, microphone permission and recording, native permission dialogs, Android AppFunctions/iOS App Intents, deep links, push notifications, platform views, and pre-release smoke tests. Do not add Patrol coverage for Flutter-only UI states that can be exercised with `WidgetTester`.

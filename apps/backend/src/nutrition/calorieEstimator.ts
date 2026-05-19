@@ -63,7 +63,7 @@ export function estimateCalories(input: CalorieEstimateRequest): CalorieEstimate
 
   const targetCalories = roundToNearest10(targetRaw);
   const maintenanceCalories = roundToNearest10(maintenanceRaw);
-  const rangePadding = input.goal === "maintain" || input.goal === "recomposition" ? 150 : 100;
+  const rangePadding = input.goal === "maintain" ? 150 : 100;
   const rangeMin = Math.max(800, roundToNearest10(targetCalories - rangePadding));
   const rangeMax = Math.min(10000, roundToNearest10(targetCalories + rangePadding));
 

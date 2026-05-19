@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../app/dark_mode_toggle.dart';
+import '../../../../domain/models/macro_distribution.dart';
 import '../../../../domain/models/nutrition_models.dart';
 import '../../../../l10n/app_localizations_context.dart';
 import '../../../../l10n/meal_label_localizations.dart';
@@ -14,6 +15,7 @@ import '../../settings/view_models/settings_view_model.dart';
 import '../dashboard_time_labels.dart';
 import '../view_models/dashboard_view_model.dart';
 import 'calorie_target_sheet.dart';
+import 'macro_distribution_sheet.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -115,11 +117,62 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
     );
     if (!context.mounted || selection == null) return;
-    await viewModel.updateCalorieTarget(
+    final saved = await viewModel.updateCalorieTarget(
       selection.calories,
       source: selection.source,
+      macroConfig: selection.macroConfig,
     );
     if (!context.mounted) return;
+    if (!saved) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.l10n.calorieCouldNotSaveCalories),
+        ),
+      );
+      return;
+    }
+    if (!context.mounted) return;
+    await Future.wait([
+      context.read<MealHistoryViewModel>().load(),
+      context.read<SettingsViewModel>().load(),
+    ]);
+    if (!context.mounted ||
+        selection.source != 'manual' ||
+        selection.macroConfig != null) {
+      return;
+    }
+    final shouldConfigure = await showModalBottomSheet<bool>(
+          context: context,
+          useSafeArea: true,
+          builder: (context) => PostCalorieSaveMacroPrompt(
+            calories: selection.calories,
+          ),
+        ) ??
+        false;
+    if (!context.mounted || !shouldConfigure) return;
+    final macroConfig = await showModalBottomSheet<MacroDistributionConfig>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) => MacroDistributionSheet(
+        calories: selection.calories,
+      ),
+    );
+    if (!context.mounted || macroConfig == null) return;
+    final macroSaved = await viewModel.updateCalorieTarget(
+      selection.calories,
+      source: selection.source,
+      macroConfig: macroConfig,
+    );
+    if (!context.mounted) return;
+    if (!macroSaved) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.l10n.calorieCouldNotSaveMacros),
+        ),
+      );
+      return;
+    }
     await Future.wait([
       context.read<MealHistoryViewModel>().load(),
       context.read<SettingsViewModel>().load(),
@@ -353,7 +406,10 @@ class _CalorieSetupProgressCard extends StatelessWidget {
                         FittedBox(
                           fit: BoxFit.scaleDown,
                           alignment: Alignment.centerLeft,
-                          child: Text('Set up your', style: titleStyle),
+                          child: Text(
+                            l10n.calorieSetupHeadlinePrefix,
+                            style: titleStyle,
+                          ),
                         ),
                         const SizedBox(height: 8),
                         FittedBox(
@@ -363,7 +419,10 @@ class _CalorieSetupProgressCard extends StatelessWidget {
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              Text('daily calories', style: titleStyle),
+                              Text(
+                                l10n.calorieSetupHeadlineMain,
+                                style: titleStyle,
+                              ),
                               const SizedBox(width: 10),
                               Container(
                                 padding: const EdgeInsets.symmetric(
@@ -376,7 +435,7 @@ class _CalorieSetupProgressCard extends StatelessWidget {
                                   borderRadius: BorderRadius.circular(18),
                                 ),
                                 child: Text(
-                                  'Here.',
+                                  l10n.calorieSetupHeadlineBadge,
                                   style: titleStyle?.copyWith(
                                     color: palette.leaf,
                                   ),
@@ -457,8 +516,8 @@ class _MacroSummaryRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final consumedNutrition = summary?.consumed ?? _emptyNutrition;
-    final targetNutrition = summary?.target ?? _defaultTarget;
-    final hasConfiguredTarget = summary?.calorieTargetConfigured ?? true;
+    final targetNutrition = summary?.target ?? _emptyNutrition;
+    final hasConfiguredMacros = summary?.macroMode != null;
     return Row(
       children: [
         Expanded(
@@ -466,7 +525,7 @@ class _MacroSummaryRow extends StatelessWidget {
             assetPath: 'assets/images/icons/carbs_icon.png',
             iconKey: const ValueKey('dashboard_macro_carbs_icon'),
             label: l10n.commonCarbs,
-            value: hasConfiguredTarget
+            value: hasConfiguredMacros
                 ? _macroRatio(
                     consumedNutrition.carbsGrams,
                     targetNutrition.carbsGrams,
@@ -481,7 +540,7 @@ class _MacroSummaryRow extends StatelessWidget {
             assetPath: 'assets/images/icons/protein_icon.png',
             iconKey: const ValueKey('dashboard_macro_protein_icon'),
             label: l10n.localeName.startsWith('es') ? 'Proteínas' : 'Proteins',
-            value: hasConfiguredTarget
+            value: hasConfiguredMacros
                 ? _macroRatio(
                     consumedNutrition.proteinGrams,
                     targetNutrition.proteinGrams,
@@ -496,7 +555,7 @@ class _MacroSummaryRow extends StatelessWidget {
             assetPath: 'assets/images/icons/fats_icon.png',
             iconKey: const ValueKey('dashboard_macro_fats_icon'),
             label: l10n.localeName.startsWith('es') ? 'Grasas' : 'Fats',
-            value: hasConfiguredTarget
+            value: hasConfiguredMacros
                 ? _macroRatio(
                     consumedNutrition.fatGrams,
                     targetNutrition.fatGrams,
@@ -601,13 +660,6 @@ const _emptyNutrition = NutritionSnapshot(
   proteinGrams: 0,
   carbsGrams: 0,
   fatGrams: 0,
-);
-
-const _defaultTarget = NutritionSnapshot(
-  calories: 2200,
-  proteinGrams: 160,
-  carbsGrams: 240,
-  fatGrams: 70,
 );
 
 String _macroRatio(double consumed, double target) {

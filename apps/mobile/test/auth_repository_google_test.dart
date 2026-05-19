@@ -10,8 +10,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 void main() {
-  test('loginWithGoogle exchanges an ID token and stores API tokens',
-      () async {
+  test('loginWithGoogle exchanges an ID token and stores API tokens', () async {
     final tokenStorage = _MemoryTokenStorage();
     final apiClient = CalTrackerApiClient(
       config: const ApiConfig(baseUrl: 'http://localhost'),
@@ -49,7 +48,82 @@ void main() {
     expect(await tokenStorage.read(), isNotNull);
     expect((await tokenStorage.read())?.accessToken, 'access-token');
   });
+
+  test('restoreSession refreshes an expired access token before returning me',
+      () async {
+    final tokenStorage = _MemoryTokenStorage();
+    await tokenStorage.write(
+      const StoredTokens(
+        accessToken: 'expired-access-token',
+        refreshToken: 'valid-refresh-token',
+      ),
+    );
+    final requestedPaths = <String>[];
+    final apiClient = CalTrackerApiClient(
+      config: const ApiConfig(baseUrl: 'http://localhost'),
+      tokenStorage: tokenStorage,
+      httpClient: MockClient((request) async {
+        requestedPaths.add(request.url.path);
+        if (request.url.path == '/v1/auth/me' &&
+            requestedPaths.where((path) => path == '/v1/auth/me').length == 1) {
+          expect(_authorizationHeader(request), 'Bearer expired-access-token');
+          return _jsonResponse({
+            'error': {'message': 'Token expired or invalid'},
+          }, 401);
+        }
+        if (request.url.path == '/v1/auth/refresh') {
+          expect(jsonDecode(request.body), {
+            'refreshToken': 'valid-refresh-token',
+          });
+          return _jsonResponse({
+            'accessToken': 'fresh-access-token',
+            'refreshToken': 'rotated-refresh-token',
+          });
+        }
+        if (request.url.path == '/v1/auth/me') {
+          expect(_authorizationHeader(request), 'Bearer fresh-access-token');
+          return _jsonResponse(_userJson);
+        }
+        fail('Unexpected request to ${request.url.path}');
+      }),
+    );
+    final repository = AuthRepository(
+      apiClient: apiClient,
+      tokenStorage: tokenStorage,
+      googleSignInService: _FakeGoogleSignInService(null),
+    );
+
+    final user = await repository.restoreSession();
+
+    expect(user?.email, 'user@example.com');
+    expect((await tokenStorage.read())?.accessToken, 'fresh-access-token');
+    expect((await tokenStorage.read())?.refreshToken, 'rotated-refresh-token');
+    expect(requestedPaths, [
+      '/v1/auth/me',
+      '/v1/auth/refresh',
+      '/v1/auth/me',
+    ]);
+  });
 }
+
+http.Response _jsonResponse(Map<String, Object?> body, [int statusCode = 200]) {
+  return http.Response(
+    jsonEncode(body),
+    statusCode,
+    headers: {'content-type': 'application/json'},
+  );
+}
+
+String? _authorizationHeader(http.Request request) {
+  return request.headers['authorization'] ?? request.headers['Authorization'];
+}
+
+const _userJson = {
+  'id': 'user-id',
+  'email': 'user@example.com',
+  'displayName': 'Saved User',
+  'trustedModeEnabled': false,
+};
 
 class _FakeGoogleSignInService implements GoogleSignInService {
   _FakeGoogleSignInService(this.idToken);

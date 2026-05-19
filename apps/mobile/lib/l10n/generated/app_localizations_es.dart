@@ -222,6 +222,9 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String get settingsNotSet => 'Sin configurar';
+
+  @override
   String get settingsLanguageTitle => 'Idioma';
 
   @override
@@ -238,6 +241,451 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get settingsLanguageSpanish => 'Español';
+
+  @override
+  String get settingsMacroRequiresCaloriesTitle =>
+      'Configura primero tus calorías';
+
+  @override
+  String get settingsMacroRequiresCaloriesMessage =>
+      'Configura tus calorías diarias antes de definir una distribución de macros.';
+
+  @override
+  String get settingsMacroRequiresCaloriesSetNow => 'Configurar calorías ahora';
+
+  @override
+  String get settingsMacroRequiresCaloriesSkip => 'Omitir por ahora';
+
+  @override
+  String get calorieTargetSheetTitle => 'Configura tus calorías diarias';
+
+  @override
+  String get calorieTargetSheetSubtitle =>
+      'Elige el objetivo que quieres controlar cada día.';
+
+  @override
+  String get calorieTargetCalculatorLink =>
+      '¿No sabes cuántas calorías necesitas?';
+
+  @override
+  String calorieTargetRangeValidationError(int min, int max) {
+    return 'Introduce un objetivo de $min a $max Kcal.';
+  }
+
+  @override
+  String get calorieTargetIncreaseTooltip => 'Aumentar';
+
+  @override
+  String get calorieTargetDecreaseTooltip => 'Disminuir';
+
+  @override
+  String get calorieSetupHeadlinePrefix => 'Configura tus';
+
+  @override
+  String get calorieSetupHeadlineMain => 'calorías diarias';
+
+  @override
+  String get calorieSetupHeadlineBadge => 'Aquí.';
+
+  @override
+  String get calorieCouldNotSaveCalories =>
+      'No se pudieron guardar tus calorías. Inténtalo de nuevo.';
+
+  @override
+  String get calorieCouldNotSaveMacros =>
+      'No se pudieron guardar tus macros. Inténtalo de nuevo.';
+
+  @override
+  String get postCalorieSaveTitle => 'Calorías guardadas';
+
+  @override
+  String postCalorieSaveTarget(int calories) {
+    return 'Tu objetivo diario es $calories Kcal.';
+  }
+
+  @override
+  String get postCalorieSaveMacroQuestion =>
+      '¿Quieres controlar también proteína, carbohidratos y grasa?';
+
+  @override
+  String get postCalorieSaveSetMacroDistribution =>
+      'Configurar distribución de macros';
+
+  @override
+  String get postCalorieSaveNotNow => 'Ahora no';
+
+  @override
+  String get calorieMacroPromptTitle => '¿Añadir macros?';
+
+  @override
+  String calorieMacroPromptMessage(int calories) {
+    return 'Elige un reparto simple de proteína, carbohidratos y grasa para $calories Kcal.';
+  }
+
+  @override
+  String get calorieMacroPromptConfigure => 'Configurar';
+
+  @override
+  String get calorieMacroPromptSkip => 'Omitir por ahora';
+
+  @override
+  String get calorieCalculatorChooseYourMacrosTitle => 'Elige tus macros';
+
+  @override
+  String get calorieWizardCheckDetailsTitle => 'Revisa tus datos';
+
+  @override
+  String get calorieWizardContinue => 'Continuar';
+
+  @override
+  String get calorieWizardUseEstimate => 'Usar esta estimación';
+
+  @override
+  String get calorieWizardSexTitle => '¿Cuál es tu sexo biológico?';
+
+  @override
+  String get calorieWizardSexSubtitle =>
+      'Esto mantiene la estimación de calorías alineada con la fórmula.';
+
+  @override
+  String get calorieWizardSexMale => 'Hombre';
+
+  @override
+  String get calorieWizardSexMaleMessage => 'Usa el coeficiente BMR masculino.';
+
+  @override
+  String get calorieWizardSexFemale => 'Mujer';
+
+  @override
+  String get calorieWizardSexFemaleMessage =>
+      'Usa el coeficiente BMR femenino.';
+
+  @override
+  String get calorieWizardBirthdayTitle => '¿Cuándo es tu cumpleaños?';
+
+  @override
+  String get calorieWizardBirthdayMonth => 'Mes';
+
+  @override
+  String get calorieWizardBirthdayDay => 'Día';
+
+  @override
+  String get calorieWizardBirthdayYear => 'Año';
+
+  @override
+  String get calorieWizardBirthdayValidationError =>
+      'Elige un cumpleaños para edades de 18 a 100 años.';
+
+  @override
+  String get calorieWizardHeightTitle => '¿Cuánto mides?';
+
+  @override
+  String get calorieWizardHeightValidationError =>
+      'Introduce una altura de 120 a 230 cm.';
+
+  @override
+  String get calorieWizardWeightTitle => '¿Cuál es tu peso actual?';
+
+  @override
+  String get calorieWizardWeightValidationError =>
+      'Introduce un peso de 35 a 250 kg.';
+
+  @override
+  String get calorieWizardProfileValidationError =>
+      'Introduce edad, altura y peso dentro de los rangos esperados.';
+
+  @override
+  String get calorieWizardGoalTitle => '¿Cuál es tu objetivo principal?';
+
+  @override
+  String get calorieWizardGoalSubtitle =>
+      'Elige el resultado que quieres que apoye tu objetivo.';
+
+  @override
+  String get calorieWizardGoalLoseWeight => 'Perder peso';
+
+  @override
+  String get calorieWizardGoalLoseWeightMessage =>
+      'Estima un déficit desde mantenimiento.';
+
+  @override
+  String get calorieWizardGoalGainMuscle => 'Ganar músculo';
+
+  @override
+  String get calorieWizardGoalGainMuscleMessage =>
+      'Estima un superávit calórico controlado.';
+
+  @override
+  String get calorieWizardGoalMaintainWeight => 'Mantener peso';
+
+  @override
+  String get calorieWizardGoalMaintainWeightMessage =>
+      'Controla cerca de tu mantenimiento estimado.';
+
+  @override
+  String get calorieWizardLossPaceTitle =>
+      '¿Qué tan rápido quieres perder peso?';
+
+  @override
+  String get calorieWizardGainPaceTitle =>
+      '¿Qué tan rápido quieres ganar peso?';
+
+  @override
+  String get calorieWizardPaceSubtitle =>
+      'Un ritmo más estable es más fácil de sostener.';
+
+  @override
+  String get calorieWizardPaceSlow => 'Lento';
+
+  @override
+  String get calorieWizardPaceSlowMessage =>
+      'Más fácil de mantener y mejor para el rendimiento.';
+
+  @override
+  String get calorieWizardPaceModerate => 'Moderado';
+
+  @override
+  String get calorieWizardPaceModerateMessage =>
+      'Opción recomendada para la mayoría.';
+
+  @override
+  String get calorieWizardPaceAggressive => 'Agresivo';
+
+  @override
+  String get calorieWizardLossPaceAggressiveMessage =>
+      'Déficit mayor. Úsalo solo si puedes recuperarte bien.';
+
+  @override
+  String get calorieWizardPaceLean => 'Ligero';
+
+  @override
+  String get calorieWizardPaceLeanMessage =>
+      'Superávit pequeño para minimizar la ganancia de grasa.';
+
+  @override
+  String get calorieWizardPaceStandard => 'Estándar';
+
+  @override
+  String get calorieWizardPaceStandardMessage =>
+      'Opción recomendada para la mayoría al ganar músculo.';
+
+  @override
+  String get calorieWizardGainPaceAggressiveMessage =>
+      'Superávit mayor con más riesgo de ganar grasa.';
+
+  @override
+  String get calorieWizardActivityTitle => '¿Cuál es tu nivel de actividad?';
+
+  @override
+  String get calorieWizardActivitySubtitle =>
+      'Elige la opción que mejor encaje con una semana normal.';
+
+  @override
+  String get calorieWizardActivitySedentary => 'Sedentario';
+
+  @override
+  String get calorieWizardActivitySedentaryMessage =>
+      'Mayormente sentado, poco movimiento diario y 0-1 entrenamientos ligeros por semana.';
+
+  @override
+  String get calorieWizardActivityLightlyActive => 'Actividad ligera';
+
+  @override
+  String get calorieWizardActivityLightlyActiveMessage =>
+      'Paseos habituales o ejercicio ligero 1-3 días por semana.';
+
+  @override
+  String get calorieWizardActivityModeratelyActive => 'Actividad moderada';
+
+  @override
+  String get calorieWizardActivityModeratelyActiveMessage =>
+      'Entrenas 3-5 días por semana o tienes una rutina bastante activa.';
+
+  @override
+  String get calorieWizardActivityVeryActive => 'Muy activo';
+
+  @override
+  String get calorieWizardActivityVeryActiveMessage =>
+      'Ejercicio intenso casi todos los días o trabajo activo con entrenamiento regular.';
+
+  @override
+  String get calorieWizardActivitySuperActive => 'Súper activo';
+
+  @override
+  String get calorieWizardActivitySuperActiveMessage =>
+      'Carga de atleta, dobles sesiones o trabajo físico exigente.';
+
+  @override
+  String get calorieWizardBackTooltip => 'Atrás';
+
+  @override
+  String get calorieWizardCloseTooltip => 'Cerrar';
+
+  @override
+  String get calorieWizardLoadingTitle =>
+      'Personalizando tu plan de calorías...';
+
+  @override
+  String get calorieWizardLoadingMessage =>
+      'Creando un objetivo a partir de tu perfil y actividad.';
+
+  @override
+  String get calorieWizardResultTitle =>
+      'Tu plan personalizado de calorías está listo.';
+
+  @override
+  String get calorieWizardResultBmr => 'Metabolismo basal';
+
+  @override
+  String get calorieWizardResultMaintenance => 'Mantenimiento';
+
+  @override
+  String get calorieWizardResultTargetRange => 'Rango objetivo';
+
+  @override
+  String get calorieWizardResultAdjustment => 'Ajuste';
+
+  @override
+  String calorieWizardTargetRangeValue(int min, int max) {
+    return '$min-$max Kcal';
+  }
+
+  @override
+  String get calorieWizardEstimateNoteTitle => 'Nota de la estimación';
+
+  @override
+  String get macroSheetTitle => 'Configura tus macros';
+
+  @override
+  String macroDailyTarget(int calories) {
+    return 'Objetivo diario: $calories Kcal';
+  }
+
+  @override
+  String get macroSaveMacros => 'Guardar macros';
+
+  @override
+  String get macroPersonalizedTitle => 'Macros personalizados';
+
+  @override
+  String get macroSavePersonalized => 'Guardar macros personalizados';
+
+  @override
+  String get macroPercentagesTab => 'Porcentajes';
+
+  @override
+  String get macroGramsTab => 'Gramos';
+
+  @override
+  String get macroPresetBalanced => 'Equilibrado';
+
+  @override
+  String get macroPresetHighProtein => 'Alta proteína';
+
+  @override
+  String get macroPresetLowerCarb => 'Bajo en carbohidratos';
+
+  @override
+  String get macroPersonalized => 'Personalizados';
+
+  @override
+  String get macroCreateOwnSplit => 'Crea tu propio reparto';
+
+  @override
+  String get macroPercentagesOrGrams => 'Porcentajes o gramos';
+
+  @override
+  String get macroPersonalizedPercentages => 'Porcentajes personalizados';
+
+  @override
+  String get macroPersonalizedGrams => 'Gramos personalizados';
+
+  @override
+  String macroProteinPercentSummary(int percent) {
+    return '$percent % proteína';
+  }
+
+  @override
+  String macroCarbsPercentSummary(int percent) {
+    return '$percent % carbohidratos';
+  }
+
+  @override
+  String macroFatPercentSummary(int percent) {
+    return '$percent % grasa';
+  }
+
+  @override
+  String macroProteinGramsSummary(String grams) {
+    return '$grams g proteína';
+  }
+
+  @override
+  String macroCarbsGramsSummary(String grams) {
+    return '$grams g carbohidratos';
+  }
+
+  @override
+  String macroFatGramsSummary(String grams) {
+    return '$grams g grasa';
+  }
+
+  @override
+  String macroGramTriplet(String protein, String carbs, String fat) {
+    return '$protein g · $carbs g · $fat g';
+  }
+
+  @override
+  String macroPercentagesWithGramsSummary(String percentages, String grams) {
+    return '$percentages ($grams)';
+  }
+
+  @override
+  String get macroPercentagesMustTotal => 'Los porcentajes deben sumar 100 %';
+
+  @override
+  String macroPercentagesTotalMessage(int total) {
+    return 'Suman $total %. Ajusta un macro o restablece el equilibrado antes de guardar.';
+  }
+
+  @override
+  String get macroAdjustProtein => 'Ajustar proteína';
+
+  @override
+  String get macroAdjustCarbs => 'Ajustar carbohidratos';
+
+  @override
+  String get macroAdjustFat => 'Ajustar grasa';
+
+  @override
+  String get macroResetBalanced => 'Restablecer equilibrado';
+
+  @override
+  String get macroGramsTooHigh => 'Los gramos de macros son demasiado altos';
+
+  @override
+  String get macroGramsTooHighMessage =>
+      'Cada macro debe ser de 2000 g o menos.';
+
+  @override
+  String get macroSmallCalorieMismatch => 'Pequeño desajuste de calorías';
+
+  @override
+  String get macroCaloriesDoNotMatch =>
+      'Los macros no coinciden con las calorías';
+
+  @override
+  String macroGramMismatchOverMessage(int macroCalories, int delta) {
+    return 'Estos gramos suman $macroCalories Kcal, $delta Kcal por encima de tu objetivo.';
+  }
+
+  @override
+  String macroGramMismatchUnderMessage(int macroCalories, int delta) {
+    return 'Estos gramos suman $macroCalories Kcal, $delta Kcal por debajo de tu objetivo.';
+  }
+
+  @override
+  String get macroUsePercentages => 'Usar porcentajes';
 
   @override
   String get dashboardCouldNotLoadToday => 'No se pudo cargar el día';

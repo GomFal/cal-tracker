@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../../data/repositories/nutrition_repository.dart';
+import '../../../../domain/models/macro_distribution.dart';
 import '../../../../domain/models/nutrition_models.dart';
 import '../../../core/user_visible_error.dart';
 
@@ -9,9 +10,9 @@ class DashboardViewModel extends ChangeNotifier {
     required NutritionRepository nutritionRepository,
     Duration cacheTtl = const Duration(seconds: 60),
     DateTime Function()? now,
-  }) : _nutritionRepository = nutritionRepository,
-       _cacheTtl = cacheTtl,
-       _now = now ?? DateTime.now;
+  })  : _nutritionRepository = nutritionRepository,
+        _cacheTtl = cacheTtl,
+        _now = now ?? DateTime.now;
 
   final NutritionRepository _nutritionRepository;
   final Duration _cacheTtl;
@@ -87,6 +88,7 @@ class DashboardViewModel extends ChangeNotifier {
   Future<bool> updateCalorieTarget(
     int calories, {
     String source = 'manual',
+    MacroDistributionConfig? macroConfig,
   }) async {
     _isLoading = true;
     notifyListeners();
@@ -94,6 +96,8 @@ class DashboardViewModel extends ChangeNotifier {
       await _nutritionRepository.updateDailyGoals(
         calories: calories,
         calorieTargetSource: source,
+        macroConfig: macroConfig,
+        macroCalorieTarget: calories,
       );
       _summary = await _nutritionRepository.getDailySummary();
       _error = null;

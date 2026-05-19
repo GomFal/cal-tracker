@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../../../data/repositories/auth_repository.dart';
 import '../../../../data/repositories/nutrition_repository.dart';
 import '../../../../domain/models/auth_models.dart';
+import '../../../../domain/models/macro_distribution.dart';
 import '../../../../domain/models/nutrition_models.dart';
 import '../../../core/user_visible_error.dart';
 
@@ -34,6 +35,14 @@ class SettingsViewModel extends ChangeNotifier {
         hydrationGoalGlasses: summary.hydrationGoalGlasses,
         calorieTargetConfigured: summary.calorieTargetConfigured,
         calorieTargetSource: summary.calorieTargetSource,
+        macroMode: summary.macroMode,
+        macroSource: summary.macroSource,
+        macroPreset: summary.macroPreset,
+        proteinPct: summary.proteinPct,
+        carbsPct: summary.carbsPct,
+        fatPct: summary.fatPct,
+        macroCalories: summary.macroCalories,
+        calorieDeltaKcal: summary.calorieDeltaKcal,
       );
       _error = null;
     } catch (error) {
@@ -51,6 +60,8 @@ class SettingsViewModel extends ChangeNotifier {
     int? calories,
     int? hydrationGoalGlasses,
     String? calorieTargetSource,
+    MacroDistributionConfig? macroConfig,
+    int? macroCalorieTarget,
   }) async {
     _isLoading = true;
     notifyListeners();
@@ -59,6 +70,8 @@ class SettingsViewModel extends ChangeNotifier {
         calories: calories,
         hydrationGoalGlasses: hydrationGoalGlasses,
         calorieTargetSource: calorieTargetSource,
+        macroConfig: macroConfig,
+        macroCalorieTarget: macroCalorieTarget,
       );
       _goals = goals;
       _error = null;

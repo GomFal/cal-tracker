@@ -41,6 +41,7 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
   @override
   Widget build(BuildContext context) {
     final viewModel = context.watch<VoiceLogViewModel>();
+    final showMealEntryControls = viewModel.proposal == null;
     if (_textController.text != viewModel.transcript) {
       _textController.value = TextEditingValue(
         text: viewModel.transcript,
@@ -89,27 +90,29 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              FreshCard(
-                padding: const EdgeInsets.all(14),
-                child: TextField(
-                  key: const ValueKey('meal_text_field'),
-                  controller: _textController,
-                  focusNode: _textFieldFocusNode,
-                  minLines: 3,
-                  maxLines: 6,
-                  decoration: const InputDecoration(
-                    labelText: 'Meal',
-                    hintText: 'Tell me what you ate',
-                    prefixIcon: Icon(Icons.restaurant_rounded),
+              if (showMealEntryControls) ...[
+                FreshCard(
+                  padding: const EdgeInsets.all(14),
+                  child: TextField(
+                    key: const ValueKey('meal_text_field'),
+                    controller: _textController,
+                    focusNode: _textFieldFocusNode,
+                    minLines: 3,
+                    maxLines: 6,
+                    decoration: const InputDecoration(
+                      labelText: 'Meal',
+                      hintText: 'Tell me what you ate',
+                      prefixIcon: Icon(Icons.restaurant_rounded),
+                    ),
+                    onChanged: viewModel.updateTranscript,
+                    enabled: viewModel.state != VoiceLogState.transcribing &&
+                        viewModel.state != VoiceLogState.agentRunning,
                   ),
-                  onChanged: viewModel.updateTranscript,
-                  enabled: viewModel.state != VoiceLogState.transcribing &&
-                      viewModel.state != VoiceLogState.agentRunning,
                 ),
-              ),
-              const SizedBox(height: FreshSpacing.md),
-              _buildControls(context, viewModel),
-              const SizedBox(height: FreshSpacing.lg),
+                const SizedBox(height: FreshSpacing.md),
+                _buildControls(context, viewModel),
+                const SizedBox(height: FreshSpacing.lg),
+              ],
               if (viewModel.isLoading)
                 const LinearProgressIndicator(minHeight: 3),
               if (viewModel.state == VoiceLogState.recording) ...[

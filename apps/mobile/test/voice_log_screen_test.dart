@@ -36,6 +36,71 @@ void main() {
       viewModel.dispose();
     });
 
+    testWidgets('hides meal entry controls while reviewing a proposal', (
+      tester,
+    ) async {
+      final proposal = MealProposal(
+        id: 'prop_chicken_rice',
+        title: 'Chicken and rice',
+        confidence: 0.85,
+        requiresConfirmation: true,
+        trustedAutoCommitEligible: false,
+        nutrition: const NutritionSnapshot(
+          calories: 295,
+          proteinGrams: 38,
+          carbsGrams: 29,
+          fatGrams: 4,
+        ),
+        items: [
+          _mealItem(
+            name: 'Chicken breast',
+            calories: 165,
+            externalId: 'chicken',
+          ),
+          _mealItem(
+            name: 'Cooked rice',
+            calories: 130,
+            externalId: 'rice',
+          ),
+        ],
+      );
+      when(() => nutritionRepository.logText('chicken and rice')).thenAnswer(
+        (_) async => AgentRunResult(
+          kind: 'proposal',
+          message: 'Meal proposal created.',
+          proposal: proposal,
+        ),
+      );
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<VoiceLogViewModel>.value(
+          value: viewModel,
+          child: MaterialApp(
+            theme: buildTheme(),
+            home: const MealCreateScreen(),
+          ),
+        ),
+      );
+
+      expect(find.byKey(const ValueKey('meal_text_field')), findsOneWidget);
+      expect(find.byKey(const ValueKey('submit_meal_button')), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const ValueKey('meal_text_field')),
+        'chicken and rice',
+      );
+      await tester.tap(find.byKey(const ValueKey('submit_meal_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Chicken and rice'), findsOneWidget);
+      expect(find.byKey(const ValueKey('confirm_proposal_button')),
+          findsOneWidget);
+      expect(
+          find.byKey(const ValueKey('edit_proposal_button')), findsOneWidget);
+      expect(find.byKey(const ValueKey('meal_text_field')), findsNothing);
+      expect(find.byKey(const ValueKey('submit_meal_button')), findsNothing);
+    });
+
     testWidgets('renders compact top 10 candidates without overflow', (
       tester,
     ) async {

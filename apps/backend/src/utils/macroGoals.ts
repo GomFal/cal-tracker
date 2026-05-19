@@ -126,9 +126,19 @@ export function applyMacroGoalUpdate(
         macroPreset: currentMetadata.macroPreset ?? null
       });
     }
+    if (currentMetadata.macroMode != null) {
+      return {
+        target: { ...currentTarget, calories: nextCalories },
+        metadata: currentMetadata
+      };
+    }
     return {
-      target: { ...currentTarget, calories: nextCalories },
-      metadata: currentMetadata
+      target: nutritionWithMacroGrams(nextCalories, {
+        proteinGrams: 0,
+        carbsGrams: 0,
+        fatGrams: 0
+      }),
+      metadata: {}
     };
   }
 

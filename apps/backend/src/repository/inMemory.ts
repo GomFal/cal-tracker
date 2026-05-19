@@ -77,7 +77,7 @@ export class InMemoryRepository implements AppRepository {
       scopes: input.scopes ?? defaultUserScopes
     };
     this.users.set(user.id, user);
-    this.targets.set(user.id, { calories: 2200, proteinGrams: 160, carbsGrams: 240, fatGrams: 70 });
+    this.targets.set(user.id, { calories: 2200, proteinGrams: 0, carbsGrams: 0, fatGrams: 0 });
     this.hydrationGoals.set(user.id, 12);
     this.calorieTargetConfigured.set(user.id, false);
     this.calorieTargetSources.set(user.id, "default");
@@ -320,7 +320,7 @@ export class InMemoryRepository implements AppRepository {
   }
 
   async getNutritionTarget(userId: string): Promise<NutritionSnapshot> {
-    return this.targets.get(userId) ?? { calories: 2200, proteinGrams: 160, carbsGrams: 240, fatGrams: 70 };
+    return this.targets.get(userId) ?? { calories: 2200, proteinGrams: 0, carbsGrams: 0, fatGrams: 0 };
   }
 
   async getDailyGoals(userId: string, date: string): Promise<DailyGoals> {

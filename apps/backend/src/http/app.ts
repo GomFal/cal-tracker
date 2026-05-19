@@ -129,6 +129,12 @@ export function createApp(input: {
     const date = body.date ?? new Date().toISOString().slice(0, 10);
     if (body.macroMode !== undefined) {
       const currentGoals = await repository.getDailyGoals(user.id, date);
+      if (
+        !currentGoals.calorieTargetConfigured &&
+        body.calories === undefined
+      ) {
+        throw new HTTPException(400, { message: "calories must be configured before macros" });
+      }
       const validationError = validateMacroGoalUpdate(
         body,
         body.calories ?? currentGoals.target.calories

@@ -80,6 +80,83 @@ describe("macro goals", () => {
     expect(summary.output.summary.macroPreset).toBe("high_protein");
   });
 
+  it("keeps macros unset when only calories are configured", async () => {
+    const { request } = buildTestApp();
+    const auth = await registerAndAuth(request);
+
+    const update = await request("http://localhost/v1/goals", {
+      method: "PUT",
+      headers: auth.authHeader,
+      body: JSON.stringify({
+        date: "2026-05-18",
+        calories: 1900,
+        calorieTargetSource: "manual"
+      })
+    });
+
+    expect(update.status).toBe(200);
+    const body = await update.json() as {
+      goals: {
+        target: { calories: number; proteinGrams: number; carbsGrams: number; fatGrams: number };
+        macroMode?: string;
+        macroSource?: string;
+        macroPreset?: string;
+      };
+    };
+
+    expect(body.goals.target).toEqual({
+      calories: 1900,
+      proteinGrams: 0,
+      carbsGrams: 0,
+      fatGrams: 0
+    });
+    expect(body.goals.macroMode).toBeUndefined();
+    expect(body.goals.macroSource).toBeUndefined();
+    expect(body.goals.macroPreset).toBeUndefined();
+
+    const summary = await request(
+      "http://localhost/v1/summary/daily?date=2026-05-18",
+      { headers: auth.authHeader }
+    ).then((response) => response.json() as Promise<{
+      output: {
+        summary: {
+          target: { proteinGrams: number; carbsGrams: number; fatGrams: number };
+          remaining: { proteinGrams: number; carbsGrams: number; fatGrams: number };
+          macroMode?: string;
+        };
+      };
+    }>);
+
+    expect(summary.output.summary.target.proteinGrams).toBe(0);
+    expect(summary.output.summary.target.carbsGrams).toBe(0);
+    expect(summary.output.summary.target.fatGrams).toBe(0);
+    expect(summary.output.summary.remaining.proteinGrams).toBe(0);
+    expect(summary.output.summary.remaining.carbsGrams).toBe(0);
+    expect(summary.output.summary.remaining.fatGrams).toBe(0);
+    expect(summary.output.summary.macroMode).toBeUndefined();
+  });
+
+  it("rejects macro configuration before calories are configured", async () => {
+    const { request } = buildTestApp();
+    const auth = await registerAndAuth(request);
+
+    const update = await request("http://localhost/v1/goals", {
+      method: "PUT",
+      headers: auth.authHeader,
+      body: JSON.stringify({
+        date: "2026-05-18",
+        macroMode: "percentage",
+        macroSource: "preset",
+        macroPreset: "balanced",
+        proteinPct: 30,
+        carbsPct: 40,
+        fatPct: 30
+      })
+    });
+
+    expect(update.status).toBe(400);
+  });
+
   it("persists custom gram targets and calorie delta", async () => {
     const { request } = buildTestApp();
     const auth = await registerAndAuth(request);

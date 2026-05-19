@@ -84,6 +84,7 @@ void main() {
 
     expect(find.text('Menu'), findsOneWidget);
     expect(find.text('1900 Kcal daily target'), findsOneWidget);
+    expect(find.text('Not set'), findsOneWidget);
   });
 
   testWidgets('Menu hides default calorie and macro previews before setup',

@@ -516,8 +516,8 @@ class _MacroSummaryRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final consumedNutrition = summary?.consumed ?? _emptyNutrition;
-    final targetNutrition = summary?.target ?? _defaultTarget;
-    final hasConfiguredTarget = summary?.calorieTargetConfigured ?? true;
+    final targetNutrition = summary?.target ?? _emptyNutrition;
+    final hasConfiguredMacros = summary?.macroMode != null;
     return Row(
       children: [
         Expanded(
@@ -525,7 +525,7 @@ class _MacroSummaryRow extends StatelessWidget {
             assetPath: 'assets/images/icons/carbs_icon.png',
             iconKey: const ValueKey('dashboard_macro_carbs_icon'),
             label: l10n.commonCarbs,
-            value: hasConfiguredTarget
+            value: hasConfiguredMacros
                 ? _macroRatio(
                     consumedNutrition.carbsGrams,
                     targetNutrition.carbsGrams,
@@ -540,7 +540,7 @@ class _MacroSummaryRow extends StatelessWidget {
             assetPath: 'assets/images/icons/protein_icon.png',
             iconKey: const ValueKey('dashboard_macro_protein_icon'),
             label: l10n.localeName.startsWith('es') ? 'Proteínas' : 'Proteins',
-            value: hasConfiguredTarget
+            value: hasConfiguredMacros
                 ? _macroRatio(
                     consumedNutrition.proteinGrams,
                     targetNutrition.proteinGrams,
@@ -555,7 +555,7 @@ class _MacroSummaryRow extends StatelessWidget {
             assetPath: 'assets/images/icons/fats_icon.png',
             iconKey: const ValueKey('dashboard_macro_fats_icon'),
             label: l10n.localeName.startsWith('es') ? 'Grasas' : 'Fats',
-            value: hasConfiguredTarget
+            value: hasConfiguredMacros
                 ? _macroRatio(
                     consumedNutrition.fatGrams,
                     targetNutrition.fatGrams,
@@ -660,13 +660,6 @@ const _emptyNutrition = NutritionSnapshot(
   proteinGrams: 0,
   carbsGrams: 0,
   fatGrams: 0,
-);
-
-const _defaultTarget = NutritionSnapshot(
-  calories: 2200,
-  proteinGrams: 160,
-  carbsGrams: 240,
-  fatGrams: 70,
 );
 
 String _macroRatio(double consumed, double target) {

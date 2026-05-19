@@ -80,7 +80,7 @@ export class PostgresRepository implements AppRepository {
           user_id, calories, protein_grams, carbs_grams, fat_grams, hydration_goal_glasses,
           calorie_target_configured, calorie_target_source
         )
-        VALUES (${row.id}, 2200, 160, 240, 70, 12, false, 'default')
+        VALUES (${row.id}, 2200, 0, 0, 0, 12, false, 'default')
       `);
       return this.mapUser(row, input.passwordHash, input.scopes);
     });
@@ -676,7 +676,7 @@ export class PostgresRepository implements AppRepository {
 
   async getNutritionTarget(userId: string): Promise<NutritionSnapshot> {
     const [row] = await this.execute(dbSql`SELECT * FROM nutrition_targets WHERE user_id = ${userId}`);
-    return row ? mapNutrition(row) : { calories: 2200, proteinGrams: 160, carbsGrams: 240, fatGrams: 70 };
+    return row ? mapNutrition(row) : { calories: 2200, proteinGrams: 0, carbsGrams: 0, fatGrams: 0 };
   }
 
   async getDailyGoals(userId: string, date: string): Promise<DailyGoals> {
@@ -1150,7 +1150,7 @@ export class PostgresRepository implements AppRepository {
     const [row] = await executeRows(dbClient, dbSql`SELECT * FROM nutrition_targets WHERE user_id = ${userId}`);
     if (!row) {
       return {
-        target: { calories: 2200, proteinGrams: 160, carbsGrams: 240, fatGrams: 70 },
+        target: { calories: 2200, proteinGrams: 0, carbsGrams: 0, fatGrams: 0 },
         hydrationGoalGlasses: 12,
         calorieTargetConfigured: false,
         calorieTargetSource: "default",

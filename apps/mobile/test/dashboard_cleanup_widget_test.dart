@@ -209,6 +209,9 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('1900'), findsOneWidget);
+    expect(find.text('0/120'), findsNothing);
+    expect(find.text('0/220'), findsNothing);
+    expect(find.text('0/70'), findsNothing);
     expect(find.byKey(const ValueKey('dashboard_goal_line')), findsNothing);
   });
 

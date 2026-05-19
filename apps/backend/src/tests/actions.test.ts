@@ -236,13 +236,31 @@ describe("action loop", () => {
             summary: {
               calorieTargetConfigured: boolean;
               calorieTargetSource: string;
-              target: { calories: number };
+              target: {
+                calories: number;
+                proteinGrams: number;
+                carbsGrams: number;
+                fatGrams: number;
+              };
+              remaining: {
+                proteinGrams: number;
+                carbsGrams: number;
+                fatGrams: number;
+              };
+              macroMode?: string;
             };
           };
         }>,
     );
 
     expect(initialSummary.output.summary.target.calories).toBe(2200);
+    expect(initialSummary.output.summary.target.proteinGrams).toBe(0);
+    expect(initialSummary.output.summary.target.carbsGrams).toBe(0);
+    expect(initialSummary.output.summary.target.fatGrams).toBe(0);
+    expect(initialSummary.output.summary.remaining.proteinGrams).toBe(0);
+    expect(initialSummary.output.summary.remaining.carbsGrams).toBe(0);
+    expect(initialSummary.output.summary.remaining.fatGrams).toBe(0);
+    expect(initialSummary.output.summary.macroMode).toBeUndefined();
     expect(initialSummary.output.summary.calorieTargetConfigured).toBe(false);
     expect(initialSummary.output.summary.calorieTargetSource).toBe("default");
 
@@ -267,12 +285,30 @@ describe("action loop", () => {
             summary: {
               calorieTargetConfigured: boolean;
               calorieTargetSource: string;
-              target: { calories: number };
+              target: {
+                calories: number;
+                proteinGrams: number;
+                carbsGrams: number;
+                fatGrams: number;
+              };
+              remaining: {
+                proteinGrams: number;
+                carbsGrams: number;
+                fatGrams: number;
+              };
+              macroMode?: string;
             };
           };
         }>,
     );
     expect(updatedSummary.output.summary.target.calories).toBe(1900);
+    expect(updatedSummary.output.summary.target.proteinGrams).toBe(0);
+    expect(updatedSummary.output.summary.target.carbsGrams).toBe(0);
+    expect(updatedSummary.output.summary.target.fatGrams).toBe(0);
+    expect(updatedSummary.output.summary.remaining.proteinGrams).toBe(0);
+    expect(updatedSummary.output.summary.remaining.carbsGrams).toBe(0);
+    expect(updatedSummary.output.summary.remaining.fatGrams).toBe(0);
+    expect(updatedSummary.output.summary.macroMode).toBeUndefined();
     expect(updatedSummary.output.summary.calorieTargetConfigured).toBe(true);
     expect(updatedSummary.output.summary.calorieTargetSource).toBe("calculator");
   });

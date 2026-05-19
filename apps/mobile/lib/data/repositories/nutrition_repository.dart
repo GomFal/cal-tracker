@@ -196,13 +196,19 @@ class NutritionRepository {
     MacroDistributionConfig? macroConfig,
     int? macroCalorieTarget,
   }) async {
+    final macroTargetCalories = macroCalorieTarget ?? calories;
+    if (macroConfig != null &&
+        (macroTargetCalories == null ||
+            !isValidMacroConfig(macroConfig, calories: macroTargetCalories))) {
+      throw ArgumentError('Invalid macro configuration');
+    }
     final json = await _apiClient.updateDailyGoals(
       date: date ?? DateTime.now().toIso8601String().substring(0, 10),
       calories: calories,
       hydrationGoalGlasses: hydrationGoalGlasses,
       calorieTargetSource: calorieTargetSource,
       macroFields: macroConfig?.toApiJson(
-        calories: macroCalorieTarget ?? calories,
+        calories: macroTargetCalories,
       ),
     );
     return DailyGoals.fromJson(json['goals'] as Map<String, Object?>);

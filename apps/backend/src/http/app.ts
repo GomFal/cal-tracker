@@ -16,6 +16,7 @@ import {
 } from "@cal-tracker/contracts";
 import { cors } from "hono/cors";
 import { Hono, type Context } from "hono";
+import { HTTPException } from "hono/http-exception";
 import { ActionExecutor } from "../actions/executor.js";
 import { AuthService } from "../auth/service.js";
 import type { AppConfig } from "../config/env.js";
@@ -29,6 +30,7 @@ import { AgentService, type AgentRunResult } from "../agent/agentService.js";
 import type { ChatAgentProvider } from "../agent/chatAgentProvider.js";
 import { RemoteChatAgentProvider } from "../agent/chatAgentProvider.js";
 import { estimateCalories } from "../nutrition/calorieEstimator.js";
+import { validateMacroGoalUpdate } from "../utils/macroGoals.js";
 import {
   summarizeError,
   type LocalRunLogger,
@@ -125,6 +127,16 @@ export function createApp(input: {
     const user = c.get("authUser");
     const body = goalsUpdateSchema.parse(await c.req.json());
     const date = body.date ?? new Date().toISOString().slice(0, 10);
+    if (body.macroMode !== undefined) {
+      const currentGoals = await repository.getDailyGoals(user.id, date);
+      const validationError = validateMacroGoalUpdate(
+        body,
+        body.calories ?? currentGoals.target.calories
+      );
+      if (validationError != null) {
+        throw new HTTPException(400, { message: validationError });
+      }
+    }
     const goals = await repository.updateDailyGoals(user.id, {
       date,
       calories: body.calories,

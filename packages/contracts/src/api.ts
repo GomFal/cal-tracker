@@ -170,7 +170,7 @@ export const calorieEstimateRequestSchema = z.object({
   heightCm: z.number().min(120).max(230),
   weightKg: z.number().min(35).max(250),
   activityLevel: z.enum(["sedentary", "lightly_active", "moderately_active", "very_active", "extra_active"]),
-  goal: z.enum(["lose_fat", "maintain", "gain_muscle", "recomposition"]),
+  goal: z.enum(["lose_fat", "maintain", "gain_muscle"]),
   pace: z.enum(["slow", "moderate", "aggressive", "lean", "standard"]).optional()
 });
 

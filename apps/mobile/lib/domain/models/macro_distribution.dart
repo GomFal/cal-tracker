@@ -1,6 +1,8 @@
 const proteinKcalPerGram = 4;
 const carbsKcalPerGram = 4;
 const fatKcalPerGram = 9;
+const maxMacroGramTarget = 2000;
+const blockingMacroCalorieDeltaKcal = 25;
 
 enum MacroMode {
   percentage('percentage'),
@@ -214,11 +216,45 @@ int calorieDeltaKcal(int calories, MacroGrams grams) {
   return macroCaloriesFromGrams(grams) - calories;
 }
 
+bool isBlockingMacroCalorieDelta(int calorieDeltaKcal) {
+  return calorieDeltaKcal.abs() > blockingMacroCalorieDeltaKcal;
+}
+
 MacroCalorieWarningLevel macroWarningLevel(int calorieDeltaKcal) {
   final absoluteDelta = calorieDeltaKcal.abs();
   if (absoluteDelta <= 25) return MacroCalorieWarningLevel.none;
   if (absoluteDelta <= 75) return MacroCalorieWarningLevel.soft;
   return MacroCalorieWarningLevel.clear;
+}
+
+bool isValidMacroConfig(MacroDistributionConfig config,
+    {required int calories}) {
+  switch (config.mode) {
+    case MacroMode.percentage:
+      final percentages = config.percentages;
+      if (percentages == null) return false;
+      return percentages.proteinPct >= 0 &&
+          percentages.proteinPct <= 100 &&
+          percentages.carbsPct >= 0 &&
+          percentages.carbsPct <= 100 &&
+          percentages.fatPct >= 0 &&
+          percentages.fatPct <= 100 &&
+          percentages.total == 100;
+    case MacroMode.grams:
+      final grams = config.grams;
+      if (grams == null) return false;
+      if (!areMacroGramsWithinLimits(grams)) return false;
+      return !isBlockingMacroCalorieDelta(calorieDeltaKcal(calories, grams));
+  }
+}
+
+bool areMacroGramsWithinLimits(MacroGrams grams) {
+  return grams.proteinGrams >= 0 &&
+      grams.proteinGrams <= maxMacroGramTarget &&
+      grams.carbsGrams >= 0 &&
+      grams.carbsGrams <= maxMacroGramTarget &&
+      grams.fatGrams >= 0 &&
+      grams.fatGrams <= maxMacroGramTarget;
 }
 
 MacroPercentages percentagesFromGrams(int calories, MacroGrams grams) {

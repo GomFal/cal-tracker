@@ -94,7 +94,7 @@ describe("macro goals", () => {
         macroSource: "custom",
         proteinGrams: 180,
         carbsGrams: 180,
-        fatGrams: 80
+        fatGrams: 62
       })
     });
 
@@ -113,11 +113,32 @@ describe("macro goals", () => {
       calories: 2000,
       proteinGrams: 180,
       carbsGrams: 180,
-      fatGrams: 80
+      fatGrams: 62
     });
     expect(body.goals.macroMode).toBe("grams");
     expect(body.goals.macroSource).toBe("custom");
-    expect(body.goals.macroCalories).toBe(2160);
-    expect(body.goals.calorieDeltaKcal).toBe(160);
+    expect(body.goals.macroCalories).toBe(1998);
+    expect(body.goals.calorieDeltaKcal).toBe(-2);
+  });
+
+  it("rejects custom gram targets that do not match calories", async () => {
+    const { request } = buildTestApp();
+    const auth = await registerAndAuth(request);
+
+    const update = await request("http://localhost/v1/goals", {
+      method: "PUT",
+      headers: auth.authHeader,
+      body: JSON.stringify({
+        date: "2026-05-18",
+        calories: 2000,
+        macroMode: "grams",
+        macroSource: "custom",
+        proteinGrams: 180,
+        carbsGrams: 180,
+        fatGrams: 80
+      })
+    });
+
+    expect(update.status).toBe(400);
   });
 });

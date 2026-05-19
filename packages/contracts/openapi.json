@@ -949,8 +949,7 @@
             "enum": [
               "lose_fat",
               "maintain",
-              "gain_muscle",
-              "recomposition"
+              "gain_muscle"
             ]
           },
           "pace": {

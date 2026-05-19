@@ -101,6 +101,26 @@ void main() {
     );
     expect(find.text('1620'), findsOneWidget);
   });
+
+  testWidgets('calorie wizard no longer shows improve nutrition goal',
+      (tester) async {
+    await tester.pumpWidget(_testApp(_wizard()));
+    await tester.pumpAndSettle();
+
+    await _tapNext(tester); // Sex.
+    await _tapNext(tester); // Birthday.
+    await _tapNext(tester); // Height.
+    await _tapNext(tester); // Weight.
+
+    expect(find.text('Lose Weight'), findsOneWidget);
+    expect(find.text('Maintain Weight'), findsOneWidget);
+    expect(find.text('Gain Muscle'), findsOneWidget);
+    expect(find.text('Improve Nutrition'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('calorie_wizard_goal_recomposition')),
+      findsNothing,
+    );
+  });
 }
 
 Widget _wizard({

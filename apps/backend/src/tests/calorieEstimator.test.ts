@@ -48,7 +48,6 @@ describe("calorie estimator", () => {
       { goal: "lose_fat", paces: ["slow", "moderate", "aggressive"] },
       { goal: "maintain", paces: [undefined] },
       { goal: "gain_muscle", paces: ["lean", "standard", "aggressive"] },
-      { goal: "recomposition", paces: [undefined] },
     ] as const;
 
     for (const activityLevel of activityLevels) {
@@ -94,5 +93,25 @@ describe("calorie estimator", () => {
     const body = await response.json() as { targetCalories: number; warnings: string[] };
     expect(body.targetCalories).toBeGreaterThan(2000);
     expect(body.warnings).toEqual([]);
+  });
+
+  it("rejects recomposition as a calorie estimate goal", async () => {
+    const { request } = buildTestApp();
+    const auth = await registerAndAuth(request);
+
+    const response = await request("http://localhost/v1/goals/calorie-estimate", {
+      method: "POST",
+      headers: auth.authHeader,
+      body: JSON.stringify({
+        age: 31,
+        sex: "female",
+        heightCm: 168,
+        weightKg: 64,
+        activityLevel: "moderately_active",
+        goal: "recomposition",
+      }),
+    });
+
+    expect(response.status).toBe(400);
   });
 });

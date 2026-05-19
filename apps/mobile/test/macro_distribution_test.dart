@@ -20,89 +20,27 @@ void main() {
     expect(macroWarningLevel(100), MacroCalorieWarningLevel.clear);
   });
 
-  testWidgets('macro sheet defaults to percentages and flips preset text order',
+  testWidgets('full macro sheet shows presets and personalized card',
       (tester) async {
     await tester.pumpWidget(_testApp(const MacroDistributionSheet(
       calories: 2000,
     )));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('macro_mode_percentage')), findsOneWidget);
-    expect(find.text('30% protein · 40% carbs · 30% fat'), findsOneWidget);
-    expect(find.text('150g protein · 200g carbs · 67g fat'), findsOneWidget);
-
-    await tester.tap(find.byKey(const ValueKey('macro_mode_grams')));
-    await tester.pumpAndSettle();
-
-    final balancedCard = find.byKey(const ValueKey('macro_preset_balanced'));
+    expect(find.byKey(const ValueKey('macro_preset_balanced')), findsOneWidget);
     expect(
-      find.descendant(
-        of: balancedCard,
-        matching: find.text('150g protein · 200g carbs · 67g fat'),
-      ),
+      find.byKey(const ValueKey('macro_preset_high_protein')),
       findsOneWidget,
     );
-  });
-
-  testWidgets('custom percentages use carbs as the default balancer',
-      (tester) async {
-    await tester.pumpWidget(_testApp(const MacroDistributionSheet(
-      calories: 2000,
-    )));
-    await tester.pumpAndSettle();
-
-    await tester.enterText(
-      find.byKey(const ValueKey('macro_percentage_protein_field')),
-      '40',
-    );
-    await tester.pumpAndSettle();
-
     expect(
-      tester
-          .widget<TextField>(
-            find.byKey(const ValueKey('macro_percentage_carbs_field')),
-          )
-          .controller
-          ?.text,
-      '30',
-    );
-    expect(
-      tester
-          .widget<TextField>(
-            find.byKey(const ValueKey('macro_percentage_fat_field')),
-          )
-          .controller
-          ?.text,
-      '30',
-    );
-  });
-
-  testWidgets('gram mode shows warnings only above the threshold',
-      (tester) async {
-    await tester.pumpWidget(_testApp(const MacroDistributionSheet(
-      calories: 2000,
-    )));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(const ValueKey('macro_mode_grams')));
-    await tester.pumpAndSettle();
-    expect(
-      find.byKey(const ValueKey('macro_calorie_mismatch_warning')),
-      findsNothing,
-    );
-
-    await tester.enterText(
-      find.byKey(const ValueKey('macro_grams_protein_field')),
-      '300',
-    );
-    await tester.pumpAndSettle();
-
-    expect(
-      find.byKey(const ValueKey('macro_calorie_mismatch_warning')),
-      findsOneWidget,
-    );
-    expect(find.byKey(const ValueKey('macro_warning_adjust_carbs')),
-        findsOneWidget);
+        find.byKey(const ValueKey('macro_preset_lower_carb')), findsOneWidget);
+    expect(find.text('Personalized'), findsOneWidget);
+    expect(_iconFor(tester, 'macro_preset_icon_balanced'),
+        Icons.pie_chart_rounded);
+    expect(_iconFor(tester, 'macro_preset_icon_high_protein'),
+        Icons.fitness_center_rounded);
+    expect(_iconFor(tester, 'macro_preset_icon_lower_carb'), Icons.eco_rounded);
+    expect(_iconFor(tester, 'macro_personalized_icon'), Icons.tune_rounded);
   });
 
   testWidgets('preset-only picker returns selected preset config',
@@ -128,6 +66,14 @@ void main() {
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const ValueKey('macro_preset_balanced')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('macro_preset_high_protein')),
+      findsOneWidget,
+    );
+    expect(
+        find.byKey(const ValueKey('macro_preset_lower_carb')), findsOneWidget);
+    expect(find.text('Personalized'), findsNothing);
     expect(find.byKey(const ValueKey('macro_mode_grams')), findsNothing);
     expect(find.byKey(const ValueKey('macro_grams_editor')), findsNothing);
 
@@ -144,11 +90,111 @@ void main() {
     expect(payload, containsPair('proteinPct', 35));
     expect(payload.containsKey('proteinGrams'), false);
   });
+
+  testWidgets('tapping personalized opens custom editor bottom sheet',
+      (tester) async {
+    await tester.pumpWidget(_testApp(const MacroDistributionSheet(
+      calories: 2000,
+    )));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Personalized'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Personalized macros'), findsOneWidget);
+    expect(find.byKey(const ValueKey('macro_mode_percentage')), findsOneWidget);
+    expect(
+        find.byKey(const ValueKey('macro_percentage_editor')), findsOneWidget);
+  });
+
+  testWidgets('percentage mismatch blocks save until a fix button resolves it',
+      (tester) async {
+    await tester.pumpWidget(_testApp(const MacroDistributionSheet(
+      calories: 2000,
+    )));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Personalized'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('macro_percentage_protein_field')),
+      '40',
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('macro_percentage_total_warning')),
+      findsOneWidget,
+    );
+    expect(_personalizedSaveButton(tester).onPressed, isNull);
+
+    final adjustCarbs =
+        find.byKey(const ValueKey('macro_percentage_adjust_carbs'));
+    await tester.ensureVisible(adjustCarbs);
+    await tester.pumpAndSettle();
+    await tester.tap(adjustCarbs.hitTestable());
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('macro_percentage_total_warning')),
+      findsNothing,
+    );
+    expect(_personalizedSaveButton(tester).onPressed, isNotNull);
+  });
+
+  testWidgets('gram mismatch blocks save until a fix button resolves it',
+      (tester) async {
+    await tester.pumpWidget(_testApp(const MacroDistributionSheet(
+      calories: 2000,
+    )));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Personalized'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('macro_mode_grams')));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('macro_grams_protein_field')),
+      '300',
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('macro_calorie_mismatch_warning')),
+      findsOneWidget,
+    );
+    expect(
+        find.byKey(const ValueKey('macro_warning_keep_grams')), findsNothing);
+    expect(_personalizedSaveButton(tester).onPressed, isNull);
+
+    final adjustProtein =
+        find.byKey(const ValueKey('macro_warning_adjust_protein'));
+    await tester.ensureVisible(adjustProtein);
+    await tester.pumpAndSettle();
+    await tester.tap(adjustProtein.hitTestable());
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('macro_calorie_mismatch_warning')),
+      findsNothing,
+    );
+    expect(_personalizedSaveButton(tester).onPressed, isNotNull);
+  });
 }
 
 Widget _testApp(Widget child) {
   return MaterialApp(
     theme: buildLightTheme(),
     home: Scaffold(body: child),
+  );
+}
+
+IconData? _iconFor(WidgetTester tester, String key) {
+  return tester.widget<Icon>(find.byKey(ValueKey(key))).icon;
+}
+
+FilledButton _personalizedSaveButton(WidgetTester tester) {
+  return tester.widget<FilledButton>(
+    find.byKey(const ValueKey('personalized_macro_save_button')),
   );
 }

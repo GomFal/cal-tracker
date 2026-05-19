@@ -165,5 +165,34 @@ void main() {
       expect(capturedMacroFields, containsPair('macroCalories', 2003));
       expect(goals.macroPreset, MacroPreset.highProtein);
     });
+
+    test('rejects invalid gram macros before calling the API', () async {
+      final apiClient = MockCalTrackerApiClient();
+      final repository = NutritionRepository(apiClient: apiClient);
+
+      await expectLater(
+        repository.updateDailyGoals(
+          date: '2026-05-18',
+          calories: 2000,
+          macroConfig: MacroDistributionConfig.grams(
+            proteinGrams: 300,
+            carbsGrams: 200,
+            fatGrams: 67,
+          ),
+          macroCalorieTarget: 2000,
+        ),
+        throwsArgumentError,
+      );
+
+      verifyNever(
+        () => apiClient.updateDailyGoals(
+          date: any(named: 'date'),
+          calories: any(named: 'calories'),
+          hydrationGoalGlasses: any(named: 'hydrationGoalGlasses'),
+          calorieTargetSource: any(named: 'calorieTargetSource'),
+          macroFields: any(named: 'macroFields'),
+        ),
+      );
+    });
   });
 }

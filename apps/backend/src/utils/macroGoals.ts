@@ -3,6 +3,8 @@ import type { MacroGoalMetadata, MacroMode, MacroPreset, MacroSource, NutritionS
 export const PROTEIN_KCAL_PER_GRAM = 4;
 export const CARBS_KCAL_PER_GRAM = 4;
 export const FAT_KCAL_PER_GRAM = 9;
+export const MAX_MACRO_GRAMS = 2000;
+export const BLOCKING_MACRO_CALORIE_DELTA_KCAL = 25;
 
 export type MacroPercentages = {
   proteinPct: number;
@@ -26,6 +28,8 @@ export type MacroGoalUpdateInput = {
   proteinGrams?: number;
   carbsGrams?: number;
   fatGrams?: number;
+  macroCalories?: number;
+  calorieDeltaKcal?: number;
 };
 
 export const macroPresets: Record<MacroPreset, MacroPercentages> = {
@@ -61,6 +65,42 @@ export function nutritionWithMacroGrams(calories: number, grams: MacroGrams): Nu
 
 export function calorieDeltaKcal(calories: number, grams: MacroGrams): number {
   return macroCaloriesFromGrams(grams) - calories;
+}
+
+export function validateMacroGoalUpdate(
+  input: MacroGoalUpdateInput,
+  nextCalories: number
+): string | null {
+  if (input.macroMode === undefined) return null;
+  if (input.macroMode === "percentage") {
+    const total = (input.proteinPct ?? 0) + (input.carbsPct ?? 0) + (input.fatPct ?? 0);
+    return total === 100 ? null : "macro percentages must total 100";
+  }
+
+  const grams = {
+    proteinGrams: input.proteinGrams ?? 0,
+    carbsGrams: input.carbsGrams ?? 0,
+    fatGrams: input.fatGrams ?? 0
+  };
+  if (
+    grams.proteinGrams > MAX_MACRO_GRAMS ||
+    grams.carbsGrams > MAX_MACRO_GRAMS ||
+    grams.fatGrams > MAX_MACRO_GRAMS
+  ) {
+    return "macro grams must be 2000 g or less";
+  }
+  const macroCalories = macroCaloriesFromGrams(grams);
+  const delta = macroCalories - nextCalories;
+  if (Math.abs(delta) > BLOCKING_MACRO_CALORIE_DELTA_KCAL) {
+    return "macro grams must match the calorie target within 25 kcal";
+  }
+  if (input.macroCalories !== undefined && input.macroCalories !== macroCalories) {
+    return "macroCalories does not match macro grams";
+  }
+  if (input.calorieDeltaKcal !== undefined && input.calorieDeltaKcal !== delta) {
+    return "calorieDeltaKcal does not match macro grams";
+  }
+  return null;
 }
 
 export function applyMacroGoalUpdate(

@@ -375,7 +375,7 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
       child: AnimatedPadding(
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOut,
-        padding: EdgeInsets.fromLTRB(20, 10, 20, bottomInset + 16),
+        padding: EdgeInsets.fromLTRB(24, 10, 24, bottomInset + 16),
         child: SizedBox(
           height: maxHeight,
           child: Column(
@@ -1096,6 +1096,14 @@ const _activityOptions = [
   ),
 ];
 
+const _calorieWizardCardShadow = [
+  BoxShadow(
+    color: Color(0x0d080907),
+    blurRadius: 22,
+    offset: Offset(0, 10),
+  ),
+];
+
 const _goalOptions = [
   _WizardOption(
     value: 'lose_fat',
@@ -1114,12 +1122,6 @@ const _goalOptions = [
     label: 'Maintain Weight',
     message: 'Track around your estimated maintenance.',
     icon: Icons.balance_rounded,
-  ),
-  _WizardOption(
-    value: 'recomposition',
-    label: 'Improve Nutrition',
-    message: 'Start near maintenance while you train consistently.',
-    icon: Icons.auto_graph_rounded,
   ),
 ];
 
@@ -1263,6 +1265,7 @@ class _WizardQuestionPage extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 2),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1331,13 +1334,7 @@ class _WizardChoiceCard extends StatelessWidget {
               color: selected ? palette.lime : palette.ruleSoft,
               width: selected ? 2 : 1,
             ),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x17080907),
-                blurRadius: 28,
-                offset: Offset(0, 14),
-              ),
-            ],
+            boxShadow: _calorieWizardCardShadow,
           ),
           child: Row(
             children: [
@@ -2053,30 +2050,36 @@ class _ResultPlanStep extends StatelessWidget {
             ),
           ),
           const SizedBox(height: FreshSpacing.xxl),
-          FreshCard(
+          DecoratedBox(
             key: const ValueKey('calorie_wizard_result_card'),
-            color: palette.surface,
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                _ResultLine(
-                  label: 'BMR estimate',
-                  value: '${estimate.bmr} Kcal',
-                ),
-                _ResultLine(
-                  label: 'Maintenance',
-                  value: '${estimate.maintenanceCalories} Kcal',
-                ),
-                _ResultLine(
-                  label: 'Target range',
-                  value:
-                      '${estimate.recommendedRangeMin}-${estimate.recommendedRangeMax} Kcal',
-                ),
-                _ResultLine(
-                  label: 'Adjustment',
-                  value: '${estimate.adjustmentCalories} Kcal',
-                ),
-              ],
+            decoration: BoxDecoration(
+              color: palette.surface,
+              borderRadius: BorderRadius.circular(FreshRadii.lg),
+              boxShadow: _calorieWizardCardShadow,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  _ResultLine(
+                    label: 'BMR estimate',
+                    value: '${estimate.bmr} Kcal',
+                  ),
+                  _ResultLine(
+                    label: 'Maintenance',
+                    value: '${estimate.maintenanceCalories} Kcal',
+                  ),
+                  _ResultLine(
+                    label: 'Target range',
+                    value:
+                        '${estimate.recommendedRangeMin}-${estimate.recommendedRangeMax} Kcal',
+                  ),
+                  _ResultLine(
+                    label: 'Adjustment',
+                    value: '${estimate.adjustmentCalories} Kcal',
+                  ),
+                ],
+              ),
             ),
           ),
           if (estimate.warnings.isNotEmpty) ...[

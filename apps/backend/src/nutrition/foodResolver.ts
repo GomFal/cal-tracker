@@ -958,10 +958,13 @@ function extractQuantityMentions(
   language?: string,
 ): FoodMention[] {
   const mentions: FoodMention[] = [];
-  const unit =
-    "(g|gr|gramo|gramos|gram|grams|kg|kilogram|kilograms|kilo|kilos|oz|ounce|ounces)";
+  const metricUnitPattern =
+    "g|gr|gramo|gramos|gram|grams|kg|kilogram|kilograms|kilo|kilos|oz|ounce|ounces";
+  const unit = `(${metricUnitPattern})`;
+  const followingMetricQuantity =
+    `\\s+\\d+(?:[\\.,]\\d+)?\\s*(?:${metricUnitPattern})\\b`;
   const quantityBefore = new RegExp(
-    `(\\d+(?:[\\.,]\\d+)?)\\s*${unit}\\b\\s*(?:de\\s+|of\\s+)?([a-z][a-z\\s]{0,40}?)(?=\\s+(?:y|and)\\s+|,|\\.|$)`,
+    `(\\d+(?:[\\.,]\\d+)?)\\s*${unit}\\b\\s*(?:de\\s+|of\\s+)?([a-z][a-z\\s]{0,40}?)(?=\\s+(?:y|and)\\s+|${followingMetricQuantity}|,|\\.|$)`,
     "g",
   );
   for (const match of text.matchAll(quantityBefore)) {

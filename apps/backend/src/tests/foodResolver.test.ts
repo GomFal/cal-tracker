@@ -245,6 +245,42 @@ describe("FoodResolver candidate groups", () => {
 });
 
 describe("FoodResolver", () => {
+  it("extracts every metric item in comma-separated ingredient lists", async () => {
+    const mentions = await new DeterministicFoodTextExtractor().extract(
+      "Add 100 grams of chicken, 100 grams of rice and 100 grams of meat.",
+    );
+
+    expect(mentions).toHaveLength(3);
+    expect(mentions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          originalText: "chicken",
+          canonicalName: "chicken",
+          canonicalEnglishName: "chicken",
+          language: "en",
+          quantity: 100,
+          unit: "g",
+        }),
+        expect.objectContaining({
+          originalText: "rice",
+          canonicalName: "rice",
+          canonicalEnglishName: "rice",
+          language: "en",
+          quantity: 100,
+          unit: "g",
+        }),
+        expect.objectContaining({
+          originalText: "meat",
+          canonicalName: "meat",
+          canonicalEnglishName: "meat",
+          language: "en",
+          quantity: 100,
+          unit: "g",
+        }),
+      ]),
+    );
+  });
+
   it("extracts Spanish quantities without translating food names in deterministic fallback", async () => {
     const mentions = await new DeterministicFoodTextExtractor().extract(
       "Añade a mi desayuno 100 gramos de pan y 100 gramos de jamón.",

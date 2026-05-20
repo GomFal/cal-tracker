@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -41,6 +42,12 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
   @override
   Widget build(BuildContext context) {
     final viewModel = context.watch<VoiceLogViewModel>();
+    final showMealEntryControls = viewModel.proposal == null &&
+        viewModel.state != VoiceLogState.clarificationRequired;
+    final showDebugTranscript = kDebugMode &&
+        viewModel.proposal == null &&
+        viewModel.state == VoiceLogState.clarificationRequired &&
+        viewModel.transcript.isNotEmpty;
     if (_textController.text != viewModel.transcript) {
       _textController.value = TextEditingValue(
         text: viewModel.transcript,
@@ -89,27 +96,29 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              FreshCard(
-                padding: const EdgeInsets.all(14),
-                child: TextField(
-                  key: const ValueKey('meal_text_field'),
-                  controller: _textController,
-                  focusNode: _textFieldFocusNode,
-                  minLines: 3,
-                  maxLines: 6,
-                  decoration: const InputDecoration(
-                    labelText: 'Meal',
-                    hintText: 'Tell me what you ate',
-                    prefixIcon: Icon(Icons.restaurant_rounded),
+              if (showMealEntryControls) ...[
+                FreshCard(
+                  padding: const EdgeInsets.all(14),
+                  child: TextField(
+                    key: const ValueKey('meal_text_field'),
+                    controller: _textController,
+                    focusNode: _textFieldFocusNode,
+                    minLines: 3,
+                    maxLines: 6,
+                    decoration: const InputDecoration(
+                      labelText: 'Meal',
+                      hintText: 'Tell me what you ate',
+                      prefixIcon: Icon(Icons.restaurant_rounded),
+                    ),
+                    onChanged: viewModel.updateTranscript,
+                    enabled: viewModel.state != VoiceLogState.transcribing &&
+                        viewModel.state != VoiceLogState.agentRunning,
                   ),
-                  onChanged: viewModel.updateTranscript,
-                  enabled: viewModel.state != VoiceLogState.transcribing &&
-                      viewModel.state != VoiceLogState.agentRunning,
                 ),
-              ),
-              const SizedBox(height: FreshSpacing.md),
-              _buildControls(context, viewModel),
-              const SizedBox(height: FreshSpacing.lg),
+                const SizedBox(height: FreshSpacing.md),
+                _buildControls(context, viewModel),
+                const SizedBox(height: FreshSpacing.lg),
+              ],
               if (viewModel.isLoading)
                 const LinearProgressIndicator(minHeight: 3),
               if (viewModel.state == VoiceLogState.recording) ...[
@@ -142,6 +151,10 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
                   onConfirm: () => _showMealLabelSheet(context, viewModel),
                   onEdit: () => _showProposalEditor(context, viewModel),
                 ),
+                const SizedBox(height: FreshSpacing.md),
+              ],
+              if (showDebugTranscript) ...[
+                _TranscriptDebugCard(transcript: viewModel.transcript),
                 const SizedBox(height: FreshSpacing.md),
               ],
               if (viewModel.state == VoiceLogState.clarificationRequired) ...[
@@ -261,6 +274,37 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
 
 const _candidatePreviewCount = 3;
 const _candidateDisplayLimit = 10;
+
+class _TranscriptDebugCard extends StatelessWidget {
+  const _TranscriptDebugCard({required this.transcript});
+
+  final String transcript;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return FreshCard(
+      key: const ValueKey('transcript_debug_card'),
+      padding: const EdgeInsets.all(FreshSpacing.lg),
+      color: FreshColors.surfaceSoft,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Debug transcript',
+            style: textTheme.labelLarge?.copyWith(
+              color: FreshColors.inkMuted,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: FreshSpacing.sm),
+          Text(transcript, style: textTheme.bodyMedium),
+        ],
+      ),
+    );
+  }
+}
 
 class _ResolverClarificationCard extends StatefulWidget {
   const _ResolverClarificationCard({

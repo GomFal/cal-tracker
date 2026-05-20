@@ -594,6 +594,63 @@ describe("action loop", () => {
     );
   });
 
+  it("creates a proposal for every item in comma-separated metric input", async () => {
+    const { request, repository } = buildTestApp();
+    await repository.upsertFoodItem({
+      name: "Meat",
+      normalizedName: "meat",
+      canonicalName: "meat",
+      source: "test_fixture",
+      servingGrams: 100,
+      calories: 250,
+      proteinGrams: 26,
+      carbsGrams: 0,
+      fatGrams: 15,
+    });
+    const auth = await registerAndAuth(request);
+
+    const proposalResponse = await request(
+      "http://localhost/v1/actions/propose_meal_log/execute",
+      {
+        method: "POST",
+        headers: auth.authHeader,
+        body: JSON.stringify({
+          input: {
+            text: "Add 100 grams of chicken, 100 grams of rice and 100 grams of meat.",
+          },
+          source: "flutter",
+        }),
+      },
+    );
+
+    expect(proposalResponse.status).toBe(200);
+    const body = (await proposalResponse.json()) as {
+      output: {
+        clarificationRequired?: boolean;
+        proposal: {
+          items: { name: string; quantity: number; unit: string }[];
+        };
+      };
+    };
+    expect(body.output.clarificationRequired).not.toBe(true);
+    expect(body.output.proposal.items).toHaveLength(3);
+    expect(body.output.proposal.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "Chicken breast",
+          quantity: 100,
+          unit: "g",
+        }),
+        expect.objectContaining({
+          name: "Cooked rice",
+          quantity: 100,
+          unit: "g",
+        }),
+        expect.objectContaining({ name: "Meat", quantity: 100, unit: "g" }),
+      ]),
+    );
+  });
+
   it("uses model-provided food mentions without extracting text again", async () => {
     const throwingExtractor = {
       async extract(): Promise<FoodMention[]> {

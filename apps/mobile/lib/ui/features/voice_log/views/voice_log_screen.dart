@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -41,7 +42,12 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
   @override
   Widget build(BuildContext context) {
     final viewModel = context.watch<VoiceLogViewModel>();
-    final showMealEntryControls = viewModel.proposal == null;
+    final showMealEntryControls = viewModel.proposal == null &&
+        viewModel.state != VoiceLogState.clarificationRequired;
+    final showDebugTranscript = kDebugMode &&
+        viewModel.proposal == null &&
+        viewModel.state == VoiceLogState.clarificationRequired &&
+        viewModel.transcript.isNotEmpty;
     if (_textController.text != viewModel.transcript) {
       _textController.value = TextEditingValue(
         text: viewModel.transcript,
@@ -145,6 +151,10 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
                   onConfirm: () => _showMealLabelSheet(context, viewModel),
                   onEdit: () => _showProposalEditor(context, viewModel),
                 ),
+                const SizedBox(height: FreshSpacing.md),
+              ],
+              if (showDebugTranscript) ...[
+                _TranscriptDebugCard(transcript: viewModel.transcript),
                 const SizedBox(height: FreshSpacing.md),
               ],
               if (viewModel.state == VoiceLogState.clarificationRequired) ...[
@@ -262,6 +272,37 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
 
 const _candidatePreviewCount = 3;
 const _candidateDisplayLimit = 10;
+
+class _TranscriptDebugCard extends StatelessWidget {
+  const _TranscriptDebugCard({required this.transcript});
+
+  final String transcript;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return FreshCard(
+      key: const ValueKey('transcript_debug_card'),
+      padding: const EdgeInsets.all(FreshSpacing.lg),
+      color: FreshColors.surfaceSoft,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Debug transcript',
+            style: textTheme.labelLarge?.copyWith(
+              color: FreshColors.inkMuted,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: FreshSpacing.sm),
+          Text(transcript, style: textTheme.bodyMedium),
+        ],
+      ),
+    );
+  }
+}
 
 class _ResolverClarificationCard extends StatefulWidget {
   const _ResolverClarificationCard({

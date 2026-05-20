@@ -101,6 +101,55 @@ void main() {
       expect(find.byKey(const ValueKey('submit_meal_button')), findsNothing);
     });
 
+    testWidgets(
+      'hides meal entry controls and shows debug transcript during clarification',
+      (tester) async {
+        const transcript =
+            'Añade 100 gramos de arroz, 100 gramos de pollo y 100 gramos de pan.';
+        final group = _candidateGroup(
+          canonicalEnglishName: 'arroz',
+          candidates: const [],
+        );
+        when(() => nutritionRepository.logText(transcript)).thenAnswer(
+          (_) async => AgentRunResult(
+            kind: 'clarification_required',
+            message:
+                'I could not confidently match every ingredient. Please choose a food match or rephrase the meal.',
+            candidateGroups: [group],
+          ),
+        );
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider<VoiceLogViewModel>.value(
+            value: viewModel,
+            child: MaterialApp(
+              theme: buildTheme(),
+              home: const MealCreateScreen(),
+            ),
+          ),
+        );
+
+        await tester.enterText(
+          find.byKey(const ValueKey('meal_text_field')),
+          transcript,
+        );
+        await tester.tap(find.byKey(const ValueKey('submit_meal_button')));
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const ValueKey('meal_text_field')), findsNothing);
+        expect(find.byKey(const ValueKey('submit_meal_button')), findsNothing);
+        expect(
+          find.byKey(const ValueKey('transcript_debug_card')),
+          findsOneWidget,
+        );
+        expect(find.text(transcript), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('resolver_clarification_card')),
+          findsOneWidget,
+        );
+      },
+    );
+
     testWidgets('renders compact top 10 candidates without overflow', (
       tester,
     ) async {

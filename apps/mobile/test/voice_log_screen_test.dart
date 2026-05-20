@@ -36,6 +36,120 @@ void main() {
       viewModel.dispose();
     });
 
+    testWidgets('hides meal entry controls while reviewing a proposal', (
+      tester,
+    ) async {
+      final proposal = MealProposal(
+        id: 'prop_chicken_rice',
+        title: 'Chicken and rice',
+        confidence: 0.85,
+        requiresConfirmation: true,
+        trustedAutoCommitEligible: false,
+        nutrition: const NutritionSnapshot(
+          calories: 295,
+          proteinGrams: 38,
+          carbsGrams: 29,
+          fatGrams: 4,
+        ),
+        items: [
+          _mealItem(
+            name: 'Chicken breast',
+            calories: 165,
+            externalId: 'chicken',
+          ),
+          _mealItem(
+            name: 'Cooked rice',
+            calories: 130,
+            externalId: 'rice',
+          ),
+        ],
+      );
+      when(() => nutritionRepository.logText('chicken and rice')).thenAnswer(
+        (_) async => AgentRunResult(
+          kind: 'proposal',
+          message: 'Meal proposal created.',
+          proposal: proposal,
+        ),
+      );
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<VoiceLogViewModel>.value(
+          value: viewModel,
+          child: MaterialApp(
+            theme: buildTheme(),
+            home: const MealCreateScreen(),
+          ),
+        ),
+      );
+
+      expect(find.byKey(const ValueKey('meal_text_field')), findsOneWidget);
+      expect(find.byKey(const ValueKey('submit_meal_button')), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const ValueKey('meal_text_field')),
+        'chicken and rice',
+      );
+      await tester.tap(find.byKey(const ValueKey('submit_meal_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Chicken and rice'), findsOneWidget);
+      expect(find.byKey(const ValueKey('confirm_proposal_button')),
+          findsOneWidget);
+      expect(
+          find.byKey(const ValueKey('edit_proposal_button')), findsOneWidget);
+      expect(find.byKey(const ValueKey('meal_text_field')), findsNothing);
+      expect(find.byKey(const ValueKey('submit_meal_button')), findsNothing);
+    });
+
+    testWidgets(
+      'hides meal entry controls and shows debug transcript during clarification',
+      (tester) async {
+        const transcript =
+            'Añade 100 gramos de arroz, 100 gramos de pollo y 100 gramos de pan.';
+        final group = _candidateGroup(
+          canonicalEnglishName: 'arroz',
+          candidates: const [],
+        );
+        when(() => nutritionRepository.logText(transcript)).thenAnswer(
+          (_) async => AgentRunResult(
+            kind: 'clarification_required',
+            message:
+                'I could not confidently match every ingredient. Please choose a food match or rephrase the meal.',
+            candidateGroups: [group],
+          ),
+        );
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider<VoiceLogViewModel>.value(
+            value: viewModel,
+            child: MaterialApp(
+              theme: buildTheme(),
+              home: const MealCreateScreen(),
+            ),
+          ),
+        );
+
+        await tester.enterText(
+          find.byKey(const ValueKey('meal_text_field')),
+          transcript,
+        );
+        await tester.tap(find.byKey(const ValueKey('submit_meal_button')));
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const ValueKey('meal_text_field')), findsNothing);
+        expect(find.byKey(const ValueKey('submit_meal_button')), findsNothing);
+        expect(
+          find.byKey(const ValueKey('transcript_debug_card')),
+          findsOneWidget,
+        );
+        expect(find.text(transcript), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('resolver_clarification_card')),
+          findsOneWidget,
+        );
+      },
+    );
+
     testWidgets('renders compact top 10 candidates without overflow', (
       tester,
     ) async {

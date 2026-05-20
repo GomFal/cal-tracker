@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:cal_tracker_mobile/app/theme.dart';
 import 'package:cal_tracker_mobile/data/repositories/nutrition_repository.dart';
 import 'package:cal_tracker_mobile/data/services/audio_recorder_service.dart';
@@ -13,7 +15,13 @@ class MockNutritionRepository extends Mock implements NutritionRepository {}
 
 class MockAudioRecorderService extends Mock implements AudioRecorderService {}
 
+class FakeFile extends Fake implements File {}
+
 void main() {
+  setUpAll(() {
+    registerFallbackValue(FakeFile());
+  });
+
   group('MealCreateScreen food candidates', () {
     late MockNutritionRepository nutritionRepository;
     late MockAudioRecorderService audioRecorderService;
@@ -36,7 +44,7 @@ void main() {
       viewModel.dispose();
     });
 
-    testWidgets('hides meal entry controls while reviewing a proposal', (
+    testWidgets('keeps voice action while reviewing a proposal', (
       tester,
     ) async {
       final proposal = MealProposal(
@@ -99,6 +107,11 @@ void main() {
           find.byKey(const ValueKey('edit_proposal_button')), findsOneWidget);
       expect(find.byKey(const ValueKey('meal_text_field')), findsNothing);
       expect(find.byKey(const ValueKey('submit_meal_button')), findsNothing);
+      expect(
+        find.byKey(const ValueKey('meal_create_voice_action_button')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('mic_button')), findsOneWidget);
     });
 
     testWidgets(
@@ -387,7 +400,7 @@ void main() {
     });
 
     testWidgets(
-      'keeps text correction controls available for active proposal',
+      'keeps voice correction action available for active proposal',
       (tester) async {
         const initialProposal = MealProposal(
           id: 'prop_1',
@@ -425,15 +438,33 @@ void main() {
           ),
         );
         when(
-          () => nutritionRepository.logText(
-            'make the butter 40 grams',
+          () => audioRecorderService.start(),
+        ).thenAnswer((_) async {});
+        when(
+          () => audioRecorderService.stop(),
+        ).thenAnswer(
+          (_) async => const RecordedAudio(
+            path: '/tmp/test.m4a',
+            mimeType: 'audio/m4a',
+            sizeBytes: 1024,
+          ),
+        );
+        when(
+          () => nutritionRepository.logAudio(
+            any(),
             activeProposalId: 'prop_1',
           ),
         ).thenAnswer(
-          (_) async => const AgentRunResult(
-            kind: 'proposal',
-            message: 'Meal proposal updated.',
-            proposal: updatedProposal,
+          (_) async => const VoiceMealRunResult(
+            transcript: 'make the butter 40 grams',
+            provider: 'test',
+            model: 'test-model',
+            traceId: 'trace-1',
+            result: AgentRunResult(
+              kind: 'proposal',
+              message: 'Meal proposal updated.',
+              proposal: updatedProposal,
+            ),
           ),
         );
 
@@ -454,24 +485,30 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('submit_meal_button')));
         await tester.pumpAndSettle();
 
-        expect(find.byKey(const ValueKey('meal_text_field')), findsOneWidget);
+        expect(find.byKey(const ValueKey('meal_text_field')), findsNothing);
         expect(
           find.byKey(const ValueKey('submit_meal_button')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const ValueKey('meal_create_voice_action_button')),
           findsOneWidget,
         );
         expect(viewModel.proposal, initialProposal);
 
-        await tester.enterText(
-          find.byKey(const ValueKey('meal_text_field')),
-          'make the butter 40 grams',
-        );
-        await tester.tap(find.byKey(const ValueKey('submit_meal_button')));
+        await tester.tap(find.byKey(const ValueKey('mic_button')));
+        await tester.pump();
+
+        expect(viewModel.state, VoiceLogState.recording);
+        expect(viewModel.proposal, initialProposal);
+
+        await tester.tap(find.byKey(const ValueKey('mic_button')));
         await tester.pumpAndSettle();
 
         expect(viewModel.proposal, updatedProposal);
         verify(
-          () => nutritionRepository.logText(
-            'make the butter 40 grams',
+          () => nutritionRepository.logAudio(
+            any(),
             activeProposalId: 'prop_1',
           ),
         ).called(1);

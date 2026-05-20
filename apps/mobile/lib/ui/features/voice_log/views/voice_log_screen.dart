@@ -71,6 +71,8 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
 
     return Scaffold(
       backgroundColor: FreshColors.screen,
+      floatingActionButton: _MealCreateVoiceActionButton(viewModel: viewModel),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       body: KeyedSubtree(
         key: const ValueKey('meal_create_screen'),
         child: ContentFrame(
@@ -208,6 +210,7 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
               ],
               if (viewModel.template != null)
                 _TemplatesCard(templates: [viewModel.template!]),
+              const SizedBox(height: 104),
             ],
           ),
         ),
@@ -643,97 +646,92 @@ class _PortionChoiceChip extends StatelessWidget {
   }
 }
 
-// ignore: unused_element
-class _VoiceCaptureCard extends StatelessWidget {
-  const _VoiceCaptureCard({required this.viewModel});
+class _MealCreateVoiceActionButton extends StatelessWidget {
+  const _MealCreateVoiceActionButton({required this.viewModel});
 
   final VoiceLogViewModel viewModel;
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.freshPalette;
     final isRecording = viewModel.state == VoiceLogState.recording;
     final isDisabled = viewModel.state == VoiceLogState.stopping ||
         viewModel.state == VoiceLogState.transcribing ||
         viewModel.state == VoiceLogState.agentRunning;
-    final textTheme = Theme.of(context).textTheme;
-    final limeCardTextColor = FreshPalette.dark.limeWash;
-    return FreshCard(
-      color: isRecording
-          ? FreshColors.coral.withValues(alpha: 0.12)
-          : FreshColors.limeSoft,
-      radius: FreshRadii.xl,
-      padding: const EdgeInsets.all(20),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    FreshIconChip(
-                      icon: isRecording
-                          ? Icons.fiber_manual_record_rounded
-                          : Icons.bolt_rounded,
-                      color: isRecording
-                          ? FreshColors.coral
-                          : FreshColors.limeDeep,
-                      backgroundColor: FreshColors.surface,
-                    ),
-                    const SizedBox(width: FreshSpacing.sm),
-                    Text(
-                      isRecording ? 'Recording' : 'Voice intake',
-                      style: textTheme.bodyMedium?.copyWith(
-                        color:
-                            isRecording ? FreshColors.ink : limeCardTextColor,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: FreshSpacing.md),
-                Text(
-                  isRecording
-                      ? 'Tap stop when you are done.'
-                      : 'Say your meal naturally.',
-                  style: textTheme.titleLarge?.copyWith(
-                    color: isRecording ? null : limeCardTextColor,
-                    fontWeight: FontWeight.w700,
-                    height: 1.12,
+    final isCorrection = viewModel.proposal != null;
+    final hasError = viewModel.state == VoiceLogState.error;
+    final tooltip = isRecording
+        ? 'Stop and submit voice'
+        : isDisabled
+            ? 'Processing voice'
+            : isCorrection
+                ? 'Record correction'
+                : 'Record meal';
+    final backgroundColor = isRecording
+        ? FreshColors.coral
+        : hasError
+            ? FreshColors.yellow
+            : isDisabled
+                ? palette.surfaceMuted
+                : palette.lime;
+    final icon = isRecording
+        ? Icons.stop_rounded
+        : isDisabled
+            ? Icons.graphic_eq_rounded
+            : hasError
+                ? Icons.error_outline_rounded
+                : Icons.mic_rounded;
+
+    return SafeArea(
+      child: Semantics(
+        key: const ValueKey('meal_create_voice_action_button'),
+        button: true,
+        label: tooltip,
+        child: Tooltip(
+          message: tooltip,
+          child: SizedBox.square(
+            dimension: 72,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: backgroundColor,
+                shape: BoxShape.circle,
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x369ad32a),
+                    blurRadius: 22,
+                    offset: Offset(0, 10),
                   ),
+                ],
+              ),
+              child: IconButton(
+                key: const ValueKey('mic_button'),
+                tooltip: tooltip,
+                onPressed: isDisabled ? null : () => _handleTap(viewModel),
+                icon: Icon(icon),
+                color: palette.ink,
+                disabledColor: palette.inkMuted,
+                iconSize: 32,
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  disabledBackgroundColor: Colors.transparent,
+                  shape: const CircleBorder(),
                 ),
-                const SizedBox(height: FreshSpacing.sm),
-                Text(
-                  'The meal will be filled with your voice.',
-                  style: textTheme.bodyMedium?.copyWith(
-                    color:
-                        isRecording ? FreshColors.inkSoft : limeCardTextColor,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: FreshSpacing.lg),
-          SizedBox.square(
-            dimension: 76,
-            child: IconButton(
-              key: const ValueKey('mic_button'),
-              tooltip: isRecording ? 'Stop recording' : 'Record voice',
-              onPressed: isDisabled ? null : viewModel.toggleRecording,
-              icon: Icon(isRecording ? Icons.stop_rounded : Icons.mic_rounded),
-              style: IconButton.styleFrom(
-                backgroundColor:
-                    isRecording ? FreshColors.coral : FreshColors.lime,
-                foregroundColor: FreshColors.ink,
-                disabledBackgroundColor: FreshColors.surfaceMuted,
-                disabledForegroundColor: FreshColors.inkMuted,
-                shape: const CircleBorder(),
-                iconSize: 34,
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
+  }
+
+  Future<void> _handleTap(VoiceLogViewModel viewModel) async {
+    if (viewModel.canStartRecording) {
+      await viewModel.startRecording();
+      return;
+    }
+    if (viewModel.canStopRecording) {
+      await viewModel.stopRecording(submitAfterTranscription: true);
+    }
   }
 }
 

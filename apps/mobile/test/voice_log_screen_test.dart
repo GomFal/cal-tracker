@@ -88,14 +88,16 @@ void main() {
         findsNothing,
       );
 
-      final toggleFinder =
-          find.byKey(const ValueKey('food_candidate_toggle_very_long_food'));
+      final toggleFinder = find.byKey(
+        const ValueKey('food_candidate_toggle_very_long_food'),
+      );
       await tester.ensureVisible(toggleFinder);
       await tester.pumpAndSettle();
       await tester.tap(toggleFinder);
       await tester.pumpAndSettle();
-      final candidateNineFinder =
-          find.byKey(const ValueKey('food_candidate_very_long_food_9'));
+      final candidateNineFinder = find.byKey(
+        const ValueKey('food_candidate_very_long_food_9'),
+      );
       await tester.ensureVisible(candidateNineFinder);
       await tester.pumpAndSettle();
 
@@ -177,24 +179,27 @@ void main() {
         find.byKey(const ValueKey('proposal_item_0_candidate_9')),
         findsNothing,
       );
-      final editorToggleFinder =
-          find.byKey(const ValueKey('proposal_item_0_candidate_toggle'));
+      final editorToggleFinder = find.byKey(
+        const ValueKey('proposal_item_0_candidate_toggle'),
+      );
       await tester.ensureVisible(editorToggleFinder);
       await tester.pumpAndSettle();
       await tester.tap(editorToggleFinder);
       await tester.pumpAndSettle();
-      final editorCandidateNineFinder =
-          find.byKey(const ValueKey('proposal_item_0_candidate_9'));
+      final editorCandidateNineFinder = find.byKey(
+        const ValueKey('proposal_item_0_candidate_9'),
+      );
       await tester.ensureVisible(editorCandidateNineFinder);
       await tester.pumpAndSettle();
+      expect(editorCandidateNineFinder, findsOneWidget);
       expect(
-        editorCandidateNineFinder,
-        findsOneWidget,
+        find.byKey(const ValueKey('proposal_item_calories_0')),
+        findsNothing,
       );
       expect(
-          find.byKey(const ValueKey('proposal_item_calories_0')), findsNothing);
-      expect(
-          find.byKey(const ValueKey('proposal_item_protein_0')), findsNothing);
+        find.byKey(const ValueKey('proposal_item_protein_0')),
+        findsNothing,
+      );
 
       await tester.tap(
         find.byKey(const ValueKey('edit_proposal_item_nutrition_0')),
@@ -266,6 +271,98 @@ void main() {
         findsNothing,
       );
     });
+
+    testWidgets(
+      'keeps text correction controls available for active proposal',
+      (tester) async {
+        const initialProposal = MealProposal(
+          id: 'prop_1',
+          title: 'Bread and butter',
+          confidence: 0.85,
+          requiresConfirmation: true,
+          trustedAutoCommitEligible: false,
+          nutrition: NutritionSnapshot(
+            calories: 408,
+            proteinGrams: 9.2,
+            carbsGrams: 49,
+            fatGrams: 19.4,
+          ),
+          items: [],
+        );
+        const updatedProposal = MealProposal(
+          id: 'prop_1',
+          title: 'Bread and butter',
+          confidence: 0.85,
+          requiresConfirmation: true,
+          trustedAutoCommitEligible: false,
+          nutrition: NutritionSnapshot(
+            calories: 552,
+            proteinGrams: 9.4,
+            carbsGrams: 49,
+            fatGrams: 35.6,
+          ),
+          items: [],
+        );
+        when(() => nutritionRepository.logText('bread and butter')).thenAnswer(
+          (_) async => const AgentRunResult(
+            kind: 'proposal',
+            message: 'Meal proposal created.',
+            proposal: initialProposal,
+          ),
+        );
+        when(
+          () => nutritionRepository.logText(
+            'make the butter 40 grams',
+            activeProposalId: 'prop_1',
+          ),
+        ).thenAnswer(
+          (_) async => const AgentRunResult(
+            kind: 'proposal',
+            message: 'Meal proposal updated.',
+            proposal: updatedProposal,
+          ),
+        );
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider<VoiceLogViewModel>.value(
+            value: viewModel,
+            child: MaterialApp(
+              theme: buildTheme(),
+              home: const MealCreateScreen(),
+            ),
+          ),
+        );
+
+        await tester.enterText(
+          find.byKey(const ValueKey('meal_text_field')),
+          'bread and butter',
+        );
+        await tester.tap(find.byKey(const ValueKey('submit_meal_button')));
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const ValueKey('meal_text_field')), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('submit_meal_button')),
+          findsOneWidget,
+        );
+        expect(viewModel.proposal, initialProposal);
+
+        await tester.enterText(
+          find.byKey(const ValueKey('meal_text_field')),
+          'make the butter 40 grams',
+        );
+        await tester.tap(find.byKey(const ValueKey('submit_meal_button')));
+        await tester.pumpAndSettle();
+
+        expect(viewModel.proposal, updatedProposal);
+        verify(
+          () => nutritionRepository.logText(
+            'make the butter 40 grams',
+            activeProposalId: 'prop_1',
+          ),
+        ).called(1);
+      },
+    );
   });
 }
 

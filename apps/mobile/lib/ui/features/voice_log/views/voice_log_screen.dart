@@ -243,6 +243,7 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
     final canSubmit = viewModel.state == VoiceLogState.idle ||
         viewModel.state == VoiceLogState.ready ||
         viewModel.state == VoiceLogState.transcriptReady ||
+        viewModel.state == VoiceLogState.proposalReady ||
         viewModel.state == VoiceLogState.resultReady ||
         viewModel.state == VoiceLogState.error;
 
@@ -252,7 +253,8 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
       onPressed: canSubmit && !viewModel.isLoading
           ? () => viewModel.submitText(_textController.text)
           : null,
-      label: const Text('Submit meal'),
+      label: Text(
+          viewModel.proposal == null ? 'Submit meal' : 'Submit correction'),
     );
   }
 }

@@ -49,6 +49,143 @@ describe("action loop", () => {
     );
   });
 
+  it("revises a pending proposal and records correction feedback", async () => {
+    const { request, repository } = buildTestApp();
+    const recordFoodFeedback = vi.fn(async () => undefined);
+    Object.assign(repository, { recordFoodFeedback });
+    const auth = await registerAndAuth(request);
+
+    const created = await request(
+      "http://localhost/v1/actions/create_meal_proposal_from_items/execute",
+      {
+        method: "POST",
+        headers: auth.authHeader,
+        body: JSON.stringify({
+          input: {
+            phrase: "100 grams of bread",
+            items: [testBreadItem],
+          },
+          source: "flutter",
+        }),
+      },
+    ).then(
+      (response) =>
+        response.json() as Promise<{ output: { proposal: { id: string } } }>,
+    );
+
+    const revised = await request(
+      "http://localhost/v1/actions/revise_meal_proposal/execute",
+      {
+        method: "POST",
+        headers: auth.authHeader,
+        body: JSON.stringify({
+          input: {
+            proposalId: created.output.proposal.id,
+            instruction: "Make the bread 200 grams.",
+            operations: [
+              {
+                type: "update_item_quantity",
+                matchText: "bread",
+                quantity: 200,
+                unit: "g",
+              },
+            ],
+          },
+          source: "flutter",
+        }),
+      },
+    );
+
+    expect(revised.status).toBe(200);
+    const body = (await revised.json()) as {
+      output: {
+        proposal: {
+          id: string;
+          status: string;
+          nutrition: { calories: number };
+          items: { name: string; quantity: number }[];
+        };
+      };
+    };
+    expect(body.output.proposal.id).toBe(created.output.proposal.id);
+    expect(body.output.proposal.status).toBe("corrected");
+    expect(body.output.proposal.items[0]).toEqual(
+      expect.objectContaining({ name: "Bread", quantity: 200 }),
+    );
+    expect(body.output.proposal.nutrition.calories).toBe(530);
+    expect(recordFoodFeedback).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: auth.user.id,
+        action: "corrected",
+        metadata: expect.objectContaining({
+          eventType: "proposal_corrected",
+          proposalId: created.output.proposal.id,
+          revisionOperationCount: 1,
+        }),
+      }),
+    );
+  });
+
+  it("asks for clarification when a proposal revision cannot resolve a new food", async () => {
+    const { request } = buildTestApp();
+    const auth = await registerAndAuth(request);
+    const created = await request(
+      "http://localhost/v1/actions/create_meal_proposal_from_items/execute",
+      {
+        method: "POST",
+        headers: auth.authHeader,
+        body: JSON.stringify({
+          input: {
+            phrase: "100 grams of bread",
+            items: [testBreadItem],
+          },
+          source: "flutter",
+        }),
+      },
+    ).then(
+      (response) =>
+        response.json() as Promise<{ output: { proposal: { id: string } } }>,
+    );
+
+    const revised = await request(
+      "http://localhost/v1/actions/revise_meal_proposal/execute",
+      {
+        method: "POST",
+        headers: auth.authHeader,
+        body: JSON.stringify({
+          input: {
+            proposalId: created.output.proposal.id,
+            instruction: "Add 100 grams of zzzzzzz.",
+            operations: [
+              {
+                type: "add_item",
+                mention: {
+                  originalText: "100 grams of zzzzzzz",
+                  canonicalName: "zzzzzzz",
+                  canonicalEnglishName: "zzzzzzz",
+                  quantity: 100,
+                  unit: "g",
+                  rawUnitText: "grams",
+                  unitKind: "metric",
+                  confidence: 0.9,
+                  marketProduct: false,
+                },
+              },
+            ],
+          },
+          source: "flutter",
+        }),
+      },
+    );
+
+    expect(revised.status).toBe(200);
+    const body = (await revised.json()) as {
+      output: { clarificationRequired?: boolean; options?: unknown[] };
+    };
+    expect(body.output.clarificationRequired).toBe(true);
+    expect(body.output.options).toBeDefined();
+  });
+
   it("creates a chicken and rice proposal, commits it, and includes it in the daily summary", async () => {
     const { request, repository } = buildTestApp();
     const recordFoodFeedback = vi.fn(async () => undefined);

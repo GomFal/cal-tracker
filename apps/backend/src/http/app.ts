@@ -11,6 +11,7 @@ import {
   refreshRequestSchema,
   registerRequestSchema,
   settingsUpdateSchema,
+  uuidSchema,
   type ActionContext,
   type ActionSource
 } from "@cal-tracker/contracts";
@@ -180,7 +181,7 @@ export function createApp(input: {
     const user = c.get("authUser");
     const body = agentRunRequestSchema.parse(await c.req.json());
     const context = buildActionContext(c, user, body.source);
-    const result = await agentService.run(body.text, context);
+    const result = await agentService.run(body.text, context, body.activeProposalId);
     return c.json(result);
   });
 
@@ -309,6 +310,7 @@ export function createApp(input: {
         result = await agentService.run(
           trimmedTranscript,
           buildActionContext(c, user, upload.source ?? "flutter"),
+          upload.activeProposalId,
         );
         agentMs = Date.now() - agentStarted;
       }
@@ -433,6 +435,7 @@ type ParsedAudioUpload = {
   filename: string;
   mimeType: string;
   source?: ActionSource;
+  activeProposalId?: string;
 };
 
 async function parseAudioUpload(
@@ -477,6 +480,21 @@ async function parseAudioUpload(
       },
     }, 400);
   }
+  const activeProposalId = parseOptionalMultipartUuid(body.activeProposalId);
+  if (activeProposalId === null) {
+    console.warn(`${logPrefix}.invalid_active_proposal`, {
+      traceId,
+      userId: user.id,
+      activeProposalId: body.activeProposalId,
+    });
+    return c.json({
+      error: {
+        code: "validation_error",
+        message: "Invalid active proposal id.",
+        traceId,
+      },
+    }, 400);
+  }
 
   const audioField = body.audio;
   if (!audioField || (Array.isArray(audioField) && audioField.length === 0)) {
@@ -512,6 +530,7 @@ async function parseAudioUpload(
     filename: validation.filename,
     mimeType: validation.mimeType,
     source: source ?? undefined,
+    activeProposalId: activeProposalId ?? undefined,
   };
 }
 
@@ -526,6 +545,14 @@ function parseMultipartActionSource(value: unknown): ActionSource | null {
     return source;
   }
   return null;
+}
+
+function parseOptionalMultipartUuid(value: unknown): string | null | undefined {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (raw == null || raw === "") return undefined;
+  if (typeof raw !== "string") return null;
+  const parsed = uuidSchema.safeParse(raw);
+  return parsed.success ? parsed.data : null;
 }
 
 async function logLocalRun(

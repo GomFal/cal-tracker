@@ -84,10 +84,20 @@ export class AgentService {
     private readonly runLogger?: LocalRunLogger,
   ) {}
 
-  async run(text: string, context: ActionContext): Promise<AgentRunResult> {
+  async run(
+    text: string,
+    context: ActionContext,
+    activeProposalId?: string,
+  ): Promise<AgentRunResult> {
     const runStarted = Date.now();
+    const activeProposal = activeProposalId
+      ? await this.actionExecutor.getProposalForAgentContext(
+          context.actorUserId,
+          activeProposalId,
+        )
+      : undefined;
     const messages: AgentMessage[] = [
-      buildSystemMessage(context),
+      buildSystemMessage(context, activeProposal),
       { role: "user", content: text },
     ];
 
@@ -128,6 +138,8 @@ export class AgentService {
       timezone: context.timezone,
       model: this.model,
       inputText: text,
+      activeProposalId,
+      activeProposal,
       systemPrompt: messages[0]!.content,
       messages,
       availableTools: allowedActions.map((action) => action.id),
@@ -150,7 +162,9 @@ export class AgentService {
       );
       llmMs = Date.now() - llmStarted;
     } catch (error) {
-      const fallbackToolCall = fallbackToolCallForText(text);
+      const fallbackToolCall = activeProposal
+        ? fallbackRevisionToolCallForText(text, activeProposal)
+        : fallbackToolCallForText(text);
       if (fallbackToolCall) {
         return this.executeFallbackTool({
           text,
@@ -178,7 +192,9 @@ export class AgentService {
     }
 
     if (decision.toolCalls.length === 0) {
-      const fallbackToolCall = fallbackToolCallForText(text);
+      const fallbackToolCall = activeProposal
+        ? fallbackRevisionToolCallForText(text, activeProposal)
+        : fallbackToolCallForText(text);
       if (fallbackToolCall) {
         return this.executeFallbackTool({
           text,
@@ -275,6 +291,16 @@ export class AgentService {
     }
 
     const originalActionId = actionId;
+    if (
+      activeProposal &&
+      actionId === "revise_meal_proposal" &&
+      typeof parsedInput === "object" &&
+      parsedInput !== null &&
+      !Array.isArray(parsedInput) &&
+      !("proposalId" in parsedInput)
+    ) {
+      parsedInput = { ...parsedInput, proposalId: activeProposal.id };
+    }
 
     const actionStarted = Date.now();
     try {
@@ -481,6 +507,27 @@ export class AgentService {
           proposal: output.proposal as MealProposal,
           message: "Meal proposal created.",
         };
+      case "revise_meal_proposal": {
+        if (output.clarificationRequired) {
+          return {
+            kind: "clarification_required",
+            options: output.options as unknown[] | undefined,
+            resolvedItems: output.resolvedItems as MealItem[] | undefined,
+            message:
+              typeof output.message === "string"
+                ? output.message
+                : "I need a food match before updating the meal proposal.",
+          };
+        }
+        return {
+          kind: "proposal",
+          proposal: output.proposal as MealProposal,
+          message:
+            typeof output.message === "string"
+              ? output.message
+              : "Meal proposal updated.",
+        };
+      }
       case "commit_meal":
         return {
           kind: "meal_committed",
@@ -603,8 +650,121 @@ function prioritizeDefaultTool<T extends { id: string }>(actions: T[]): T[] {
   });
 }
 
+function isMealLoggingIntent(text: string): boolean {
+  const normalized = normalizeIntentText(text);
+
+  if (/^(how|cuanto|cuanta|cuantas|cuantos|que|what)\b/.test(normalized)) {
+    return false;
+  }
+  if (
+    /\b(delete|remove|borrar|eliminar|corrige|correct|corregir)\b/.test(
+      normalized,
+    )
+  ) {
+    return false;
+  }
+  return (
+    /\b(log|add|ate|had|consumed|record|registrar|registro|anade|anadir|agrega|agregar|apunta|apuntar|pon|ponme|poner|mete|meteme|put|comi|comido|tome|consumi|desayuno|almuerzo|comida|cena|merienda|snack)\b/.test(
+      normalized,
+    ) || hasExplicitFoodQuantity(normalized)
+  );
+}
+
+function hasExplicitFoodQuantity(normalized: string): boolean {
+  return /\b\d+(?:[.,]\d+)?\s*(?:g|gr|gramo|gramos|gram|grams|kg|kilo|kilos|ml|mililitro|mililitros|l|litro|litros|oz|ounce|ounces|cup|cups|taza|tazas)\b(?:\s+(?:de|of))?\s+[a-z]/.test(
+    normalized,
+  );
+}
+
+function fallbackRevisionToolCallForText(
+  text: string,
+  activeProposal: MealProposal,
+): AgentToolCall | null {
+  const normalized = normalizeIntentText(text);
+  const quantity = extractQuantityAndUnit(normalized);
+  if (!quantity) return null;
+
+  const itemIndex = activeProposal.items.findIndex((item) =>
+    proposalItemMentioned(normalized, item),
+  );
+  if (itemIndex < 0) return null;
+
+  return toolCall("revise_meal_proposal", {
+    proposalId: activeProposal.id,
+    instruction: text,
+    operations: [
+      {
+        type: "update_item_quantity",
+        itemIndex,
+        quantity: quantity.quantity,
+        unit: quantity.unit,
+        rawUnitText: quantity.rawUnitText,
+      },
+    ],
+  });
+}
+
+function extractQuantityAndUnit(
+  normalized: string,
+): { quantity: number; unit: string; rawUnitText: string } | null {
+  const match =
+    /\b(\d+(?:[.,]\d+)?)\s*(g|gr|gramo|gramos|gram|grams|kg|kilo|kilos|ml|mililitro|mililitros|l|litro|litros|oz|ounce|ounces|cup|cups|taza|tazas)\b/.exec(
+      normalized,
+    );
+  if (!match) return null;
+  const quantity = Number(match[1]!.replace(",", "."));
+  if (!Number.isFinite(quantity) || quantity <= 0) return null;
+  const rawUnitText = match[2]!;
+  return {
+    quantity,
+    unit: normalizedUnit(rawUnitText),
+    rawUnitText,
+  };
+}
+
+function normalizedUnit(unit: string): string {
+  switch (unit) {
+    case "gr":
+    case "gramo":
+    case "gramos":
+    case "gram":
+    case "grams":
+      return "g";
+    case "kilo":
+    case "kilos":
+      return "kg";
+    case "mililitro":
+    case "mililitros":
+      return "ml";
+    case "litro":
+    case "litros":
+      return "l";
+    case "ounce":
+    case "ounces":
+      return "oz";
+    case "taza":
+    case "tazas":
+      return "cup";
+    default:
+      return unit;
+  }
+}
+
+function proposalItemMentioned(normalizedText: string, item: MealItem): boolean {
+  const names = [item.name, item.canonicalName, item.originalText]
+    .filter((value): value is string => Boolean(value))
+    .map(normalizeIntentText);
+  return names.some((name) => {
+    if (!name) return false;
+    if (normalizedText.includes(name)) return true;
+    const tokens = name.split(" ").filter((token) => token.length >= 4);
+    return tokens.some((token) => normalizedText.includes(token));
+  });
+}
+
 function fallbackToolCallForText(text: string): AgentToolCall | null {
   const normalized = normalizeIntentText(text);
+  if (isMealLoggingIntent(text)) return toolCall("propose_meal_log", { text });
   if (
     /\b(remaining|left|quedan|restan|calorias restantes|calories left)\b/.test(
       normalized,
@@ -632,7 +792,7 @@ function fallbackToolCallForText(text: string): AgentToolCall | null {
       query: nutritionSearch[1].trim(),
     });
 
-  return toolCall("propose_meal_log", { text });
+  return null;
 }
 
 function toolCall(name: string, input: unknown): AgentToolCall {

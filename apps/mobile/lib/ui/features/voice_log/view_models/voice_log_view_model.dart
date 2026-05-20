@@ -245,12 +245,13 @@ class VoiceLogViewModel extends ChangeNotifier {
       state == VoiceLogState.clarificationRequired;
 
   Future<void> _startRecording() async {
+    final activeProposal = _uiState.proposal;
     _setUiState(
       _uiState.copyWith(
         phase: VoiceLogState.requestingPermission,
         errorMessage: null,
         message: null,
-        proposal: null,
+        proposal: activeProposal,
         autoCommittedMeal: null,
         summary: null,
         remaining: null,
@@ -330,16 +331,25 @@ class VoiceLogViewModel extends ChangeNotifier {
     bool submitAfterTranscription = false,
   }) async {
     _setState(VoiceLogState.transcribing);
+    final activeProposal = _uiState.proposal;
     try {
       if (submitAfterTranscription) {
-        final voiceResult = await _nutritionRepository.logAudio(File(path));
+        final voiceResult = activeProposal == null
+            ? await _nutritionRepository.logAudio(File(path))
+            : await _nutritionRepository.logAudio(
+                File(path),
+                activeProposalId: activeProposal.id,
+              );
         _setUiState(
           _uiState.copyWith(
             transcript: voiceResult.transcript,
             errorMessage: null,
           ),
         );
-        _applyAgentRunResult(voiceResult.result);
+        _applyAgentRunResult(
+          voiceResult.result,
+          fallbackProposal: activeProposal,
+        );
       } else {
         final transcript = await _nutritionRepository.transcribeAudio(
           File(path),
@@ -374,13 +384,14 @@ class VoiceLogViewModel extends ChangeNotifier {
   Future<void> submitText([String? overrideText]) async {
     final text = (overrideText ?? _uiState.transcript).trim();
     if (text.isEmpty) return;
+    final activeProposal = _uiState.proposal;
     _setUiState(
       _uiState.copyWith(
         phase: VoiceLogState.agentRunning,
         transcript: text,
         errorMessage: null,
         message: null,
-        proposal: null,
+        proposal: activeProposal,
         autoCommittedMeal: null,
         summary: null,
         remaining: null,
@@ -397,8 +408,13 @@ class VoiceLogViewModel extends ChangeNotifier {
       ),
     );
     try {
-      final result = await _nutritionRepository.logText(text);
-      _applyAgentRunResult(result);
+      final result = activeProposal == null
+          ? await _nutritionRepository.logText(text)
+          : await _nutritionRepository.logText(
+              text,
+              activeProposalId: activeProposal.id,
+            );
+      _applyAgentRunResult(result, fallbackProposal: activeProposal);
     } catch (error) {
       _setError(
         userVisibleErrorMessage(error, context: UserErrorContext.voiceAgent),
@@ -406,7 +422,10 @@ class VoiceLogViewModel extends ChangeNotifier {
     }
   }
 
-  void _applyAgentRunResult(AgentRunResult result) {
+  void _applyAgentRunResult(
+    AgentRunResult result, {
+    MealProposal? fallbackProposal,
+  }) {
     VoiceLogState nextState;
     switch (result.kind) {
       case 'meal_committed':
@@ -441,7 +460,9 @@ class VoiceLogViewModel extends ChangeNotifier {
     _setUiState(
       _uiState.copyWith(
         phase: nextState,
-        proposal: result.proposal,
+        proposal:
+            result.proposal ??
+            (result.kind == 'clarification_required' ? fallbackProposal : null),
         autoCommittedMeal: result.meal,
         summary: result.summary,
         remaining: result.remaining,

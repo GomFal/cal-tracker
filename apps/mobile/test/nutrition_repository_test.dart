@@ -74,9 +74,7 @@ void main() {
     test('parses voice meal run transcript and agent result', () async {
       final apiClient = MockCalTrackerApiClient();
       final repository = NutritionRepository(apiClient: apiClient);
-      when(
-        () => apiClient.runVoiceMeal(any(), source: 'flutter'),
-      ).thenAnswer(
+      when(() => apiClient.runVoiceMeal(any(), source: 'flutter')).thenAnswer(
         (_) async => {
           'transcript': '100 grams bread',
           'provider': 'test',
@@ -111,6 +109,93 @@ void main() {
       expect(result.traceId, 'trace-1');
       expect(result.result.kind, 'proposal');
       expect(result.result.proposal?.title, 'Bread');
+    });
+
+    test('passes active proposal id to agent and voice meal runs', () async {
+      final apiClient = MockCalTrackerApiClient();
+      final repository = NutritionRepository(apiClient: apiClient);
+      when(
+        () => apiClient.runAgent(
+          'make the butter 40 grams',
+          activeProposalId: 'proposal-1',
+        ),
+      ).thenAnswer(
+        (_) async => {
+          'kind': 'proposal',
+          'message': 'Meal proposal updated.',
+          'proposal': {
+            'id': 'proposal-1',
+            'title': 'Bread and butter',
+            'confidence': 0.8,
+            'requiresConfirmation': true,
+            'trustedAutoCommitEligible': false,
+            'nutrition': {
+              'calories': 552,
+              'proteinGrams': 9.4,
+              'carbsGrams': 49,
+              'fatGrams': 35.6,
+            },
+            'items': [],
+          },
+        },
+      );
+      when(
+        () => apiClient.runVoiceMeal(
+          any(),
+          source: 'flutter',
+          activeProposalId: 'proposal-1',
+        ),
+      ).thenAnswer(
+        (_) async => {
+          'transcript': 'make the butter 40 grams',
+          'provider': 'test',
+          'model': 'test-model',
+          'traceId': 'trace-2',
+          'result': {
+            'kind': 'proposal',
+            'message': 'Meal proposal updated.',
+            'proposal': {
+              'id': 'proposal-1',
+              'title': 'Bread and butter',
+              'confidence': 0.8,
+              'requiresConfirmation': true,
+              'trustedAutoCommitEligible': false,
+              'nutrition': {
+                'calories': 552,
+                'proteinGrams': 9.4,
+                'carbsGrams': 49,
+                'fatGrams': 35.6,
+              },
+              'items': [],
+            },
+          },
+        },
+      );
+
+      final textResult = await repository.logText(
+        'make the butter 40 grams',
+        activeProposalId: 'proposal-1',
+      );
+      final voiceResult = await repository.logAudio(
+        File('/tmp/test.m4a'),
+        activeProposalId: 'proposal-1',
+      );
+
+      expect(textResult.proposal?.id, 'proposal-1');
+      expect(voiceResult.result.proposal?.id, 'proposal-1');
+      verify(
+        () => apiClient.runAgent(
+          'make the butter 40 grams',
+          activeProposalId: 'proposal-1',
+        ),
+      ).called(1);
+      verify(
+        () => apiClient.runVoiceMeal(
+          any(),
+          source: 'flutter',
+          activeProposalId: 'proposal-1',
+        ),
+      ).called(1);
     });
 
     test('sends macro preset fields when updating daily goals', () async {

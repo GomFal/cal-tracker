@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { FoodMention } from "@cal-tracker/contracts";
 import type {
+  AgentMessage,
   AgentToolDecision,
   ChatAgentProvider,
 } from "../agent/chatAgentProvider.js";
@@ -23,6 +24,19 @@ class QueueChatAgentProvider implements ChatAgentProvider {
     const decision = this.decisions.shift();
     if (!decision) throw new Error("missing_fake_agent_decision");
     return decision;
+  }
+}
+
+class CapturingChatAgentProvider implements ChatAgentProvider {
+  public messages: AgentMessage[] = [];
+
+  constructor(private readonly decision: AgentToolDecision) {}
+
+  async runWithTools(input: {
+    messages: AgentMessage[];
+  }): Promise<AgentToolDecision> {
+    this.messages = input.messages;
+    return this.decision;
   }
 }
 
@@ -754,6 +768,359 @@ describe("AgentService", () => {
       correctedBody.meal.items.find((item) => item.name === "Chicken breast")
         ?.quantity,
     ).toBe(200);
+  });
+
+  it("runs a full active proposal revision session before commit", async () => {
+    const agentProvider = new QueueChatAgentProvider();
+    const { request } = buildTestApp({ agentProvider });
+    const { authHeader } = await registerAndAuth(request);
+
+    agentProvider.push({
+      toolCalls: [
+        {
+          id: "call_create",
+          type: "function",
+          function: {
+            name: "propose_meal_log",
+            arguments: JSON.stringify({
+              text: "Add 100 grams of bread and 20 grams of butter",
+              mentions: [
+                {
+                  originalText: "100 grams of bread",
+                  canonicalName: "bread",
+                  canonicalEnglishName: "bread",
+                  quantity: 100,
+                  unit: "g",
+                  rawUnitText: "grams",
+                  unitKind: "metric",
+                  confidence: 0.95,
+                  marketProduct: false,
+                },
+                {
+                  originalText: "20 grams of butter",
+                  canonicalName: "butter",
+                  canonicalEnglishName: "butter",
+                  quantity: 20,
+                  unit: "g",
+                  rawUnitText: "grams",
+                  unitKind: "metric",
+                  confidence: 0.95,
+                  marketProduct: false,
+                },
+              ],
+            }),
+          },
+        },
+      ],
+      rawResponse: {},
+    });
+    const created = await request("http://localhost/v1/agent/runs", {
+      method: "POST",
+      headers: authHeader,
+      body: JSON.stringify({
+        text: "Add 100 grams of bread and 20 grams of butter",
+        source: "flutter",
+      }),
+    });
+    expect(created.status).toBe(200);
+    const createdBody = (await created.json()) as {
+      kind: string;
+      proposal: {
+        id: string;
+        items: { name: string; quantity: number }[];
+      };
+    };
+    expect(createdBody.kind).toBe("proposal");
+    const proposalId = createdBody.proposal.id;
+
+    agentProvider.push({
+      toolCalls: [
+        {
+          id: "call_quantity",
+          type: "function",
+          function: {
+            name: "revise_meal_proposal",
+            arguments: JSON.stringify({
+              instruction: "No, the butter was 40 grams.",
+              operations: [
+                {
+                  type: "update_item_quantity",
+                  itemIndex: 1,
+                  quantity: 40,
+                  unit: "g",
+                  rawUnitText: "grams",
+                },
+              ],
+            }),
+          },
+        },
+      ],
+      rawResponse: {},
+    });
+    const quantityRevision = await request("http://localhost/v1/agent/runs", {
+      method: "POST",
+      headers: authHeader,
+      body: JSON.stringify({
+        text: "No, the butter was 40 grams.",
+        activeProposalId: proposalId,
+        source: "flutter",
+      }),
+    });
+    expect(quantityRevision.status).toBe(200);
+    const quantityBody = (await quantityRevision.json()) as typeof createdBody;
+    expect(quantityBody.kind).toBe("proposal");
+    expect(quantityBody.proposal.id).toBe(proposalId);
+    expect(
+      quantityBody.proposal.items.find((item) => item.name === "Butter")
+        ?.quantity,
+    ).toBe(40);
+
+    agentProvider.push({
+      toolCalls: [
+        {
+          id: "call_add",
+          type: "function",
+          function: {
+            name: "revise_meal_proposal",
+            arguments: JSON.stringify({
+              proposalId,
+              instruction: "Add 50 grams of ham too.",
+              operations: [
+                {
+                  type: "add_item",
+                  mention: {
+                    originalText: "50 grams of ham",
+                    canonicalName: "ham",
+                    canonicalEnglishName: "ham",
+                    quantity: 50,
+                    unit: "g",
+                    rawUnitText: "grams",
+                    unitKind: "metric",
+                    confidence: 0.95,
+                    marketProduct: false,
+                  },
+                },
+              ],
+            }),
+          },
+        },
+      ],
+      rawResponse: {},
+    });
+    const addRevision = await request("http://localhost/v1/agent/runs", {
+      method: "POST",
+      headers: authHeader,
+      body: JSON.stringify({
+        text: "Add 50 grams of ham too.",
+        activeProposalId: proposalId,
+        source: "flutter",
+      }),
+    });
+    expect(addRevision.status).toBe(200);
+    const addBody = (await addRevision.json()) as typeof createdBody;
+    expect(addBody.proposal.id).toBe(proposalId);
+    expect(addBody.proposal.items.map((item) => item.name)).toEqual([
+      "Bread",
+      "Butter",
+      "Ham",
+    ]);
+
+    agentProvider.push({
+      toolCalls: [
+        {
+          id: "call_remove",
+          type: "function",
+          function: {
+            name: "revise_meal_proposal",
+            arguments: JSON.stringify({
+              proposalId,
+              instruction: "Remove the bread.",
+              operations: [{ type: "remove_item", matchText: "bread" }],
+            }),
+          },
+        },
+      ],
+      rawResponse: {},
+    });
+    const removeRevision = await request("http://localhost/v1/agent/runs", {
+      method: "POST",
+      headers: authHeader,
+      body: JSON.stringify({
+        text: "Remove the bread.",
+        activeProposalId: proposalId,
+        source: "flutter",
+      }),
+    });
+    expect(removeRevision.status).toBe(200);
+    const removeBody = (await removeRevision.json()) as typeof createdBody;
+    expect(removeBody.proposal.id).toBe(proposalId);
+    expect(removeBody.proposal.items.map((item) => item.name)).toEqual([
+      "Butter",
+      "Ham",
+    ]);
+
+    const committed = await request(
+      `http://localhost/v1/meals/proposals/${proposalId}/commit`,
+      {
+        method: "POST",
+        headers: authHeader,
+        body: JSON.stringify({}),
+      },
+    );
+    expect(committed.status).toBe(200);
+    const committedBody = (await committed.json()) as {
+      output: {
+        meal: {
+          items: { name: string; quantity: number }[];
+          nutrition: { calories: number };
+        };
+      };
+    };
+    expect(committedBody.output.meal.items).toEqual([
+      expect.objectContaining({ name: "Butter", quantity: 40 }),
+      expect.objectContaining({ name: "Ham", quantity: 50 }),
+    ]);
+    expect(committedBody.output.meal.nutrition.calories).toBe(359);
+
+    agentProvider.push({
+      toolCalls: [
+        {
+          id: "call_after_commit",
+          type: "function",
+          function: {
+            name: "revise_meal_proposal",
+            arguments: JSON.stringify({
+              proposalId,
+              instruction: "Make the butter 20 grams.",
+              operations: [
+                {
+                  type: "update_item_quantity",
+                  matchText: "butter",
+                  quantity: 20,
+                  unit: "g",
+                },
+              ],
+            }),
+          },
+        },
+      ],
+      rawResponse: {},
+    });
+    const rejectedRevision = await request("http://localhost/v1/agent/runs", {
+      method: "POST",
+      headers: authHeader,
+      body: JSON.stringify({
+        text: "Make the butter 20 grams.",
+        activeProposalId: proposalId,
+        source: "flutter",
+      }),
+    });
+    expect(rejectedRevision.status).toBe(400);
+  });
+
+  it("includes the active proposal in the model context", async () => {
+    const agentProvider = new CapturingChatAgentProvider({
+      toolCalls: [
+        {
+          id: "call_1",
+          type: "function",
+          function: {
+            name: "revise_meal_proposal",
+            arguments: JSON.stringify({
+              instruction: "Make it 200 grams.",
+              operations: [
+                {
+                  type: "update_item_quantity",
+                  itemIndex: 0,
+                  quantity: 200,
+                  unit: "g",
+                },
+              ],
+            }),
+          },
+        },
+      ],
+      rawResponse: {},
+    });
+    const { request } = buildTestApp({ agentProvider });
+    const { authHeader } = await registerAndAuth(request);
+    const proposal = await request(
+      "http://localhost/v1/actions/create_meal_proposal_from_items/execute",
+      {
+        method: "POST",
+        headers: authHeader,
+        body: JSON.stringify({
+          input: {
+            phrase: "100 grams of bread",
+            items: [testBreadItem],
+          },
+          source: "flutter",
+        }),
+      },
+    ).then(
+      (response) =>
+        response.json() as Promise<{ output: { proposal: { id: string } } }>,
+    );
+
+    await request("http://localhost/v1/agent/runs", {
+      method: "POST",
+      headers: authHeader,
+      body: JSON.stringify({
+        text: "Make it 200 grams.",
+        activeProposalId: proposal.output.proposal.id,
+        source: "flutter",
+      }),
+    });
+
+    expect(agentProvider.messages[0]?.content).toContain(
+      "Active meal proposal",
+    );
+    expect(agentProvider.messages[0]?.content).toContain(testBreadItem.name);
+  });
+
+  it("falls back to a deterministic active proposal quantity revision when the provider is unavailable", async () => {
+    const { request } = buildTestApp({
+      agentProvider: new ThrowingChatAgentProvider(),
+    });
+    const { authHeader } = await registerAndAuth(request);
+    const proposal = await request(
+      "http://localhost/v1/actions/create_meal_proposal_from_items/execute",
+      {
+        method: "POST",
+        headers: authHeader,
+        body: JSON.stringify({
+          input: {
+            phrase: "100 grams of bread",
+            items: [testBreadItem],
+          },
+          source: "flutter",
+        }),
+      },
+    ).then(
+      (response) =>
+        response.json() as Promise<{ output: { proposal: { id: string } } }>,
+    );
+
+    const revised = await request("http://localhost/v1/agent/runs", {
+      method: "POST",
+      headers: authHeader,
+      body: JSON.stringify({
+        text: "No, the bread was 200 grams.",
+        activeProposalId: proposal.output.proposal.id,
+        source: "flutter",
+      }),
+    });
+
+    expect(revised.status).toBe(200);
+    const body = (await revised.json()) as {
+      kind: string;
+      proposal: { id: string; items: { name: string; quantity: number }[] };
+    };
+    expect(body.kind).toBe("proposal");
+    expect(body.proposal.id).toBe(proposal.output.proposal.id);
+    expect(body.proposal.items[0]).toEqual(
+      expect.objectContaining({ name: "Bread", quantity: 200 }),
+    );
   });
 
   it("rejects unknown model-selected actions", async () => {

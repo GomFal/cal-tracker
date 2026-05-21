@@ -243,6 +243,21 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsLanguageSpanish => 'Español';
 
   @override
+  String get settingsDataSourcesTitle => 'Fuentes de datos';
+
+  @override
+  String get settingsDataSourcesSubtitle =>
+      'Las coincidencias de alimentos pueden incluir datos públicos de referencia.';
+
+  @override
+  String get settingsDataSourcesOpenFoodFacts =>
+      'Contiene información de Open Food Facts, disponible bajo ODbL 1.0. © Colaboradores de Open Food Facts.';
+
+  @override
+  String get settingsDataSourcesUsda =>
+      'Los datos de USDA FoodData Central son de dominio público bajo CC0 1.0.';
+
+  @override
   String get settingsMacroRequiresCaloriesTitle =>
       'Configura primero tus calorías';
 

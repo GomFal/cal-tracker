@@ -170,6 +170,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 : l10n.settingsLanguageSubtitleEnglish,
             onTap: () => _showLanguageSheet(context),
           ),
+          const SizedBox(height: FreshSpacing.md),
+          _DataSourcesCard(
+            title: l10n.settingsDataSourcesTitle,
+            subtitle: l10n.settingsDataSourcesSubtitle,
+            openFoodFacts: l10n.settingsDataSourcesOpenFoodFacts,
+            usda: l10n.settingsDataSourcesUsda,
+          ),
           const SizedBox(height: FreshSpacing.xl),
           OutlinedButton.icon(
             onPressed: auth.logout,
@@ -378,6 +385,68 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+class _DataSourcesCard extends StatelessWidget {
+  const _DataSourcesCard({
+    required this.title,
+    required this.subtitle,
+    required this.openFoodFacts,
+    required this.usda,
+  });
+
+  final String title;
+  final String subtitle;
+  final String openFoodFacts;
+  final String usda;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return FreshCard(
+      padding: const EdgeInsets.all(16),
+      shadow: false,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const FreshIconChip(
+            icon: Icons.source_rounded,
+            color: FreshColors.orange,
+          ),
+          const SizedBox(width: FreshSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: textTheme.titleMedium),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: FreshColors.inkMuted,
+                  ),
+                ),
+                const SizedBox(height: FreshSpacing.sm),
+                Text(
+                  openFoodFacts,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: FreshColors.inkMuted,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  usda,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: FreshColors.inkMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

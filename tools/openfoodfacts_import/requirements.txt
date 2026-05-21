@@ -1,0 +1,6 @@
+pandas
+numpy
+pyarrow
+psycopg[binary]
+requests
+tqdm

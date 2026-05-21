@@ -258,6 +258,19 @@ class AppLocalizationsEs extends AppLocalizations {
       'Los datos de USDA FoodData Central son de dominio público bajo CC0 1.0.';
 
   @override
+  String get mobileUpdateTitle => 'Actualiza por favor';
+
+  @override
+  String get mobileUpdateMessage =>
+      'Hay una nueva versión de BetterCalories. Descarga la APK desde el navegador para actualizar.';
+
+  @override
+  String get mobileUpdateNow => 'Actualizar ahora';
+
+  @override
+  String get mobileUpdateLater => 'Ahora no';
+
+  @override
   String get settingsMacroRequiresCaloriesTitle =>
       'Configura primero tus calorías';
 

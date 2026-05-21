@@ -14,8 +14,12 @@ import '../ui/features/settings/views/settings_screen.dart';
 import '../ui/features/voice_log/views/voice_log_screen.dart';
 import 'theme.dart';
 
-GoRouter buildRouter(AuthViewModel authViewModel) {
+GoRouter buildRouter(
+  AuthViewModel authViewModel, {
+  GlobalKey<NavigatorState>? navigatorKey,
+}) {
   return GoRouter(
+    navigatorKey: navigatorKey,
     initialLocation: '/dashboard',
     refreshListenable: authViewModel,
     redirect: (context, state) {

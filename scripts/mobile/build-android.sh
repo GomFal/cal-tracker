@@ -66,6 +66,12 @@ MESSAGE
     exit 1
   fi
 
+  local define_file="$MOBILE_DIR/config/$flavor.json"
+  if [[ ! -f "$define_file" ]]; then
+    echo "Missing Flutter dart-define file: $define_file" >&2
+    exit 1
+  fi
+
   echo "Building Android APK: $flavor ($api_base_url)"
   (
     cd "$MOBILE_DIR"
@@ -73,6 +79,7 @@ MESSAGE
     flutter build apk \
       --release \
       --flavor "$flavor" \
+      --dart-define-from-file="$define_file" \
       --dart-define="API_BASE_URL=$api_base_url"
   )
 

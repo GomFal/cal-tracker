@@ -1,7 +1,7 @@
 name: cal_tracker_mobile
 description: Agent-operable calorie and nutrition tracker MVP.
 publish_to: "none"
-version: 0.1.0+1
+version: 0.1.4+5
 
 environment:
   sdk: ">=3.4.0 <4.0.0"
@@ -18,12 +18,14 @@ dependencies:
   http: ^1.6.0
   http_parser: ^4.0.2
   intl: any
+  package_info_plus: ^9.0.1
   path_provider: ^2.1.5
   permission_handler: ^12.0.1
   provider: ^6.1.5+1
   record: ^6.1.2
   marionette_flutter: ^0.5.0
   shared_preferences: ^2.5.3
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_driver:

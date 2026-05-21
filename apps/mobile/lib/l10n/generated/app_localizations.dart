@@ -560,6 +560,30 @@ abstract class AppLocalizations {
   /// **'USDA FoodData Central data is public domain under CC0 1.0.'**
   String get settingsDataSourcesUsda;
 
+  /// No description provided for @mobileUpdateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Please update'**
+  String get mobileUpdateTitle;
+
+  /// No description provided for @mobileUpdateMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'A new BetterCalories version is available. Download the APK from your browser to update.'**
+  String get mobileUpdateMessage;
+
+  /// No description provided for @mobileUpdateNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Update now'**
+  String get mobileUpdateNow;
+
+  /// No description provided for @mobileUpdateLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Later'**
+  String get mobileUpdateLater;
+
   /// No description provided for @settingsMacroRequiresCaloriesTitle.
   ///
   /// In en, this message translates to:

@@ -9,9 +9,11 @@ import '../data/services/app_preferences_repository.dart';
 import '../data/services/app_preferences_storage.dart';
 import '../data/services/api_config.dart';
 import '../data/services/audio_recorder_service.dart';
+import '../data/services/mobile_update_service.dart';
 import '../data/services/secure_token_storage.dart';
 import '../generated/api/cal_tracker_api.dart';
 import '../l10n/generated/app_localizations.dart';
+import '../ui/core/mobile_update_dialog_host.dart';
 import '../ui/features/auth/view_models/auth_view_model.dart';
 import '../ui/features/dashboard/view_models/dashboard_view_model.dart';
 import '../ui/features/meal_history/view_models/meal_history_view_model.dart';
@@ -19,6 +21,7 @@ import '../ui/features/meal_templates/view_models/meal_templates_view_model.dart
 import '../ui/features/settings/view_models/settings_view_model.dart';
 import '../ui/features/voice_log/view_models/voice_log_view_model.dart';
 import 'locale_view_model.dart';
+import 'mobile_update_view_model.dart';
 import 'router.dart';
 import 'theme.dart';
 import 'theme_mode_view_model.dart';
@@ -31,6 +34,7 @@ class CalTrackerBootstrap extends StatelessWidget {
     this.authRepository,
     this.nutritionRepository,
     this.tokenStorage,
+    this.mobileUpdateService,
   });
 
   final ApiConfig apiConfig;
@@ -38,6 +42,7 @@ class CalTrackerBootstrap extends StatelessWidget {
   final AuthRepository? authRepository;
   final NutritionRepository? nutritionRepository;
   final TokenStorage? tokenStorage;
+  final MobileUpdateService? mobileUpdateService;
 
   @override
   Widget build(BuildContext context) {
@@ -54,6 +59,8 @@ class CalTrackerBootstrap extends StatelessWidget {
         AppPreferencesRepository(
           storage: AppPreferencesStorage(),
         );
+    final mobileUpdateService =
+        this.mobileUpdateService ?? MobileUpdateService(apiConfig: apiConfig);
 
     return MultiProvider(
       providers: [
@@ -61,6 +68,11 @@ class CalTrackerBootstrap extends StatelessWidget {
         Provider<NutritionRepository>.value(value: nutritionRepository),
         Provider<AppPreferencesRepository>.value(
           value: preferencesRepository,
+        ),
+        ChangeNotifierProvider(
+          create: (_) => MobileUpdateViewModel(
+            updateService: mobileUpdateService,
+          )..checkForUpdate(),
         ),
         ChangeNotifierProvider(
           create: (_) => ThemeModeViewModel(
@@ -110,6 +122,7 @@ class _CalTrackerApp extends StatefulWidget {
 class _CalTrackerAppState extends State<_CalTrackerApp> {
   AuthViewModel? _authViewModel;
   GoRouter? _router;
+  final _navigatorKey = GlobalKey<NavigatorState>();
 
   @override
   void didChangeDependencies() {
@@ -118,7 +131,7 @@ class _CalTrackerAppState extends State<_CalTrackerApp> {
     if (_authViewModel == authViewModel) return;
     _router?.dispose();
     _authViewModel = authViewModel;
-    _router = buildRouter(authViewModel);
+    _router = buildRouter(authViewModel, navigatorKey: _navigatorKey);
   }
 
   @override
@@ -146,6 +159,10 @@ class _CalTrackerAppState extends State<_CalTrackerApp> {
       darkTheme: buildDarkTheme(),
       themeMode: themeMode,
       routerConfig: _router!,
+      builder: (context, child) => MobileUpdateDialogHost(
+        navigatorKey: _navigatorKey,
+        child: child ?? const SizedBox.shrink(),
+      ),
     );
   }
 }

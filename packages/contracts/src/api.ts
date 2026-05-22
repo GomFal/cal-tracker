@@ -12,6 +12,7 @@ import {
   mealSchema,
   mealTemplateSchema,
   nutritionSnapshotSchema,
+  quarterLiterSchema,
   uuidSchema
 } from "./common.js";
 
@@ -95,7 +96,7 @@ export const settingsUpdateSchema = z.object({
 export const goalsUpdateSchema = z.object({
   date: z.string().optional(),
   calories: z.number().int().min(800).max(10000).optional(),
-  hydrationGoalGlasses: z.number().int().min(1).max(40).optional(),
+  hydrationGoalLiters: quarterLiterSchema.optional(),
   calorieTargetSource: calorieTargetSourceSchema.optional(),
   macroMode: macroModeSchema.optional(),
   macroSource: macroSourceSchema.optional(),
@@ -120,10 +121,10 @@ export const goalsUpdateSchema = z.object({
     value.fatGrams !== undefined ||
     value.macroCalories !== undefined ||
     value.calorieDeltaKcal !== undefined;
-  if (value.calories === undefined && value.hydrationGoalGlasses === undefined && !hasMacroField) {
+  if (value.calories === undefined && value.hydrationGoalLiters === undefined && !hasMacroField) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: "calories, hydrationGoalGlasses, or macro fields are required"
+      message: "calories, hydrationGoalLiters, or macro fields are required"
     });
   }
   if (!hasMacroField) return;
@@ -162,6 +163,15 @@ export const goalsUpdateSchema = z.object({
       });
     }
   }
+});
+
+export const dailyHydrationUpdateSchema = z.object({
+  date: z.string().optional(),
+  waterConsumedLiters: quarterLiterSchema
+});
+
+export const dailyHydrationResponseSchema = z.object({
+  summary: dailySummarySchema
 });
 
 export const calorieEstimateRequestSchema = z.object({

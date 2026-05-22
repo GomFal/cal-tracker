@@ -121,7 +121,7 @@ void main() {
         () => apiClient.updateDailyGoals(
           date: any(named: 'date'),
           calories: any(named: 'calories'),
-          hydrationGoalGlasses: any(named: 'hydrationGoalGlasses'),
+          hydrationGoalLiters: any(named: 'hydrationGoalLiters'),
           calorieTargetSource: any(named: 'calorieTargetSource'),
           macroFields: any(named: 'macroFields'),
         ),
@@ -137,7 +137,7 @@ void main() {
               'carbsGrams': 175,
               'fatGrams': 67,
             },
-            'hydrationGoalGlasses': 12,
+            'hydrationGoalLiters': 2.5,
             'calorieTargetConfigured': true,
             'calorieTargetSource': 'calculator',
             'macroMode': 'percentage',
@@ -188,11 +188,59 @@ void main() {
         () => apiClient.updateDailyGoals(
           date: any(named: 'date'),
           calories: any(named: 'calories'),
-          hydrationGoalGlasses: any(named: 'hydrationGoalGlasses'),
+          hydrationGoalLiters: any(named: 'hydrationGoalLiters'),
           calorieTargetSource: any(named: 'calorieTargetSource'),
           macroFields: any(named: 'macroFields'),
         ),
       );
+    });
+
+    test('updates daily hydration and parses the returned summary', () async {
+      final apiClient = MockCalTrackerApiClient();
+      final repository = NutritionRepository(apiClient: apiClient);
+      when(
+        () => apiClient.updateDailyHydration(
+          date: '2026-05-18',
+          waterConsumedLiters: 1.25,
+        ),
+      ).thenAnswer(
+        (_) async => {
+          'summary': {
+            'date': '2026-05-18',
+            'consumed': {
+              'calories': 0,
+              'proteinGrams': 0,
+              'carbsGrams': 0,
+              'fatGrams': 0,
+            },
+            'target': {
+              'calories': 2000,
+              'proteinGrams': 0,
+              'carbsGrams': 0,
+              'fatGrams': 0,
+            },
+            'remaining': {
+              'calories': 2000,
+              'proteinGrams': 0,
+              'carbsGrams': 0,
+              'fatGrams': 0,
+            },
+            'hydrationGoalLiters': 2.5,
+            'waterConsumedLiters': 1.25,
+            'calorieTargetConfigured': true,
+            'calorieTargetSource': 'manual',
+            'meals': [],
+          },
+        },
+      );
+
+      final summary = await repository.updateDailyHydration(
+        date: '2026-05-18',
+        waterConsumedLiters: 1.25,
+      );
+
+      expect(summary.hydrationGoalLiters, 2.5);
+      expect(summary.waterConsumedLiters, 1.25);
     });
   });
 }

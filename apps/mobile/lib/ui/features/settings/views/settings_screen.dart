@@ -8,12 +8,14 @@ import '../../../../l10n/app_localizations_context.dart';
 import '../../../../l10n/generated/app_localizations.dart';
 import '../../../core/content_frame.dart';
 import '../../../core/design_system.dart';
+import '../../hydration/hydration_format.dart';
 import '../../auth/view_models/auth_view_model.dart';
 import '../../dashboard/view_models/dashboard_view_model.dart';
 import '../../dashboard/views/calorie_target_sheet.dart';
 import '../../dashboard/views/macro_distribution_sheet.dart';
 import '../../meal_history/view_models/meal_history_view_model.dart';
 import '../view_models/settings_view_model.dart';
+import 'hydration_goal_sheet.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -116,22 +118,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             color: FreshColors.water,
             title: l10n.settingsHydrationGoal,
             subtitle: l10n.settingsHydrationGoalSubtitle(
-              goals?.hydrationGoalGlasses ?? 12,
+              formatHydrationLiters(goals?.hydrationGoalLiters ?? 0),
             ),
             onTap: settings.isLoading
                 ? null
-                : () => _editGoal(
-                      context,
-                      title: l10n.settingsHydrationGoal,
-                      fieldKey: const ValueKey('hydration_goal_field'),
-                      initialValue: goals?.hydrationGoalGlasses ?? 12,
-                      unit: l10n.settingsGlassesUnit,
-                      minValue: 1,
-                      maxValue: 40,
-                      onSave: (value) => context
-                          .read<SettingsViewModel>()
-                          .updateGoals(hydrationGoalGlasses: value),
-                    ),
+                : () => _showHydrationGoalSheet(context, goals: goals),
           ),
           const SizedBox(height: FreshSpacing.md),
           _SettingsGoalRow(
@@ -188,36 +179,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Future<void> _editGoal(
+  Future<void> _showHydrationGoalSheet(
     BuildContext context, {
-    required String title,
-    required ValueKey<String> fieldKey,
-    required int initialValue,
-    required String unit,
-    required int minValue,
-    required int maxValue,
-    required Future<Object?> Function(int value) onSave,
+    required DailyGoals? goals,
   }) async {
-    final value = await showModalBottomSheet<int>(
+    final value = await showModalBottomSheet<double>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (context) => _GoalEditSheet(
-        title: title,
-        fieldKey: fieldKey,
-        initialValue: initialValue,
-        unit: unit,
-        minValue: minValue,
-        maxValue: maxValue,
+      builder: (context) => HydrationGoalSheet(
+        initialLiters: goals?.hydrationGoalLiters ?? 0,
       ),
     );
     if (!context.mounted || value == null) return;
-    final updated = await onSave(value);
+    final updated = await context
+        .read<SettingsViewModel>()
+        .updateGoals(hydrationGoalLiters: value);
     if (!context.mounted || updated == null) return;
-    await Future.wait([
-      context.read<DashboardViewModel>().load(),
-      context.read<MealHistoryViewModel>().load(),
-    ]);
+    await _refreshGoalConsumers(context, forceDashboardRefresh: true);
   }
 
   Future<void> _showCalorieTargetSheet(
@@ -584,100 +563,5 @@ class _SettingsGoalRow extends StatelessWidget {
         ],
       ),
     );
-  }
-}
-
-class _GoalEditSheet extends StatefulWidget {
-  const _GoalEditSheet({
-    required this.title,
-    required this.fieldKey,
-    required this.initialValue,
-    required this.unit,
-    required this.minValue,
-    required this.maxValue,
-  });
-
-  final String title;
-  final ValueKey<String> fieldKey;
-  final int initialValue;
-  final String unit;
-  final int minValue;
-  final int maxValue;
-
-  @override
-  State<_GoalEditSheet> createState() => _GoalEditSheetState();
-}
-
-class _GoalEditSheetState extends State<_GoalEditSheet> {
-  late final TextEditingController _controller;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(text: widget.initialValue.toString());
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(20, 12, 20, bottomInset + 20),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Center(
-            child: Container(
-              width: 44,
-              height: 4,
-              decoration: BoxDecoration(
-                color: context.freshPalette.rule,
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-          ),
-          const SizedBox(height: FreshSpacing.lg),
-          Text(widget.title, style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: FreshSpacing.md),
-          TextField(
-            key: widget.fieldKey,
-            controller: _controller,
-            autofocus: true,
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(
-              labelText: widget.unit,
-              errorText: _error,
-            ),
-          ),
-          const SizedBox(height: FreshSpacing.lg),
-          FilledButton(
-            key: const ValueKey('save_goal_button'),
-            onPressed: _submit,
-            child: Text(context.l10n.commonSave),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _submit() {
-    final value = int.tryParse(_controller.text.trim());
-    if (value == null || value < widget.minValue || value > widget.maxValue) {
-      setState(() {
-        _error = context.l10n.settingsGoalRangeError(
-          widget.minValue,
-          widget.maxValue,
-        );
-      });
-      return;
-    }
-    Navigator.of(context).pop(value);
   }
 }

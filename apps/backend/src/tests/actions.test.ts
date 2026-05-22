@@ -153,7 +153,7 @@ describe("action loop", () => {
       body: JSON.stringify({
         date: yesterday,
         calories: 1800,
-        hydrationGoalGlasses: 10,
+        hydrationGoalLiters: 2.5,
       }),
     });
     expect(initialGoals.status).toBe(200);
@@ -167,13 +167,13 @@ describe("action loop", () => {
           output: {
             summary: {
               target: { calories: number };
-              hydrationGoalGlasses: number;
+              hydrationGoalLiters: number;
             };
           };
         }>,
     );
     expect(yesterdayBefore.output.summary.target.calories).toBe(1800);
-    expect(yesterdayBefore.output.summary.hydrationGoalGlasses).toBe(10);
+    expect(yesterdayBefore.output.summary.hydrationGoalLiters).toBe(2.5);
 
     const todayGoals = await request("http://localhost/v1/goals", {
       method: "PUT",
@@ -181,7 +181,7 @@ describe("action loop", () => {
       body: JSON.stringify({
         date: today,
         calories: 2400,
-        hydrationGoalGlasses: 14,
+        hydrationGoalLiters: 3,
       }),
     });
     expect(todayGoals.status).toBe(200);
@@ -195,7 +195,7 @@ describe("action loop", () => {
           output: {
             summary: {
               target: { calories: number };
-              hydrationGoalGlasses: number;
+              hydrationGoalLiters: number;
             };
           };
         }>,
@@ -209,16 +209,16 @@ describe("action loop", () => {
           output: {
             summary: {
               target: { calories: number };
-              hydrationGoalGlasses: number;
+              hydrationGoalLiters: number;
             };
           };
         }>,
     );
 
     expect(yesterdayAfter.output.summary.target.calories).toBe(1800);
-    expect(yesterdayAfter.output.summary.hydrationGoalGlasses).toBe(10);
+    expect(yesterdayAfter.output.summary.hydrationGoalLiters).toBe(2.5);
     expect(todayAfter.output.summary.target.calories).toBe(2400);
-    expect(todayAfter.output.summary.hydrationGoalGlasses).toBe(14);
+    expect(todayAfter.output.summary.hydrationGoalLiters).toBe(3);
   });
 
   it("starts new users without a configured calorie target and marks calories configured when saved", async () => {
@@ -248,6 +248,8 @@ describe("action loop", () => {
                 fatGrams: number;
               };
               macroMode?: string;
+              hydrationGoalLiters: number;
+              waterConsumedLiters: number;
             };
           };
         }>,
@@ -263,6 +265,8 @@ describe("action loop", () => {
     expect(initialSummary.output.summary.macroMode).toBeUndefined();
     expect(initialSummary.output.summary.calorieTargetConfigured).toBe(false);
     expect(initialSummary.output.summary.calorieTargetSource).toBe("default");
+    expect(initialSummary.output.summary.hydrationGoalLiters).toBe(0);
+    expect(initialSummary.output.summary.waterConsumedLiters).toBe(0);
 
     const update = await request("http://localhost/v1/goals", {
       method: "PUT",
@@ -311,6 +315,87 @@ describe("action loop", () => {
     expect(updatedSummary.output.summary.macroMode).toBeUndefined();
     expect(updatedSummary.output.summary.calorieTargetConfigured).toBe(true);
     expect(updatedSummary.output.summary.calorieTargetSource).toBe("calculator");
+  });
+
+  it("updates daily hydration in quarter-liter steps and clamps to the configured goal", async () => {
+    const { request } = buildTestApp();
+    const auth = await registerAndAuth(request);
+    const today = dateOffset(0);
+
+    const invalidGoal = await request("http://localhost/v1/goals", {
+      method: "PUT",
+      headers: auth.authHeader,
+      body: JSON.stringify({
+        date: today,
+        hydrationGoalLiters: 1.3,
+      }),
+    });
+    expect(invalidGoal.status).toBe(400);
+
+    const goal = await request("http://localhost/v1/goals", {
+      method: "PUT",
+      headers: auth.authHeader,
+      body: JSON.stringify({
+        date: today,
+        hydrationGoalLiters: 2.5,
+      }),
+    });
+    expect(goal.status).toBe(200);
+
+    const water = await request("http://localhost/v1/hydration/daily", {
+      method: "PUT",
+      headers: auth.authHeader,
+      body: JSON.stringify({
+        date: today,
+        waterConsumedLiters: 1.25,
+      }),
+    }).then(
+      (response) =>
+        response.json() as Promise<{
+          summary: { hydrationGoalLiters: number; waterConsumedLiters: number };
+        }>,
+    );
+    expect(water.summary.hydrationGoalLiters).toBe(2.5);
+    expect(water.summary.waterConsumedLiters).toBe(1.25);
+
+    const clamped = await request("http://localhost/v1/hydration/daily", {
+      method: "PUT",
+      headers: auth.authHeader,
+      body: JSON.stringify({
+        date: today,
+        waterConsumedLiters: 9,
+      }),
+    }).then(
+      (response) =>
+        response.json() as Promise<{
+          summary: { hydrationGoalLiters: number; waterConsumedLiters: number };
+        }>,
+    );
+    expect(clamped.summary.waterConsumedLiters).toBe(2.5);
+
+    const loweredGoal = await request("http://localhost/v1/goals", {
+      method: "PUT",
+      headers: auth.authHeader,
+      body: JSON.stringify({
+        date: today,
+        hydrationGoalLiters: 1,
+      }),
+    });
+    expect(loweredGoal.status).toBe(200);
+
+    const lowered = await request(
+      `http://localhost/v1/summary/daily?date=${today}`,
+      { headers: auth.authHeader },
+    ).then(
+      (response) =>
+        response.json() as Promise<{
+          output: {
+            summary: { hydrationGoalLiters: number; waterConsumedLiters: number };
+          };
+        }>,
+    );
+    expect(lowered.output.summary.hydrationGoalLiters).toBe(1);
+    expect(lowered.output.summary.waterConsumedLiters).toBe(1);
   });
 
   it("commits optional meal labels and exposes them in summaries", async () => {

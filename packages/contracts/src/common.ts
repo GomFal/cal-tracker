@@ -26,10 +26,15 @@ export const macroGoalMetadataSchema = z.object({
   calorieDeltaKcal: z.number().int().nullable().optional()
 });
 
+export const quarterLiterSchema = z.number().min(0).max(10).refine(
+  (value) => Math.abs(value * 4 - Math.round(value * 4)) < 1e-9,
+  "must be in 0.25 L increments"
+);
+
 export const dailyGoalsSchema = z.object({
   date: z.string(),
   target: nutritionSnapshotSchema,
-  hydrationGoalGlasses: z.number().int().min(1).max(40),
+  hydrationGoalLiters: quarterLiterSchema,
   calorieTargetConfigured: z.boolean(),
   calorieTargetSource: calorieTargetSourceSchema,
   ...macroGoalMetadataSchema.shape
@@ -166,7 +171,8 @@ export const dailySummarySchema = z.object({
   consumed: nutritionSnapshotSchema,
   target: nutritionSnapshotSchema,
   remaining: nutritionSnapshotSchema,
-  hydrationGoalGlasses: z.number().int().min(1).max(40),
+  hydrationGoalLiters: quarterLiterSchema,
+  waterConsumedLiters: quarterLiterSchema,
   calorieTargetConfigured: z.boolean(),
   calorieTargetSource: calorieTargetSourceSchema,
   ...macroGoalMetadataSchema.shape,

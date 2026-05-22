@@ -11,8 +11,8 @@ class SettingsViewModel extends ChangeNotifier {
   SettingsViewModel({
     required AuthRepository authRepository,
     required NutritionRepository nutritionRepository,
-  }) : _authRepository = authRepository,
-       _nutritionRepository = nutritionRepository;
+  })  : _authRepository = authRepository,
+        _nutritionRepository = nutritionRepository;
 
   final AuthRepository _authRepository;
   final NutritionRepository _nutritionRepository;
@@ -32,7 +32,7 @@ class SettingsViewModel extends ChangeNotifier {
       _goals = DailyGoals(
         date: summary.date,
         target: summary.target,
-        hydrationGoalGlasses: summary.hydrationGoalGlasses,
+        hydrationGoalLiters: summary.hydrationGoalLiters,
         calorieTargetConfigured: summary.calorieTargetConfigured,
         calorieTargetSource: summary.calorieTargetSource,
         macroMode: summary.macroMode,
@@ -58,7 +58,7 @@ class SettingsViewModel extends ChangeNotifier {
 
   Future<DailyGoals?> updateGoals({
     int? calories,
-    int? hydrationGoalGlasses,
+    double? hydrationGoalLiters,
     String? calorieTargetSource,
     MacroDistributionConfig? macroConfig,
     int? macroCalorieTarget,
@@ -68,7 +68,7 @@ class SettingsViewModel extends ChangeNotifier {
     try {
       final goals = await _nutritionRepository.updateDailyGoals(
         calories: calories,
-        hydrationGoalGlasses: hydrationGoalGlasses,
+        hydrationGoalLiters: hydrationGoalLiters,
         calorieTargetSource: calorieTargetSource,
         macroConfig: macroConfig,
         macroCalorieTarget: macroCalorieTarget,

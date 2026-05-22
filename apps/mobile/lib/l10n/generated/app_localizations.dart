@@ -461,8 +461,8 @@ abstract class AppLocalizations {
   /// No description provided for @settingsHydrationGoalSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'{glasses} glasses per day'**
-  String settingsHydrationGoalSubtitle(int glasses);
+  /// **'{liters} L per day'**
+  String settingsHydrationGoalSubtitle(String liters);
 
   /// No description provided for @settingsCalorieTarget.
   ///
@@ -476,11 +476,83 @@ abstract class AppLocalizations {
   /// **'{calories} Kcal daily target'**
   String settingsCalorieTargetSubtitle(int calories);
 
-  /// No description provided for @settingsGlassesUnit.
+  /// No description provided for @settingsLitersUnit.
   ///
   /// In en, this message translates to:
-  /// **'glasses'**
-  String get settingsGlassesUnit;
+  /// **'liters'**
+  String get settingsLitersUnit;
+
+  /// No description provided for @settingsOuncesUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'ounces'**
+  String get settingsOuncesUnit;
+
+  /// No description provided for @hydrationSheetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Set your daily water goal'**
+  String get hydrationSheetTitle;
+
+  /// No description provided for @hydrationSheetSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose how much water you want to drink each day.'**
+  String get hydrationSheetSubtitle;
+
+  /// No description provided for @hydrationUnitTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Unit'**
+  String get hydrationUnitTitle;
+
+  /// No description provided for @hydrationUnitLiters.
+  ///
+  /// In en, this message translates to:
+  /// **'Liters (L)'**
+  String get hydrationUnitLiters;
+
+  /// No description provided for @hydrationUnitOunces.
+  ///
+  /// In en, this message translates to:
+  /// **'Ounces (fl oz)'**
+  String get hydrationUnitOunces;
+
+  /// No description provided for @hydrationDailyGoal.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily goal'**
+  String get hydrationDailyGoal;
+
+  /// No description provided for @hydrationRecommendedRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Recommended: 2.0 - 3.0 L'**
+  String get hydrationRecommendedRange;
+
+  /// No description provided for @hydrationInfoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Stay hydrated'**
+  String get hydrationInfoTitle;
+
+  /// No description provided for @hydrationInfoMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Drinking enough water helps your body function better and supports your goals.'**
+  String get hydrationInfoMessage;
+
+  /// No description provided for @hydrationDecreaseGoalTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Decrease water goal'**
+  String get hydrationDecreaseGoalTooltip;
+
+  /// No description provided for @hydrationIncreaseGoalTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Increase water goal'**
+  String get hydrationIncreaseGoalTooltip;
 
   /// No description provided for @settingsLogOut.
   ///
@@ -1379,8 +1451,32 @@ abstract class AppLocalizations {
   /// No description provided for @dashboardGoalLine.
   ///
   /// In en, this message translates to:
-  /// **'Target {calories} Kcal, {glasses} glasses'**
-  String dashboardGoalLine(int calories, int glasses);
+  /// **'Target {calories} Kcal, {liters} L'**
+  String dashboardGoalLine(int calories, String liters);
+
+  /// No description provided for @dashboardWaterIntake.
+  ///
+  /// In en, this message translates to:
+  /// **'Water Intake'**
+  String get dashboardWaterIntake;
+
+  /// No description provided for @dashboardWaterProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'{consumed} / {goal} L'**
+  String dashboardWaterProgress(String consumed, String goal);
+
+  /// No description provided for @dashboardWaterDecreaseTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Decrease water intake'**
+  String get dashboardWaterDecreaseTooltip;
+
+  /// No description provided for @dashboardWaterIncreaseTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Increase water intake'**
+  String get dashboardWaterIncreaseTooltip;
 
   /// No description provided for @dashboardTodayLower.
   ///

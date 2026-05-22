@@ -77,10 +77,10 @@ export class PostgresRepository implements AppRepository {
       }
       await executeRows(tx, dbSql`
         INSERT INTO nutrition_targets (
-          user_id, calories, protein_grams, carbs_grams, fat_grams, hydration_goal_glasses,
+          user_id, calories, protein_grams, carbs_grams, fat_grams, hydration_goal_glasses, hydration_goal_liters,
           calorie_target_configured, calorie_target_source
         )
-        VALUES (${row.id}, 2200, 0, 0, 0, 12, false, 'default')
+        VALUES (${row.id}, 2200, 0, 0, 0, 0, 0, false, 'default')
       `);
       return this.mapUser(row, input.passwordHash, input.scopes);
     });
@@ -690,12 +690,12 @@ export class PostgresRepository implements AppRepository {
     const current = await this.getCurrentGoals(userId);
     const [inserted] = await this.execute(dbSql`
       INSERT INTO daily_goal_snapshots (
-        user_id, target_date, calories, protein_grams, carbs_grams, fat_grams, hydration_goal_glasses,
+        user_id, target_date, calories, protein_grams, carbs_grams, fat_grams, hydration_goal_glasses, hydration_goal_liters, water_consumed_liters,
         calorie_target_configured, calorie_target_source, calorie_target_configured_at,
         macro_mode, macro_source, macro_preset, protein_pct, carbs_pct, fat_pct, macro_calories, calorie_delta_kcal
       )
       VALUES (
-        ${userId}, ${date}, ${current.target.calories}, ${current.target.proteinGrams}, ${current.target.carbsGrams}, ${current.target.fatGrams}, ${current.hydrationGoalGlasses},
+        ${userId}, ${date}, ${current.target.calories}, ${current.target.proteinGrams}, ${current.target.carbsGrams}, ${current.target.fatGrams}, 0, ${current.hydrationGoalLiters}, 0,
         ${current.calorieTargetConfigured}, ${current.calorieTargetSource}, ${current.calorieTargetConfiguredAt ?? null},
         ${current.macroMode ?? null}, ${current.macroSource ?? null}, ${current.macroPreset ?? null},
         ${current.proteinPct ?? null}, ${current.carbsPct ?? null}, ${current.fatPct ?? null},
@@ -719,12 +719,12 @@ export class PostgresRepository implements AppRepository {
       for (const snapshotDate of previousDatesInWeek(input.date)) {
         await executeRows(tx, dbSql`
           INSERT INTO daily_goal_snapshots (
-            user_id, target_date, calories, protein_grams, carbs_grams, fat_grams, hydration_goal_glasses,
+            user_id, target_date, calories, protein_grams, carbs_grams, fat_grams, hydration_goal_glasses, hydration_goal_liters, water_consumed_liters,
             calorie_target_configured, calorie_target_source, calorie_target_configured_at,
             macro_mode, macro_source, macro_preset, protein_pct, carbs_pct, fat_pct, macro_calories, calorie_delta_kcal
           )
           VALUES (
-            ${userId}, ${snapshotDate}, ${current.target.calories}, ${current.target.proteinGrams}, ${current.target.carbsGrams}, ${current.target.fatGrams}, ${current.hydrationGoalGlasses},
+            ${userId}, ${snapshotDate}, ${current.target.calories}, ${current.target.proteinGrams}, ${current.target.carbsGrams}, ${current.target.fatGrams}, 0, ${current.hydrationGoalLiters}, 0,
             ${current.calorieTargetConfigured}, ${current.calorieTargetSource}, ${current.calorieTargetConfiguredAt ?? null},
             ${current.macroMode ?? null}, ${current.macroSource ?? null}, ${current.macroPreset ?? null},
             ${current.proteinPct ?? null}, ${current.carbsPct ?? null}, ${current.fatPct ?? null},
@@ -740,20 +740,20 @@ export class PostgresRepository implements AppRepository {
         input,
         input.calories ?? current.target.calories
       );
-      const nextHydration = input.hydrationGoalGlasses ?? current.hydrationGoalGlasses;
+      const nextHydrationLiters = input.hydrationGoalLiters ?? current.hydrationGoalLiters;
       const calorieTargetWasUpdated = input.calories !== undefined;
       const nextConfigured = calorieTargetWasUpdated ? true : current.calorieTargetConfigured;
       const nextSource = calorieTargetWasUpdated ? input.calorieTargetSource ?? "manual" : current.calorieTargetSource;
       const nextConfiguredAt = calorieTargetWasUpdated ? new Date().toISOString() : current.calorieTargetConfiguredAt;
       await executeRows(tx, dbSql`
         INSERT INTO nutrition_targets (
-          user_id, calories, protein_grams, carbs_grams, fat_grams, hydration_goal_glasses,
+          user_id, calories, protein_grams, carbs_grams, fat_grams, hydration_goal_glasses, hydration_goal_liters,
           calorie_target_configured, calorie_target_source, calorie_target_configured_at,
           macro_mode, macro_source, macro_preset, protein_pct, carbs_pct, fat_pct, macro_calories, calorie_delta_kcal,
           updated_at
         )
         VALUES (
-          ${userId}, ${nextTarget.calories}, ${nextTarget.proteinGrams}, ${nextTarget.carbsGrams}, ${nextTarget.fatGrams}, ${nextHydration},
+          ${userId}, ${nextTarget.calories}, ${nextTarget.proteinGrams}, ${nextTarget.carbsGrams}, ${nextTarget.fatGrams}, 0, ${nextHydrationLiters},
           ${nextConfigured}, ${nextSource}, ${nextConfiguredAt ?? null},
           ${nextMacroMetadata.macroMode ?? null}, ${nextMacroMetadata.macroSource ?? null}, ${nextMacroMetadata.macroPreset ?? null},
           ${nextMacroMetadata.proteinPct ?? null}, ${nextMacroMetadata.carbsPct ?? null}, ${nextMacroMetadata.fatPct ?? null},
@@ -766,6 +766,7 @@ export class PostgresRepository implements AppRepository {
             carbs_grams = EXCLUDED.carbs_grams,
             fat_grams = EXCLUDED.fat_grams,
             hydration_goal_glasses = EXCLUDED.hydration_goal_glasses,
+            hydration_goal_liters = EXCLUDED.hydration_goal_liters,
             calorie_target_configured = EXCLUDED.calorie_target_configured,
             calorie_target_source = EXCLUDED.calorie_target_source,
             calorie_target_configured_at = EXCLUDED.calorie_target_configured_at,
@@ -781,13 +782,13 @@ export class PostgresRepository implements AppRepository {
       `);
       const [row] = await executeRows(tx, dbSql`
         INSERT INTO daily_goal_snapshots (
-          user_id, target_date, calories, protein_grams, carbs_grams, fat_grams, hydration_goal_glasses,
+          user_id, target_date, calories, protein_grams, carbs_grams, fat_grams, hydration_goal_glasses, hydration_goal_liters, water_consumed_liters,
           calorie_target_configured, calorie_target_source, calorie_target_configured_at,
           macro_mode, macro_source, macro_preset, protein_pct, carbs_pct, fat_pct, macro_calories, calorie_delta_kcal,
           updated_at
         )
         VALUES (
-          ${userId}, ${input.date}, ${nextTarget.calories}, ${nextTarget.proteinGrams}, ${nextTarget.carbsGrams}, ${nextTarget.fatGrams}, ${nextHydration},
+          ${userId}, ${input.date}, ${nextTarget.calories}, ${nextTarget.proteinGrams}, ${nextTarget.carbsGrams}, ${nextTarget.fatGrams}, 0, ${nextHydrationLiters}, 0,
           ${nextConfigured}, ${nextSource}, ${nextConfiguredAt ?? null},
           ${nextMacroMetadata.macroMode ?? null}, ${nextMacroMetadata.macroSource ?? null}, ${nextMacroMetadata.macroPreset ?? null},
           ${nextMacroMetadata.proteinPct ?? null}, ${nextMacroMetadata.carbsPct ?? null}, ${nextMacroMetadata.fatPct ?? null},
@@ -800,6 +801,8 @@ export class PostgresRepository implements AppRepository {
             carbs_grams = EXCLUDED.carbs_grams,
             fat_grams = EXCLUDED.fat_grams,
             hydration_goal_glasses = EXCLUDED.hydration_goal_glasses,
+            hydration_goal_liters = EXCLUDED.hydration_goal_liters,
+            water_consumed_liters = LEAST(daily_goal_snapshots.water_consumed_liters, EXCLUDED.hydration_goal_liters),
             calorie_target_configured = EXCLUDED.calorie_target_configured,
             calorie_target_source = EXCLUDED.calorie_target_source,
             calorie_target_configured_at = EXCLUDED.calorie_target_configured_at,
@@ -816,6 +819,17 @@ export class PostgresRepository implements AppRepository {
       `);
       return mapDailyGoals(row);
     });
+  }
+
+  async updateDailyHydration(userId: string, date: string, waterConsumedLiters: number) {
+    const goals = await this.getDailyGoals(userId, date);
+    const clampedWater = Math.min(Math.max(waterConsumedLiters, 0), goals.hydrationGoalLiters);
+    await this.execute(dbSql`
+      UPDATE daily_goal_snapshots
+      SET water_consumed_liters = ${clampedWater}, updated_at = now()
+      WHERE user_id = ${userId} AND target_date = ${date}
+    `);
+    return this.getDailySummary(userId, date);
   }
 
   async listMeals(userId: string, limit = 25): Promise<Meal[]> {
@@ -929,12 +943,18 @@ export class PostgresRepository implements AppRepository {
       fatGrams: total.fatGrams + meal.nutrition.fatGrams
     }), { calories: 0, proteinGrams: 0, carbsGrams: 0, fatGrams: 0 });
     const goals = await this.getDailyGoals(userId, date);
+    const [hydrationRow] = await this.execute(dbSql`
+      SELECT water_consumed_liters
+      FROM daily_goal_snapshots
+      WHERE user_id = ${userId} AND target_date = ${date}
+    `);
     return {
       date,
       consumed,
       target: goals.target,
       remaining: subtractNutrition(goals.target, consumed),
-      hydrationGoalGlasses: goals.hydrationGoalGlasses,
+      hydrationGoalLiters: goals.hydrationGoalLiters,
+      waterConsumedLiters: Number(hydrationRow?.water_consumed_liters ?? 0),
       calorieTargetConfigured: goals.calorieTargetConfigured,
       calorieTargetSource: goals.calorieTargetSource,
       macroMode: goals.macroMode,
@@ -1151,7 +1171,7 @@ export class PostgresRepository implements AppRepository {
     if (!row) {
       return {
         target: { calories: 2200, proteinGrams: 0, carbsGrams: 0, fatGrams: 0 },
-        hydrationGoalGlasses: 12,
+        hydrationGoalLiters: 0,
         calorieTargetConfigured: false,
         calorieTargetSource: "default",
         calorieTargetConfiguredAt: undefined
@@ -1159,7 +1179,7 @@ export class PostgresRepository implements AppRepository {
     }
     return {
       target: mapNutrition(row),
-      hydrationGoalGlasses: Number(row.hydration_goal_glasses ?? 12),
+      hydrationGoalLiters: Number(row.hydration_goal_liters ?? 0),
       calorieTargetConfigured: Boolean(row.calorie_target_configured),
       calorieTargetSource: parseCalorieTargetSource(row.calorie_target_source),
       calorieTargetConfiguredAt: row.calorie_target_configured_at ? toIso(row.calorie_target_configured_at) : undefined,
@@ -1359,7 +1379,7 @@ function mapDailyGoals(row: Record<string, unknown>): DailyGoals {
   return {
     date: toDateOnly(row.target_date),
     target: mapNutrition(row),
-    hydrationGoalGlasses: Number(row.hydration_goal_glasses ?? 12),
+    hydrationGoalLiters: Number(row.hydration_goal_liters ?? 0),
     calorieTargetConfigured: Boolean(row.calorie_target_configured),
     calorieTargetSource: parseCalorieTargetSource(row.calorie_target_source),
     ...mapMacroMetadata(row)

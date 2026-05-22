@@ -27,7 +27,7 @@ class DailyGoals {
   const DailyGoals({
     required this.date,
     required this.target,
-    required this.hydrationGoalGlasses,
+    required this.hydrationGoalLiters,
     required this.calorieTargetConfigured,
     required this.calorieTargetSource,
     this.macroMode,
@@ -42,7 +42,7 @@ class DailyGoals {
 
   final String date;
   final NutritionSnapshot target;
-  final int hydrationGoalGlasses;
+  final double hydrationGoalLiters;
   final bool calorieTargetConfigured;
   final String calorieTargetSource;
   final MacroMode? macroMode;
@@ -59,8 +59,8 @@ class DailyGoals {
       date: json['date'] as String,
       target:
           NutritionSnapshot.fromJson(json['target'] as Map<String, Object?>),
-      hydrationGoalGlasses:
-          (json['hydrationGoalGlasses'] as num? ?? 12).toInt(),
+      hydrationGoalLiters:
+          (json['hydrationGoalLiters'] as num? ?? 0).toDouble(),
       calorieTargetConfigured: json['calorieTargetConfigured'] as bool? ?? true,
       calorieTargetSource: json['calorieTargetSource'] as String? ?? 'manual',
       macroMode: MacroMode.fromApi(json['macroMode'] as String?),
@@ -499,7 +499,8 @@ class DailySummary {
     required this.consumed,
     required this.target,
     required this.remaining,
-    required this.hydrationGoalGlasses,
+    required this.hydrationGoalLiters,
+    required this.waterConsumedLiters,
     required this.calorieTargetConfigured,
     required this.calorieTargetSource,
     this.macroMode,
@@ -517,7 +518,8 @@ class DailySummary {
   final NutritionSnapshot consumed;
   final NutritionSnapshot target;
   final NutritionSnapshot remaining;
-  final int hydrationGoalGlasses;
+  final double hydrationGoalLiters;
+  final double waterConsumedLiters;
   final bool calorieTargetConfigured;
   final String calorieTargetSource;
   final MacroMode? macroMode;
@@ -539,8 +541,10 @@ class DailySummary {
           NutritionSnapshot.fromJson(json['target'] as Map<String, Object?>),
       remaining:
           NutritionSnapshot.fromJson(json['remaining'] as Map<String, Object?>),
-      hydrationGoalGlasses:
-          (json['hydrationGoalGlasses'] as num? ?? 12).toInt(),
+      hydrationGoalLiters:
+          (json['hydrationGoalLiters'] as num? ?? 0).toDouble(),
+      waterConsumedLiters:
+          (json['waterConsumedLiters'] as num? ?? 0).toDouble(),
       calorieTargetConfigured: json['calorieTargetConfigured'] as bool? ?? true,
       calorieTargetSource: json['calorieTargetSource'] as String? ?? 'manual',
       macroMode: MacroMode.fromApi(json['macroMode'] as String?),

@@ -10,6 +10,7 @@ import '../../../core/content_frame.dart';
 import '../../../core/design_system.dart';
 import '../../../shared/meal_item_editor_sheet.dart';
 import '../../auth/view_models/auth_view_model.dart';
+import '../../hydration/hydration_format.dart';
 import '../../meal_history/view_models/meal_history_view_model.dart';
 import '../../settings/view_models/settings_view_model.dart';
 import '../dashboard_time_labels.dart';
@@ -74,6 +75,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           const SizedBox(height: FreshSpacing.md),
           _MacroSummaryRow(summary: summary),
+          const SizedBox(height: FreshSpacing.md),
+          _WaterIntakeCard(
+            summary: summary,
+            enabled: !viewModel.isLoading,
+            onUpdate: viewModel.updateDailyWater,
+          ),
           const SizedBox(height: FreshSpacing.lg),
           _MealSection(
             summary: summary,
@@ -649,6 +656,153 @@ class _MacroSummaryPill extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WaterIntakeCard extends StatelessWidget {
+  const _WaterIntakeCard({
+    required this.summary,
+    required this.enabled,
+    required this.onUpdate,
+  });
+
+  final DailySummary? summary;
+  final bool enabled;
+  final Future<bool> Function(double waterConsumedLiters) onUpdate;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.freshPalette;
+    final textTheme = Theme.of(context).textTheme;
+    final l10n = context.l10n;
+    final consumed = roundHydrationLiters(summary?.waterConsumedLiters ?? 0);
+    final goal = roundHydrationLiters(summary?.hydrationGoalLiters ?? 0);
+    final canDecrease = enabled && consumed > 0;
+    final canIncrease = enabled && goal > 0 && consumed < goal;
+    return Container(
+      key: const ValueKey('dashboard_water_intake_card'),
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      decoration: BoxDecoration(
+        color: palette.water.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(26),
+        boxShadow: [
+          BoxShadow(
+            color: palette.water.withValues(alpha: 0.16),
+            blurRadius: 18,
+            spreadRadius: 1,
+            offset: const Offset(0, 8),
+          ),
+          BoxShadow(
+            color: palette.ink.withValues(alpha: 0.08),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          FreshIconChip(
+            icon: Icons.water_drop_rounded,
+            color: palette.water,
+            backgroundColor: palette.water.withValues(alpha: 0.14),
+            size: 48,
+          ),
+          const SizedBox(width: FreshSpacing.md),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.dashboardWaterIntake,
+                  style: textTheme.titleMedium?.copyWith(
+                    color: palette.ink,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  l10n.dashboardWaterProgress(
+                    formatHydrationLiters(consumed),
+                    formatHydrationLiters(goal),
+                  ),
+                  key: const ValueKey('dashboard_water_progress'),
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: palette.inkSoft,
+                    fontWeight: FontWeight.w700,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: FreshSpacing.sm),
+          _WaterStepButton(
+            key: const ValueKey('dashboard_water_decrease_button'),
+            icon: Icons.remove_rounded,
+            tooltip: l10n.dashboardWaterDecreaseTooltip,
+            enabled: canDecrease,
+            onPressed: () {
+              _setWater(consumed - 0.25, goal);
+            },
+          ),
+          const SizedBox(width: FreshSpacing.sm),
+          _WaterStepButton(
+            key: const ValueKey('dashboard_water_increase_button'),
+            icon: Icons.add_rounded,
+            tooltip: l10n.dashboardWaterIncreaseTooltip,
+            enabled: canIncrease,
+            onPressed: () {
+              _setWater(consumed + 0.25, goal);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _setWater(double next, double goal) async {
+    final clamped = next.clamp(0, goal).toDouble();
+    await onUpdate(roundHydrationLiters(clamped));
+  }
+}
+
+class _WaterStepButton extends StatelessWidget {
+  const _WaterStepButton({
+    super.key,
+    required this.icon,
+    required this.tooltip,
+    required this.enabled,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final bool enabled;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.freshPalette;
+    final actionBlue = Theme.of(context).brightness == Brightness.dark
+        ? palette.water
+        : const Color(0xff0078c8);
+    return SizedBox.square(
+      dimension: 42,
+      child: IconButton(
+        tooltip: tooltip,
+        onPressed: enabled ? onPressed : null,
+        icon: Icon(icon, size: 26),
+        style: IconButton.styleFrom(
+          backgroundColor: palette.water.withValues(alpha: 0.18),
+          foregroundColor: actionBlue,
+          disabledBackgroundColor: palette.water.withValues(alpha: 0.14),
+          disabledForegroundColor: actionBlue.withValues(alpha: 0.62),
+          shape: const CircleBorder(),
         ),
       ),
     );

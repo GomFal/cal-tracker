@@ -191,7 +191,7 @@ class NutritionRepository {
   Future<DailyGoals> updateDailyGoals({
     String? date,
     int? calories,
-    int? hydrationGoalGlasses,
+    double? hydrationGoalLiters,
     String? calorieTargetSource,
     MacroDistributionConfig? macroConfig,
     int? macroCalorieTarget,
@@ -205,13 +205,24 @@ class NutritionRepository {
     final json = await _apiClient.updateDailyGoals(
       date: date ?? DateTime.now().toIso8601String().substring(0, 10),
       calories: calories,
-      hydrationGoalGlasses: hydrationGoalGlasses,
+      hydrationGoalLiters: hydrationGoalLiters,
       calorieTargetSource: calorieTargetSource,
       macroFields: macroConfig?.toApiJson(
         calories: macroTargetCalories,
       ),
     );
     return DailyGoals.fromJson(json['goals'] as Map<String, Object?>);
+  }
+
+  Future<DailySummary> updateDailyHydration({
+    String? date,
+    required double waterConsumedLiters,
+  }) async {
+    final json = await _apiClient.updateDailyHydration(
+      date: date ?? DateTime.now().toIso8601String().substring(0, 10),
+      waterConsumedLiters: waterConsumedLiters,
+    );
+    return DailySummary.fromJson(json['summary'] as Map<String, Object?>);
   }
 
   Future<CalorieEstimate> estimateCalories({

@@ -71,7 +71,10 @@ export const agentRunResponseSchema = z.object({
   deleted: z.boolean().optional(),
   actionId: z.string().optional(),
   input: z.unknown().optional(),
-  options: z.array(z.union([foodCandidateSchema, z.unknown()])).optional()
+  options: z.array(z.union([foodCandidateSchema, z.unknown()])).optional(),
+  candidateGroups: z
+    .array(z.union([foodCandidateSchema, z.unknown()]))
+    .optional()
 });
 
 export const transcriptionResponseSchema = z.object({

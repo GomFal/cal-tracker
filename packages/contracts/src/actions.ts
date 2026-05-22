@@ -76,6 +76,7 @@ export const proposeMealLogOutputSchema = z.object({
   resolvedItems: z.array(mealItemSchema).optional(),
   unresolvedMentions: z.array(foodMentionSchema).optional(),
   options: z.array(foodCandidateSchema).optional(),
+  candidateGroups: z.array(foodCandidateSchema).optional(),
   message: z.string().optional(),
 });
 
@@ -153,6 +154,7 @@ export const reviseMealProposalOutputSchema = z.object({
   resolvedItems: z.array(mealItemSchema).optional(),
   unresolvedMentions: z.array(foodMentionSchema).optional(),
   options: z.array(foodCandidateSchema).optional(),
+  candidateGroups: z.array(foodCandidateSchema).optional(),
   message: z.string().optional(),
 });
 

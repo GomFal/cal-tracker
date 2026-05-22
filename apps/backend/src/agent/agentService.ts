@@ -3,6 +3,7 @@ import {
   type DailySummary,
   type Meal,
   type MealItem,
+  type FoodMention,
   type NutritionSnapshot,
   type MealProposal,
   type MealTemplate,
@@ -36,8 +37,15 @@ export type AgentRunResult =
       proposal: MealProposal;
       message: string;
       options?: unknown[];
+      candidateGroups?: unknown[];
     }
-  | { kind: "meal_committed"; meal: Meal; message: string; options?: unknown[] }
+  | {
+      kind: "meal_committed";
+      meal: Meal;
+      message: string;
+      options?: unknown[];
+      candidateGroups?: unknown[];
+    }
   | {
       kind: "meal_corrected";
       meal?: Meal;
@@ -72,7 +80,9 @@ export type AgentRunResult =
   | {
       kind: "clarification_required";
       message: string;
+      proposal?: MealProposal;
       options?: unknown[];
+      candidateGroups?: unknown[];
       resolvedItems?: MealItem[];
     };
 
@@ -88,14 +98,20 @@ export class AgentService {
     text: string,
     context: ActionContext,
     activeProposalId?: string,
+    options: {
+      activeProposal?: MealProposal | null;
+      inputMode?: "text" | "voice";
+    } = {},
   ): Promise<AgentRunResult> {
     const runStarted = Date.now();
-    const activeProposal = activeProposalId
-      ? await this.actionExecutor.getProposalForAgentContext(
-          context.actorUserId,
-          activeProposalId,
-        )
-      : undefined;
+    const activeProposal = options.activeProposal !== undefined
+      ? options.activeProposal ?? undefined
+      : activeProposalId
+        ? await this.actionExecutor.getProposalForAgentContext(
+            context.actorUserId,
+            activeProposalId,
+          )
+        : undefined;
     const messages: AgentMessage[] = [
       buildSystemMessage(context, activeProposal),
       { role: "user", content: text },
@@ -138,6 +154,7 @@ export class AgentService {
       timezone: context.timezone,
       model: this.model,
       inputText: text,
+      inputMode: options.inputMode ?? "text",
       activeProposalId,
       activeProposal,
       systemPrompt: messages[0]!.content,
@@ -178,8 +195,8 @@ export class AgentService {
       }
       const mapped = {
         kind: "clarification_required",
-        message:
-          "The agent provider is unavailable. Please rephrase or try again.",
+        proposal: activeProposal,
+        message: providerFallbackFailureMessage(activeProposal),
       } satisfies AgentRunResult;
       await this.logRun({
         ...baseLog,
@@ -209,7 +226,10 @@ export class AgentService {
       }
       const mapped = {
         kind: "clarification_required",
-        message: "I'm not sure what you'd like to do. Could you rephrase?",
+        proposal: activeProposal,
+        message: activeProposal
+          ? "I could not safely apply that correction. The meal was not changed. Please repeat the correction."
+          : "I'm not sure what you'd like to do. Could you rephrase?",
       } satisfies AgentRunResult;
       await this.logRun({
         ...baseLog,
@@ -472,7 +492,9 @@ export class AgentService {
           const resolvedItems = output.resolvedItems as MealItem[] | undefined;
           return {
             kind: "clarification_required",
+            proposal: output.proposal as MealProposal | undefined,
             options,
+            candidateGroups: output.candidateGroups as unknown[] | undefined,
             resolvedItems,
             message:
               typeof output.message === "string"
@@ -482,22 +504,22 @@ export class AgentService {
         }
         const proposal = output.proposal as MealProposal;
         const meal = output.autoCommittedMeal as Meal | undefined;
-        const options =
-          (output.options as unknown[] | undefined) ??
+        const candidateGroups =
           (output.candidateGroups as unknown[] | undefined) ??
+          (output.options as unknown[] | undefined) ??
           [];
         if (meal) {
           return {
             kind: "meal_committed",
             meal,
-            options,
+            candidateGroups,
             message: "Meal logged from trusted template.",
           };
         }
         return {
           kind: "proposal",
           proposal,
-          options,
+          candidateGroups,
           message: "Meal proposal created.",
         };
       }
@@ -511,7 +533,9 @@ export class AgentService {
         if (output.clarificationRequired) {
           return {
             kind: "clarification_required",
+            proposal: output.proposal as MealProposal | undefined,
             options: output.options as unknown[] | undefined,
+            candidateGroups: output.candidateGroups as unknown[] | undefined,
             resolvedItems: output.resolvedItems as MealItem[] | undefined,
             message:
               typeof output.message === "string"
@@ -522,6 +546,7 @@ export class AgentService {
         return {
           kind: "proposal",
           proposal: output.proposal as MealProposal,
+          candidateGroups: output.candidateGroups as unknown[] | undefined,
           message:
             typeof output.message === "string"
               ? output.message
@@ -676,7 +701,123 @@ function hasExplicitFoodQuantity(normalized: string): boolean {
   );
 }
 
+type FallbackParseResult =
+  | { status: "tool"; toolCall: AgentToolCall }
+  | { status: "invalid" }
+  | { status: "none" };
+
+type FallbackAction = "add" | "delete";
+
+type FallbackFoodChunk = {
+  action: FallbackAction;
+  quantity: number;
+  unit: string;
+  rawUnitText: string;
+  food: string;
+  start: number;
+  end: number;
+};
+
 function fallbackRevisionToolCallForText(
+  text: string,
+  activeProposal: MealProposal,
+): AgentToolCall | null {
+  const explicitListFallback = fallbackExplicitListRevisionToolCallForText(
+    text,
+    activeProposal,
+  );
+  if (explicitListFallback.status === "tool") {
+    return explicitListFallback.toolCall;
+  }
+  if (explicitListFallback.status === "invalid") {
+    return null;
+  }
+
+  return fallbackQuantityRevisionToolCallForText(text, activeProposal);
+}
+
+function fallbackExplicitListRevisionToolCallForText(
+  text: string,
+  activeProposal: MealProposal,
+): FallbackParseResult {
+  const normalized = normalizeIntentText(text);
+  const leadingMatch = leadingFallbackActionRegex().exec(normalized);
+  const leadingAction = leadingMatch?.groups?.action
+    ? normalizedFallbackAction(leadingMatch.groups.action)
+    : null;
+  const chunks = parseFallbackFoodChunks(normalized, leadingAction);
+
+  if (!leadingAction && chunks.length === 0) return { status: "none" };
+  if (leadingAction && chunks.length === 0) return { status: "invalid" };
+  if (chunks.length === 0) return { status: "none" };
+
+  const masks = Array.from({ length: normalized.length }, () => false);
+  if (leadingMatch) maskRange(masks, leadingMatch.index, leadingMatch[0].length);
+  for (const chunk of chunks) {
+    maskRange(masks, chunk.start, chunk.end - chunk.start);
+  }
+  if (hasMeaningfulFallbackRemainder(normalized, masks)) {
+    return { status: "invalid" };
+  }
+
+  const operations: Array<Record<string, unknown>> = [];
+  const projectedRemovedIndexes = new Set<number>();
+  for (const chunk of chunks) {
+    if (hasUnsafeFallbackFoodName(chunk.food)) return { status: "invalid" };
+    const itemIndex = activeProposal.items.findIndex((item, index) =>
+      !projectedRemovedIndexes.has(index) &&
+      proposalItemMentioned(chunk.food, item),
+    );
+
+    if (chunk.action === "delete") {
+      if (itemIndex < 0) return { status: "invalid" };
+      projectedRemovedIndexes.add(itemIndex);
+      operations.push({
+        type: "remove_item",
+        itemIndex,
+        matchText: chunk.food,
+      });
+      continue;
+    }
+
+    if (itemIndex >= 0) {
+      const item = activeProposal.items[itemIndex]!;
+      if (sameFallbackQuantity(item, chunk)) continue;
+      operations.push({
+        type: "update_item_quantity",
+        itemIndex,
+        quantity: chunk.quantity,
+        unit: chunk.unit,
+        rawUnitText: chunk.rawUnitText,
+      });
+      continue;
+    }
+
+    operations.push({
+      type: "add_item",
+      mention: foodMentionForFallbackChunk(chunk),
+    });
+  }
+
+  if (operations.length === 0) return { status: "invalid" };
+  if (
+    operations.every((operation) => operation.type === "remove_item") &&
+    projectedRemovedIndexes.size >= activeProposal.items.length
+  ) {
+    return { status: "invalid" };
+  }
+
+  return {
+    status: "tool",
+    toolCall: toolCall("revise_meal_proposal", {
+      proposalId: activeProposal.id,
+      instruction: text,
+      operations,
+    }),
+  };
+}
+
+function fallbackQuantityRevisionToolCallForText(
   text: string,
   activeProposal: MealProposal,
 ): AgentToolCall | null {
@@ -688,6 +829,13 @@ function fallbackRevisionToolCallForText(
     proposalItemMentioned(normalized, item),
   );
   if (itemIndex < 0) return null;
+  const item = activeProposal.items[itemIndex]!;
+  if (
+    item.unit === quantity.unit &&
+    Math.abs(item.quantity - quantity.quantity) < 0.000001
+  ) {
+    return null;
+  }
 
   return toolCall("revise_meal_proposal", {
     proposalId: activeProposal.id,
@@ -702,6 +850,181 @@ function fallbackRevisionToolCallForText(
       },
     ],
   });
+}
+
+function parseFallbackFoodChunks(
+  normalized: string,
+  leadingAction: FallbackAction | null,
+): FallbackFoodChunk[] {
+  const chunks: FallbackFoodChunk[] = [];
+  const regex = fallbackFoodChunkRegex();
+  for (const match of normalized.matchAll(regex)) {
+    const rawAction = match.groups?.itemAction;
+    const action = rawAction
+      ? normalizedFallbackAction(rawAction)
+      : leadingAction;
+    if (!action) continue;
+    const quantity = Number(match.groups!.quantity!.replace(",", "."));
+    if (!Number.isFinite(quantity) || quantity <= 0) continue;
+    const food = normalizeFallbackFoodName(match.groups!.food ?? "");
+    if (!food) continue;
+    const rawUnitText = match.groups!.unit!;
+    chunks.push({
+      action,
+      quantity,
+      unit: normalizedUnit(rawUnitText),
+      rawUnitText,
+      food,
+      start: match.index ?? 0,
+      end: (match.index ?? 0) + match[0].length,
+    });
+  }
+  return chunks;
+}
+
+function leadingFallbackActionRegex(): RegExp {
+  return new RegExp(
+    String.raw`^\s*(?:please\s+|por\s+favor\s+)?(?<action>${fallbackActionWords()})\b(?:\s+(?:to|into|in|a|al|en))?(?:\s+(?:this|the|este|esta|el|la))?(?:\s+(?:meal|food|dish|comida|plato))?`,
+    "iu",
+  );
+}
+
+function fallbackFoodChunkRegex(): RegExp {
+  const actionWords = fallbackActionWords();
+  const unitWords = fallbackUnitWords();
+  return new RegExp(
+    String.raw`(?:(?<itemAction>${actionWords})\s+(?:the|el|la)?\s*)?(?<quantity>\d+(?:[.,]\d+)?)\s*(?<unit>${unitWords})\b\s*(?:of|de)?\s*(?<food>.+?)(?=\s+(?:(?:and|y|e)\s+)?(?:(?:${actionWords})\s+(?:the|el|la)?\s*)?\d+(?:[.,]\d+)?\s*(?:${unitWords})\b|$)`,
+    "giu",
+  );
+}
+
+function fallbackActionWords(): string {
+  return [
+    "add",
+    "anade",
+    "agrega",
+    "incluye",
+    "include",
+    "delete",
+    "remove",
+    "elimina",
+    "quita",
+    "borra",
+  ].join("|");
+}
+
+function fallbackUnitWords(): string {
+  return [
+    "g",
+    "gr",
+    "gram",
+    "grams",
+    "gramo",
+    "gramos",
+    "kg",
+    "kilo",
+    "kilos",
+    "ml",
+    "mililitro",
+    "mililitros",
+    "l",
+    "litro",
+    "litros",
+    "oz",
+    "ounce",
+    "ounces",
+    "cup",
+    "cups",
+    "taza",
+    "tazas",
+  ].join("|");
+}
+
+function normalizedFallbackAction(action: string): FallbackAction {
+  switch (normalizeIntentText(action)) {
+    case "delete":
+    case "remove":
+    case "elimina":
+    case "quita":
+    case "borra":
+      return "delete";
+    default:
+      return "add";
+  }
+}
+
+function normalizeFallbackFoodName(food: string): string {
+  return food
+    .replace(/\b(?:and|y|e)\s*$/iu, "")
+    .replace(/\b(?:too|tambien)\s*$/iu, "")
+    .replace(/^\s*(?:the|el|la)\s+/iu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function hasUnsafeFallbackFoodName(food: string): boolean {
+  return /\b(?:and|y|e|make|better|instead|rather|change|correct|update|actualiza|cambia|corrige)\b/iu.test(
+    food,
+  );
+}
+
+function hasMeaningfulFallbackRemainder(
+  normalized: string,
+  masks: boolean[],
+): boolean {
+  const remainder = normalized
+    .split("")
+    .filter((_, index) => !masks[index])
+    .join("")
+    .replace(
+      /\b(?:and|y|e|also|too|tambien|the|el|la|a|al|to|into|in|en|this|este|esta|food|meal|dish|comida|plato|please|por|favor)\b/giu,
+      " ",
+    )
+    .replace(/\s+/g, "")
+    .trim();
+  return remainder.length > 0;
+}
+
+function maskRange(masks: boolean[], start: number, length: number): void {
+  for (let index = start; index < start + length && index < masks.length; index++) {
+    masks[index] = true;
+  }
+}
+
+function sameFallbackQuantity(
+  item: MealItem,
+  chunk: FallbackFoodChunk,
+): boolean {
+  return (
+    item.unit === chunk.unit &&
+    Math.abs(item.quantity - chunk.quantity) < 0.000001
+  );
+}
+
+function foodMentionForFallbackChunk(chunk: FallbackFoodChunk): FoodMention {
+  return {
+    originalText: `${chunk.quantity} ${chunk.rawUnitText} ${chunk.food}`,
+    canonicalName: chunk.food,
+    canonicalEnglishName: chunk.food,
+    quantity: chunk.quantity,
+    unit: chunk.unit,
+    rawUnitText: chunk.rawUnitText,
+    unitKind: unitKindForFallbackUnit(chunk.unit),
+    confidence: 0.82,
+    marketProduct: false,
+  };
+}
+
+function unitKindForFallbackUnit(
+  unit: string,
+): NonNullable<FoodMention["unitKind"]> {
+  return unit === "cup" ? "household" : "metric";
+}
+
+function providerFallbackFailureMessage(activeProposal?: MealProposal): string {
+  return activeProposal
+    ? "The assistant took too long and I could not safely apply that correction. The meal was not changed. Please repeat the correction."
+    : "The agent provider is unavailable. Please rephrase or try again.";
 }
 
 function extractQuantityAndUnit(

@@ -727,6 +727,12 @@ class AppLocalizationsEs extends AppLocalizations {
   String get dashboardEditIngredientsTooltip => 'Editar ingredientes';
 
   @override
+  String get dashboardDeleteMealTooltip => 'Eliminar comida';
+
+  @override
+  String get dashboardCouldNotDeleteMeal => 'No se pudo eliminar la comida.';
+
+  @override
   String get monthJan => 'ene';
 
   @override
@@ -873,15 +879,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get voiceStartOver => 'Empezar de nuevo';
 
   @override
-  String get voiceMealFieldLabel => 'Comida';
-
-  @override
-  String get voiceMealFieldHint => 'Cuenta qué has comido';
-
-  @override
-  String get voiceSubmitMeal => 'Registrar comida';
-
-  @override
   String get voiceTranscribingTitle => 'Transcribiendo...';
 
   @override
@@ -899,6 +896,10 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get voiceNoConfidentMatchYet => 'Aún no hay una coincidencia clara';
+
+  @override
+  String get voiceNoDatabaseMatch =>
+      'No hay coincidencias en la base de datos para este ingrediente. Repítelo o reformúlalo.';
 
   @override
   String get voiceRecordingTitle => 'Grabando';
@@ -940,6 +941,9 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get voiceMessageMealProposalCreated => 'Propuesta de comida creada.';
+
+  @override
+  String get voiceChangesApplied => 'Cambios aplicados';
 
   @override
   String get voiceTodaySection => 'Hoy';

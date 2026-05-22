@@ -12,14 +12,22 @@ import {
 } from "../nutrition/foodResolver.js";
 import { ResolverNutritionProvider } from "../nutrition/provider.js";
 import { InMemoryRepository } from "../repository/inMemory.js";
-import type { SpeechToTextProvider, TranscriptionResult } from "../stt/speechToTextProvider.js";
+import type {
+  SpeechToTextInput,
+  SpeechToTextProvider,
+  TranscriptionResult,
+} from "../stt/speechToTextProvider.js";
 import type { ChatAgentProvider, AgentToolDecision } from "../agent/chatAgentProvider.js";
 import type { LocalRunLogger } from "../observability/localRunLogger.js";
 import { seedTestFoods } from "./foodFixtures.js";
 
 export class FakeSpeechToTextProvider implements SpeechToTextProvider {
+  readonly inputs: SpeechToTextInput[] = [];
+
   constructor(private readonly transcript = "fake transcript from test") {}
-  async transcribe(): Promise<TranscriptionResult> {
+
+  async transcribe(input: SpeechToTextInput): Promise<TranscriptionResult> {
+    this.inputs.push(input);
     return { text: this.transcript, provider: "test", model: "test-model" };
   }
 }

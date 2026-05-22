@@ -20,6 +20,7 @@ class AgentRunResult {
     this.deleted,
     this.actionId,
     this.input,
+    this.clarificationOptions,
     this.candidateGroups,
   });
 
@@ -37,6 +38,7 @@ class AgentRunResult {
   final bool? deleted;
   final String? actionId;
   final dynamic input;
+  final List<FoodCandidateGroup>? clarificationOptions;
   final List<FoodCandidateGroup>? candidateGroups;
 }
 
@@ -58,7 +60,7 @@ class VoiceMealRunResult {
 
 class NutritionRepository {
   NutritionRepository({required CalTrackerApiClient apiClient})
-    : _apiClient = apiClient;
+      : _apiClient = apiClient;
 
   final CalTrackerApiClient _apiClient;
 
@@ -114,34 +116,36 @@ class NutritionRepository {
       meals: json['meals'] == null
           ? null
           : (json['meals'] as List<Object?>)
-                .cast<Map<String, Object?>>()
-                .map(Meal.fromJson)
-                .toList(),
+              .cast<Map<String, Object?>>()
+              .map(Meal.fromJson)
+              .toList(),
       items: json['items'] == null
           ? null
           : (json['items'] as List<Object?>)
-                .cast<Map<String, Object?>>()
-                .map(MealItem.fromJson)
-                .toList(),
+              .cast<Map<String, Object?>>()
+              .map(MealItem.fromJson)
+              .toList(),
       templates: json['templates'] == null
           ? null
           : (json['templates'] as List<Object?>)
-                .cast<Map<String, Object?>>()
-                .map(MealTemplate.fromJson)
-                .toList(),
+              .cast<Map<String, Object?>>()
+              .map(MealTemplate.fromJson)
+              .toList(),
       template: json['template'] == null
           ? null
           : MealTemplate.fromJson(json['template'] as Map<String, Object?>),
       resolvedItems: json['resolvedItems'] == null
           ? null
           : (json['resolvedItems'] as List<Object?>)
-                .cast<Map<String, Object?>>()
-                .map(MealItem.fromJson)
-                .toList(),
+              .cast<Map<String, Object?>>()
+              .map(MealItem.fromJson)
+              .toList(),
       deleted: json['deleted'] as bool?,
       actionId: json['actionId'] as String?,
       input: json['input'],
-      candidateGroups: _parseCandidateGroups(json['options']),
+      clarificationOptions: _parseCandidateGroups(json['options']),
+      candidateGroups: _parseCandidateGroups(json['candidateGroups']) ??
+          _parseCandidateGroups(json['options']),
     );
   }
 
@@ -180,12 +184,12 @@ class NutritionRepository {
     required List<MealItem> items,
     String? title,
   }) async {
-    final json = await _apiClient
-        .executeAction('create_meal_proposal_from_items', {
-          'phrase': phrase,
-          if (title != null) 'title': title,
-          'items': items.map((item) => item.toJson()).toList(),
-        });
+    final json =
+        await _apiClient.executeAction('create_meal_proposal_from_items', {
+      'phrase': phrase,
+      if (title != null) 'title': title,
+      'items': items.map((item) => item.toJson()).toList(),
+    });
     final output = json['output'] as Map<String, Object?>;
     return MealProposal.fromJson(output['proposal'] as Map<String, Object?>);
   }

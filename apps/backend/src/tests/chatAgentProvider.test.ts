@@ -82,6 +82,7 @@ describe("RemoteChatAgentProvider", () => {
       expect.objectContaining({
         model: "deepseek/deepseek-v4-flash:nitro",
         tool_choice: "auto",
+        max_tokens: 2048,
         stream: true,
         stream_options: { include_usage: true },
         provider: routing,

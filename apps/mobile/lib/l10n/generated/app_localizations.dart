@@ -1358,6 +1358,18 @@ abstract class AppLocalizations {
   /// **'Edit ingredients'**
   String get dashboardEditIngredientsTooltip;
 
+  /// No description provided for @dashboardDeleteMealTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete meal'**
+  String get dashboardDeleteMealTooltip;
+
+  /// No description provided for @dashboardCouldNotDeleteMeal.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not delete meal.'**
+  String get dashboardCouldNotDeleteMeal;
+
   /// No description provided for @monthJan.
   ///
   /// In en, this message translates to:
@@ -1616,24 +1628,6 @@ abstract class AppLocalizations {
   /// **'Start over'**
   String get voiceStartOver;
 
-  /// No description provided for @voiceMealFieldLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Meal'**
-  String get voiceMealFieldLabel;
-
-  /// No description provided for @voiceMealFieldHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Tell me what you ate'**
-  String get voiceMealFieldHint;
-
-  /// No description provided for @voiceSubmitMeal.
-  ///
-  /// In en, this message translates to:
-  /// **'Submit meal'**
-  String get voiceSubmitMeal;
-
   /// No description provided for @voiceTranscribingTitle.
   ///
   /// In en, this message translates to:
@@ -1669,6 +1663,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No confident match yet'**
   String get voiceNoConfidentMatchYet;
+
+  /// No description provided for @voiceNoDatabaseMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'No database match for this ingredient. Please repeat or rephrase it.'**
+  String get voiceNoDatabaseMatch;
 
   /// No description provided for @voiceRecordingTitle.
   ///
@@ -1747,6 +1747,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Meal proposal created.'**
   String get voiceMessageMealProposalCreated;
+
+  /// No description provided for @voiceChangesApplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Changes applied'**
+  String get voiceChangesApplied;
 
   /// No description provided for @voiceTodaySection.
   ///

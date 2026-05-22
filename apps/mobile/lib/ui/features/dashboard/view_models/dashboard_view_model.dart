@@ -85,6 +85,32 @@ class DashboardViewModel extends ChangeNotifier {
     }
   }
 
+  Future<bool> deleteMeal(Meal meal) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      final deleted = await _nutritionRepository.deleteMeal(
+        meal.id,
+        confirmed: true,
+      );
+      if (deleted) {
+        _summary = await _nutritionRepository.getDailySummary();
+        _lastLoadedAt = _now();
+      }
+      _error = null;
+      return deleted;
+    } catch (error) {
+      _error = userVisibleErrorMessage(
+        error,
+        context: UserErrorContext.dashboardSave,
+      );
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<bool> updateCalorieTarget(
     int calories, {
     String source = 'manual',

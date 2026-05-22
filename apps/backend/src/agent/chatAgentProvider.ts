@@ -122,6 +122,7 @@ export class RemoteChatAgentProvider implements ChatAgentProvider {
       messages: input.messages,
       tools: input.tools,
       tool_choice: "auto",
+      max_tokens: 2048,
       stream: true,
       stream_options: { include_usage: true },
       provider: this.providerRouting,

@@ -1,11 +1,55 @@
 import { describe, expect, it, vi } from "vitest";
-import type { FoodMention } from "@cal-tracker/contracts";
+import type { FoodMention, MealItem } from "@cal-tracker/contracts";
 import {
   buildTestApp,
   createTestUsualBreakfastTemplate,
   registerAndAuth,
   testBreadItem,
 } from "./testApp.js";
+
+type TestRequest = (input: string, init?: RequestInit) => Promise<Response>;
+
+async function createChickenBreadRiceButterProposal(
+  request: TestRequest,
+  authHeader: Record<string, string>,
+): Promise<{ id: string; items: MealItem[] }> {
+  const response = await request(
+    "http://localhost/v1/actions/propose_meal_log/execute",
+    {
+      method: "POST",
+      headers: authHeader,
+      body: JSON.stringify({
+        input: {
+          text: "Add 100g of chicken, 100g of bread, 100g of rice and 100g of butter.",
+        },
+        source: "flutter",
+      }),
+    },
+  );
+  expect(response.status).toBe(200);
+  const body = (await response.json()) as {
+    output: { proposal: { id: string; items: MealItem[] } };
+  };
+  expect(body.output.proposal.items.map((item) => item.name)).toEqual(
+    expect.arrayContaining(["Chicken breast", "Bread", "Cooked rice", "Butter"]),
+  );
+  return body.output.proposal;
+}
+
+function redMeatMention(): FoodMention {
+  return {
+    originalText: "10 grams of red meat",
+    canonicalName: "red meat",
+    canonicalEnglishName: "red meat",
+    language: "en",
+    quantity: 10,
+    unit: "g",
+    rawUnitText: "grams",
+    unitKind: "metric",
+    confidence: 0.9,
+    marketProduct: false,
+  };
+}
 
 describe("action loop", () => {
   it("creates a proposal from explicit selected meal items", async () => {
@@ -186,6 +230,155 @@ describe("action loop", () => {
     expect(body.output.options).toBeDefined();
   });
 
+  it("persists valid deletion when a correction also adds an unresolved food", async () => {
+    const { request, repository } = buildTestApp();
+    const recordFoodFeedback = vi.fn(async () => undefined);
+    Object.assign(repository, { recordFoodFeedback });
+    const auth = await registerAndAuth(request);
+    const proposal = await createChickenBreadRiceButterProposal(
+      request,
+      auth.authHeader,
+    );
+
+    const revised = await request(
+      "http://localhost/v1/actions/revise_meal_proposal/execute",
+      {
+        method: "POST",
+        headers: auth.authHeader,
+        body: JSON.stringify({
+          input: {
+            proposalId: proposal.id,
+            instruction:
+              "Add to this food 10 grams of red meat and delete the 100 grams of butter.",
+            operations: [
+              {
+                type: "add_item",
+                mention: redMeatMention(),
+              },
+              {
+                type: "remove_item",
+                matchText: "butter",
+              },
+            ],
+          },
+          source: "flutter",
+        }),
+      },
+    );
+
+    expect(revised.status).toBe(200);
+    const body = (await revised.json()) as {
+      output: {
+        clarificationRequired?: boolean;
+        message?: string;
+        proposal: { id: string; status: string; items: MealItem[] };
+        unresolvedMentions?: FoodMention[];
+        options?: Array<{
+          mention: FoodMention;
+          candidates: MealItem[];
+          reason?: string;
+        }>;
+      };
+    };
+    expect(body.output.clarificationRequired).toBe(true);
+    expect(body.output.proposal.id).toBe(proposal.id);
+    expect(body.output.proposal.status).toBe("corrected");
+    expect(body.output.proposal.items.map((item) => item.name)).toEqual(
+      expect.arrayContaining(["Chicken breast", "Bread", "Cooked rice"]),
+    );
+    expect(
+      body.output.proposal.items.some((item) => item.name === "Butter"),
+    ).toBe(false);
+    expect(
+      body.output.proposal.items.some((item) =>
+        item.name.toLowerCase().includes("red meat"),
+      ),
+    ).toBe(false);
+    expect(body.output.message).toContain("red meat");
+    expect(body.output.unresolvedMentions).toEqual([
+      expect.objectContaining({ canonicalEnglishName: "red meat" }),
+    ]);
+    expect(body.output.options).toEqual([
+      expect.objectContaining({
+        mention: expect.objectContaining({
+          originalText: "10 grams of red meat",
+          canonicalEnglishName: "red meat",
+        }),
+        candidates: [],
+        reason: "no_database_match",
+      }),
+    ]);
+    expect(recordFoodFeedback).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: auth.user.id,
+        action: "corrected",
+        metadata: expect.objectContaining({
+          partial: true,
+          appliedRevisionOperationCount: 1,
+          unresolvedMentionCount: 1,
+        }),
+      }),
+    );
+  });
+
+  it.each([
+    {
+      label: "without exact quantity",
+      instruction: "Delete the butter.",
+      operation: { type: "remove_item", matchText: "butter" },
+    },
+    {
+      label: "with exact quantity by item index",
+      instruction: "Delete the 100 grams of butter.",
+      operation: { type: "remove_item", itemIndex: 3 },
+    },
+    {
+      label: "with compact exact quantity",
+      instruction: "Delete 100g butter.",
+      operation: { type: "remove_item", matchText: "butter" },
+    },
+    {
+      label: "with Spanish phrasing",
+      instruction: "Elimina la mantequilla.",
+      operation: { type: "remove_item", itemIndex: 3 },
+    },
+  ])("removes butter from a proposal $label", async ({ instruction, operation }) => {
+    const { request } = buildTestApp();
+    const auth = await registerAndAuth(request);
+    const proposal = await createChickenBreadRiceButterProposal(
+      request,
+      auth.authHeader,
+    );
+
+    const revised = await request(
+      "http://localhost/v1/actions/revise_meal_proposal/execute",
+      {
+        method: "POST",
+        headers: auth.authHeader,
+        body: JSON.stringify({
+          input: {
+            proposalId: proposal.id,
+            instruction,
+            operations: [operation],
+          },
+          source: "flutter",
+        }),
+      },
+    );
+
+    expect(revised.status).toBe(200);
+    const body = (await revised.json()) as {
+      output: { proposal: { id: string; items: MealItem[] } };
+    };
+    expect(body.output.proposal.id).toBe(proposal.id);
+    expect(body.output.proposal.items.map((item) => item.name)).toEqual(
+      expect.arrayContaining(["Chicken breast", "Bread", "Cooked rice"]),
+    );
+    expect(
+      body.output.proposal.items.some((item) => item.name === "Butter"),
+    ).toBe(false);
+  });
+
   it("creates a chicken and rice proposal, commits it, and includes it in the daily summary", async () => {
     const { request, repository } = buildTestApp();
     const recordFoodFeedback = vi.fn(async () => undefined);
@@ -215,7 +408,8 @@ describe("action loop", () => {
     };
     expect(proposalEnvelope.output.proposal.title).toBe("Chicken and rice");
     expect(proposalEnvelope.output.proposal.items).toHaveLength(2);
-    expect(proposalEnvelope.output.options).toEqual(
+    expect(proposalEnvelope.output.options).toEqual([]);
+    expect(proposalEnvelope.output.candidateGroups).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           mention: expect.objectContaining({
@@ -226,9 +420,6 @@ describe("action loop", () => {
           mention: expect.objectContaining({ canonicalEnglishName: "rice" }),
         }),
       ]),
-    );
-    expect(proposalEnvelope.output.candidateGroups).toEqual(
-      proposalEnvelope.output.options,
     );
 
     const commitResponse = await request(
@@ -649,6 +840,82 @@ describe("action loop", () => {
         expect.objectContaining({ name: "Meat", quantity: 100, unit: "g" }),
       ]),
     );
+  });
+
+  it("limits meal clarification options to the unresolved ingredients only", async () => {
+    const { request } = buildTestApp();
+    const auth = await registerAndAuth(request);
+
+    const proposalResponse = await request(
+      "http://localhost/v1/actions/propose_meal_log/execute",
+      {
+        method: "POST",
+        headers: auth.authHeader,
+        body: JSON.stringify({
+          input: {
+            text: "Add 100 grams of rice, 100 grams of beef, 100 grams of butter and 100 grams of bread.",
+          },
+          source: "flutter",
+        }),
+      },
+    );
+
+    expect(proposalResponse.status).toBe(200);
+    const body = (await proposalResponse.json()) as {
+      output: {
+        clarificationRequired?: boolean;
+        message?: string;
+        proposal?: { items: Array<{ name: string }> };
+        resolvedItems?: Array<{ name: string }>;
+        unresolvedMentions?: FoodMention[];
+        options?: Array<{
+          mention: FoodMention;
+          candidates: MealItem[];
+          reason?: string;
+        }>;
+        candidateGroups?: Array<{
+          mention: FoodMention;
+          candidates: MealItem[];
+          reason?: string;
+        }>;
+      };
+    };
+    expect(body.output.clarificationRequired).toBe(true);
+    expect(body.output.proposal?.items.map((item) => item.name)).toEqual(
+      expect.arrayContaining(["Cooked rice", "Butter", "Bread"]),
+    );
+    expect(body.output.resolvedItems?.map((item) => item.name)).toEqual(
+      expect.arrayContaining(["Cooked rice", "Butter", "Bread"]),
+    );
+    expect(body.output.unresolvedMentions).toEqual([
+      expect.objectContaining({ canonicalEnglishName: "beef" }),
+    ]);
+    expect(body.output.options).toEqual([
+      expect.objectContaining({
+        mention: expect.objectContaining({ canonicalEnglishName: "beef" }),
+        reason: "no_database_match",
+      }),
+    ]);
+    expect(body.output.candidateGroups).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          mention: expect.objectContaining({ canonicalEnglishName: "rice" }),
+        }),
+        expect.objectContaining({
+          mention: expect.objectContaining({ canonicalEnglishName: "beef" }),
+        }),
+        expect.objectContaining({
+          mention: expect.objectContaining({ canonicalEnglishName: "butter" }),
+        }),
+        expect.objectContaining({
+          mention: expect.objectContaining({ canonicalEnglishName: "bread" }),
+        }),
+      ]),
+    );
+    expect(body.output.message).toContain("beef");
+    expect(body.output.message).not.toContain("rice");
+    expect(body.output.message).not.toContain("butter");
+    expect(body.output.message).not.toContain("bread");
   });
 
   it("uses model-provided food mentions without extracting text again", async () => {

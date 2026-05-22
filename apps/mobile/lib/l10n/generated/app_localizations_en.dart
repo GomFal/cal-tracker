@@ -720,6 +720,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dashboardEditIngredientsTooltip => 'Edit ingredients';
 
   @override
+  String get dashboardDeleteMealTooltip => 'Delete meal';
+
+  @override
+  String get dashboardCouldNotDeleteMeal => 'Could not delete meal.';
+
+  @override
   String get monthJan => 'Jan';
 
   @override
@@ -863,15 +869,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get voiceStartOver => 'Start over';
 
   @override
-  String get voiceMealFieldLabel => 'Meal';
-
-  @override
-  String get voiceMealFieldHint => 'Tell me what you ate';
-
-  @override
-  String get voiceSubmitMeal => 'Submit meal';
-
-  @override
   String get voiceTranscribingTitle => 'Transcribing...';
 
   @override
@@ -890,6 +887,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get voiceNoConfidentMatchYet => 'No confident match yet';
+
+  @override
+  String get voiceNoDatabaseMatch =>
+      'No database match for this ingredient. Please repeat or rephrase it.';
 
   @override
   String get voiceRecordingTitle => 'Recording';
@@ -930,6 +931,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get voiceMessageMealProposalCreated => 'Meal proposal created.';
+
+  @override
+  String get voiceChangesApplied => 'Changes applied';
 
   @override
   String get voiceTodaySection => 'Today';

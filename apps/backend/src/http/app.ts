@@ -13,7 +13,8 @@ import {
   settingsUpdateSchema,
   uuidSchema,
   type ActionContext,
-  type ActionSource
+  type ActionSource,
+  type MealProposal,
 } from "@cal-tracker/contracts";
 import { cors } from "hono/cors";
 import { Hono, type Context } from "hono";
@@ -69,6 +70,62 @@ export function createApp(input: {
     },
   );
   const agentService = new AgentService(resolvedAgentProvider, actionExecutor, config.OPENROUTER_MODEL, runLogger);
+
+  async function runMealInput(input: {
+    c: Context;
+    user: StoredUser;
+    text: string;
+    source: ActionSource;
+    inputMode: MealInputMode;
+    activeProposalId?: string;
+    activeProposal?: MealProposal | null;
+  }): Promise<MealInputRunResult> {
+    const text = input.text.trim();
+    if (text.length === 0) {
+      return {
+        text,
+        agentMs: 0,
+        activeProposal: input.activeProposal ?? undefined,
+        result: {
+          kind: "clarification_required" as const,
+          message:
+            input.inputMode === "voice"
+              ? "I could not understand enough audio to create a meal. Please try again or type the meal."
+              : "I could not understand enough input to create a meal. Please try again.",
+          options: [],
+        },
+      };
+    }
+
+    const activeProposal = input.activeProposalId
+      ? input.activeProposal !== undefined
+        ? input.activeProposal ?? undefined
+        : await actionExecutor.getProposalForAgentContext(
+            input.user.id,
+            input.activeProposalId,
+          )
+      : undefined;
+    const context = buildActionContext(input.c, input.user, input.source);
+    const startedAt = Date.now();
+    const result = await agentService.run(
+      text,
+      context,
+      input.activeProposalId,
+      {
+        activeProposal: input.activeProposalId
+          ? activeProposal ?? null
+          : undefined,
+        inputMode: input.inputMode,
+      },
+    );
+
+    return {
+      text,
+      agentMs: Date.now() - startedAt,
+      activeProposal,
+      result,
+    };
+  }
 
   app.use("*", requestIdMiddleware);
   app.use("*", cors({
@@ -180,9 +237,15 @@ export function createApp(input: {
   app.post("/v1/agent/runs", async (c) => {
     const user = c.get("authUser");
     const body = agentRunRequestSchema.parse(await c.req.json());
-    const context = buildActionContext(c, user, body.source);
-    const result = await agentService.run(body.text, context, body.activeProposalId);
-    return c.json(result);
+    const run = await runMealInput({
+      c,
+      user,
+      text: body.text,
+      source: body.source,
+      inputMode: "text",
+      activeProposalId: body.activeProposalId,
+    });
+    return c.json(run.result);
   });
 
   app.post("/v1/stt/transcriptions", async (c) => {
@@ -254,14 +317,25 @@ export function createApp(input: {
 
     let transcription: TranscriptionResult;
     let sttMs = 0;
+    let activeProposal: MealProposal | undefined;
     try {
       const sttStarted = Date.now();
+      activeProposal = upload.activeProposalId
+        ? await actionExecutor.getProposalForAgentContext(
+            user.id,
+            upload.activeProposalId,
+          )
+        : undefined;
+      const speechHint = upload.activeProposalId
+        ? speechHintForProposal(activeProposal)
+        : {};
       transcription = await sttProvider.transcribe({
         audio: upload.buffer,
         filename: upload.filename,
         mimeType: upload.mimeType,
         userId: user.id,
         traceId,
+        ...speechHint,
       });
       sttMs = Date.now() - sttStarted;
     } catch (error) {
@@ -294,26 +368,17 @@ export function createApp(input: {
     }
 
     const transcript = transcription.text;
-    const trimmedTranscript = transcript.trim();
-    let agentMs = 0;
-    let result: AgentRunResult;
+    let mealInput: MealInputRunResult;
     try {
-      if (trimmedTranscript.length === 0) {
-        result = {
-          kind: "clarification_required" as const,
-          message:
-            "I could not understand enough audio to create a meal. Please try again or type the meal.",
-          options: [],
-        };
-      } else {
-        const agentStarted = Date.now();
-        result = await agentService.run(
-          trimmedTranscript,
-          buildActionContext(c, user, upload.source ?? "flutter"),
-          upload.activeProposalId,
-        );
-        agentMs = Date.now() - agentStarted;
-      }
+      mealInput = await runMealInput({
+        c,
+        user,
+        text: transcript,
+        source: upload.source ?? "flutter",
+        inputMode: "voice",
+        activeProposalId: upload.activeProposalId,
+        activeProposal: activeProposal ?? null,
+      });
     } catch (error) {
       await logLocalRun(runLogger, {
         type: "voice.meal_run",
@@ -345,7 +410,7 @@ export function createApp(input: {
       provider: transcription.provider,
       model: transcription.model,
       transcriptLength: transcript.length,
-      resultKind: result.kind,
+      resultKind: mealInput.result.kind,
     });
     await logLocalRun(runLogger, {
       type: "voice.meal_run",
@@ -360,10 +425,10 @@ export function createApp(input: {
       transcript,
       provider: transcription.provider,
       model: transcription.model,
-      resultKind: result.kind,
+      resultKind: mealInput.result.kind,
       timingsMs: {
         stt: sttMs,
-        agent: agentMs,
+        agent: mealInput.agentMs,
         total: Date.now() - routeStarted,
       },
     });
@@ -373,7 +438,7 @@ export function createApp(input: {
       provider: transcription.provider,
       model: transcription.model,
       traceId,
-      result,
+      result: mealInput.result,
     });
   });
 
@@ -436,6 +501,15 @@ type ParsedAudioUpload = {
   mimeType: string;
   source?: ActionSource;
   activeProposalId?: string;
+};
+
+type MealInputMode = "text" | "voice";
+
+type MealInputRunResult = {
+  text: string;
+  agentMs: number;
+  activeProposal?: MealProposal;
+  result: AgentRunResult;
 };
 
 async function parseAudioUpload(
@@ -577,6 +651,110 @@ function buildActionContext(c: Context, user: StoredUser, source: ActionSource):
     trustedModeEnabled: false,
     traceId: getTraceId(c)
   };
+}
+
+function speechHintForProposal(proposal?: MealProposal): {
+  language?: string;
+  prompt?: string;
+} {
+  const language = speechLanguageFromProposal(proposal);
+  return {
+    ...(language ? { language } : {}),
+    ...(language ? { prompt: speechCorrectionPrompt(language) } : {}),
+  };
+}
+
+function speechLanguageFromProposal(
+  proposal?: MealProposal,
+): "es" | "en" | undefined {
+  if (!proposal) return undefined;
+  return inferSpeechLanguage(
+    [
+      proposal.phrase,
+      proposal.title,
+      ...proposal.items.flatMap((item) => [
+        item.originalText,
+        item.canonicalName,
+        item.name,
+      ]),
+    ]
+      .filter((value): value is string => Boolean(value))
+      .join(" "),
+  );
+}
+
+function inferSpeechLanguage(text: string): "es" | "en" | undefined {
+  const normalized = text
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const spanishScore = scoreLanguageTerms(normalized, [
+    "anade",
+    "agrega",
+    "apunta",
+    "registra",
+    "cambia",
+    "corrige",
+    "gramo",
+    "gramos",
+    "kilo",
+    "kilos",
+    "taza",
+    "tazas",
+    "cucharada",
+    "cucharadas",
+    "desayuno",
+    "almuerzo",
+    "comida",
+    "cena",
+    "merienda",
+    "de",
+    "con",
+    "sin",
+  ]);
+  const englishScore = scoreLanguageTerms(normalized, [
+    "add",
+    "log",
+    "record",
+    "change",
+    "correct",
+    "gram",
+    "grams",
+    "kilogram",
+    "kilograms",
+    "cup",
+    "cups",
+    "tablespoon",
+    "tablespoons",
+    "breakfast",
+    "lunch",
+    "dinner",
+    "snack",
+    "of",
+    "with",
+    "without",
+  ]);
+  if (spanishScore > englishScore) return "es";
+  if (englishScore > spanishScore) return "en";
+  return undefined;
+}
+
+function scoreLanguageTerms(text: string, terms: string[]): number {
+  return terms.reduce(
+    (score, term) =>
+      score + (new RegExp(`\\b${term}\\b`, "g").exec(text) ? 1 : 0),
+    0,
+  );
+}
+
+function speechCorrectionPrompt(language: "es" | "en"): string {
+  if (language === "es") {
+    return "Comando de correccion de comida. Transcribe exactamente lo que se dice; no traduzcas. Conserva alimentos, unidades y numeros.";
+  }
+  return "Meal correction command. Transcribe exactly what is spoken; do not translate. Preserve foods, units, and numbers.";
 }
 
 function publicUser(user: StoredUser) {

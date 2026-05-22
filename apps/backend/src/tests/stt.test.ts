@@ -6,6 +6,7 @@ import {
   FakeChatAgentProvider,
   FakeSpeechToTextProvider,
   registerAndAuth,
+  testBreadItem,
 } from "./testApp.js";
 
 describe("STT endpoint", () => {
@@ -95,9 +96,10 @@ describe("STT endpoint", () => {
 
   it("transcribes audio and creates a meal result in a single request", async () => {
     const runLogger = new CollectingRunLogger();
+    const sttProvider = new FakeSpeechToTextProvider("100 grams bread");
     const { request } = buildTestApp({
       runLogger,
-      sttProvider: new FakeSpeechToTextProvider("100 grams bread"),
+      sttProvider,
       agentProvider: new FakeChatAgentProvider({
         toolCalls: [
           {
@@ -125,7 +127,7 @@ describe("STT endpoint", () => {
 
     const res = await request("http://localhost/v1/voice/meal-runs", {
       method: "POST",
-      headers: bearerOnly(authHeader),
+      headers: { ...bearerOnly(authHeader), "accept-language": "en-US" },
       body
     });
 
@@ -137,6 +139,8 @@ describe("STT endpoint", () => {
     expect(json.traceId).toBeDefined();
     expect(json.result.kind).toBe("proposal");
     expect(json.result.proposal.items[0].name).toBe("Bread");
+    expect(sttProvider.inputs[0]).not.toHaveProperty("language");
+    expect(sttProvider.inputs[0]).not.toHaveProperty("prompt");
     expect(runLogger.events).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -161,6 +165,75 @@ describe("STT endpoint", () => {
           }),
         }),
       ]),
+    );
+  });
+
+  it("biases correction transcriptions with the active proposal language", async () => {
+    const sttProvider = new FakeSpeechToTextProvider(
+      "cambia el pan a 50 gramos",
+    );
+    const { request } = buildTestApp({
+      sttProvider,
+      agentProvider: new FakeChatAgentProvider({
+        toolCalls: [
+          {
+            id: "call_revision",
+            type: "function",
+            function: {
+              name: "revise_meal_proposal",
+              arguments: JSON.stringify({
+                instruction: "cambia el pan a 50 gramos",
+                operations: [
+                  {
+                    type: "update_item_quantity",
+                    itemIndex: 0,
+                    quantity: 50,
+                    unit: "g",
+                    rawUnitText: "grams",
+                  },
+                ],
+              }),
+            },
+          },
+        ],
+        rawResponse: {},
+      }),
+    });
+    const { authHeader } = await registerAndAuth(request);
+    const proposal = await request(
+      "http://localhost/v1/actions/create_meal_proposal_from_items/execute",
+      {
+        method: "POST",
+        headers: authHeader,
+        body: JSON.stringify({
+          input: {
+            phrase: "100 gramos de pan",
+            items: [testBreadItem],
+          },
+          source: "flutter",
+        }),
+      },
+    ).then(
+      (response) =>
+        response.json() as Promise<{ output: { proposal: { id: string } } }>,
+    );
+
+    const body = new FormData();
+    body.append("audio", new Blob(["fake audio"], { type: "audio/m4a" }), "test.m4a");
+    body.append("activeProposalId", proposal.output.proposal.id);
+
+    const res = await request("http://localhost/v1/voice/meal-runs", {
+      method: "POST",
+      headers: { ...bearerOnly(authHeader), "accept-language": "en-US" },
+      body,
+    });
+
+    expect(res.status).toBe(200);
+    expect(sttProvider.inputs[0]).toEqual(
+      expect.objectContaining({
+        language: "es",
+        prompt: expect.stringContaining("Comando de correccion"),
+      }),
     );
   });
 

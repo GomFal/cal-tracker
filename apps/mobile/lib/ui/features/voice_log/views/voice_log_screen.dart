@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../domain/models/nutrition_models.dart';
+import '../../../../l10n/app_localizations_context.dart';
 import '../../../core/content_frame.dart';
 import '../../../core/design_system.dart';
 import '../view_models/voice_log_view_model.dart';
@@ -16,58 +17,11 @@ class MealCreateScreen extends StatefulWidget {
 }
 
 class _MealCreateScreenState extends State<MealCreateScreen> {
-  final _textController = TextEditingController();
-  final _textFieldFocusNode = FocusNode();
-  bool _transcriptReadyFocusQueued = false;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final viewModel = context.read<VoiceLogViewModel>();
-      if (viewModel.state == VoiceLogState.transcriptReady) {
-        _requestTextFieldFocus();
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _textController.dispose();
-    _textFieldFocusNode.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     final viewModel = context.watch<VoiceLogViewModel>();
-    final showMealEntryControls = viewModel.proposal == null &&
-        viewModel.state != VoiceLogState.clarificationRequired;
-    final showDebugTranscript = kDebugMode &&
-        viewModel.proposal == null &&
-        viewModel.state == VoiceLogState.clarificationRequired &&
-        viewModel.transcript.isNotEmpty;
-    if (_textController.text != viewModel.transcript) {
-      _textController.value = TextEditingValue(
-        text: viewModel.transcript,
-        selection: TextSelection.collapsed(offset: viewModel.transcript.length),
-      );
-    }
-
-    if (viewModel.state == VoiceLogState.transcriptReady) {
-      if (!_transcriptReadyFocusQueued) {
-        _transcriptReadyFocusQueued = true;
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted || viewModel.state != VoiceLogState.transcriptReady) {
-            return;
-          }
-          _requestTextFieldFocus();
-        });
-      }
-    } else {
-      _transcriptReadyFocusQueued = false;
-    }
+    final showDebugTranscript =
+        kDebugMode && viewModel.transcript.trim().isNotEmpty;
 
     return Scaffold(
       backgroundColor: FreshColors.screen,
@@ -98,29 +52,6 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (showMealEntryControls) ...[
-                FreshCard(
-                  padding: const EdgeInsets.all(14),
-                  child: TextField(
-                    key: const ValueKey('meal_text_field'),
-                    controller: _textController,
-                    focusNode: _textFieldFocusNode,
-                    minLines: 3,
-                    maxLines: 6,
-                    decoration: const InputDecoration(
-                      labelText: 'Meal',
-                      hintText: 'Tell me what you ate',
-                      prefixIcon: Icon(Icons.restaurant_rounded),
-                    ),
-                    onChanged: viewModel.updateTranscript,
-                    enabled: viewModel.state != VoiceLogState.transcribing &&
-                        viewModel.state != VoiceLogState.agentRunning,
-                  ),
-                ),
-                const SizedBox(height: FreshSpacing.md),
-                _buildControls(context, viewModel),
-                const SizedBox(height: FreshSpacing.lg),
-              ],
               if (viewModel.isLoading)
                 const LinearProgressIndicator(minHeight: 3),
               if (viewModel.state == VoiceLogState.recording) ...[
@@ -143,6 +74,14 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
                 ),
                 const SizedBox(height: FreshSpacing.md),
               ],
+              if (showDebugTranscript) ...[
+                _TranscriptDebugCard(transcript: viewModel.transcript),
+                const SizedBox(height: FreshSpacing.md),
+              ],
+              if (viewModel.showProposalChangeSuccess) ...[
+                const _ProposalChangeSuccessToast(),
+                const SizedBox(height: FreshSpacing.md),
+              ],
               if (viewModel.autoCommittedMeal != null) ...[
                 _LoggedMealBanner(title: viewModel.autoCommittedMeal!.title),
                 const SizedBox(height: FreshSpacing.md),
@@ -155,10 +94,6 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
                 ),
                 const SizedBox(height: FreshSpacing.md),
               ],
-              if (showDebugTranscript) ...[
-                _TranscriptDebugCard(transcript: viewModel.transcript),
-                const SizedBox(height: FreshSpacing.md),
-              ],
               if (viewModel.state == VoiceLogState.clarificationRequired) ...[
                 FreshStatusBanner(
                   icon: Icons.help_outline_rounded,
@@ -169,10 +104,10 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
                 ),
                 const SizedBox(height: FreshSpacing.md),
               ],
-              if (viewModel.candidateGroups != null &&
-                  viewModel.proposal == null) ...[
+              if (viewModel.state == VoiceLogState.clarificationRequired &&
+                  (viewModel.clarificationOptions?.isNotEmpty ?? false)) ...[
                 _ResolverClarificationCard(
-                  groups: viewModel.candidateGroups!,
+                  groups: viewModel.clarificationOptions!,
                   isCandidateSelected: viewModel.isCandidateSelected,
                   onCandidateSelected: viewModel.selectCandidate,
                   onPortionSelected: (choice) {
@@ -218,11 +153,6 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
     );
   }
 
-  void _requestTextFieldFocus() {
-    if (!_textFieldFocusNode.canRequestFocus) return;
-    _textFieldFocusNode.requestFocus();
-  }
-
   Future<void> _showProposalEditor(
     BuildContext context,
     VoiceLogViewModel viewModel,
@@ -254,25 +184,6 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
     if (!context.mounted || selection == null) return;
     await viewModel.commitProposal(mealLabel: selection.label);
   }
-
-  Widget _buildControls(BuildContext context, VoiceLogViewModel viewModel) {
-    final canSubmit = viewModel.state == VoiceLogState.idle ||
-        viewModel.state == VoiceLogState.ready ||
-        viewModel.state == VoiceLogState.transcriptReady ||
-        viewModel.state == VoiceLogState.proposalReady ||
-        viewModel.state == VoiceLogState.resultReady ||
-        viewModel.state == VoiceLogState.error;
-
-    return FilledButton.icon(
-      key: const ValueKey('submit_meal_button'),
-      icon: const Icon(Icons.keyboard_double_arrow_right_rounded),
-      onPressed: canSubmit && !viewModel.isLoading
-          ? () => viewModel.submitText(_textController.text)
-          : null,
-      label: Text(
-          viewModel.proposal == null ? 'Submit meal' : 'Submit correction'),
-    );
-  }
 }
 
 const _candidatePreviewCount = 3;
@@ -303,6 +214,47 @@ class _TranscriptDebugCard extends StatelessWidget {
           ),
           const SizedBox(height: FreshSpacing.sm),
           Text(transcript, style: textTheme.bodyMedium),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProposalChangeSuccessToast extends StatelessWidget {
+  const _ProposalChangeSuccessToast();
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return FreshCard(
+      key: const ValueKey('proposal_change_success_toast'),
+      color: FreshColors.limeWash,
+      radius: FreshRadii.lg,
+      padding: const EdgeInsets.symmetric(
+        horizontal: FreshSpacing.lg,
+        vertical: FreshSpacing.md,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.check_rounded,
+            color: FreshColors.limeDeep,
+            size: 20,
+          ),
+          const SizedBox(width: FreshSpacing.sm),
+          Flexible(
+            child: Text(
+              context.l10n.voiceChangesApplied,
+              style: textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: FreshColors.ink,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );
@@ -372,7 +324,7 @@ class _ResolverClarificationCardState
             ],
             if (group.candidates.isEmpty)
               Text(
-                'No confident match yet',
+                context.l10n.voiceNoDatabaseMatch,
                 style: textTheme.bodyMedium?.copyWith(
                   color: FreshColors.inkMuted,
                 ),
@@ -431,29 +383,72 @@ class _CandidateList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final candidates = group.candidates.take(_candidateDisplayLimit).toList();
-    final visibleIndexes = _visibleCandidateIndexes(candidates);
-    final hiddenCount = candidates.length - visibleIndexes.length;
+    return _FoodCandidateStrip(
+      candidates: group.candidates,
+      expanded: expanded,
+      itemKeyPrefix: 'food_candidate_${group.mention.canonicalName}',
+      toggleKey: ValueKey(
+        'food_candidate_toggle_${group.mention.canonicalName}',
+      ),
+      isSelected: (candidate) => isCandidateSelected(group, candidate),
+      onSelected: (candidate) => onCandidateSelected(group, candidate),
+      onToggleExpanded: onToggleExpanded,
+    );
+  }
+}
+
+class _FoodCandidateStrip extends StatelessWidget {
+  const _FoodCandidateStrip({
+    required this.candidates,
+    required this.expanded,
+    required this.itemKeyPrefix,
+    required this.toggleKey,
+    required this.isSelected,
+    required this.onSelected,
+    required this.onToggleExpanded,
+    this.label,
+  });
+
+  final List<MealItem> candidates;
+  final bool expanded;
+  final String itemKeyPrefix;
+  final Key toggleKey;
+  final bool Function(MealItem candidate) isSelected;
+  final ValueChanged<MealItem> onSelected;
+  final VoidCallback onToggleExpanded;
+  final String? label;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final visibleCandidates = candidates.take(_candidateDisplayLimit).toList();
+    final visibleIndexes = _visibleCandidateIndexes(visibleCandidates);
+    final hiddenCount = visibleCandidates.length - visibleIndexes.length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (label != null) ...[
+          Text(
+            label!,
+            style: textTheme.labelMedium?.copyWith(
+              color: FreshColors.inkMuted,
+            ),
+          ),
+          const SizedBox(height: FreshSpacing.xs),
+        ],
         for (final index in visibleIndexes)
           _CandidateMealLine(
-            key: ValueKey(
-              'food_candidate_${group.mention.canonicalName}_$index',
-            ),
-            candidate: candidates[index],
-            selected: isCandidateSelected(group, candidates[index]),
-            onSelected: () => onCandidateSelected(group, candidates[index]),
+            key: ValueKey('${itemKeyPrefix}_$index'),
+            candidate: visibleCandidates[index],
+            selected: isSelected(visibleCandidates[index]),
+            onSelected: () => onSelected(visibleCandidates[index]),
           ),
-        if (candidates.length > _candidatePreviewCount) ...[
+        if (visibleCandidates.length > _candidatePreviewCount) ...[
           const SizedBox(height: FreshSpacing.xs),
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton.icon(
-              key: ValueKey(
-                'food_candidate_toggle_${group.mention.canonicalName}',
-              ),
+              key: toggleKey,
               onPressed: onToggleExpanded,
               icon: Icon(
                 expanded
@@ -463,7 +458,7 @@ class _CandidateList extends StatelessWidget {
               label: Text(
                 expanded
                     ? 'Show fewer'
-                    : 'Show ${hiddenCount.clamp(0, candidates.length)} more',
+                    : 'Show ${hiddenCount.clamp(0, visibleCandidates.length)} more',
               ),
             ),
           ),
@@ -472,20 +467,22 @@ class _CandidateList extends StatelessWidget {
     );
   }
 
-  List<int> _visibleCandidateIndexes(List<MealItem> candidates) {
+  List<int> _visibleCandidateIndexes(List<MealItem> visibleCandidates) {
     if (expanded) {
-      return [for (var index = 0; index < candidates.length; index++) index];
+      return [
+        for (var index = 0; index < visibleCandidates.length; index++) index,
+      ];
     }
 
     final indexes = <int>{};
     for (var index = 0;
-        index < candidates.length && index < _candidatePreviewCount;
+        index < visibleCandidates.length && index < _candidatePreviewCount;
         index++) {
       indexes.add(index);
     }
 
-    for (var index = 0; index < candidates.length; index++) {
-      if (isCandidateSelected(group, candidates[index])) {
+    for (var index = 0; index < visibleCandidates.length; index++) {
+      if (isSelected(visibleCandidates[index])) {
         indexes.add(index);
         break;
       }
@@ -1308,6 +1305,10 @@ class _ProposalEditorSheetState extends State<_ProposalEditorSheet> {
       edited.add(item.toMealItem(name: name, quantity: quantity, unit: unit));
     }
     if (edited.isEmpty) return;
+    if (_mealItemListsMateriallyEqual(widget.proposal.items, edited)) {
+      Navigator.of(context).pop();
+      return;
+    }
     Navigator.of(context).pop(edited);
   }
 
@@ -1457,74 +1458,16 @@ class _CandidateSwapStripState extends State<_CandidateSwapStrip> {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final candidates = widget.candidates.take(_candidateDisplayLimit).toList();
-    final visibleIndexes = _visibleCandidateIndexes(candidates);
-    final hiddenCount = candidates.length - visibleIndexes.length;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(
-          'Food match',
-          style: textTheme.labelMedium?.copyWith(color: FreshColors.inkMuted),
-        ),
-        const SizedBox(height: FreshSpacing.xs),
-        for (final candidateIndex in visibleIndexes)
-          _CandidateMealLine(
-            key: ValueKey(
-              'proposal_item_${widget.index}_candidate_$candidateIndex',
-            ),
-            candidate: candidates[candidateIndex],
-            selected: _sameMealItem(
-              candidates[candidateIndex],
-              widget.selectedItem,
-            ),
-            onSelected: () => widget.onSelected(candidates[candidateIndex]),
-          ),
-        if (candidates.length > _candidatePreviewCount) ...[
-          const SizedBox(height: FreshSpacing.xs),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              key: ValueKey('proposal_item_${widget.index}_candidate_toggle'),
-              onPressed: () => setState(() => _expanded = !_expanded),
-              icon: Icon(
-                _expanded
-                    ? Icons.keyboard_arrow_up_rounded
-                    : Icons.keyboard_arrow_down_rounded,
-              ),
-              label: Text(
-                _expanded
-                    ? 'Show fewer'
-                    : 'Show ${hiddenCount.clamp(0, candidates.length)} more',
-              ),
-            ),
-          ),
-        ],
-      ],
+    return _FoodCandidateStrip(
+      label: 'Food match',
+      candidates: widget.candidates,
+      expanded: _expanded,
+      itemKeyPrefix: 'proposal_item_${widget.index}_candidate',
+      toggleKey: ValueKey('proposal_item_${widget.index}_candidate_toggle'),
+      isSelected: (candidate) => _sameMealItem(candidate, widget.selectedItem),
+      onSelected: widget.onSelected,
+      onToggleExpanded: () => setState(() => _expanded = !_expanded),
     );
-  }
-
-  List<int> _visibleCandidateIndexes(List<MealItem> candidates) {
-    if (_expanded) {
-      return [for (var index = 0; index < candidates.length; index++) index];
-    }
-
-    final indexes = <int>{};
-    for (var index = 0;
-        index < candidates.length && index < _candidatePreviewCount;
-        index++) {
-      indexes.add(index);
-    }
-
-    for (var index = 0; index < candidates.length; index++) {
-      if (_sameMealItem(candidates[index], widget.selectedItem)) {
-        indexes.add(index);
-        break;
-      }
-    }
-
-    return indexes.toList()..sort();
   }
 }
 
@@ -1807,6 +1750,36 @@ bool _sameMealItem(MealItem a, MealItem b) {
       a.quantity == b.quantity &&
       a.unit == b.unit;
 }
+
+bool _mealItemListsMateriallyEqual(List<MealItem> a, List<MealItem> b) {
+  if (a.length != b.length) return false;
+  for (var index = 0; index < a.length; index++) {
+    if (!_mealItemsMateriallyEqual(a[index], b[index])) return false;
+  }
+  return true;
+}
+
+bool _mealItemsMateriallyEqual(MealItem a, MealItem b) {
+  final hasExternalIdentity = a.externalId != null ||
+      b.externalId != null ||
+      a.externalSource != null ||
+      b.externalSource != null;
+  if (hasExternalIdentity &&
+      (a.externalId != b.externalId || a.externalSource != b.externalSource)) {
+    return false;
+  }
+  return _normalizedText(a.name) == _normalizedText(b.name) &&
+      _normalizedText(a.unit) == _normalizedText(b.unit) &&
+      _sameNumber(a.quantity, b.quantity) &&
+      a.calories == b.calories &&
+      _sameNumber(a.proteinGrams, b.proteinGrams) &&
+      _sameNumber(a.carbsGrams, b.carbsGrams) &&
+      _sameNumber(a.fatGrams, b.fatGrams);
+}
+
+String _normalizedText(String value) => value.trim().toLowerCase();
+
+bool _sameNumber(double a, double b) => (a - b).abs() < 0.05;
 
 class _MetricBlock extends StatelessWidget {
   const _MetricBlock({

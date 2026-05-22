@@ -65,6 +65,14 @@ function mention(name: string, originalText = name): FoodMention {
   };
 }
 
+function normalizeFixtureFoodName(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 describe("scoreUsdaCandidate", () => {
   it("ranks plain salmon candidates above product-form matches without ingredient-specific rules", () => {
     const salmon = mention("salmon");
@@ -120,6 +128,95 @@ describe("scoreUsdaCandidate", () => {
 
     expect(score?.confidence).toBeGreaterThan(0.75);
   });
+
+  it("prefers exact first USDA description segments over compound food names", () => {
+    const rice = mention("rice");
+    const riceVariant = scoreUsdaCandidate(
+      {
+        description: "Rice, white, medium-grain, enriched, cooked",
+        dataType: "SR Legacy",
+      },
+      rice,
+    );
+    const riceNoodles = scoreUsdaCandidate(
+      { description: "Rice noodles, cooked", dataType: "SR Legacy" },
+      rice,
+    );
+    const invertedRiceNoodles = scoreUsdaCandidate(
+      { description: "Noodles, rice", dataType: "SR Legacy" },
+      rice,
+    );
+
+    expect(riceVariant?.confidence).toBeGreaterThan(0.75);
+    expect(riceVariant?.confidence ?? 0).toBeGreaterThan(
+      riceNoodles?.confidence ?? 0,
+    );
+    expect(invertedRiceNoodles).toBeNull();
+  });
+
+  it.each([
+    {
+      query: "apple",
+      basic: "Apple, raw, with skin",
+      compound: "Apple juice, canned or bottled",
+      inverted: "Juice, apple",
+    },
+    {
+      query: "tomato",
+      basic: "Tomatoes, red, ripe, raw, year round average",
+      compound: "Tomato sauce, canned",
+      inverted: "Sauce, tomato",
+    },
+    {
+      query: "egg",
+      basic: "Egg, whole, raw, fresh",
+      compound: "Egg noodles, cooked, enriched",
+      inverted: "Noodles, egg",
+    },
+    {
+      query: "milk",
+      basic: "Milk, whole, 3.25% milkfat",
+      compound: "Milk chocolate candy",
+      inverted: "Chocolate milk",
+    },
+    {
+      query: "orange",
+      basic: "Oranges, raw, navels",
+      compound: "Orange juice, raw",
+      inverted: "Juice, orange",
+    },
+    {
+      query: "chicken",
+      basic: "Chicken, broilers or fryers, meat only, cooked, roasted",
+      compound: "Chicken nuggets, frozen, cooked",
+      inverted: "Nuggets, chicken",
+    },
+  ])(
+    "prefers the basic $query USDA segment over product-form matches",
+    ({ query, basic, compound, inverted }) => {
+      const requestedFood = mention(query);
+      const basicScore = scoreUsdaCandidate(
+        { description: basic, dataType: "SR Legacy" },
+        requestedFood,
+      );
+      const compoundScore = scoreUsdaCandidate(
+        { description: compound, dataType: "SR Legacy" },
+        requestedFood,
+      );
+      const invertedScore = scoreUsdaCandidate(
+        { description: inverted, dataType: "SR Legacy" },
+        requestedFood,
+      );
+
+      expect(basicScore?.confidence).toBeGreaterThan(0.75);
+      expect(basicScore?.confidence ?? 0).toBeGreaterThan(
+        compoundScore?.confidence ?? 0,
+      );
+      expect(basicScore?.confidence ?? 0).toBeGreaterThan(
+        invertedScore?.confidence ?? 0,
+      );
+    },
+  );
 });
 
 describe("FoodResolver candidate groups", () => {
@@ -396,6 +493,150 @@ describe("FoodResolver", () => {
       expect.objectContaining({ externalId: "usda-rice" }),
     ]);
   });
+
+  it("ranks first-token food matches above later-token matches", async () => {
+    const repository = InMemoryRepository.seeded();
+    await repository.upsertFoodItem({
+      name: "Noodles, rice",
+      normalizedName: "noodles rice",
+      canonicalName: "noodles rice",
+      source: "usda_fdc",
+      externalSource: "usda_fdc",
+      externalId: "usda-noodles-rice",
+      dataType: "SR Legacy",
+      servingGrams: 100,
+      calories: 109,
+      proteinGrams: 1.8,
+      carbsGrams: 24.9,
+      fatGrams: 0.2,
+    });
+    await repository.upsertFoodItem({
+      name: "Rice noodles",
+      normalizedName: "rice noodles",
+      canonicalName: "rice noodles",
+      source: "usda_fdc",
+      externalSource: "usda_fdc",
+      externalId: "usda-rice-noodles",
+      dataType: "SR Legacy",
+      servingGrams: 100,
+      calories: 109,
+      proteinGrams: 1.8,
+      carbsGrams: 24.9,
+      fatGrams: 0.2,
+    });
+    await repository.upsertFoodItem({
+      name: "Rice, grain",
+      normalizedName: "rice grain",
+      canonicalName: "rice grain",
+      source: "usda_fdc",
+      externalSource: "usda_fdc",
+      externalId: "usda-rice-grain",
+      dataType: "SR Legacy",
+      servingGrams: 100,
+      calories: 130,
+      proteinGrams: 2.7,
+      carbsGrams: 28,
+      fatGrams: 0.3,
+    });
+
+    const riceResults = await repository.searchFoodsHybrid("user-1", {
+      query: "rice",
+      locale: "en-US",
+      scope: "generic",
+    });
+    expect(riceResults.map((food) => food.externalId)).toEqual([
+      "usda-rice-grain",
+      "usda-rice-noodles",
+      "usda-noodles-rice",
+    ]);
+
+    const noodleResults = await repository.searchFoodsHybrid("user-1", {
+      query: "rice noodles",
+      locale: "en-US",
+      scope: "generic",
+    });
+    expect(noodleResults[0]).toEqual(
+      expect.objectContaining({ externalId: "usda-rice-noodles" }),
+    );
+  });
+
+  it.each([
+    {
+      query: "apple",
+      basic: "Apple, raw, with skin",
+      compound: "Apple juice, canned or bottled",
+      inverted: "Juice, apple",
+    },
+    {
+      query: "tomato",
+      basic: "Tomatoes, red, ripe, raw",
+      compound: "Tomato sauce, canned",
+      inverted: "Sauce, tomato",
+    },
+    {
+      query: "egg",
+      basic: "Egg, whole, raw, fresh",
+      compound: "Egg noodles, cooked, enriched",
+      inverted: "Noodles, egg",
+    },
+    {
+      query: "milk",
+      basic: "Milk, whole, 3.25% milkfat",
+      compound: "Milk chocolate candy",
+      inverted: "Chocolate milk",
+    },
+    {
+      query: "orange",
+      basic: "Oranges, raw, navels",
+      compound: "Orange juice, raw",
+      inverted: "Juice, orange",
+    },
+    {
+      query: "chicken",
+      basic: "Chicken, broilers or fryers, meat only, cooked, roasted",
+      compound: "Chicken nuggets, frozen, cooked",
+      inverted: "Nuggets, chicken",
+    },
+  ])(
+    "resolves a basic $query mention before compound product-form matches",
+    async ({ query, basic, compound, inverted }) => {
+      const repository = InMemoryRepository.seeded();
+      for (const [index, name] of [basic, compound, inverted].entries()) {
+        await repository.upsertFoodItem({
+          name,
+          normalizedName: normalizeFixtureFoodName(name),
+          canonicalName: normalizeFixtureFoodName(name),
+          source: "usda_fdc",
+          externalSource: "usda_fdc",
+          externalId: `${query}-${index}`,
+          dataType: "SR Legacy",
+          servingGrams: 100,
+          calories: 100,
+          proteinGrams: 1,
+          carbsGrams: 10,
+          fatGrams: 1,
+        });
+      }
+      const resolver = new FoodResolver(
+        new DeterministicFoodTextExtractor(),
+        [new LocalFoodDataProvider(repository)],
+        repository,
+        0.75,
+      );
+
+      const result = await resolver.resolveMealText(
+        "user-1",
+        `Add 100 grams of ${query}`,
+        "en-US",
+      );
+
+      expect(result.clarificationRequired).toBe(false);
+      expect(result.items[0]).toEqual(expect.objectContaining({ name: basic }));
+      expect(result.candidateGroups[0]?.candidates[0]).toEqual(
+        expect.objectContaining({ name: basic }),
+      );
+    },
+  );
 
   it("infers Spanish for deterministic fallback before local food search", async () => {
     const repository = InMemoryRepository.seeded();

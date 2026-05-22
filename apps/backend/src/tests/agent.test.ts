@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { FoodMention } from "@cal-tracker/contracts";
+import type { FoodMention, MealItem } from "@cal-tracker/contracts";
 import type {
   AgentMessage,
   AgentToolDecision,
@@ -44,6 +44,44 @@ class ThrowingChatAgentProvider implements ChatAgentProvider {
   async runWithTools(): Promise<AgentToolDecision> {
     throw new Error("provider_unavailable");
   }
+}
+
+const testRiceItem: MealItem = {
+  name: "Cooked rice",
+  quantity: 100,
+  unit: "g",
+  calories: 130,
+  proteinGrams: 2.7,
+  carbsGrams: 28,
+  fatGrams: 0.3,
+  source: "test_fixture",
+  originalText: "100 grams of rice",
+  canonicalName: "rice",
+  confidence: 0.9,
+};
+
+async function createProposalFromItems(
+  request: (input: string, init?: RequestInit) => Promise<Response>,
+  authHeader: Record<string, string>,
+  items: MealItem[],
+  phrase = "test proposal",
+): Promise<{ id: string; items: MealItem[] }> {
+  const response = await request(
+    "http://localhost/v1/actions/create_meal_proposal_from_items/execute",
+    {
+      method: "POST",
+      headers: authHeader,
+      body: JSON.stringify({
+        input: { phrase, items },
+        source: "flutter",
+      }),
+    },
+  );
+  expect(response.status).toBe(200);
+  const body = (await response.json()) as {
+    output: { proposal: { id: string; items: MealItem[] } };
+  };
+  return body.output.proposal;
 }
 
 describe("AgentService", () => {
@@ -107,12 +145,14 @@ describe("AgentService", () => {
       kind: string;
       proposal?: unknown;
       message: string;
-      options: Array<{ mention: { canonicalEnglishName: string } }>;
+      options?: Array<{ mention: { canonicalEnglishName: string } }>;
+      candidateGroups?: Array<{ mention: { canonicalEnglishName: string } }>;
     };
     expect(body.kind).toBe("proposal");
     expect(body.proposal).toBeDefined();
     expect(body.message).toBe("Meal proposal created.");
-    expect(body.options).toEqual(
+    expect(body.options).toBeUndefined();
+    expect(body.candidateGroups).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           mention: expect.objectContaining({
@@ -1121,6 +1161,136 @@ describe("AgentService", () => {
     expect(body.proposal.items[0]).toEqual(
       expect.objectContaining({ name: "Bread", quantity: 200 }),
     );
+  });
+
+  it("falls back to explicit add-item correction chunks when the model returns no tool call", async () => {
+    const { request } = buildTestApp({
+      agentProvider: new FakeChatAgentProvider({
+        toolCalls: [],
+        rawResponse: {},
+      }),
+    });
+    const { authHeader } = await registerAndAuth(request);
+    const proposal = await createProposalFromItems(
+      request,
+      authHeader,
+      [testRiceItem],
+      "100 grams of rice",
+    );
+
+    const revised = await request("http://localhost/v1/agent/runs", {
+      method: "POST",
+      headers: authHeader,
+      body: JSON.stringify({
+        text: "Add 100 grams of bread and 100 grams of butter.",
+        activeProposalId: proposal.id,
+        source: "flutter",
+      }),
+    });
+
+    expect(revised.status).toBe(200);
+    const body = (await revised.json()) as {
+      kind: string;
+      proposal: { id: string; items: Array<{ name: string; quantity: number }> };
+    };
+    expect(body.kind).toBe("proposal");
+    expect(body.proposal.id).toBe(proposal.id);
+    expect(body.proposal.items.map((item) => item.name)).toEqual([
+      "Cooked rice",
+      "Bread",
+      "Butter",
+    ]);
+  });
+
+  it("uses strict fallback for explicit add chunks and clarifies unresolved foods when the provider fails", async () => {
+    const { request } = buildTestApp({
+      agentProvider: new ThrowingChatAgentProvider(),
+    });
+    const { authHeader } = await registerAndAuth(request);
+    const proposal = await createProposalFromItems(
+      request,
+      authHeader,
+      [testRiceItem],
+      "100 grams of rice",
+    );
+
+    const revised = await request("http://localhost/v1/agent/runs", {
+      method: "POST",
+      headers: authHeader,
+      body: JSON.stringify({
+        text: "Add 100 grams of rice, 100 grams of beef, 100 grams of butter, and 100 grams of bread.",
+        activeProposalId: proposal.id,
+        source: "flutter",
+      }),
+    });
+
+    expect(revised.status).toBe(200);
+    const body = (await revised.json()) as {
+      kind: string;
+      message: string;
+      proposal: { id: string; items: Array<{ name: string; quantity: number }> };
+      options?: Array<{ mention: { canonicalEnglishName?: string } }>;
+      candidateGroups?: Array<{ mention: { canonicalEnglishName?: string } }>;
+    };
+    expect(body.kind).toBe("clarification_required");
+    expect(body.proposal.id).toBe(proposal.id);
+    expect(body.proposal.items.map((item) => item.name)).toEqual([
+      "Cooked rice",
+      "Butter",
+      "Bread",
+    ]);
+    expect(
+      body.proposal.items.filter((item) => item.name === "Cooked rice"),
+    ).toHaveLength(1);
+    expect(body.message).toContain("beef");
+    expect(body.options).toEqual([
+      expect.objectContaining({
+        mention: expect.objectContaining({ canonicalEnglishName: "beef" }),
+      }),
+    ]);
+    expect(body.candidateGroups).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          mention: expect.objectContaining({ canonicalEnglishName: "beef" }),
+        }),
+      ]),
+    );
+  });
+
+  it("does not mutate the proposal when strict fallback cannot account for the full correction", async () => {
+    const { request } = buildTestApp({
+      agentProvider: new ThrowingChatAgentProvider(),
+    });
+    const { authHeader } = await registerAndAuth(request);
+    const proposal = await createProposalFromItems(
+      request,
+      authHeader,
+      [testRiceItem],
+      "100 grams of rice",
+    );
+
+    const revised = await request("http://localhost/v1/agent/runs", {
+      method: "POST",
+      headers: authHeader,
+      body: JSON.stringify({
+        text: "Add 100 grams of bread and make it better.",
+        activeProposalId: proposal.id,
+        source: "flutter",
+      }),
+    });
+
+    expect(revised.status).toBe(200);
+    const body = (await revised.json()) as {
+      kind: string;
+      message: string;
+      proposal: { id: string; items: Array<{ name: string; quantity: number }> };
+    };
+    expect(body.kind).toBe("clarification_required");
+    expect(body.proposal.id).toBe(proposal.id);
+    expect(body.proposal.items).toEqual([
+      expect.objectContaining({ name: "Cooked rice", quantity: 100 }),
+    ]);
+    expect(body.message).toContain("could not safely apply");
   });
 
   it("rejects unknown model-selected actions", async () => {

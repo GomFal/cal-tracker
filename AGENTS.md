@@ -269,6 +269,24 @@ curl -s http://localhost:3000/v1/health
 
 ## PostgreSQL Database
 
+### Local Volume Policy
+
+Always use the original loaded local PostgreSQL volume for development, including from feature worktrees. The canonical Compose project is the original checkout at `/home/javier/dev/cal-tracker`; it owns the loaded database volume named `cal-tracker_cal_tracker_postgres`.
+
+Do not run plain `docker compose up -d postgres` from a feature worktree. Docker Compose derives the project name from the current directory, so starting Postgres from a worktree such as `/home/javier/dev/cal-tracker-voice-meal-proposal-rescue` creates a separate empty volume like `cal-tracker-voice-meal-proposal-rescue_cal_tracker_postgres`, which breaks local food search because the USDA/Open Food data is missing.
+
+From any worktree, start the shared local database through the canonical project:
+
+```bash
+docker compose --project-directory /home/javier/dev/cal-tracker \
+  -f /home/javier/dev/cal-tracker/docker-compose.yml \
+  up -d postgres
+```
+
+The backend `DATABASE_URL` can still point to `postgres://cal_tracker:cal_tracker@localhost:5432/cal_tracker`; the important part is that port `5432` is served by the canonical `cal-tracker-postgres-1` container backed by `cal-tracker_cal_tracker_postgres`.
+
+If a worktree-specific Postgres container was started accidentally, stop that container and restart the canonical database. Do not delete Docker volumes unless the user explicitly asks.
+
 ### Start (Docker)
 
 ```bash
@@ -279,8 +297,9 @@ docker compose up -d postgres
 ### Verify
 
 ```bash
-docker ps | grep postgres
-# Should show cal-tracker-postgres-1 as healthy
+docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}' | grep cal-tracker-postgres-1
+docker volume ls | grep cal-tracker_cal_tracker_postgres
+# Should show cal-tracker-postgres-1 as healthy and the loaded cal-tracker_cal_tracker_postgres volume.
 ```
 
 ---

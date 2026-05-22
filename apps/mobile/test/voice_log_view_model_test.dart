@@ -378,6 +378,7 @@ void main() {
         expect(viewModel.state, VoiceLogState.proposalReady);
         expect(viewModel.proposal, proposal);
         expect(viewModel.message, 'Meal proposal created.');
+        expect(viewModel.showProposalChangeSuccess, isFalse);
       });
 
       test(
@@ -450,12 +451,68 @@ void main() {
 
           expect(viewModel.state, VoiceLogState.proposalReady);
           expect(viewModel.proposal, updatedProposal);
+          expect(viewModel.showProposalChangeSuccess, isTrue);
           verify(
             () => mockNutritionRepository.logText(
               'make the butter 40 grams',
               activeProposalId: 'prop_1',
             ),
           ).called(1);
+
+          await Future<void>.delayed(
+            VoiceLogViewModel.proposalChangeSuccessDuration +
+                const Duration(milliseconds: 100),
+          );
+
+          expect(viewModel.showProposalChangeSuccess, isFalse);
+        },
+      );
+
+      test(
+        'does not show change success when active proposal needs clarification',
+        () async {
+          const initialProposal = MealProposal(
+            id: 'prop_1',
+            title: 'Bread and butter',
+            confidence: 0.85,
+            requiresConfirmation: true,
+            trustedAutoCommitEligible: false,
+            nutrition: NutritionSnapshot(
+              calories: 408,
+              proteinGrams: 9.2,
+              carbsGrams: 49,
+              fatGrams: 19.4,
+            ),
+            items: [],
+          );
+          when(
+            () => mockNutritionRepository.logText('bread and butter'),
+          ).thenAnswer(
+            (_) async => const AgentRunResult(
+              kind: 'proposal',
+              proposal: initialProposal,
+              message: 'Meal proposal created.',
+            ),
+          );
+          when(
+            () => mockNutritionRepository.logText(
+              'add red meat',
+              activeProposalId: 'prop_1',
+            ),
+          ).thenAnswer(
+            (_) async => const AgentRunResult(
+              kind: 'clarification_required',
+              proposal: initialProposal,
+              message: 'Choose a food match for red meat.',
+            ),
+          );
+
+          await viewModel.submitText('bread and butter');
+          await viewModel.submitText('add red meat');
+
+          expect(viewModel.state, VoiceLogState.clarificationRequired);
+          expect(viewModel.proposal, initialProposal);
+          expect(viewModel.showProposalChangeSuccess, isFalse);
         },
       );
 
@@ -666,12 +723,96 @@ void main() {
 
         expect(viewModel.state, VoiceLogState.proposalReady);
         expect(viewModel.proposal, updatedProposal);
+        expect(viewModel.showProposalChangeSuccess, isTrue);
         verify(
           () => mockNutritionRepository.updateProposalItems(
             'prop_1',
             editedItems,
           ),
         ).called(1);
+      });
+
+      test('does not show change success for materially unchanged edits',
+          () async {
+        const initialItems = [
+          MealItem(
+            name: 'Chicken breast',
+            quantity: 100,
+            unit: 'g',
+            calories: 165,
+            proteinGrams: 31,
+            carbsGrams: 0,
+            fatGrams: 3.6,
+            source: 'generic_usda',
+            externalSource: 'usda_fdc',
+            externalId: '171477',
+          ),
+        ];
+        const initialProposal = MealProposal(
+          id: 'prop_1',
+          title: 'Chicken',
+          confidence: 0.85,
+          requiresConfirmation: true,
+          trustedAutoCommitEligible: false,
+          nutrition: NutritionSnapshot(
+            calories: 165,
+            proteinGrams: 31,
+            carbsGrams: 0,
+            fatGrams: 3.6,
+          ),
+          items: initialItems,
+        );
+        const editedItems = [
+          MealItem(
+            name: 'Chicken breast',
+            quantity: 100,
+            unit: 'g',
+            calories: 165,
+            proteinGrams: 31,
+            carbsGrams: 0,
+            fatGrams: 3.6,
+            source: 'generic_usda:manual_edit',
+            externalSource: 'usda_fdc',
+            externalId: '171477',
+          ),
+        ];
+        const updatedProposal = MealProposal(
+          id: 'prop_1',
+          title: 'Chicken',
+          confidence: 0.85,
+          requiresConfirmation: true,
+          trustedAutoCommitEligible: false,
+          nutrition: NutritionSnapshot(
+            calories: 165,
+            proteinGrams: 31,
+            carbsGrams: 0,
+            fatGrams: 3.6,
+          ),
+          items: editedItems,
+        );
+        when(
+          () => mockNutritionRepository.logText('chicken'),
+        ).thenAnswer(
+          (_) async => const AgentRunResult(
+            kind: 'proposal',
+            proposal: initialProposal,
+            message: 'Meal proposal created.',
+          ),
+        );
+        when(
+          () => mockNutritionRepository.updateProposalItems(
+            'prop_1',
+            editedItems,
+          ),
+        ).thenAnswer((_) async => updatedProposal);
+
+        await viewModel.submitText('chicken');
+        await viewModel.updateProposalItems(editedItems);
+
+        expect(viewModel.state, VoiceLogState.proposalReady);
+        expect(viewModel.proposal, updatedProposal);
+        expect(viewModel.message, isNull);
+        expect(viewModel.showProposalChangeSuccess, isFalse);
       });
     });
 
@@ -715,14 +856,12 @@ void main() {
         await viewModel.submitText('100 gramos de queso');
         await viewModel.selectCandidate(group, group.candidates[9]);
 
-        final captured =
-            verify(
-                  () => mockNutritionRepository.createProposalFromItems(
-                    phrase: '100 gramos de queso',
-                    items: captureAny(named: 'items'),
-                  ),
-                ).captured.single
-                as List<MealItem>;
+        final captured = verify(
+          () => mockNutritionRepository.createProposalFromItems(
+            phrase: '100 gramos de queso',
+            items: captureAny(named: 'items'),
+          ),
+        ).captured.single as List<MealItem>;
         expect(captured, [group.candidates[9]]);
         expect(viewModel.state, VoiceLogState.proposalReady);
         expect(viewModel.proposal, proposal);
@@ -786,14 +925,12 @@ void main() {
 
           await viewModel.selectCandidate(breadGroup, breadGroup.candidates[1]);
 
-          final captured =
-              verify(
-                    () => mockNutritionRepository.createProposalFromItems(
-                      phrase: 'queso y pan',
-                      items: captureAny(named: 'items'),
-                    ),
-                  ).captured.single
-                  as List<MealItem>;
+          final captured = verify(
+            () => mockNutritionRepository.createProposalFromItems(
+              phrase: 'queso y pan',
+              items: captureAny(named: 'items'),
+            ),
+          ).captured.single as List<MealItem>;
           expect(captured, [
             cheeseGroup.candidates[1],
             breadGroup.candidates[1],
@@ -856,17 +993,102 @@ void main() {
 
         await viewModel.selectCandidate(group, alternateCheese);
 
-        final captured =
-            verify(
-                  () => mockNutritionRepository.createProposalFromItems(
-                    phrase: '100 gramos de queso',
-                    items: captureAny(named: 'items'),
-                  ),
-                ).captured.single
-                as List<MealItem>;
+        final captured = verify(
+          () => mockNutritionRepository.createProposalFromItems(
+            phrase: '100 gramos de queso',
+            items: captureAny(named: 'items'),
+          ),
+        ).captured.single as List<MealItem>;
         expect(captured, [alternateCheese]);
         expect(viewModel.state, VoiceLogState.proposalReady);
       });
+
+      test(
+        'uses visible clarification options while keeping full proposal candidates',
+        () async {
+          final rice = _mealItem(
+            name: 'Cooked rice',
+            externalId: 'rice_1',
+            canonicalName: 'rice',
+          );
+          final riceGroup = _candidateGroup(
+            originalText: '100 grams of rice',
+            canonicalEnglishName: 'rice',
+            candidates: [rice, _mealItem(name: 'Rice 2', externalId: 'rice_2')],
+          );
+          final beefGroup = _candidateGroup(
+            originalText: '100 grams of beef',
+            canonicalEnglishName: 'beef',
+            candidates: _candidateItems('Beef', count: 2),
+          );
+          final selectedBeef = beefGroup.candidates[1];
+          final partialProposal = MealProposal(
+            id: 'prop_partial',
+            title: 'Rice',
+            confidence: 0.68,
+            requiresConfirmation: true,
+            trustedAutoCommitEligible: false,
+            nutrition: const NutritionSnapshot(
+              calories: 100,
+              proteinGrams: 7,
+              carbsGrams: 1,
+              fatGrams: 8,
+            ),
+            items: [rice],
+          );
+          final updatedProposal = MealProposal(
+            id: 'prop_partial',
+            title: 'Rice and beef',
+            confidence: 0.82,
+            requiresConfirmation: true,
+            trustedAutoCommitEligible: false,
+            nutrition: const NutritionSnapshot(
+              calories: 201,
+              proteinGrams: 14,
+              carbsGrams: 2,
+              fatGrams: 16,
+            ),
+            items: [rice, selectedBeef],
+          );
+          when(
+            () => mockNutritionRepository.logText('rice and beef'),
+          ).thenAnswer(
+            (_) async => AgentRunResult(
+              kind: 'clarification_required',
+              message: 'Choose a food match for beef.',
+              proposal: partialProposal,
+              resolvedItems: [rice],
+              clarificationOptions: [beefGroup],
+              candidateGroups: [riceGroup, beefGroup],
+            ),
+          );
+          when(
+            () => mockNutritionRepository.updateProposalItems(
+              'prop_partial',
+              any(),
+            ),
+          ).thenAnswer((_) async => updatedProposal);
+
+          await viewModel.submitText('rice and beef');
+
+          expect(viewModel.proposal, partialProposal);
+          expect(viewModel.clarificationOptions, [beefGroup]);
+          expect(viewModel.candidateGroups, [riceGroup, beefGroup]);
+          expect(viewModel.isCandidateSelected(riceGroup, rice), isTrue);
+
+          await viewModel.selectCandidate(beefGroup, selectedBeef);
+
+          final captured = verify(
+            () => mockNutritionRepository.updateProposalItems(
+              'prop_partial',
+              captureAny(),
+            ),
+          ).captured.single as List<MealItem>;
+          expect(captured, [rice, selectedBeef]);
+          expect(viewModel.state, VoiceLogState.proposalReady);
+          expect(viewModel.proposal, updatedProposal);
+        },
+      );
     });
 
     group('clearResult', () {

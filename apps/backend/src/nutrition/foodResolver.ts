@@ -1327,6 +1327,9 @@ export function scoreUsdaCandidate(
     .map((segment) => tokenizeFoodText(segment))
     .filter((segment) => segment.length > 0);
   const firstSegment = segments[0] ?? [];
+  const firstSegmentIsCanonical =
+    firstSegment.length === canonicalTokens.length &&
+    canonicalTokens.every((token, index) => firstSegment[index] === token);
   const firstToken = descriptionTokens[0];
   const canonicalTokenSet = new Set(canonicalTokens);
   const canonicalIndexes = canonicalTokens
@@ -1350,7 +1353,8 @@ export function scoreUsdaCandidate(
 
   if (canonicalTokens.length === 1) {
     const token = canonicalTokens[0]!;
-    if (firstToken === token) confidence += 0.18;
+    if (firstSegmentIsCanonical) confidence += 0.22;
+    else if (firstToken === token) confidence += 0.08;
     else if (firstSegment.includes(token)) confidence += 0.1;
     else if (firstToken && usdaCategoryWords.has(firstToken))
       confidence += 0.04;
@@ -1370,6 +1374,7 @@ export function scoreUsdaCandidate(
     canonicalTokenSet,
     inputTokenSet,
     firstCanonicalIndex,
+    firstSegmentIsCanonical,
   );
   confidence -= extraPenalty;
 
@@ -1412,6 +1417,7 @@ function usdaExtraDescriptionPenalty(
   canonicalTokenSet: Set<string>,
   inputTokenSet: Set<string>,
   firstCanonicalIndex: number,
+  firstSegmentIsCanonical: boolean,
 ): number {
   let penalty = 0;
   const canonicalStartsDescription = firstCanonicalIndex === 0;
@@ -1441,7 +1447,9 @@ function usdaExtraDescriptionPenalty(
         ? hasLeadingCategory
           ? 0.035
           : 0.16
-        : canonicalStartsDescription
+        : firstSegmentIsCanonical
+          ? 0.025
+          : canonicalStartsDescription
           ? 0.14
           : 0.025;
   }

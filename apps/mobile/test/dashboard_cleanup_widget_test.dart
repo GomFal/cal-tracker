@@ -137,6 +137,70 @@ void main() {
     expect(find.text('Breakfast'), findsOneWidget);
   });
 
+  testWidgets('dashboard meal cards delete after confirmation', (tester) async {
+    final nutritionRepository = _FakeNutritionRepository(
+      dailySummary: _summaryWithMeal,
+    );
+    final authViewModel = AuthViewModel(authRepository: _FakeAuthRepository())
+      ..setUser(_testUser);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<AuthViewModel>.value(value: authViewModel),
+          ChangeNotifierProvider(
+            create: (_) => ThemeModeViewModel(
+              preferencesRepository: _FakePreferencesRepository(),
+            ),
+          ),
+          ChangeNotifierProvider(
+            create: (_) => DashboardViewModel(
+              nutritionRepository: nutritionRepository,
+            ),
+          ),
+          ChangeNotifierProvider(
+            create: (_) => MealHistoryViewModel(
+              nutritionRepository: nutritionRepository,
+            ),
+          ),
+        ],
+        child: _testApp(const DashboardScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Oats bowl'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('dashboard_delete_meal_meal-1')),
+      findsOneWidget,
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey('dashboard_delete_meal_meal-1')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Delete meal?'), findsOneWidget);
+    expect(find.text('Oats bowl'), findsWidgets);
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    expect(nutritionRepository.deletedMealIds, isEmpty);
+    expect(find.text('Oats bowl'), findsOneWidget);
+
+    await tester.tap(
+      find.byKey(const ValueKey('dashboard_delete_meal_meal-1')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await tester.pumpAndSettle();
+
+    expect(nutritionRepository.deletedMealIds, ['meal-1']);
+    expect(find.text('Oats bowl'), findsNothing);
+    expect(find.text('No meals logged today'), findsOneWidget);
+  });
+
   testWidgets('dashboard first-run calorie setup saves and refreshes Home',
       (tester) async {
     final authRepository = _FakeAuthRepository();
@@ -291,6 +355,7 @@ class _FakeNutritionRepository extends NutritionRepository {
   DailySummary _dailySummary;
   final List<Meal> _mealHistory;
   List<MealItem>? lastCorrectedItems;
+  final List<String> deletedMealIds = [];
   int? updatedCalories;
   String? updateSource;
 
@@ -403,6 +468,35 @@ class _FakeNutritionRepository extends NutritionRepository {
       meals: meals,
     );
     return corrected;
+  }
+
+  @override
+  Future<bool> deleteMeal(String mealId, {bool confirmed = false}) async {
+    if (!confirmed) return false;
+    final mealExists = _dailySummary.meals.any((meal) => meal.id == mealId);
+    if (!mealExists) return false;
+    deletedMealIds.add(mealId);
+    final meals = [
+      for (final meal in _dailySummary.meals)
+        if (meal.id != mealId) meal,
+    ];
+    final consumed = _sumMealNutrition(meals);
+    _dailySummary = DailySummary(
+      date: _dailySummary.date,
+      consumed: consumed,
+      target: _dailySummary.target,
+      remaining: NutritionSnapshot(
+        calories: _dailySummary.target.calories - consumed.calories,
+        proteinGrams: _dailySummary.target.proteinGrams - consumed.proteinGrams,
+        carbsGrams: _dailySummary.target.carbsGrams - consumed.carbsGrams,
+        fatGrams: _dailySummary.target.fatGrams - consumed.fatGrams,
+      ),
+      hydrationGoalGlasses: _dailySummary.hydrationGoalGlasses,
+      calorieTargetConfigured: _dailySummary.calorieTargetConfigured,
+      calorieTargetSource: _dailySummary.calorieTargetSource,
+      meals: meals,
+    );
+    return true;
   }
 }
 

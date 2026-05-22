@@ -78,6 +78,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _MealSection(
             summary: summary,
             onEditMeal: (meal) => _showMealItemEditor(context, viewModel, meal),
+            onDeleteMeal: (meal) => _confirmDeleteMeal(context, viewModel, meal),
           ),
         ],
       ),
@@ -100,6 +101,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
     if (!context.mounted || items == null) return;
     await viewModel.correctMealItems(meal, items);
+  }
+
+  Future<void> _confirmDeleteMeal(
+    BuildContext context,
+    DashboardViewModel viewModel,
+    Meal meal,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(context.l10n.historyDeleteMealTitle),
+        content: Text(meal.title),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(context.l10n.commonCancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(context.l10n.commonDelete),
+          ),
+        ],
+      ),
+    );
+    if (!context.mounted || confirmed != true) return;
+
+    final deleted = await viewModel.deleteMeal(meal);
+    if (!context.mounted) return;
+    if (!deleted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.dashboardCouldNotDeleteMeal)),
+      );
+      return;
+    }
+    await context.read<MealHistoryViewModel>().load(forceRefresh: true);
   }
 
   Future<void> _showCalorieTargetSheet(
@@ -674,10 +710,12 @@ class _MealSection extends StatelessWidget {
   const _MealSection({
     required this.summary,
     required this.onEditMeal,
+    required this.onDeleteMeal,
   });
 
   final DailySummary? summary;
   final ValueChanged<Meal> onEditMeal;
+  final ValueChanged<Meal> onDeleteMeal;
 
   @override
   Widget build(BuildContext context) {
@@ -698,6 +736,7 @@ class _MealSection extends StatelessWidget {
               child: _MealRow(
                 meal: meal,
                 onEdit: () => onEditMeal(meal),
+                onDelete: () => onDeleteMeal(meal),
               ),
             ),
       ],
@@ -773,10 +812,12 @@ class _MealRow extends StatelessWidget {
   const _MealRow({
     required this.meal,
     required this.onEdit,
+    required this.onDelete,
   });
 
   final Meal meal;
   final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -805,6 +846,15 @@ class _MealRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: FreshSpacing.sm),
+          FreshIconButton(
+            key: ValueKey('dashboard_delete_meal_${meal.id}'),
+            icon: Icons.delete_outline_rounded,
+            tooltip: l10n.dashboardDeleteMealTooltip,
+            foregroundColor: palette.coral,
+            size: 42,
+            onPressed: onDelete,
+          ),
+          const SizedBox(width: FreshSpacing.xs),
           FreshIconButton(
             key: ValueKey('dashboard_edit_meal_${meal.id}'),
             icon: Icons.edit_rounded,

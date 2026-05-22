@@ -76,6 +76,7 @@ export const proposeMealLogOutputSchema = z.object({
   resolvedItems: z.array(mealItemSchema).optional(),
   unresolvedMentions: z.array(foodMentionSchema).optional(),
   options: z.array(foodCandidateSchema).optional(),
+  candidateGroups: z.array(foodCandidateSchema).optional(),
   message: z.string().optional(),
 });
 
@@ -115,6 +116,46 @@ export const correctMealInputSchema = z
 export const correctMealOutputSchema = z.object({
   proposal: mealProposalSchema.optional(),
   meal: mealSchema.optional(),
+});
+
+export const reviseMealProposalOperationSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("add_item"),
+    mention: foodMentionSchema,
+  }),
+  z.object({
+    type: z.literal("remove_item"),
+    itemIndex: z.number().int().nonnegative().optional(),
+    matchText: z.string().min(1).optional(),
+  }),
+  z.object({
+    type: z.literal("replace_item"),
+    itemIndex: z.number().int().nonnegative().optional(),
+    matchText: z.string().min(1).optional(),
+    mention: foodMentionSchema,
+  }),
+  z.object({
+    type: z.literal("update_item_quantity"),
+    itemIndex: z.number().int().nonnegative().optional(),
+    matchText: z.string().min(1).optional(),
+    quantity: z.number().positive(),
+    unit: z.string().min(1),
+    rawUnitText: z.string().min(1).optional(),
+  }),
+]);
+export const reviseMealProposalInputSchema = z.object({
+  proposalId: uuidSchema,
+  instruction: z.string().min(1),
+  operations: z.array(reviseMealProposalOperationSchema).min(1),
+});
+export const reviseMealProposalOutputSchema = z.object({
+  proposal: mealProposalSchema.optional(),
+  clarificationRequired: z.boolean().optional(),
+  resolvedItems: z.array(mealItemSchema).optional(),
+  unresolvedMentions: z.array(foodMentionSchema).optional(),
+  options: z.array(foodCandidateSchema).optional(),
+  candidateGroups: z.array(foodCandidateSchema).optional(),
+  message: z.string().optional(),
 });
 
 export const deleteMealInputSchema = z.object({
@@ -265,6 +306,19 @@ export const actionDefinitions = [
     outputSchema: correctMealOutputSchema,
     permissionScope: PermissionScope.NutritionWriteCorrect,
     sideEffect: "write",
+    confirmationPolicy: "required",
+    executionMode: "deterministic",
+  },
+  {
+    id: "revise_meal_proposal",
+    version: "1.0.0",
+    title: "Revise Meal Proposal",
+    description:
+      "Apply a natural-language correction to a pending meal proposal using structured add, remove, replace, or quantity update operations.",
+    inputSchema: reviseMealProposalInputSchema,
+    outputSchema: reviseMealProposalOutputSchema,
+    permissionScope: PermissionScope.NutritionWriteCorrect,
+    sideEffect: "proposal",
     confirmationPolicy: "required",
     executionMode: "deterministic",
   },

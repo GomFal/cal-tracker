@@ -6,6 +6,7 @@ import { applyMacroGoalUpdate } from "../utils/macroGoals.js";
 import { withSpan, withSyncSpan } from "../observability/profiler.js";
 import { normalizeText } from "../utils/normalize.js";
 import { subtractNutrition, sumNutrition } from "../utils/nutrition.js";
+import { lexicalFoodScore } from "./foodSearchScoring.js";
 import type {
   ActionCallRecord,
   AppRepository,
@@ -300,7 +301,15 @@ export class PostgresRepository implements AppRepository {
       { foodCount: foods.length, limit },
       () => foods.map((food) => {
         const scores = scoresByFoodId.get(food.id);
-        const lexicalScore = clampScore(scores?.lexicalScore ?? 0);
+        const computedLexicalScore =
+          normalized.length > 0 && !input.barcode
+            ? lexicalFoodScore(food, normalized)
+            : 0;
+        const lexicalScore = clampScore(
+          computedLexicalScore > 0
+            ? computedLexicalScore
+            : scores?.lexicalScore ?? 0,
+        );
         const vectorScore = scores?.vectorScore == null ? undefined : clampScore(scores.vectorScore);
         const preferenceScore = clamp((preferenceScores.get(food.id) ?? 0) / PREFERENCE_SCORE_NORMALIZER, -1, 1);
         const baseScore = vectorScore == null
@@ -314,7 +323,12 @@ export class PostgresRepository implements AppRepository {
           finalScore: clampScore(baseScore + preferenceScore * PREFERENCE_SCORE_WEIGHT)
         };
       })
-      .sort((a, b) => b.finalScore - a.finalScore || b.lexicalScore - a.lexicalScore || (b.vectorScore ?? 0) - (a.vectorScore ?? 0))
+      .sort((a, b) =>
+        b.finalScore - a.finalScore ||
+        b.lexicalScore - a.lexicalScore ||
+        (b.vectorScore ?? 0) - (a.vectorScore ?? 0) ||
+        a.name.localeCompare(b.name)
+      )
       .slice(0, limit),
     );
     this.setCachedFoodSearch(cacheKey, ranked);
@@ -371,29 +385,20 @@ export class PostgresRepository implements AppRepository {
     limit: number,
   ): Promise<Record<string, unknown>[]> {
     const searchLimit = Math.max(limit * 4, DEFAULT_FOOD_SEARCH_LIMIT);
-    const prefix = `${normalized}%`;
-    const tokenContains = `% ${normalized}%`;
+    const searchScore = foodSearchScoreSql(normalized);
     const locale0 = profile.locales[0] ?? "any";
     const locale1 = profile.locales[1] ?? locale0;
     const locale2 = profile.locales[2] ?? locale1;
     const locale3 = profile.locales[3] ?? locale2;
     return this.execute(dbSql`
       SELECT food_items.*,
-             GREATEST(
-               CASE WHEN food_search_documents.search_text = ${normalized} THEN 1::float ELSE 0::float END,
-               CASE WHEN food_search_documents.search_text LIKE ${prefix} THEN 0.92::float ELSE 0::float END,
-               CASE WHEN food_search_documents.search_text LIKE ${tokenContains} THEN 0.84::float ELSE 0::float END
-             ) AS search_score
+             ${searchScore} AS search_score
       FROM food_search_documents
       JOIN food_items ON food_items.id = food_search_documents.food_item_id
       WHERE (food_search_documents.user_id IS NULL OR food_search_documents.user_id = ${userId})
         AND food_search_documents.scope = ${profile.scope}
         AND food_search_documents.locale IN ${sqlList(profile.locales)}
-        AND (
-          food_search_documents.search_text = ${normalized}
-          OR food_search_documents.search_text LIKE ${prefix}
-          OR food_search_documents.search_text LIKE ${tokenContains}
-        )
+        AND (${foodSearchPredicateSql(normalized)})
       ORDER BY
         CASE WHEN food_search_documents.user_id = ${userId} THEN 0 ELSE 1 END,
         CASE
@@ -403,8 +408,8 @@ export class PostgresRepository implements AppRepository {
           WHEN food_search_documents.locale = ${locale3} THEN 3
           ELSE 4
         END,
-        food_search_documents.rank_bucket,
         search_score DESC,
+        food_search_documents.rank_bucket,
         char_length(food_search_documents.search_text),
         food_items.name
       LIMIT ${searchLimit}
@@ -424,7 +429,10 @@ export class PostgresRepository implements AppRepository {
     const locale3 = profile.locales[3] ?? locale2;
     return this.execute(dbSql`
       SELECT food_items.*,
-             similarity(food_search_documents.search_text, ${normalized}) AS search_score
+             GREATEST(
+               similarity(food_search_documents.search_text, ${normalized}),
+               ${foodSearchScoreSql(normalized)}
+             ) AS search_score
       FROM food_search_documents
       JOIN food_items ON food_items.id = food_search_documents.food_item_id
       WHERE (food_search_documents.user_id IS NULL OR food_search_documents.user_id = ${userId})
@@ -440,8 +448,8 @@ export class PostgresRepository implements AppRepository {
           WHEN food_search_documents.locale = ${locale3} THEN 3
           ELSE 4
         END,
-        food_search_documents.rank_bucket,
         search_score DESC,
+        food_search_documents.rank_bucket,
         char_length(food_search_documents.search_text),
         food_items.name
       LIMIT ${searchLimit}
@@ -1526,6 +1534,129 @@ function foodSearchCacheKey(
     excludeBranded: input.excludeBranded,
     limit,
   });
+}
+
+function foodSearchPredicateSql(normalized: string): SQL {
+  const prefix = `${normalized}%`;
+  const tokenContains = `% ${normalized}%`;
+  const multiTokenQuery = normalized.split(/\s+/).filter(Boolean).length > 1;
+  const normalizedName = dbSql`COALESCE(food_items.normalized_name, '')`;
+  const canonicalName = dbSql`COALESCE(food_items.canonical_name, '')`;
+  return dbSql`
+    food_search_documents.search_text = ${normalized}
+    OR food_search_documents.search_text LIKE ${prefix}
+    OR food_search_documents.search_text LIKE ${tokenContains}
+    OR (
+      ${multiTokenQuery}
+      AND (
+        ${candidatePhraseInQuerySql(normalizedName, normalized)}
+        OR ${candidatePhraseInQuerySql(canonicalName, normalized)}
+      )
+    )
+  `;
+}
+
+function foodSearchScoreSql(normalized: string): SQL {
+  const prefix = `${normalized}%`;
+  const tokenPrefix = `${normalized} %`;
+  const tokenContainsMiddle = `% ${normalized} %`;
+  const tokenContainsEnd = `% ${normalized}`;
+  const queryTokenCount = normalized.split(/\s+/).filter(Boolean).length;
+  const normalizedName = dbSql`COALESCE(food_items.normalized_name, '')`;
+  const canonicalName = dbSql`COALESCE(food_items.canonical_name, '')`;
+  const normalizedNamePenalty = compactnessPenaltySql(normalizedName, normalized, queryTokenCount);
+  const canonicalNamePenalty = compactnessPenaltySql(canonicalName, normalized, queryTokenCount);
+
+  return dbSql`
+    GREATEST(
+      CASE
+        WHEN ${normalizedName} = ${normalized}
+          OR ${canonicalName} = ${normalized}
+          OR food_search_documents.search_text = ${normalized}
+        THEN 1::float
+        ELSE 0::float
+      END,
+      CASE
+        WHEN ${candidatePhraseInQuerySql(normalizedName, normalized)}
+          OR ${candidatePhraseInQuerySql(canonicalName, normalized)}
+        THEN 0.78::float
+        ELSE 0::float
+      END,
+      CASE
+        WHEN ${normalizedName} LIKE ${tokenPrefix}
+          OR ${canonicalName} LIKE ${tokenPrefix}
+        THEN GREATEST(
+          CASE WHEN ${normalizedName} LIKE ${tokenPrefix} THEN 0.94::float - ${normalizedNamePenalty} ELSE 0::float END,
+          CASE WHEN ${canonicalName} LIKE ${tokenPrefix} THEN 0.94::float - ${canonicalNamePenalty} ELSE 0::float END
+        )
+        ELSE 0::float
+      END,
+      CASE
+        WHEN food_search_documents.search_text LIKE ${tokenPrefix}
+        THEN 0.90::float
+        ELSE 0::float
+      END,
+      CASE
+        WHEN ${normalizedName} LIKE ${tokenContainsMiddle}
+          OR ${normalizedName} LIKE ${tokenContainsEnd}
+          OR ${canonicalName} LIKE ${tokenContainsMiddle}
+          OR ${canonicalName} LIKE ${tokenContainsEnd}
+        THEN GREATEST(
+          CASE
+            WHEN ${normalizedName} LIKE ${tokenContainsMiddle}
+              OR ${normalizedName} LIKE ${tokenContainsEnd}
+            THEN 0.82::float - ${normalizedNamePenalty}
+            ELSE 0::float
+          END,
+          CASE
+            WHEN ${canonicalName} LIKE ${tokenContainsMiddle}
+              OR ${canonicalName} LIKE ${tokenContainsEnd}
+            THEN 0.82::float - ${canonicalNamePenalty}
+            ELSE 0::float
+          END
+        )
+        ELSE 0::float
+      END,
+      CASE
+        WHEN food_search_documents.search_text LIKE ${tokenContainsMiddle}
+          OR food_search_documents.search_text LIKE ${tokenContainsEnd}
+        THEN 0.76::float
+        ELSE 0::float
+      END,
+      CASE
+        WHEN ${normalizedName} LIKE ${prefix}
+          OR ${canonicalName} LIKE ${prefix}
+        THEN GREATEST(
+          CASE WHEN ${normalizedName} LIKE ${prefix} THEN 0.62::float - ${normalizedNamePenalty} ELSE 0::float END,
+          CASE WHEN ${canonicalName} LIKE ${prefix} THEN 0.62::float - ${canonicalNamePenalty} ELSE 0::float END
+        )
+        ELSE 0::float
+      END,
+      CASE
+        WHEN food_search_documents.search_text LIKE ${prefix}
+        THEN 0.58::float
+        ELSE 0::float
+      END
+    )
+  `;
+}
+
+function candidatePhraseInQuerySql(text: SQL, normalized: string): SQL {
+  const paddedQuery = ` ${normalized} `;
+  return dbSql`${text} <> '' AND POSITION(' ' || ${text} || ' ' IN ${paddedQuery}) > 0`;
+}
+
+function compactnessPenaltySql(text: SQL, normalized: string, queryTokenCount: number): SQL {
+  return dbSql`
+    LEAST(
+      0.12::float,
+      GREATEST(
+        COALESCE(array_length(regexp_split_to_array(NULLIF(trim(${text}), ''), '[[:space:]]+'), 1), 0) - ${queryTokenCount},
+        0
+      )::float * 0.015 +
+      GREATEST(char_length(trim(${text})) - char_length(${normalized}), 0)::float * 0.001
+    )
+  `;
 }
 
 function foodSearchProfiles(

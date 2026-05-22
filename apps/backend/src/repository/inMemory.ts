@@ -3,6 +3,7 @@ import { newId } from "../utils/ids.js";
 import { normalizeText } from "../utils/normalize.js";
 import { applyMacroGoalUpdate } from "../utils/macroGoals.js";
 import { subtractNutrition, sumNutrition } from "../utils/nutrition.js";
+import { lexicalFoodScore } from "./foodSearchScoring.js";
 import type {
   ActionCallRecord,
   AppRepository,
@@ -228,7 +229,12 @@ export class InMemoryRepository implements AppRepository {
           finalScore: clampScore(baseScore + preferenceScore * PREFERENCE_SCORE_WEIGHT)
         };
       })
-      .sort((a, b) => b.finalScore - a.finalScore || b.lexicalScore - a.lexicalScore || (b.vectorScore ?? 0) - (a.vectorScore ?? 0))
+      .sort((a, b) =>
+        b.finalScore - a.finalScore ||
+        b.lexicalScore - a.lexicalScore ||
+        (b.vectorScore ?? 0) - (a.vectorScore ?? 0) ||
+        a.name.localeCompare(b.name)
+      )
       .slice(0, limit);
   }
 
@@ -598,22 +604,6 @@ function stripFoodSearchCandidate(candidate: FoodSearchCandidate): FoodItemRecor
     ...food
   } = candidate;
   return food;
-}
-
-function lexicalFoodScore(food: FoodItemRecord, normalizedQuery: string): number {
-  const canonical = food.canonicalName ? normalizeText(food.canonicalName) : food.normalizedName;
-  const brand = food.brand ? normalizeText(food.brand) : "";
-  if (food.normalizedName === normalizedQuery || canonical === normalizedQuery) return 1;
-  if (food.normalizedName.includes(normalizedQuery) || normalizedQuery.includes(food.normalizedName)) return 0.82;
-  if (canonical.includes(normalizedQuery) || normalizedQuery.includes(canonical)) return 0.76;
-  if (brand && (brand.includes(normalizedQuery) || normalizedQuery.includes(brand))) return 0.5;
-  const queryTokens = normalizedQuery.split(/\s+/).filter(Boolean);
-  if (queryTokens.length > 1) {
-    const nameTokens = new Set(`${food.normalizedName} ${canonical}`.split(/\s+/).filter(Boolean));
-    const matchedTokens = queryTokens.filter((token) => nameTokens.has(token)).length;
-    if (matchedTokens === queryTokens.length) return 0.68;
-  }
-  return 0;
 }
 
 function foodMatchesSearchScope(food: FoodItemRecord, input: FoodHybridSearchInput): boolean {

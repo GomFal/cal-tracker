@@ -96,8 +96,15 @@ class CalTrackerApiClient {
     return _post('/v1/goals/calorie-estimate', body);
   }
 
-  Future<Map<String, Object?>> runAgent(String text) {
-    return _post('/v1/agent/runs', {'text': text, 'source': 'flutter'});
+  Future<Map<String, Object?>> runAgent(
+    String text, {
+    String? activeProposalId,
+  }) {
+    return _post('/v1/agent/runs', {
+      'text': text,
+      'source': 'flutter',
+      if (activeProposalId != null) 'activeProposalId': activeProposalId,
+    });
   }
 
   Future<Map<String, Object?>> proposeMeal(String text) {
@@ -224,6 +231,7 @@ class CalTrackerApiClient {
   Future<Map<String, Object?>> runVoiceMeal(
     File audioFile, {
     String? source,
+    String? activeProposalId,
   }) async {
     final request = http.MultipartRequest('POST', _uri('/v1/voice/meal-runs'));
     request.headers.addAll(await _headers(includeContentType: false));
@@ -236,6 +244,9 @@ class CalTrackerApiClient {
     );
     if (source != null) {
       request.fields['source'] = source;
+    }
+    if (activeProposalId != null) {
+      request.fields['activeProposalId'] = activeProposalId;
     }
 
     // Use a dedicated client with longer timeouts for file uploads.
@@ -258,7 +269,11 @@ class CalTrackerApiClient {
               refreshToken: refreshed['refreshToken'] as String,
             ),
           );
-          return runVoiceMeal(audioFile, source: source);
+          return runVoiceMeal(
+            audioFile,
+            source: source,
+            activeProposalId: activeProposalId,
+          );
         }
       }
 

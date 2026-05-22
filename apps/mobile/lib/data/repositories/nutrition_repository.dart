@@ -20,6 +20,7 @@ class AgentRunResult {
     this.deleted,
     this.actionId,
     this.input,
+    this.clarificationOptions,
     this.candidateGroups,
   });
 
@@ -37,6 +38,7 @@ class AgentRunResult {
   final bool? deleted;
   final String? actionId;
   final dynamic input;
+  final List<FoodCandidateGroup>? clarificationOptions;
   final List<FoodCandidateGroup>? candidateGroups;
 }
 
@@ -62,13 +64,27 @@ class NutritionRepository {
 
   final CalTrackerApiClient _apiClient;
 
-  Future<AgentRunResult> logText(String text) async {
-    final json = await _apiClient.runAgent(text);
+  Future<AgentRunResult> logText(
+    String text, {
+    String? activeProposalId,
+  }) async {
+    final json = activeProposalId == null
+        ? await _apiClient.runAgent(text)
+        : await _apiClient.runAgent(text, activeProposalId: activeProposalId);
     return _parseAgentRunResult(json);
   }
 
-  Future<VoiceMealRunResult> logAudio(File audioFile) async {
-    final json = await _apiClient.runVoiceMeal(audioFile, source: 'flutter');
+  Future<VoiceMealRunResult> logAudio(
+    File audioFile, {
+    String? activeProposalId,
+  }) async {
+    final json = activeProposalId == null
+        ? await _apiClient.runVoiceMeal(audioFile, source: 'flutter')
+        : await _apiClient.runVoiceMeal(
+            audioFile,
+            source: 'flutter',
+            activeProposalId: activeProposalId,
+          );
     return VoiceMealRunResult(
       transcript: json['transcript'] as String,
       provider: json['provider'] as String,
@@ -95,7 +111,8 @@ class NutritionRepository {
       remaining: json['remaining'] == null
           ? null
           : NutritionSnapshot.fromJson(
-              json['remaining'] as Map<String, Object?>),
+              json['remaining'] as Map<String, Object?>,
+            ),
       meals: json['meals'] == null
           ? null
           : (json['meals'] as List<Object?>)
@@ -126,7 +143,9 @@ class NutritionRepository {
       deleted: json['deleted'] as bool?,
       actionId: json['actionId'] as String?,
       input: json['input'],
-      candidateGroups: _parseCandidateGroups(json['options']),
+      clarificationOptions: _parseCandidateGroups(json['options']),
+      candidateGroups: _parseCandidateGroups(json['candidateGroups']) ??
+          _parseCandidateGroups(json['options']),
     );
   }
 
@@ -149,7 +168,9 @@ class NutritionRepository {
   }
 
   Future<MealProposal> updateProposalItems(
-      String proposalId, List<MealItem> items) async {
+    String proposalId,
+    List<MealItem> items,
+  ) async {
     final json = await _apiClient.correctProposal(
       proposalId: proposalId,
       items: items.map((item) => item.toJson()).toList(),
@@ -163,14 +184,12 @@ class NutritionRepository {
     required List<MealItem> items,
     String? title,
   }) async {
-    final json = await _apiClient.executeAction(
-      'create_meal_proposal_from_items',
-      {
-        'phrase': phrase,
-        if (title != null) 'title': title,
-        'items': items.map((item) => item.toJson()).toList(),
-      },
-    );
+    final json =
+        await _apiClient.executeAction('create_meal_proposal_from_items', {
+      'phrase': phrase,
+      if (title != null) 'title': title,
+      'items': items.map((item) => item.toJson()).toList(),
+    });
     final output = json['output'] as Map<String, Object?>;
     return MealProposal.fromJson(output['proposal'] as Map<String, Object?>);
   }
@@ -183,7 +202,8 @@ class NutritionRepository {
 
   Future<DailySummary> getDailySummary({String? date}) async {
     final json = await _apiClient.getDailySummary(
-        date: date ?? DateTime.now().toIso8601String().substring(0, 10));
+      date: date ?? DateTime.now().toIso8601String().substring(0, 10),
+    );
     final output = json['output'] as Map<String, Object?>;
     return DailySummary.fromJson(output['summary'] as Map<String, Object?>);
   }
@@ -207,9 +227,7 @@ class NutritionRepository {
       calories: calories,
       hydrationGoalGlasses: hydrationGoalGlasses,
       calorieTargetSource: calorieTargetSource,
-      macroFields: macroConfig?.toApiJson(
-        calories: macroTargetCalories,
-      ),
+      macroFields: macroConfig?.toApiJson(calories: macroTargetCalories),
     );
     return DailyGoals.fromJson(json['goals'] as Map<String, Object?>);
   }
@@ -254,7 +272,9 @@ class NutritionRepository {
   }
 
   Future<MealTemplate> setTemplateTrustedMode(
-      MealTemplate template, bool enabled) async {
+    MealTemplate template,
+    bool enabled,
+  ) async {
     final body = template.toUpdateJson()
       ..['trustedAutoCommitEnabled'] = enabled;
     final json = await _apiClient.updateTemplate(template.id, body);

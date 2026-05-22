@@ -12,6 +12,7 @@ import {
   getRemainingTargetsInputSchema,
   proposeMealLogInputSchema,
   queryFoodMemoryInputSchema,
+  reviseMealProposalInputSchema,
   searchNutritionDatabaseInputSchema,
   updateMealTemplateInputSchema,
   type ActionContext,
@@ -50,6 +51,17 @@ export class ActionExecutionError extends Error {
     super(message);
   }
 }
+
+type RevisionMentionResolution =
+  | { items: MealItem[]; candidateGroups: FoodCandidateGroup[] }
+  | {
+      clarificationRequired: true;
+      resolvedItems: MealItem[];
+      unresolvedMentions: FoodMention[];
+      options: FoodCandidateGroup[];
+      candidateGroups: FoodCandidateGroup[];
+      message: string;
+    };
 
 function actionInstrumentation(output: unknown): Record<string, unknown> | undefined {
   if (
@@ -266,6 +278,8 @@ export class ActionExecutor {
       }
       case "correct_meal":
         return this.correctMeal(input, context);
+      case "revise_meal_proposal":
+        return this.reviseMealProposal(input, context);
       case "delete_meal": {
         const parsed = deleteMealInputSchema.parse(input);
         if (parsed.confirmationToken !== "DELETE") {
@@ -419,19 +433,41 @@ export class ActionExecutor {
     );
     if (resolution?.clarificationRequired) {
       const clarificationStarted = Date.now();
-      const unsupportedUnitMessage = unsupportedUnitClarification(
+      const visibleCandidateGroups = candidateGroupsForMentions(
         resolution.candidateGroups,
+        resolution.unresolvedMentions,
       );
+      const unsupportedUnitMessage =
+        unsupportedUnitClarification(visibleCandidateGroups);
+      const proposal = resolution.items.length > 0
+        ? await this.repository.createProposal(context.actorUserId, {
+            phrase: parsed.text,
+            title: inferTitle(parsed.text, resolution.items),
+            status: "pending",
+            confidence: 0.68,
+            requiresConfirmation: true,
+            trustedAutoCommitEligible: false,
+            source: "backend_estimate",
+            nutrition: sumNutrition(resolution.items),
+            items: resolution.items,
+          })
+        : undefined;
       markPhase("build_clarification", clarificationStarted);
       return {
+        proposal,
         clarificationRequired: true,
         resolvedItems: resolution.items,
         unresolvedMentions: resolution.unresolvedMentions,
-        options: resolution.candidateGroups,
+        options: visibleCandidateGroups,
+        candidateGroups: resolution.candidateGroups,
         message:
           unsupportedUnitMessage ??
           (resolution.unresolvedMentions.length > 0
-            ? "I could not confidently match every ingredient. Please choose a food match or rephrase the meal."
+            ? foodMatchClarificationMessage(
+                visibleCandidateGroups,
+                "Please choose a food match or rephrase the meal.",
+                "in that meal",
+              )
             : "I could not identify the ingredients in that meal. Please add quantities and food names."),
         instrumentation: {
           action: "propose_meal_log",
@@ -541,7 +577,7 @@ export class ActionExecutor {
     return {
       proposal,
       autoCommittedMeal,
-      options: resolution?.candidateGroups ?? [],
+      options: [],
       candidateGroups: resolution?.candidateGroups ?? [],
       instrumentation: {
         action: "propose_meal_log",
@@ -674,6 +710,233 @@ export class ActionExecutor {
     return { meal: corrected };
   }
 
+  async getProposalForAgentContext(
+    userId: string,
+    proposalId: string,
+  ): Promise<MealProposal | undefined> {
+    return this.repository.getProposal(userId, proposalId);
+  }
+
+  private async reviseMealProposal(input: unknown, context: ActionContext) {
+    const parsed = reviseMealProposalInputSchema.parse(input);
+    const proposal = await this.requireProposal(
+      context.actorUserId,
+      parsed.proposalId,
+    );
+    if (proposal.status === "committed") {
+      throw new ActionExecutionError("proposal_already_committed");
+    }
+    if (proposal.status === "rejected") {
+      throw new ActionExecutionError("proposal_not_editable");
+    }
+
+    const items = [...proposal.items];
+    const revisionCandidateGroups: FoodCandidateGroup[] = [];
+    const unresolved: Extract<
+      RevisionMentionResolution,
+      { clarificationRequired: true }
+    >[] = [];
+    let appliedOperationCount = 0;
+    for (const operation of parsed.operations) {
+      switch (operation.type) {
+        case "add_item": {
+          const resolved = await this.resolveRevisionMention(
+            context.actorUserId,
+            operation.mention,
+            context.locale,
+          );
+          if ("clarificationRequired" in resolved) {
+            unresolved.push(resolved);
+            break;
+          }
+          revisionCandidateGroups.push(...resolved.candidateGroups);
+          items.push(...resolved.items);
+          appliedOperationCount++;
+          break;
+        }
+        case "remove_item": {
+          const index = findProposalItemIndex(items, operation);
+          if (index < 0) {
+            throw new ActionExecutionError("proposal_item_not_found");
+          }
+          items.splice(index, 1);
+          appliedOperationCount++;
+          break;
+        }
+        case "replace_item": {
+          const index = findProposalItemIndex(items, operation);
+          if (index < 0) {
+            throw new ActionExecutionError("proposal_item_not_found");
+          }
+          const resolved = await this.resolveRevisionMention(
+            context.actorUserId,
+            operation.mention,
+            context.locale,
+          );
+          if ("clarificationRequired" in resolved) {
+            unresolved.push(resolved);
+            break;
+          }
+          revisionCandidateGroups.push(...resolved.candidateGroups);
+          items.splice(index, 1, ...resolved.items);
+          appliedOperationCount++;
+          break;
+        }
+        case "update_item_quantity": {
+          const index = findProposalItemIndex(items, operation);
+          if (index < 0) {
+            throw new ActionExecutionError("proposal_item_not_found");
+          }
+          const current = items[index]!;
+          if (sameUnit(current.unit, operation.unit)) {
+            items[index] = scaleMealItem(
+              current,
+              operation.quantity,
+              operation.unit,
+            );
+            appliedOperationCount++;
+            break;
+          }
+          const foodName = current.canonicalName ?? current.name;
+          const resolved = await this.resolveRevisionMention(
+            context.actorUserId,
+            {
+              originalText:
+                `${operation.quantity} ${operation.rawUnitText ?? operation.unit} ${foodName}`.trim(),
+              canonicalEnglishName: foodName,
+              quantity: operation.quantity,
+              unit: operation.unit,
+              rawUnitText: operation.rawUnitText ?? operation.unit,
+              unitKind: operation.unit === "g" ? "metric" : "unknown",
+              confidence: current.confidence ?? 0.8,
+              marketProduct: false,
+            },
+            context.locale,
+          );
+          if ("clarificationRequired" in resolved) {
+            unresolved.push(resolved);
+            break;
+          }
+          revisionCandidateGroups.push(...resolved.candidateGroups);
+          items.splice(index, 1, ...resolved.items);
+          appliedOperationCount++;
+          break;
+        }
+      }
+    }
+
+    const unresolvedMentions = unresolved.flatMap(
+      (entry) => entry.unresolvedMentions,
+    );
+    const unresolvedOptions = mergeCandidateGroups(
+      unresolved.flatMap((entry) => entry.options),
+      unresolvedMentions,
+    );
+    const candidateGroups = mergeCandidateGroups(
+      [
+        ...revisionCandidateGroups,
+        ...unresolved.flatMap((entry) => entry.candidateGroups),
+      ],
+      unresolvedMentions,
+    );
+    const resolvedItems = unresolved.flatMap((entry) => entry.resolvedItems);
+    const hasUnresolved = unresolvedOptions.length > 0;
+
+    if (items.length === 0 && !hasUnresolved) {
+      throw new ActionExecutionError("proposal_empty");
+    }
+
+    const shouldPersist = appliedOperationCount > 0 && items.length > 0;
+    const corrected = shouldPersist
+      ? await this.repository.updateProposal(
+          context.actorUserId,
+          {
+            ...proposal,
+            status: "corrected",
+            title: inferTitle(proposal.phrase, items),
+            items,
+            nutrition: sumNutrition(items),
+          },
+        )
+      : proposal;
+
+    if (shouldPersist) {
+      await recordFoodFeedback(this.repository, {
+        userId: context.actorUserId,
+        eventType: "proposal_corrected",
+        traceId: context.traceId,
+        source: context.source,
+        phrase: parsed.instruction,
+        proposalId: corrected.id,
+        items: corrected.items,
+        previousItems: proposal.items,
+        metadata: {
+          partial: hasUnresolved,
+          revisionOperationCount: parsed.operations.length,
+          appliedRevisionOperationCount: appliedOperationCount,
+          unresolvedMentionCount: unresolvedMentions.length,
+        },
+      });
+    }
+
+    if (hasUnresolved) {
+      return {
+        proposal: corrected,
+        clarificationRequired: true,
+        resolvedItems,
+        unresolvedMentions,
+        options: unresolvedOptions,
+        candidateGroups,
+        message: foodMatchClarificationMessage(
+          unresolvedOptions,
+          "Please choose a food match or rephrase the correction.",
+          "before updating the meal proposal",
+        ),
+      };
+    }
+
+    return {
+      proposal: corrected,
+      candidateGroups: mergeCandidateGroups(revisionCandidateGroups, []),
+      message: "Meal proposal updated.",
+    };
+  }
+
+  private async resolveRevisionMention(
+    userId: string,
+    mention: FoodMention,
+    locale?: string,
+  ): Promise<RevisionMentionResolution> {
+    const resolution = await this.resolveMealMentions(userId, [mention], locale);
+    if (resolution.clarificationRequired || resolution.items.length === 0) {
+      const unresolvedMentions = resolution.unresolvedMentions.length > 0
+        ? resolution.unresolvedMentions
+        : [mention];
+      const candidateGroups = ensureCandidateGroupsForMentions(
+        resolution.candidateGroups,
+        unresolvedMentions,
+      );
+      return {
+        clarificationRequired: true,
+        resolvedItems: resolution.items,
+        unresolvedMentions,
+        options: candidateGroups,
+        candidateGroups: resolution.candidateGroups,
+        message:
+          unsupportedUnitClarification(candidateGroups) ??
+          foodMatchClarificationMessage(
+            candidateGroups,
+            "Please choose a food match or rephrase the correction.",
+            "before updating the meal proposal",
+          ),
+      };
+    }
+    return {
+      items: resolution.items,
+      candidateGroups: resolution.candidateGroups,
+    };
+  }
+
   private async requireProposal(
     userId: string,
     proposalId: string,
@@ -781,6 +1044,104 @@ function foodFeedbackRecordForItem(
   };
 }
 
+function ensureCandidateGroupsForMentions(
+  candidateGroups: FoodCandidateGroup[],
+  mentions: FoodMention[],
+): FoodCandidateGroup[] {
+  const groups = candidateGroups.map((group) =>
+    group.candidates.length === 0 && !group.reason
+      ? { ...group, reason: "no_database_match" }
+      : group,
+  );
+  const existingKeys = new Set(
+    groups.map((group) => foodMentionKey(group.mention)),
+  );
+  for (const mention of mentions) {
+    const key = foodMentionKey(mention);
+    if (existingKeys.has(key)) continue;
+    groups.push({
+      mention,
+      candidates: [],
+      reason: "no_database_match",
+    });
+    existingKeys.add(key);
+  }
+  return groups;
+}
+
+function candidateGroupsForMentions(
+  candidateGroups: FoodCandidateGroup[],
+  mentions: FoodMention[],
+): FoodCandidateGroup[] {
+  if (mentions.length === 0) return [];
+  const mentionKeys = new Set(mentions.map(foodMentionKey));
+  return ensureCandidateGroupsForMentions(
+    candidateGroups.filter((group) =>
+      mentionKeys.has(foodMentionKey(group.mention)),
+    ),
+    mentions,
+  );
+}
+
+function mergeCandidateGroups(
+  candidateGroups: FoodCandidateGroup[],
+  mentions: FoodMention[],
+): FoodCandidateGroup[] {
+  return ensureCandidateGroupsForMentions(
+    candidateGroups.filter(
+      (group, index, groups) =>
+        groups.findIndex(
+          (candidate) =>
+            foodMentionKey(candidate.mention) === foodMentionKey(group.mention),
+        ) === index,
+    ),
+    mentions,
+  );
+}
+
+function foodMentionKey(mention: FoodMention): string {
+  return [
+    mention.originalText,
+    mention.canonicalName ?? "",
+    mention.canonicalEnglishName ?? "",
+    mention.quantity.toString(),
+    mention.unit,
+  ]
+    .map(normalizeText)
+    .join("|");
+}
+
+function foodMatchClarificationMessage(
+  candidateGroups: FoodCandidateGroup[],
+  suffix: string,
+  targetPhrase: string,
+): string {
+  const names = uniqueStrings(
+    candidateGroups
+      .map((group) => displayNameForMention(group.mention))
+      .filter((value) => value.length > 0),
+  );
+  if (names.length === 0) {
+    return `I could not confidently match every ingredient. ${suffix}`;
+  }
+  if (names.length === 1) {
+    return `I need a food match for ${names[0]} ${targetPhrase}. ${suffix}`;
+  }
+  return `I need food matches for ${names.join(", ")} ${targetPhrase}. ${suffix}`;
+}
+
+function displayNameForMention(mention: FoodMention): string {
+  return (
+    mention.canonicalName ??
+    mention.canonicalEnglishName ??
+    mention.originalText
+  ).trim();
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return [...new Set(values)];
+}
+
 function unsupportedUnitClarification(
   candidateGroups: FoodCandidateGroup[],
 ): string | undefined {
@@ -817,6 +1178,64 @@ function canonicalNameForMention(mention: FoodMention): string {
       mention.canonicalEnglishName ??
       mention.originalText,
   );
+}
+
+function findProposalItemIndex(
+  items: MealItem[],
+  target: { itemIndex?: number; matchText?: string },
+): number {
+  if (
+    target.itemIndex !== undefined &&
+    target.itemIndex >= 0 &&
+    target.itemIndex < items.length
+  ) {
+    return target.itemIndex;
+  }
+  const normalizedMatch = normalizeText(target.matchText ?? "");
+  if (!normalizedMatch) return -1;
+  return items.findIndex((item) => {
+    const names = [item.name, item.canonicalName, item.originalText]
+      .filter((value): value is string => Boolean(value))
+      .map(normalizeText);
+    return names.some(
+      (name) =>
+        name === normalizedMatch ||
+        name.includes(normalizedMatch) ||
+        normalizedMatch.includes(name),
+    );
+  });
+}
+
+function sameUnit(left: string, right: string): boolean {
+  return normalizeText(left) === normalizeText(right);
+}
+
+function scaleMealItem(
+  item: MealItem,
+  quantity: number,
+  unit: string,
+): MealItem {
+  const ratio = quantity / item.quantity;
+  return {
+    ...item,
+    quantity,
+    unit,
+    calories: Math.round(item.calories * ratio),
+    proteinGrams: roundOne(item.proteinGrams * ratio),
+    carbsGrams: roundOne(item.carbsGrams * ratio),
+    fatGrams: roundOne(item.fatGrams * ratio),
+    resolvedGrams:
+      item.resolvedGrams === undefined
+        ? undefined
+        : roundOne(item.resolvedGrams * ratio),
+    source: item.source.endsWith(":manual_edit")
+      ? item.source
+      : `${item.source}:manual_edit`,
+  };
+}
+
+function roundOne(value: number): number {
+  return Math.round(value * 10) / 10;
 }
 
 function inferTitle(text: string, items: MealItem[]): string {

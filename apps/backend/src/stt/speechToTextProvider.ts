@@ -6,14 +6,18 @@ export type TranscriptionResult = {
   model: string;
 };
 
+export type SpeechToTextInput = {
+  audio: Buffer;
+  filename: string;
+  mimeType: string;
+  userId: string;
+  traceId: string;
+  language?: string;
+  prompt?: string;
+};
+
 export interface SpeechToTextProvider {
-  transcribe(input: {
-    audio: Buffer;
-    filename: string;
-    mimeType: string;
-    userId: string;
-    traceId: string;
-  }): Promise<TranscriptionResult>;
+  transcribe(input: SpeechToTextInput): Promise<TranscriptionResult>;
 }
 
 export class RemoteSpeechToTextProvider implements SpeechToTextProvider {
@@ -23,13 +27,7 @@ export class RemoteSpeechToTextProvider implements SpeechToTextProvider {
     private readonly baseUrl: string
   ) {}
 
-  async transcribe(input: {
-    audio: Buffer;
-    filename: string;
-    mimeType: string;
-    userId: string;
-    traceId: string;
-  }): Promise<TranscriptionResult> {
+  async transcribe(input: SpeechToTextInput): Promise<TranscriptionResult> {
     const startedAt = Date.now();
     const form = new FormData();
     const arrayBuffer = input.audio.buffer.slice(
@@ -39,6 +37,10 @@ export class RemoteSpeechToTextProvider implements SpeechToTextProvider {
     const blob = new Blob([arrayBuffer], { type: input.mimeType });
     form.append("file", blob, input.filename);
     form.append("model", this.model);
+    form.append("response_format", "json");
+    form.append("temperature", "0");
+    if (input.language) form.append("language", input.language);
+    if (input.prompt) form.append("prompt", input.prompt);
 
     const res = await fetch(`${this.baseUrl}/audio/transcriptions`, {
       method: "POST",
@@ -66,6 +68,7 @@ export class RemoteSpeechToTextProvider implements SpeechToTextProvider {
       traceId: input.traceId,
       provider: "groq",
       model: this.model,
+      language: input.language,
       durationMs: Date.now() - startedAt,
       transcriptLength: json.text.length,
     });

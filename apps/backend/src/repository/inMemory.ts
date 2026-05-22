@@ -46,6 +46,7 @@ export class InMemoryRepository implements AppRepository {
   private foods = new Map<string, FoodItemRecord>();
   private targets = new Map<string, NutritionSnapshot>();
   private hydrationGoals = new Map<string, number>();
+  private dailyWater = new Map<string, number>();
   private calorieTargetConfigured = new Map<string, boolean>();
   private calorieTargetSources = new Map<string, CalorieTargetSource>();
   private macroGoalMetadata = new Map<string, MacroGoalMetadata>();
@@ -79,7 +80,7 @@ export class InMemoryRepository implements AppRepository {
     };
     this.users.set(user.id, user);
     this.targets.set(user.id, { calories: 2200, proteinGrams: 0, carbsGrams: 0, fatGrams: 0 });
-    this.hydrationGoals.set(user.id, 12);
+    this.hydrationGoals.set(user.id, 0);
     this.calorieTargetConfigured.set(user.id, false);
     this.calorieTargetSources.set(user.id, "default");
     return user;
@@ -332,7 +333,7 @@ export class InMemoryRepository implements AppRepository {
   async getDailyGoals(userId: string, date: string): Promise<DailyGoals> {
     return this.ensureDailyGoalSnapshot(userId, date, {
       target: await this.getNutritionTarget(userId),
-      hydrationGoalGlasses: this.hydrationGoals.get(userId) ?? 12,
+      hydrationGoalLiters: this.hydrationGoals.get(userId) ?? 0,
       calorieTargetConfigured: this.calorieTargetConfigured.get(userId) ?? false,
       calorieTargetSource: this.calorieTargetSources.get(userId) ?? "default",
       ...this.currentMacroMetadata(userId),
@@ -341,14 +342,14 @@ export class InMemoryRepository implements AppRepository {
 
   async updateDailyGoals(userId: string, input: UpdateDailyGoalsInput): Promise<DailyGoals> {
     const currentTarget = await this.getNutritionTarget(userId);
-    const currentHydration = this.hydrationGoals.get(userId) ?? 12;
+    const currentHydration = this.hydrationGoals.get(userId) ?? 0;
     const currentConfigured = this.calorieTargetConfigured.get(userId) ?? false;
     const currentSource = this.calorieTargetSources.get(userId) ?? "default";
     const currentMetadata = this.currentMacroMetadata(userId);
     for (const date of previousDatesInWeek(input.date)) {
       this.ensureDailyGoalSnapshot(userId, date, {
         target: currentTarget,
-        hydrationGoalGlasses: currentHydration,
+        hydrationGoalLiters: currentHydration,
         calorieTargetConfigured: currentConfigured,
         calorieTargetSource: currentSource,
         ...currentMetadata,
@@ -362,7 +363,7 @@ export class InMemoryRepository implements AppRepository {
           input,
           input.calories ?? currentTarget.calories,
         );
-    const nextHydration = input.hydrationGoalGlasses ?? currentHydration;
+    const nextHydration = input.hydrationGoalLiters ?? currentHydration;
     const nextConfigured = input.calories === undefined ? currentConfigured : true;
     const nextSource = input.calories === undefined ? currentSource : input.calorieTargetSource ?? "manual";
     this.targets.set(userId, nextTarget);
@@ -373,13 +374,24 @@ export class InMemoryRepository implements AppRepository {
     const goals = {
       date: input.date,
       target: nextTarget,
-      hydrationGoalGlasses: nextHydration,
+      hydrationGoalLiters: nextHydration,
       calorieTargetConfigured: nextConfigured,
       calorieTargetSource: nextSource,
       ...nextMetadata,
     };
     this.dailyGoalSnapshots.set(dailyGoalKey(userId, input.date), goals);
+    const waterKey = dailyGoalKey(userId, input.date);
+    this.dailyWater.set(waterKey, Math.min(this.dailyWater.get(waterKey) ?? 0, nextHydration));
     return goals;
+  }
+
+  async updateDailyHydration(userId: string, date: string, waterConsumedLiters: number): Promise<import("@cal-tracker/contracts").DailySummary> {
+    const goals = await this.getDailyGoals(userId, date);
+    this.dailyWater.set(
+      dailyGoalKey(userId, date),
+      Math.min(Math.max(waterConsumedLiters, 0), goals.hydrationGoalLiters),
+    );
+    return this.getDailySummary(userId, date);
   }
 
   async listMeals(userId: string, limit = 25): Promise<Meal[]> {
@@ -465,7 +477,8 @@ export class InMemoryRepository implements AppRepository {
       consumed,
       target: goals.target,
       remaining: subtractNutrition(goals.target, consumed),
-      hydrationGoalGlasses: goals.hydrationGoalGlasses,
+      hydrationGoalLiters: goals.hydrationGoalLiters,
+      waterConsumedLiters: this.dailyWater.get(dailyGoalKey(userId, date)) ?? 0,
       calorieTargetConfigured: goals.calorieTargetConfigured,
       calorieTargetSource: goals.calorieTargetSource,
       macroMode: goals.macroMode,

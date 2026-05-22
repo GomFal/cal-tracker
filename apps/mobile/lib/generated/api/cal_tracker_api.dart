@@ -37,33 +37,45 @@ class CalTrackerApiClient {
     required String password,
     required String displayName,
   }) {
-    return _post('/v1/auth/register', {
-      'email': email,
-      'password': password,
-      'displayName': displayName,
-    }, authenticated: false);
+    return _post(
+        '/v1/auth/register',
+        {
+          'email': email,
+          'password': password,
+          'displayName': displayName,
+        },
+        authenticated: false);
   }
 
   Future<Map<String, Object?>> login({
     required String email,
     required String password,
   }) {
-    return _post('/v1/auth/login', {
-      'email': email,
-      'password': password,
-    }, authenticated: false);
+    return _post(
+        '/v1/auth/login',
+        {
+          'email': email,
+          'password': password,
+        },
+        authenticated: false);
   }
 
   Future<Map<String, Object?>> loginWithGoogle({required String idToken}) {
-    return _post('/v1/auth/google/login', {
-      'idToken': idToken,
-    }, authenticated: false);
+    return _post(
+        '/v1/auth/google/login',
+        {
+          'idToken': idToken,
+        },
+        authenticated: false);
   }
 
   Future<Map<String, Object?>> refresh(String refreshToken) {
-    return _post('/v1/auth/refresh', {
-      'refreshToken': refreshToken,
-    }, authenticated: false);
+    return _post(
+        '/v1/auth/refresh',
+        {
+          'refreshToken': refreshToken,
+        },
+        authenticated: false);
   }
 
   Future<Map<String, Object?>> getMe() => _get('/v1/auth/me');
@@ -77,18 +89,28 @@ class CalTrackerApiClient {
   Future<Map<String, Object?>> updateDailyGoals({
     String? date,
     int? calories,
-    int? hydrationGoalGlasses,
+    double? hydrationGoalLiters,
     String? calorieTargetSource,
     Map<String, Object?>? macroFields,
   }) {
     return _put('/v1/goals', {
       if (date != null) 'date': date,
       if (calories != null) 'calories': calories,
-      if (hydrationGoalGlasses != null)
-        'hydrationGoalGlasses': hydrationGoalGlasses,
+      if (hydrationGoalLiters != null)
+        'hydrationGoalLiters': hydrationGoalLiters,
       if (calorieTargetSource != null)
         'calorieTargetSource': calorieTargetSource,
       if (macroFields != null) ...macroFields,
+    });
+  }
+
+  Future<Map<String, Object?>> updateDailyHydration({
+    String? date,
+    required double waterConsumedLiters,
+  }) {
+    return _put('/v1/hydration/daily', {
+      if (date != null) 'date': date,
+      'waterConsumedLiters': waterConsumedLiters,
     });
   }
 

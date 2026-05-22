@@ -48,6 +48,66 @@ void main() {
     expect(preferencesRepository.savedLocaleCode, 'es');
   });
 
+  testWidgets('Menu hydration sheet uses localized copy and saves liters',
+      (tester) async {
+    final nutritionRepository = _FakeNutritionRepository();
+    await _pumpSettings(tester, nutritionRepository: nutritionRepository);
+
+    expect(find.text('2.5 L per day'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('hydration_goal_row')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Set your daily water goal'), findsOneWidget);
+    expect(find.text('Choose how much water you want to drink each day.'),
+        findsOneWidget);
+    expect(find.text('Liters (L)'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('hydration_goal_cancel_button')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('save_goal_button')).hitTestable(),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('hydration_unit_ounces')));
+    await tester.pumpAndSettle();
+    expect(find.text('84.5'), findsOneWidget);
+
+    await tester
+        .tap(find.byKey(const ValueKey('hydration_goal_increase_button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('save_goal_button')));
+    await tester.pumpAndSettle();
+
+    expect(nutritionRepository.updatedHydrationGoalLiters, 2.75);
+    expect(find.text('2.75 L per day'), findsOneWidget);
+
+    final preferencesRepository = _FakePreferencesRepository();
+    final localeViewModel = LocaleViewModel(
+      preferencesRepository: preferencesRepository,
+    );
+    await localeViewModel.setLocaleCode('es');
+    await _pumpSettings(
+      tester,
+      nutritionRepository: _FakeNutritionRepository(),
+      localeViewModel: localeViewModel,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('hydration_goal_row')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Define tu objetivo diario de agua'), findsOneWidget);
+    expect(
+        find.text('Elige cuánta agua quieres beber cada día.'), findsOneWidget);
+
+    await tester.drag(find.byType(BottomSheet), const Offset(0, 500));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Define tu objetivo diario de agua'), findsNothing);
+  });
+
   testWidgets('Menu calorie target row opens shared calorie sheet and saves',
       (tester) async {
     final nutritionRepository = _FakeNutritionRepository(
@@ -252,6 +312,7 @@ class _FakeNutritionRepository extends NutritionRepository {
   DailySummary _dailySummary;
   int updateCalls = 0;
   int? updatedCalories;
+  double? updatedHydrationGoalLiters;
   String? updateSource;
 
   @override
@@ -266,13 +327,14 @@ class _FakeNutritionRepository extends NutritionRepository {
   Future<DailyGoals> updateDailyGoals({
     String? date,
     int? calories,
-    int? hydrationGoalGlasses,
+    double? hydrationGoalLiters,
     String? calorieTargetSource,
     MacroDistributionConfig? macroConfig,
     int? macroCalorieTarget,
   }) async {
     updateCalls += 1;
     updatedCalories = calories;
+    updatedHydrationGoalLiters = hydrationGoalLiters;
     updateSource = calorieTargetSource;
     final target = calories == null
         ? _dailySummary.target
@@ -292,8 +354,9 @@ class _FakeNutritionRepository extends NutritionRepository {
         carbsGrams: target.carbsGrams - _dailySummary.consumed.carbsGrams,
         fatGrams: target.fatGrams - _dailySummary.consumed.fatGrams,
       ),
-      hydrationGoalGlasses:
-          hydrationGoalGlasses ?? _dailySummary.hydrationGoalGlasses,
+      hydrationGoalLiters:
+          hydrationGoalLiters ?? _dailySummary.hydrationGoalLiters,
+      waterConsumedLiters: _dailySummary.waterConsumedLiters,
       calorieTargetConfigured:
           calories == null ? _dailySummary.calorieTargetConfigured : true,
       calorieTargetSource:
@@ -311,7 +374,7 @@ class _FakeNutritionRepository extends NutritionRepository {
     return DailyGoals(
       date: _dailySummary.date,
       target: _dailySummary.target,
-      hydrationGoalGlasses: _dailySummary.hydrationGoalGlasses,
+      hydrationGoalLiters: _dailySummary.hydrationGoalLiters,
       calorieTargetConfigured: _dailySummary.calorieTargetConfigured,
       calorieTargetSource: _dailySummary.calorieTargetSource,
       macroMode: _dailySummary.macroMode,
@@ -402,7 +465,8 @@ const _summary = DailySummary(
     carbsGrams: 240,
     fatGrams: 70,
   ),
-  hydrationGoalGlasses: 12,
+  hydrationGoalLiters: 2.5,
+  waterConsumedLiters: 0,
   calorieTargetConfigured: true,
   calorieTargetSource: 'manual',
   meals: [],
@@ -428,7 +492,8 @@ const _summaryWithoutConfiguredCalories = DailySummary(
     carbsGrams: 240,
     fatGrams: 70,
   ),
-  hydrationGoalGlasses: 12,
+  hydrationGoalLiters: 0,
+  waterConsumedLiters: 0,
   calorieTargetConfigured: false,
   calorieTargetSource: 'default',
   meals: [],
@@ -454,7 +519,8 @@ const _summaryWithoutConfiguredCaloriesWithDefaultMacro = DailySummary(
     carbsGrams: 240,
     fatGrams: 70,
   ),
-  hydrationGoalGlasses: 12,
+  hydrationGoalLiters: 0,
+  waterConsumedLiters: 0,
   calorieTargetConfigured: false,
   calorieTargetSource: 'default',
   macroMode: MacroMode.percentage,

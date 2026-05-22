@@ -198,8 +198,8 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsHydrationGoal => 'Objetivo de hidratación';
 
   @override
-  String settingsHydrationGoalSubtitle(int glasses) {
-    return '$glasses vasos al día';
+  String settingsHydrationGoalSubtitle(String liters) {
+    return '$liters L al día';
   }
 
   @override
@@ -211,7 +211,45 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get settingsGlassesUnit => 'vasos';
+  String get settingsLitersUnit => 'litros';
+
+  @override
+  String get settingsOuncesUnit => 'onzas';
+
+  @override
+  String get hydrationSheetTitle => 'Define tu objetivo diario de agua';
+
+  @override
+  String get hydrationSheetSubtitle =>
+      'Elige cuánta agua quieres beber cada día.';
+
+  @override
+  String get hydrationUnitTitle => 'Unidad';
+
+  @override
+  String get hydrationUnitLiters => 'Litros (L)';
+
+  @override
+  String get hydrationUnitOunces => 'Onzas (fl oz)';
+
+  @override
+  String get hydrationDailyGoal => 'Objetivo diario';
+
+  @override
+  String get hydrationRecommendedRange => 'Recomendado: 2.0 - 3.0 L';
+
+  @override
+  String get hydrationInfoTitle => 'Mantente hidratado';
+
+  @override
+  String get hydrationInfoMessage =>
+      'Beber suficiente agua ayuda a tu cuerpo a funcionar mejor y apoya tus objetivos.';
+
+  @override
+  String get hydrationDecreaseGoalTooltip => 'Reducir objetivo de agua';
+
+  @override
+  String get hydrationIncreaseGoalTooltip => 'Aumentar objetivo de agua';
 
   @override
   String get settingsLogOut => 'Cerrar sesión';
@@ -737,9 +775,23 @@ class AppLocalizationsEs extends AppLocalizations {
   String get dashboardCaloriesLeft => 'restantes';
 
   @override
-  String dashboardGoalLine(int calories, int glasses) {
-    return 'Objetivo $calories Kcal, $glasses vasos';
+  String dashboardGoalLine(int calories, String liters) {
+    return 'Objetivo $calories Kcal, $liters L';
   }
+
+  @override
+  String get dashboardWaterIntake => 'Consumo de agua';
+
+  @override
+  String dashboardWaterProgress(String consumed, String goal) {
+    return '$consumed / $goal L';
+  }
+
+  @override
+  String get dashboardWaterDecreaseTooltip => 'Reducir consumo de agua';
+
+  @override
+  String get dashboardWaterIncreaseTooltip => 'Aumentar consumo de agua';
 
   @override
   String get dashboardTodayLower => 'hoy';

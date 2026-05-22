@@ -23,7 +23,7 @@ export type StoredUser = AuthUser & {
 export type UpdateDailyGoalsInput = {
   date: string;
   calories?: number;
-  hydrationGoalGlasses?: number;
+  hydrationGoalLiters?: number;
   calorieTargetSource?: CalorieTargetSource;
   macroMode?: MacroMode;
   macroSource?: MacroSource;
@@ -233,6 +233,7 @@ export interface AppRepository {
   getNutritionTarget(userId: string): Promise<NutritionSnapshot>;
   getDailyGoals(userId: string, date: string): Promise<DailyGoals>;
   updateDailyGoals(userId: string, input: UpdateDailyGoalsInput): Promise<DailyGoals>;
+  updateDailyHydration(userId: string, date: string, waterConsumedLiters: number): Promise<DailySummary>;
   listMeals(userId: string, limit?: number): Promise<Meal[]>;
   getMeal(userId: string, mealId: string): Promise<Meal | undefined>;
   createProposal(userId: string, proposal: Omit<MealProposal, "id" | "createdAt">): Promise<MealProposal>;

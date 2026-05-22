@@ -1,6 +1,7 @@
 import {
   agentRunRequestSchema,
   calorieEstimateRequestSchema,
+  dailyHydrationUpdateSchema,
   executeActionRequestSchema,
   goalsUpdateSchema,
   googleLoginRequestSchema,
@@ -204,7 +205,7 @@ export function createApp(input: {
     const goals = await repository.updateDailyGoals(user.id, {
       date,
       calories: body.calories,
-      hydrationGoalGlasses: body.hydrationGoalGlasses,
+      hydrationGoalLiters: body.hydrationGoalLiters,
       calorieTargetSource: body.calorieTargetSource,
       macroMode: body.macroMode,
       macroSource: body.macroSource,
@@ -220,6 +221,13 @@ export function createApp(input: {
     });
     const summary = await repository.getDailySummary(user.id, date);
     return c.json({ goals, summary });
+  });
+  app.put("/v1/hydration/daily", async (c) => {
+    const user = c.get("authUser");
+    const body = dailyHydrationUpdateSchema.parse(await c.req.json());
+    const date = body.date ?? new Date().toISOString().slice(0, 10);
+    const summary = await repository.updateDailyHydration(user.id, date, body.waterConsumedLiters);
+    return c.json({ summary });
   });
   app.post("/v1/goals/calorie-estimate", async (c) => {
     const body = calorieEstimateRequestSchema.parse(await c.req.json());

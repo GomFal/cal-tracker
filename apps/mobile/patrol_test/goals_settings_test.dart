@@ -93,9 +93,14 @@ void main() {
     );
 
     await $(const ValueKey('hydration_goal_row')).tap();
-    await $(const ValueKey('hydration_goal_field')).enterText('15');
-    await $(const ValueKey('save_goal_button')).scrollTo().tap();
-    await $('15 glasses per day').waitUntilVisible(
+    await $(const ValueKey('hydration_goal_value')).waitUntilVisible(
+      timeout: const Duration(seconds: 20),
+    );
+    for (var index = 0; index < 10; index++) {
+      await $(const ValueKey('hydration_goal_increase_button')).tap();
+    }
+    await $(const ValueKey('save_goal_button')).tap();
+    await $('2.5 L per day').waitUntilVisible(
       timeout: const Duration(seconds: 20),
     );
 
@@ -112,7 +117,7 @@ void main() {
       accessToken: user.accessToken,
       date: today,
       calories: 2450,
-      hydrationGoalGlasses: 13,
+      hydrationGoalLiters: 2.5,
     );
     await _login($, user);
 
@@ -138,7 +143,7 @@ void main() {
       accessToken: user.accessToken,
       date: previousDate,
       calories: 1800,
-      hydrationGoalGlasses: 10,
+      hydrationGoalLiters: 2.5,
     );
     await _getDailySummary(user.accessToken, previousDate);
     await _seedCommittedMeal(
@@ -157,7 +162,7 @@ void main() {
       accessToken: user.accessToken,
       date: todayDate,
       calories: 2400,
-      hydrationGoalGlasses: 14,
+      hydrationGoalLiters: 3,
     );
 
     await _login($, user);
@@ -238,7 +243,7 @@ Future<void> _putGoals({
   required String accessToken,
   required String date,
   required int calories,
-  required int hydrationGoalGlasses,
+  required double hydrationGoalLiters,
 }) async {
   final uri = Uri.parse('${_patrolApiConfig.baseUrl}/v1/goals');
   final headers = {
@@ -248,7 +253,7 @@ Future<void> _putGoals({
   final body = jsonEncode({
     'date': date,
     'calories': calories,
-    'hydrationGoalGlasses': hydrationGoalGlasses,
+    'hydrationGoalLiters': hydrationGoalLiters,
   });
   final response = await _sendWithRetry(
     () => http.put(uri, headers: headers, body: body),

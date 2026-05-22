@@ -7,6 +7,8 @@ import {
   agentRunResponseSchema,
   calorieEstimateRequestSchema,
   calorieEstimateResponseSchema,
+  dailyHydrationResponseSchema,
+  dailyHydrationUpdateSchema,
   errorResponseSchema,
   executeActionRequestSchema,
   executeActionResponseSchema,
@@ -74,6 +76,8 @@ const spec = {
       SettingsUpdate: schema("SettingsUpdate", settingsUpdateSchema),
       GoalsUpdate: schema("GoalsUpdate", goalsUpdateSchema),
       GoalsResponse: schema("GoalsResponse", goalsResponseSchema),
+      DailyHydrationUpdate: schema("DailyHydrationUpdate", dailyHydrationUpdateSchema),
+      DailyHydrationResponse: schema("DailyHydrationResponse", dailyHydrationResponseSchema),
       CalorieEstimateRequest: schema("CalorieEstimateRequest", calorieEstimateRequestSchema),
       CalorieEstimateResponse: schema("CalorieEstimateResponse", calorieEstimateResponseSchema),
       ExecuteActionRequest: schema("ExecuteActionRequest", executeActionRequestSchema),
@@ -329,6 +333,23 @@ const spec = {
         parameters: [{ name: "date", in: "query", required: false, schema: { type: "string" } }],
         responses: {
           "200": { description: "Daily summary action result", content: { "application/json": { schema: { $ref: "#/components/schemas/ExecuteActionResponse" } } } }
+        }
+      }
+    },
+    "/v1/hydration/daily": {
+      put: {
+        operationId: "updateDailyHydration",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/DailyHydrationUpdate" }
+            }
+          }
+        },
+        responses: {
+          "200": { description: "Updated hydration summary", content: { "application/json": { schema: { $ref: "#/components/schemas/DailyHydrationResponse" } } } }
         }
       }
     },

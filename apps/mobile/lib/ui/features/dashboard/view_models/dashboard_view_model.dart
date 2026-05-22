@@ -140,6 +140,28 @@ class DashboardViewModel extends ChangeNotifier {
     }
   }
 
+  Future<bool> updateDailyWater(double waterConsumedLiters) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      _summary = await _nutritionRepository.updateDailyHydration(
+        waterConsumedLiters: waterConsumedLiters,
+      );
+      _lastLoadedAt = _now();
+      _error = null;
+      return true;
+    } catch (error) {
+      _error = userVisibleErrorMessage(
+        error,
+        context: UserErrorContext.dashboardSave,
+      );
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<CalorieEstimate> estimateCalories({
     required int age,
     required String sex,

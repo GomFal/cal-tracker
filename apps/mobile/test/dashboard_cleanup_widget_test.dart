@@ -68,6 +68,11 @@ void main() {
       find.byKey(const ValueKey('dashboard_macro_fats_icon')),
       findsOneWidget,
     );
+    expect(
+      find.byKey(const ValueKey('dashboard_water_intake_card')),
+      findsOneWidget,
+    );
+    expect(find.text('0 / 0 L'), findsOneWidget);
     expect(find.byKey(const ValueKey('dashboard_goal_line')), findsNothing);
     expect(find.text('Calendar'), findsNothing);
     expect(find.text('Notifications'), findsNothing);
@@ -80,6 +85,50 @@ void main() {
 
     expect(themeModeViewModel.themeMode, ThemeMode.dark);
     expect(preferencesRepository.savedModes, [ThemeMode.dark]);
+  });
+
+  testWidgets('dashboard water widget steps between zero and the goal',
+      (tester) async {
+    final nutritionRepository = _FakeNutritionRepository(
+      dailySummary: _summaryWithWaterGoal,
+    );
+    final authViewModel = AuthViewModel(authRepository: _FakeAuthRepository())
+      ..setUser(_testUser);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<AuthViewModel>.value(value: authViewModel),
+          ChangeNotifierProvider(
+            create: (_) => ThemeModeViewModel(
+              preferencesRepository: _FakePreferencesRepository(),
+            ),
+          ),
+          ChangeNotifierProvider(
+            create: (_) => DashboardViewModel(
+              nutritionRepository: nutritionRepository,
+            ),
+          ),
+        ],
+        child: _testApp(const DashboardScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Water Intake'), findsOneWidget);
+    expect(find.text('0 / 2.5 L'), findsOneWidget);
+
+    await tester.tap(
+      find.byKey(const ValueKey('dashboard_water_increase_button')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('0.25 / 2.5 L'), findsOneWidget);
+
+    await tester.tap(
+      find.byKey(const ValueKey('dashboard_water_decrease_button')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('0 / 2.5 L'), findsOneWidget);
   });
 
   testWidgets('dashboard meal cards edit explicit ingredients', (tester) async {
@@ -110,7 +159,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(FreshFoodStack), findsNothing);
-    expect(find.byIcon(Icons.add_rounded), findsNothing);
+    expect(
+      find.byKey(const ValueKey('dashboard_water_increase_button')),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byKey(const ValueKey('dashboard_edit_meal_meal-1')));
     await tester.pumpAndSettle();
@@ -369,7 +421,7 @@ class _FakeNutritionRepository extends NutritionRepository {
   Future<DailyGoals> updateDailyGoals({
     String? date,
     int? calories,
-    int? hydrationGoalGlasses,
+    double? hydrationGoalLiters,
     String? calorieTargetSource,
     MacroDistributionConfig? macroConfig,
     int? macroCalorieTarget,
@@ -394,8 +446,9 @@ class _FakeNutritionRepository extends NutritionRepository {
         carbsGrams: target.carbsGrams - _dailySummary.consumed.carbsGrams,
         fatGrams: target.fatGrams - _dailySummary.consumed.fatGrams,
       ),
-      hydrationGoalGlasses:
-          hydrationGoalGlasses ?? _dailySummary.hydrationGoalGlasses,
+      hydrationGoalLiters:
+          hydrationGoalLiters ?? _dailySummary.hydrationGoalLiters,
+      waterConsumedLiters: _dailySummary.waterConsumedLiters,
       calorieTargetConfigured:
           calories == null ? _dailySummary.calorieTargetConfigured : true,
       calorieTargetSource:
@@ -405,10 +458,35 @@ class _FakeNutritionRepository extends NutritionRepository {
     return DailyGoals(
       date: _dailySummary.date,
       target: _dailySummary.target,
-      hydrationGoalGlasses: _dailySummary.hydrationGoalGlasses,
+      hydrationGoalLiters: _dailySummary.hydrationGoalLiters,
       calorieTargetConfigured: _dailySummary.calorieTargetConfigured,
       calorieTargetSource: _dailySummary.calorieTargetSource,
     );
+  }
+
+  @override
+  Future<DailySummary> updateDailyHydration({
+    String? date,
+    required double waterConsumedLiters,
+  }) async {
+    final clamped = waterConsumedLiters
+        .clamp(
+          0,
+          _dailySummary.hydrationGoalLiters,
+        )
+        .toDouble();
+    _dailySummary = DailySummary(
+      date: _dailySummary.date,
+      consumed: _dailySummary.consumed,
+      target: _dailySummary.target,
+      remaining: _dailySummary.remaining,
+      hydrationGoalLiters: _dailySummary.hydrationGoalLiters,
+      waterConsumedLiters: clamped,
+      calorieTargetConfigured: _dailySummary.calorieTargetConfigured,
+      calorieTargetSource: _dailySummary.calorieTargetSource,
+      meals: _dailySummary.meals,
+    );
+    return _dailySummary;
   }
 
   @override
@@ -462,7 +540,8 @@ class _FakeNutritionRepository extends NutritionRepository {
         carbsGrams: _dailySummary.target.carbsGrams - consumed.carbsGrams,
         fatGrams: _dailySummary.target.fatGrams - consumed.fatGrams,
       ),
-      hydrationGoalGlasses: _dailySummary.hydrationGoalGlasses,
+      hydrationGoalLiters: _dailySummary.hydrationGoalLiters,
+      waterConsumedLiters: _dailySummary.waterConsumedLiters,
       calorieTargetConfigured: _dailySummary.calorieTargetConfigured,
       calorieTargetSource: _dailySummary.calorieTargetSource,
       meals: meals,
@@ -491,7 +570,8 @@ class _FakeNutritionRepository extends NutritionRepository {
         carbsGrams: _dailySummary.target.carbsGrams - consumed.carbsGrams,
         fatGrams: _dailySummary.target.fatGrams - consumed.fatGrams,
       ),
-      hydrationGoalGlasses: _dailySummary.hydrationGoalGlasses,
+      hydrationGoalLiters: _dailySummary.hydrationGoalLiters,
+      waterConsumedLiters: _dailySummary.waterConsumedLiters,
       calorieTargetConfigured: _dailySummary.calorieTargetConfigured,
       calorieTargetSource: _dailySummary.calorieTargetSource,
       meals: meals,
@@ -587,7 +667,20 @@ const _summaryWithNoMeals = DailySummary(
   consumed: _emptyNutrition,
   target: _targetNutrition,
   remaining: _targetNutrition,
-  hydrationGoalGlasses: 12,
+  hydrationGoalLiters: 0,
+  waterConsumedLiters: 0,
+  calorieTargetConfigured: true,
+  calorieTargetSource: 'manual',
+  meals: [],
+);
+
+const _summaryWithWaterGoal = DailySummary(
+  date: '2026-05-09',
+  consumed: _emptyNutrition,
+  target: _targetNutrition,
+  remaining: _targetNutrition,
+  hydrationGoalLiters: 2.5,
+  waterConsumedLiters: 0,
   calorieTargetConfigured: true,
   calorieTargetSource: 'manual',
   meals: [],
@@ -598,7 +691,8 @@ const _summaryWithoutConfiguredCalories = DailySummary(
   consumed: _emptyNutrition,
   target: _targetNutrition,
   remaining: _targetNutrition,
-  hydrationGoalGlasses: 12,
+  hydrationGoalLiters: 0,
+  waterConsumedLiters: 0,
   calorieTargetConfigured: false,
   calorieTargetSource: 'default',
   meals: [],
@@ -639,7 +733,8 @@ final _summaryWithMeal = DailySummary(
     carbsGrams: 175,
     fatGrams: 58,
   ),
-  hydrationGoalGlasses: 12,
+  hydrationGoalLiters: 2.5,
+  waterConsumedLiters: 0,
   calorieTargetConfigured: true,
   calorieTargetSource: 'manual',
   meals: [_testMeal],

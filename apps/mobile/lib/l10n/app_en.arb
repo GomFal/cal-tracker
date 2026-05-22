@@ -84,11 +84,11 @@
   "settingsMoreTooltip": "More",
   "settingsCouldNotUpdateGoals": "Could not update goals",
   "settingsHydrationGoal": "Hydration goal",
-  "settingsHydrationGoalSubtitle": "{glasses} glasses per day",
+  "settingsHydrationGoalSubtitle": "{liters} L per day",
   "@settingsHydrationGoalSubtitle": {
     "placeholders": {
-      "glasses": {
-        "type": "int"
+      "liters": {
+        "type": "String"
       }
     }
   },
@@ -101,7 +101,19 @@
       }
     }
   },
-  "settingsGlassesUnit": "glasses",
+  "settingsLitersUnit": "liters",
+  "settingsOuncesUnit": "ounces",
+  "hydrationSheetTitle": "Set your daily water goal",
+  "hydrationSheetSubtitle": "Choose how much water you want to drink each day.",
+  "hydrationUnitTitle": "Unit",
+  "hydrationUnitLiters": "Liters (L)",
+  "hydrationUnitOunces": "Ounces (fl oz)",
+  "hydrationDailyGoal": "Daily goal",
+  "hydrationRecommendedRange": "Recommended: 2.0 - 3.0 L",
+  "hydrationInfoTitle": "Stay hydrated",
+  "hydrationInfoMessage": "Drinking enough water helps your body function better and supports your goals.",
+  "hydrationDecreaseGoalTooltip": "Decrease water goal",
+  "hydrationIncreaseGoalTooltip": "Increase water goal",
   "settingsLogOut": "Log out",
   "settingsGoalRangeError": "Enter {min}-{max}.",
   "@settingsGoalRangeError": {
@@ -394,17 +406,31 @@
   "dashboardDailyProgress": "Your Daily\nProgress",
   "dashboardTodayCalories": "Today's Calories",
   "dashboardCaloriesLeft": "left",
-  "dashboardGoalLine": "Target {calories} Kcal, {glasses} glasses",
+  "dashboardGoalLine": "Target {calories} Kcal, {liters} L",
   "@dashboardGoalLine": {
     "placeholders": {
       "calories": {
         "type": "int"
       },
-      "glasses": {
-        "type": "int"
+      "liters": {
+        "type": "String"
       }
     }
   },
+  "dashboardWaterIntake": "Water Intake",
+  "dashboardWaterProgress": "{consumed} / {goal} L",
+  "@dashboardWaterProgress": {
+    "placeholders": {
+      "consumed": {
+        "type": "String"
+      },
+      "goal": {
+        "type": "String"
+      }
+    }
+  },
+  "dashboardWaterDecreaseTooltip": "Decrease water intake",
+  "dashboardWaterIncreaseTooltip": "Increase water intake",
   "dashboardTodayLower": "today",
   "dashboardNoMealsLoggedToday": "No meals logged today",
   "dashboardNoMealsMessage": "Logged meals will appear here.",

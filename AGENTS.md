@@ -202,6 +202,84 @@ d  Detach from Flutter while leaving the app running
 q  Quit the app and Flutter run session
 ```
 
+### Local Parallel Worktree Flavors
+
+Use one shared Android emulator for parallel worktree development. Do not start a second emulator unless explicitly required; two Android emulators can push this machine into OOM.
+
+Local-only Android flavors are injected from the user Gradle init script at:
+
+```text
+/home/javier/.gradle/init.d/cal-tracker-local-flavors.gradle
+```
+
+Expected init script body:
+
+```groovy
+allprojects { project ->
+    project.plugins.withId('com.android.application') {
+        if (project.path != ':app') {
+            return
+        }
+
+        if (!project.rootProject.projectDir.absolutePath.endsWith('/apps/mobile/android')) {
+            return
+        }
+
+        project.android.productFlavors {
+            def local1 = maybeCreate('local1')
+            local1.dimension = 'env'
+            local1.applicationIdSuffix = '.dev.local1'
+            local1.resValue('string', 'app_name', 'local1:BetterCalories')
+
+            def local2 = maybeCreate('local2')
+            local2.dimension = 'env'
+            local2.applicationIdSuffix = '.dev.local2'
+            local2.resValue('string', 'app_name', 'local2:BetterCalories')
+        }
+
+        project.android.variantFilter { variant ->
+            def isLocal = variant.flavors.any { flavor ->
+                flavor.name == 'local1' || flavor.name == 'local2'
+            }
+
+            if (isLocal && variant.buildType.name != 'debug') {
+                variant.setIgnore(true)
+            }
+        }
+    }
+}
+```
+
+That script must stay outside the repository. It adds debug-only flavors without changing the tracked `dev` and `prod` flavors:
+
+- `dev`: package `app.bettercalories.dev`, tracked production/dev configuration.
+- `prod`: package `app.bettercalories`, tracked production configuration.
+- `local1`: package `app.bettercalories.dev.local1`, local debug-only configuration.
+- `local2`: package `app.bettercalories.dev.local2`, local debug-only configuration.
+
+Use `local1` and `local2` when two Codex agents or worktrees need to visualize different Flutter app builds on the same running emulator. Example:
+
+```bash
+# Worktree A
+cd /home/javier/dev/cal-tracker/apps/mobile
+flutter run --flavor local1 --debug --dart-define=API_BASE_URL=http://10.0.2.2:3000 -d emulator-5554
+
+# Worktree B
+cd /home/javier/dev/cal-tracker-ui-experimenting/apps/mobile
+flutter run --flavor local2 --debug --dart-define=API_BASE_URL=http://10.0.2.2:3000 -d emulator-5554
+```
+
+For a one-off local APK install:
+
+```bash
+cd /home/javier/dev/cal-tracker-ui-experimenting/apps/mobile
+flutter build apk --flavor local1 --debug --dart-define=API_BASE_URL=http://10.0.2.2:3000
+adb -s emulator-5554 install -r build/app/outputs/flutter-apk/app-local1-debug.apk
+adb -s emulator-5554 shell am start -n app.bettercalories.dev.local1/com.example.cal_tracker_mobile.MainActivity
+```
+
+If a future session cannot resolve `local1` or `local2`, inspect or recreate `/home/javier/.gradle/init.d/cal-tracker-local-flavors.gradle`. Do not add these local flavors to release, deploy, or GitHub release scripts. Google auth flows are not expected to work on the local package IDs unless matching OAuth clients are configured.
+
 Use `flutter build apk` plus `adb install -r` only when you specifically need a one-off APK install without a live Flutter tool session:
 
 ```bash

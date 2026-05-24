@@ -386,9 +386,18 @@ docker volume ls | grep cal-tracker_cal_tracker_postgres
 
 Run these services in separate terminals or detached sessions. For emulator details, use the Android section above.
 
+After every local PostgreSQL start, apply pending migrations before starting the backend, emulator-driven app, or Flutter. Local schema drift has repeatedly caused runtime failures when the backend expected newly migrated columns.
+
 ```bash
 # Database
-cd /home/javier/dev/cal-tracker && docker compose up -d postgres
+docker compose --project-directory /home/javier/dev/cal-tracker \
+  -f /home/javier/dev/cal-tracker/docker-compose.yml \
+  up -d postgres
+
+# Pending database migrations
+cd /home/javier/dev/cal-tracker/apps/backend
+unset STT_API_KEY OPENROUTER_API_KEY
+bun --env-file=.env run db:migrate
 
 # Backend
 cd /home/javier/dev/cal-tracker/apps/backend

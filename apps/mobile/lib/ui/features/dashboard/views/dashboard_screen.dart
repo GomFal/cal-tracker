@@ -85,7 +85,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _MealSection(
             summary: summary,
             onEditMeal: (meal) => _showMealItemEditor(context, viewModel, meal),
-            onDeleteMeal: (meal) => _confirmDeleteMeal(context, viewModel, meal),
+            onDeleteMeal: (meal) =>
+                _confirmDeleteMeal(context, viewModel, meal),
           ),
         ],
       ),
@@ -718,11 +719,14 @@ class _WaterIntakeCard extends StatelessWidget {
     final goal = roundHydrationLiters(summary?.hydrationGoalLiters ?? 0);
     final canDecrease = enabled && consumed > 0;
     final canIncrease = enabled && goal > 0 && consumed < goal;
+    final waterCardColor = Theme.of(context).brightness == Brightness.dark
+        ? const Color(0xff203940)
+        : const Color(0xffd5f2f8);
     return Container(
       key: const ValueKey('dashboard_water_intake_card'),
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
       decoration: BoxDecoration(
-        color: palette.water.withValues(alpha: 0.08),
+        color: waterCardColor,
         borderRadius: BorderRadius.circular(26),
         boxShadow: [
           BoxShadow(
@@ -824,9 +828,15 @@ class _WaterStepButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
-    final actionBlue = Theme.of(context).brightness == Brightness.dark
-        ? palette.water
-        : const Color(0xff0078c8);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final actionBlue = isDark ? palette.water : const Color(0xff006da8);
+    final buttonBackground =
+        isDark ? const Color(0xff2d5963) : const Color(0xff91deed);
+    final disabledButtonBackground =
+        isDark ? const Color(0xff263f46) : const Color(0xffc5eaf2);
+    final disabledActionBlue = isDark
+        ? palette.water.withValues(alpha: 0.48)
+        : const Color(0xff6c9ead);
     return SizedBox.square(
       dimension: 42,
       child: IconButton(
@@ -834,10 +844,10 @@ class _WaterStepButton extends StatelessWidget {
         onPressed: enabled ? onPressed : null,
         icon: Icon(icon, size: 26),
         style: IconButton.styleFrom(
-          backgroundColor: palette.water.withValues(alpha: 0.18),
+          backgroundColor: buttonBackground,
           foregroundColor: actionBlue,
-          disabledBackgroundColor: palette.water.withValues(alpha: 0.14),
-          disabledForegroundColor: actionBlue.withValues(alpha: 0.62),
+          disabledBackgroundColor: disabledButtonBackground,
+          disabledForegroundColor: disabledActionBlue,
           shape: const CircleBorder(),
         ),
       ),

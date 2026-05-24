@@ -80,6 +80,140 @@ void main() {
     });
   });
 
+  group('DashboardViewModel hydration updates', () {
+    late MockNutritionRepository repository;
+    late DateTime now;
+    late DashboardViewModel viewModel;
+
+    setUp(() {
+      repository = MockNutritionRepository();
+      now = DateTime(2026, 5, 10, 10);
+      viewModel = DashboardViewModel(
+        nutritionRepository: repository,
+        now: () => now,
+      );
+    });
+
+    test('updates daily water optimistically without loading state', () async {
+      when(() => repository.getDailySummary()).thenAnswer(
+        (_) async => _summary(
+          '2026-05-10',
+          hydrationGoalLiters: 2.5,
+        ),
+      );
+      await viewModel.load();
+
+      final save = Completer<DailySummary>();
+      when(
+        () => repository.updateDailyHydration(waterConsumedLiters: 0.25),
+      ).thenAnswer((_) => save.future);
+
+      final update = viewModel.updateDailyWater(0.25);
+
+      expect(viewModel.summary?.waterConsumedLiters, 0.25);
+      expect(viewModel.isLoading, isFalse);
+
+      save.complete(
+        _summary(
+          '2026-05-10',
+          hydrationGoalLiters: 2.5,
+          waterConsumedLiters: 0.25,
+        ),
+      );
+
+      expect(await update, isTrue);
+      expect(viewModel.summary?.waterConsumedLiters, 0.25);
+      expect(viewModel.error, isNull);
+      verify(
+        () => repository.updateDailyHydration(waterConsumedLiters: 0.25),
+      ).called(1);
+    });
+
+    test('queues rapid daily water updates and saves the latest value',
+        () async {
+      when(() => repository.getDailySummary()).thenAnswer(
+        (_) async => _summary(
+          '2026-05-10',
+          hydrationGoalLiters: 2.5,
+        ),
+      );
+      await viewModel.load();
+
+      final firstSave = Completer<DailySummary>();
+      final secondSave = Completer<DailySummary>();
+      when(
+        () => repository.updateDailyHydration(waterConsumedLiters: 0.25),
+      ).thenAnswer((_) => firstSave.future);
+      when(
+        () => repository.updateDailyHydration(waterConsumedLiters: 0.5),
+      ).thenAnswer((_) => secondSave.future);
+
+      final firstUpdate = viewModel.updateDailyWater(0.25);
+      final secondUpdate = viewModel.updateDailyWater(0.5);
+
+      expect(viewModel.summary?.waterConsumedLiters, 0.5);
+      expect(viewModel.isLoading, isFalse);
+      verify(
+        () => repository.updateDailyHydration(waterConsumedLiters: 0.25),
+      ).called(1);
+      verifyNever(
+        () => repository.updateDailyHydration(waterConsumedLiters: 0.5),
+      );
+
+      firstSave.complete(
+        _summary(
+          '2026-05-10',
+          hydrationGoalLiters: 2.5,
+          waterConsumedLiters: 0.25,
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      verify(
+        () => repository.updateDailyHydration(waterConsumedLiters: 0.5),
+      ).called(1);
+      expect(viewModel.summary?.waterConsumedLiters, 0.5);
+
+      secondSave.complete(
+        _summary(
+          '2026-05-10',
+          hydrationGoalLiters: 2.5,
+          waterConsumedLiters: 0.5,
+        ),
+      );
+
+      expect(await firstUpdate, isTrue);
+      expect(await secondUpdate, isTrue);
+      expect(viewModel.summary?.waterConsumedLiters, 0.5);
+      expect(viewModel.error, isNull);
+    });
+
+    test('rolls back optimistic water when save fails', () async {
+      when(() => repository.getDailySummary()).thenAnswer(
+        (_) async => _summary(
+          '2026-05-10',
+          hydrationGoalLiters: 2.5,
+        ),
+      );
+      await viewModel.load();
+
+      final save = Completer<DailySummary>();
+      when(
+        () => repository.updateDailyHydration(waterConsumedLiters: 0.25),
+      ).thenAnswer((_) => save.future);
+
+      final update = viewModel.updateDailyWater(0.25);
+
+      expect(viewModel.summary?.waterConsumedLiters, 0.25);
+      expect(viewModel.isLoading, isFalse);
+      save.completeError(Exception('database unavailable'));
+
+      expect(await update, isFalse);
+      expect(viewModel.summary?.waterConsumedLiters, 0);
+      expect(viewModel.error, 'We could not save that change. Try again.');
+    });
+  });
+
   group('MealHistoryViewModel cache', () {
     late MockNutritionRepository repository;
     late DateTime now;
@@ -243,14 +377,19 @@ void _stubWeekSummaries(
   );
 }
 
-DailySummary _summary(String date, {List<Meal> meals = const []}) {
+DailySummary _summary(
+  String date, {
+  List<Meal> meals = const [],
+  double hydrationGoalLiters = 0,
+  double waterConsumedLiters = 0,
+}) {
   return DailySummary(
     date: date,
     consumed: _nutrition,
     target: _nutrition,
     remaining: _nutrition,
-    hydrationGoalLiters: 0,
-    waterConsumedLiters: 0,
+    hydrationGoalLiters: hydrationGoalLiters,
+    waterConsumedLiters: waterConsumedLiters,
     calorieTargetConfigured: false,
     calorieTargetSource: 'default',
     meals: meals,

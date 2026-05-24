@@ -4,6 +4,7 @@ import '../../../../data/repositories/nutrition_repository.dart';
 import '../../../../domain/models/macro_distribution.dart';
 import '../../../../domain/models/nutrition_models.dart';
 import '../../../core/user_visible_error.dart';
+import '../../hydration/hydration_format.dart';
 
 class DashboardViewModel extends ChangeNotifier {
   DashboardViewModel({
@@ -19,12 +20,16 @@ class DashboardViewModel extends ChangeNotifier {
   final DateTime Function() _now;
   DailySummary? _summary;
   bool _isLoading = false;
+  bool _isSavingWater = false;
   DateTime? _lastLoadedAt;
   Future<void>? _loadOperation;
+  Future<void>? _waterSaveOperation;
+  DailySummary? _confirmedWaterSummary;
+  double? _pendingWaterLiters;
   String? _error;
 
   DailySummary? get summary => _summary;
-  bool get isLoading => _isLoading;
+  bool get isLoading => _isLoading && !_isSavingWater;
   String? get error => _error;
 
   Future<void> load({bool forceRefresh = false}) {
@@ -140,26 +145,82 @@ class DashboardViewModel extends ChangeNotifier {
     }
   }
 
-  Future<bool> updateDailyWater(double waterConsumedLiters) async {
-    _isLoading = true;
+  Future<bool> updateDailyWater(double waterConsumedLiters) {
+    final nextWater = _normalizedWater(waterConsumedLiters);
+    _confirmedWaterSummary ??= _summary;
+    _pendingWaterLiters = nextWater;
+    _isSavingWater = true;
+    if (_summary != null) {
+      _summary = _summaryWithWater(_summary!, nextWater);
+    }
+    _error = null;
     notifyListeners();
+
+    final operation = _waterSaveOperation ??= _flushPendingWater();
+    return operation.then((_) => _error == null);
+  }
+
+  Future<void> _flushPendingWater() async {
     try {
-      _summary = await _nutritionRepository.updateDailyHydration(
-        waterConsumedLiters: waterConsumedLiters,
-      );
-      _lastLoadedAt = _now();
-      _error = null;
-      return true;
+      while (_pendingWaterLiters != null) {
+        final waterToSave = _pendingWaterLiters!;
+        _pendingWaterLiters = null;
+        final savedSummary = await _nutritionRepository.updateDailyHydration(
+          waterConsumedLiters: waterToSave,
+        );
+        _confirmedWaterSummary = savedSummary;
+        _lastLoadedAt = _now();
+        _error = null;
+        if (_pendingWaterLiters == null) {
+          _summary = savedSummary;
+          notifyListeners();
+        }
+      }
     } catch (error) {
+      _summary = _confirmedWaterSummary;
+      _pendingWaterLiters = null;
       _error = userVisibleErrorMessage(
         error,
         context: UserErrorContext.dashboardSave,
       );
-      return false;
+      notifyListeners();
     } finally {
-      _isLoading = false;
+      _confirmedWaterSummary = null;
+      _waterSaveOperation = null;
+      _isSavingWater = false;
       notifyListeners();
     }
+  }
+
+  double _normalizedWater(double waterConsumedLiters) {
+    final goal = roundHydrationLiters(_summary?.hydrationGoalLiters ?? 10);
+    final clamped = waterConsumedLiters.clamp(0, goal).toDouble();
+    return roundHydrationLiters(clamped);
+  }
+
+  DailySummary _summaryWithWater(
+    DailySummary summary,
+    double waterConsumedLiters,
+  ) {
+    return DailySummary(
+      date: summary.date,
+      consumed: summary.consumed,
+      target: summary.target,
+      remaining: summary.remaining,
+      hydrationGoalLiters: summary.hydrationGoalLiters,
+      waterConsumedLiters: waterConsumedLiters,
+      calorieTargetConfigured: summary.calorieTargetConfigured,
+      calorieTargetSource: summary.calorieTargetSource,
+      macroMode: summary.macroMode,
+      macroSource: summary.macroSource,
+      macroPreset: summary.macroPreset,
+      proteinPct: summary.proteinPct,
+      carbsPct: summary.carbsPct,
+      fatPct: summary.fatPct,
+      macroCalories: summary.macroCalories,
+      calorieDeltaKcal: summary.calorieDeltaKcal,
+      meals: summary.meals,
+    );
   }
 
   Future<CalorieEstimate> estimateCalories({

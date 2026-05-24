@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cal_tracker_mobile/app/dark_mode_toggle.dart';
 import 'package:cal_tracker_mobile/app/theme.dart';
 import 'package:cal_tracker_mobile/app/theme_mode_view_model.dart';
@@ -129,6 +131,72 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('0 / 2.5 L'), findsOneWidget);
+  });
+
+  testWidgets(
+      'dashboard water widget updates optimistically without page refresh',
+      (tester) async {
+    final firstSave = Completer<DailySummary>();
+    final secondSave = Completer<DailySummary>();
+    final nutritionRepository = _FakeNutritionRepository(
+      dailySummary: _summaryWithWaterGoal,
+      hydrationUpdateCompleters: [firstSave, secondSave],
+    );
+    final authViewModel = AuthViewModel(authRepository: _FakeAuthRepository())
+      ..setUser(_testUser);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<AuthViewModel>.value(value: authViewModel),
+          ChangeNotifierProvider(
+            create: (_) => ThemeModeViewModel(
+              preferencesRepository: _FakePreferencesRepository(),
+            ),
+          ),
+          ChangeNotifierProvider(
+            create: (_) => DashboardViewModel(
+              nutritionRepository: nutritionRepository,
+            ),
+          ),
+        ],
+        child: _testApp(const DashboardScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('0 / 2.5 L'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+
+    await tester.tap(
+      find.byKey(const ValueKey('dashboard_water_increase_button')),
+    );
+    await tester.pump();
+
+    expect(find.text('0.25 / 2.5 L'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+
+    await tester.tap(
+      find.byKey(const ValueKey('dashboard_water_increase_button')),
+    );
+    await tester.pump();
+
+    expect(find.text('0.5 / 2.5 L'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(nutritionRepository.hydrationUpdateRequests, [0.25]);
+
+    firstSave.complete(_summaryWithWater(_summaryWithWaterGoal, 0.25));
+    await tester.pump();
+
+    expect(nutritionRepository.hydrationUpdateRequests, [0.25, 0.5]);
+    expect(find.text('0.5 / 2.5 L'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+
+    secondSave.complete(_summaryWithWater(_summaryWithWaterGoal, 0.5));
+    await tester.pumpAndSettle();
+
+    expect(find.text('0.5 / 2.5 L'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
   });
 
   testWidgets('dashboard meal cards edit explicit ingredients', (tester) async {
@@ -400,14 +468,19 @@ class _FakeNutritionRepository extends NutritionRepository {
   _FakeNutritionRepository({
     DailySummary? dailySummary,
     List<Meal>? mealHistory,
+    List<Completer<DailySummary>>? hydrationUpdateCompleters,
   })  : _dailySummary = dailySummary ?? _summaryWithNoMeals,
         _mealHistory = mealHistory ?? const [],
+        _hydrationUpdateCompleters =
+            hydrationUpdateCompleters ?? <Completer<DailySummary>>[],
         super(apiClient: _unusedApiClient());
 
   DailySummary _dailySummary;
   final List<Meal> _mealHistory;
+  final List<Completer<DailySummary>> _hydrationUpdateCompleters;
   List<MealItem>? lastCorrectedItems;
   final List<String> deletedMealIds = [];
+  final List<double> hydrationUpdateRequests = [];
   int? updatedCalories;
   String? updateSource;
 
@@ -469,23 +542,18 @@ class _FakeNutritionRepository extends NutritionRepository {
     String? date,
     required double waterConsumedLiters,
   }) async {
+    hydrationUpdateRequests.add(waterConsumedLiters);
     final clamped = waterConsumedLiters
         .clamp(
           0,
           _dailySummary.hydrationGoalLiters,
         )
         .toDouble();
-    _dailySummary = DailySummary(
-      date: _dailySummary.date,
-      consumed: _dailySummary.consumed,
-      target: _dailySummary.target,
-      remaining: _dailySummary.remaining,
-      hydrationGoalLiters: _dailySummary.hydrationGoalLiters,
-      waterConsumedLiters: clamped,
-      calorieTargetConfigured: _dailySummary.calorieTargetConfigured,
-      calorieTargetSource: _dailySummary.calorieTargetSource,
-      meals: _dailySummary.meals,
-    );
+    if (_hydrationUpdateCompleters.isNotEmpty) {
+      _dailySummary = await _hydrationUpdateCompleters.removeAt(0).future;
+      return _dailySummary;
+    }
+    _dailySummary = _summaryWithWater(_dailySummary, clamped);
     return _dailySummary;
   }
 
@@ -638,6 +706,31 @@ CalTrackerApiClient _unusedApiClient() {
   return CalTrackerApiClient(
     config: const ApiConfig(baseUrl: 'http://localhost'),
     tokenStorage: _MemoryTokenStorage(),
+  );
+}
+
+DailySummary _summaryWithWater(
+  DailySummary summary,
+  double waterConsumedLiters,
+) {
+  return DailySummary(
+    date: summary.date,
+    consumed: summary.consumed,
+    target: summary.target,
+    remaining: summary.remaining,
+    hydrationGoalLiters: summary.hydrationGoalLiters,
+    waterConsumedLiters: waterConsumedLiters,
+    calorieTargetConfigured: summary.calorieTargetConfigured,
+    calorieTargetSource: summary.calorieTargetSource,
+    macroMode: summary.macroMode,
+    macroSource: summary.macroSource,
+    macroPreset: summary.macroPreset,
+    proteinPct: summary.proteinPct,
+    carbsPct: summary.carbsPct,
+    fatPct: summary.fatPct,
+    macroCalories: summary.macroCalories,
+    calorieDeltaKcal: summary.calorieDeltaKcal,
+    meals: summary.meals,
   );
 }
 

@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Better Calories | App para contar calorías con voz y macros</title>
+    <meta
+      name="description"
+      content="Better Calories es una app para contar calorías y macros con voz, texto, comidas habituales, historial editable y fuentes nutricionales verificables."
+    >
+    <meta name="robots" content="index, follow, max-image-preview:large">
+    <meta name="theme-color" content="#9ad32a">
+    <meta name="color-scheme" content="light">
+    <link rel="canonical" href="https://bettercalories.app/">
+    <link rel="alternate" href="https://bettercalories.app/" hreflang="es">
+    <link rel="alternate" href="https://bettercalories.app/" hreflang="x-default">
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <link rel="apple-touch-icon" href="/assets/icon-192.png">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="preload" href="/styles.css" as="style">
+    <link rel="preload" href="/assets/fresh-food-01.webp" as="image" fetchpriority="high">
+    <link rel="stylesheet" href="/styles.css">
+
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="Better Calories">
+    <meta property="og:title" content="Better Calories, contar calorías sin pelearte con el diario">
+    <meta
+      property="og:description"
+      content="Registra comidas por voz o texto, revisa calorías y macros antes de guardar y reutiliza tus comidas habituales."
+    >
+    <meta property="og:url" content="https://bettercalories.app/">
+    <meta property="og:image" content="https://bettercalories.app/assets/fresh-food-01.webp">
+    <meta property="og:image:alt" content="Comida fresca usada en la experiencia visual de Better Calories">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Better Calories | App para contar calorías con voz">
+    <meta
+      name="twitter:description"
+      content="Una app móvil para registrar calorías, macros, agua, historial y comidas habituales con menos fricción."
+    >
+    <meta name="twitter:image" content="https://bettercalories.app/assets/fresh-food-01.webp">
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://bettercalories.app/#organization",
+            "name": "Better Calories",
+            "url": "https://bettercalories.app/",
+            "logo": "https://bettercalories.app/assets/icon-512.png"
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://bettercalories.app/#website",
+            "name": "Better Calories",
+            "url": "https://bettercalories.app/",
+            "inLanguage": "es",
+            "publisher": {
+              "@id": "https://bettercalories.app/#organization"
+            }
+          },
+          {
+            "@type": "MobileApplication",
+            "@id": "https://bettercalories.app/#app",
+            "name": "Better Calories",
+            "applicationCategory": "HealthApplication",
+            "operatingSystem": "Android, iOS",
+            "url": "https://bettercalories.app/",
+            "description": "App móvil para registrar comidas, calorías, macros y agua con voz, texto, confirmación editable y fuentes nutricionales verificables.",
+            "publisher": {
+              "@id": "https://bettercalories.app/#organization"
+            }
+          }
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <a class="skip-link" href="#contenido">Saltar al contenido</a>
+
+    <header class="site-header" aria-label="Navegación principal">
+      <a class="brand-lockup" href="/" aria-label="Better Calories inicio">
+        <img src="/assets/brand-icon.png" width="42" height="42" alt="">
+        <span>Better Calories</span>
+      </a>
+      <nav class="nav-links" aria-label="Secciones">
+        <a href="#como-funciona">Cómo funciona</a>
+        <a href="#producto">Producto</a>
+        <a href="#confianza">Confianza</a>
+        <a href="#faq">FAQ</a>
+      </nav>
+      <a class="nav-cta" href="/download.html">Descargar</a>
+    </header>
+
+    <main id="contenido">
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-media" aria-hidden="true">
+          <img class="hero-food hero-food-one" src="/assets/fresh-food-01.webp" alt="">
+          <img class="hero-food hero-food-two" src="/assets/fresh-food-02.webp" alt="">
+          <img class="hero-food hero-food-three" src="/assets/fresh-food-03.webp" alt="">
+        </div>
+
+        <div class="hero-copy">
+          <p class="eyebrow">App móvil de nutrición diaria</p>
+          <h1 id="hero-title">Better Calories</h1>
+          <p class="hero-lede">
+            Cuenta calorías y macros sin convertir cada comida en una tarea.
+            Habla o escribe lo que has comido, revisa la propuesta, corrige
+            porciones y guarda solo cuando todo encaja.
+          </p>
+          <div class="hero-actions" aria-label="Acciones principales">
+            <a class="button button-primary" href="/download.html">Descargar Android</a>
+            <a class="button button-secondary" href="#como-funciona">Ver cómo funciona</a>
+          </div>
+          <dl class="trust-strip" aria-label="Capacidades principales">
+            <div>
+              <dt>Entrada</dt>
+              <dd>voz y texto</dd>
+            </div>
+            <div>
+              <dt>Control</dt>
+              <dd>confirmar y corregir</dd>
+            </div>
+            <div>
+              <dt>Datos</dt>
+              <dd>Open Food Facts y USDA</dd>
+            </div>
+          </dl>
+        </div>
+
+        <a class="hero-peek" href="#idea" aria-label="Ir a la idea de producto">
+          <span>La idea</span>
+          <strong>Contar calorías no debería parecer contabilidad.</strong>
+        </a>
+
+        <div class="hero-product" aria-label="Vista previa de la app Better Calories">
+          <div class="phone phone-dashboard" role="img" aria-label="Pantalla con progreso diario de calorías, macros y agua">
+            <div class="phone-top">
+              <span>Buenos días</span>
+              <strong>Antonio</strong>
+            </div>
+            <div class="daily-panel">
+              <span>Calorías de hoy</span>
+              <strong>1.250</strong>
+              <small>720 kcal restantes</small>
+              <div class="ring" aria-hidden="true"><span></span></div>
+            </div>
+            <div class="macro-row">
+              <span><b>118 g</b> proteína</span>
+              <span><b>162 g</b> carbos</span>
+              <span><b>58 g</b> grasa</span>
+            </div>
+            <div class="water-panel">
+              <span>Agua</span>
+              <strong>1.75 / 2.50 L</strong>
+              <div class="water-meter"><span></span></div>
+            </div>
+            <div class="meal-line">
+              <img src="/assets/meal-breakfast.webp" width="40" height="40" alt="">
+              <div>
+                <strong>Desayuno habitual</strong>
+                <span>410 kcal</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="phone phone-voice" role="img" aria-label="Pantalla con una propuesta de comida lista para confirmar">
+            <div class="voice-chip">Escuchado</div>
+            <p class="spoken-text">"150 g de pollo, arroz y yogur"</p>
+            <div class="proposal-card">
+              <span>Propuesta</span>
+              <strong>Comida post entreno</strong>
+              <div class="proposal-total">645 kcal</div>
+              <ul>
+                <li><span>Pollo</span><b>248 kcal</b></li>
+                <li><span>Arroz cocido</span><b>270 kcal</b></li>
+                <li><span>Yogur natural</span><b>127 kcal</b></li>
+              </ul>
+              <div class="confirm-row">
+                <span>Editar</span>
+                <span>Confirmar</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <section class="intro-section" id="idea" aria-labelledby="intro-title">
+        <div class="section-shell intro-grid">
+          <div data-reveal>
+            <p class="eyebrow">La idea</p>
+            <h2 id="intro-title">Contar calorías no debería parecer contabilidad.</h2>
+          </div>
+          <p class="intro-copy" data-reveal>
+            Better Calories está diseñada para el momento real en el que comes:
+            una frase incompleta, una comida que repites, un producto de
+            supermercado o una corrección rápida. La app propone, tú decides.
+          </p>
+        </div>
+      </section>
+
+      <section class="workflow-section" id="como-funciona" aria-labelledby="workflow-title">
+        <div class="section-shell">
+          <div class="section-heading" data-reveal>
+            <p class="eyebrow">Cómo funciona</p>
+            <h2 id="workflow-title">Del plato al historial en tres decisiones claras.</h2>
+          </div>
+
+          <ol class="workflow-list">
+            <li data-reveal>
+              <span class="step-number">01</span>
+              <div>
+                <h3>Di la comida como hablarías normalmente.</h3>
+                <p>
+                  Voz o texto: "mi desayuno de siempre", "150 gramos de pollo
+                  con arroz" o "un snack del súper".
+                </p>
+              </div>
+            </li>
+            <li data-reveal>
+              <span class="step-number">02</span>
+              <div>
+                <h3>Revisa calorías, macros, porciones y fuentes.</h3>
+                <p>
+                  La propuesta se muestra antes de guardar, con ingredientes
+                  separados y valores de proteína, carbohidratos y grasa.
+                </p>
+              </div>
+            </li>
+            <li data-reveal>
+              <span class="step-number">03</span>
+              <div>
+                <h3>Corrige una vez, reutiliza muchas.</h3>
+                <p>
+                  Edita ingredientes, ajusta cantidades, guarda comidas
+                  habituales y deja que tus alias vuelvan más rápido la próxima vez.
+                </p>
+              </div>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="product-section" id="producto" aria-labelledby="product-title">
+        <div class="section-shell product-grid">
+          <div class="product-copy" data-reveal>
+            <p class="eyebrow">Producto</p>
+            <h2 id="product-title">Una pantalla para cada trabajo del día.</h2>
+            <p>
+              El objetivo no es hablar con un chatbot. Es registrar, confirmar,
+              revisar y ajustar sin perder el control de lo que queda guardado.
+            </p>
+          </div>
+
+          <div class="feature-board" aria-label="Funciones de Better Calories">
+            <article data-reveal>
+              <h3>Resumen diario</h3>
+              <p>Calorías consumidas, restantes, macros y agua sin abrir tres pantallas.</p>
+            </article>
+            <article data-reveal>
+              <h3>Historial editable</h3>
+              <p>Revisa comidas recientes, corrige ingredientes y elimina registros con confirmación.</p>
+            </article>
+            <article data-reveal>
+              <h3>Objetivos personalizados</h3>
+              <p>Calculadora de calorías, reparto de macros por porcentajes o gramos e hidratación diaria.</p>
+            </article>
+            <article data-reveal>
+              <h3>Comidas habituales</h3>
+              <p>Plantillas y alias para desayunos, comidas de gimnasio y recetas que repites.</p>
+            </article>
+            <article data-reveal>
+              <h3>Español e inglés</h3>
+              <p>Interfaz localizada, unidades métricas y lenguaje natural pensado para usuarios de España y la UE.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="proof-section" id="confianza" aria-labelledby="proof-title">
+        <div class="section-shell proof-grid">
+          <div class="proof-visual" aria-hidden="true" data-reveal>
+            <div class="source-ticket ticket-a">
+              <span>Open Food Facts</span>
+              <strong>producto de mercado</strong>
+            </div>
+            <div class="source-ticket ticket-b">
+              <span>USDA FoodData Central</span>
+              <strong>referencia nutricional</strong>
+            </div>
+            <div class="source-ticket ticket-c">
+              <span>Tu memoria</span>
+              <strong>alias y habituales</strong>
+            </div>
+          </div>
+          <div data-reveal>
+            <p class="eyebrow">Confianza</p>
+            <h2 id="proof-title">Automatización con una pausa antes de guardar.</h2>
+            <p>
+              Better Calories no convierte una frase en historial a ciegas. El
+              backend resuelve alimentos, conserva procedencia cuando existe,
+              marca dudas y exige confirmación para escribir datos nutricionales.
+            </p>
+            <ul class="check-list">
+              <li>Correcciones de porción e ingredientes antes de confirmar.</li>
+              <li>Fuentes públicas de referencia visibles en la experiencia.</li>
+              <li>Acciones con permisos separados para leer, proponer, guardar y borrar.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="seo-section" aria-labelledby="seo-title">
+        <div class="section-shell seo-grid">
+          <div data-reveal>
+            <p class="eyebrow">Para quién</p>
+            <h2 id="seo-title">Para quien quiere registrar mejor, no obsesionarse más.</h2>
+          </div>
+          <div class="audience-copy" data-reveal>
+            <p>
+              Si buscas una app para contar calorías, controlar macros, registrar
+              comida por voz y mantener un historial fiable de comidas, Better
+              Calories apunta a ese uso diario: desayunos repetidos, recetas en
+              casa, productos de supermercado, snacks rápidos y comidas alrededor
+              del entrenamiento.
+            </p>
+            <p>
+              La app no sustituye consejo médico o nutricional. Sirve para
+              seguimiento personal, revisión de objetivos y toma de decisiones
+              con datos claros antes de guardar cada comida.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="faq-section" id="faq" aria-labelledby="faq-title">
+        <div class="section-shell">
+          <div class="section-heading" data-reveal>
+            <p class="eyebrow">FAQ</p>
+            <h2 id="faq-title">Preguntas antes de probar Better Calories.</h2>
+          </div>
+          <div class="faq-list">
+            <details data-reveal>
+              <summary>¿Puedo usar Better Calories sin hablar?</summary>
+              <p>Sí. La voz acelera el registro, pero los flujos principales funcionan también con texto y controles táctiles.</p>
+            </details>
+            <details data-reveal>
+              <summary>¿La app guarda una comida automáticamente?</summary>
+              <p>El flujo normal crea una propuesta revisable. Las escrituras importantes requieren confirmación y se pueden corregir.</p>
+            </details>
+            <details data-reveal>
+              <summary>¿De dónde salen los datos nutricionales?</summary>
+              <p>El backend puede usar alimentos propios, Open Food Facts, USDA FoodData Central y memoria de comidas del usuario.</p>
+            </details>
+            <details data-reveal>
+              <summary>¿Puedo configurar mi objetivo de calorías y macros?</summary>
+              <p>Sí. Hay objetivo diario de calorías, calculadora orientativa, macros por porcentajes o gramos e hidratación diaria.</p>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <section class="final-cta" aria-labelledby="final-title">
+        <div class="section-shell final-panel" data-reveal>
+          <div>
+            <p class="eyebrow">Beta Android</p>
+            <h2 id="final-title">Empieza con una comida, no con una base de datos.</h2>
+          </div>
+          <a class="button button-primary" href="/download.html">Descargar Better Calories</a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="section-shell footer-grid">
+        <a class="brand-lockup" href="/" aria-label="Better Calories inicio">
+          <img src="/assets/brand-icon.png" width="34" height="34" alt="">
+          <span>Better Calories</span>
+        </a>
+        <p>Seguimiento personal de calorías, macros, agua y comidas habituales.</p>
+        <nav aria-label="Enlaces de pie">
+          <a href="/robots.txt">Robots</a>
+          <a href="/sitemap.xml">Sitemap</a>
+          <a href="https://api.bettercalories.app/v1/health" rel="nofollow">Estado API</a>
+        </nav>
+      </div>
+    </footer>
+
+    <script src="/script.js" defer></script>
+  </body>
+</html>

@@ -117,7 +117,7 @@ JSON
   ssh "$REMOTE_HOST" "install -d -m 0755 '$remote_dir'"
   scp "$source_apk" "$REMOTE_HOST:/tmp/$apk_name"
   scp "$local_manifest" "$REMOTE_HOST:/tmp/bettercalories-$flavor-latest.json"
-  ssh "$REMOTE_HOST" "mv '/tmp/$apk_name' '$remote_dir/$apk_name' && mv '/tmp/bettercalories-$flavor-latest.json' '$remote_dir/latest.json' && chmod 0644 '$remote_dir/$apk_name' '$remote_dir/latest.json'"
+  ssh "$REMOTE_HOST" "mv '/tmp/$apk_name' '$remote_dir/$apk_name' && mv '/tmp/bettercalories-$flavor-latest.json' '$remote_dir/latest.json' && ln -sfn '$apk_name' '$remote_dir/latest.apk' && chmod 0644 '$remote_dir/$apk_name' '$remote_dir/latest.json'"
   rm -f "$local_manifest"
 }
 
@@ -138,6 +138,7 @@ validate_public_download() {
     exit 1
   fi
   curl -fsSI "$apk_url" >/dev/null
+  curl -fsSI "$public_base_url/apk/latest.apk" >/dev/null
 }
 
 case "$ENVIRONMENT" in

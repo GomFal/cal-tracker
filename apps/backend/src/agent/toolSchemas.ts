@@ -23,6 +23,7 @@ function toolDescription(action: (typeof actionDefinitions)[number]): string {
         `${action.title}.`,
         "Primary/default tool for turning typed or transcribed food text into a meal proposal.",
         "Use for one or many foods, quantities, and natural-language add/record meal requests in any language.",
+        "In same-list phrases like '300 gramos de pollo y 200 de pan', treat the second quantity as 200 grams because grams was the last explicit unit.",
         "Do not use nutrition lookup tools first for these requests.",
         action.description,
       ].join(" ");

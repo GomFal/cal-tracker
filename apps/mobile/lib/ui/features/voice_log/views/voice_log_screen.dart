@@ -1,4 +1,5 @@
-import 'package:flutter/foundation.dart';
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -21,8 +22,6 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
   @override
   Widget build(BuildContext context) {
     final viewModel = context.watch<VoiceLogViewModel>();
-    final showDebugTranscript =
-        kDebugMode && viewModel.transcript.trim().isNotEmpty;
 
     return Scaffold(
       backgroundColor: FreshColors.screen,
@@ -75,8 +74,12 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
                 ),
                 const SizedBox(height: FreshSpacing.md),
               ],
-              if (showDebugTranscript) ...[
-                _TranscriptDebugCard(transcript: viewModel.transcript),
+              if (viewModel.hasVoiceTranscript) ...[
+                _VoiceTranscriptCard(transcript: viewModel.transcript),
+                const SizedBox(height: FreshSpacing.md),
+              ],
+              if (_shouldShowManualFoodSearch(viewModel)) ...[
+                _ManualFoodSearchPanel(viewModel: viewModel),
                 const SizedBox(height: FreshSpacing.md),
               ],
               if (viewModel.showProposalChangeSuccess) ...[
@@ -189,9 +192,27 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
 
 const _candidatePreviewCount = 3;
 const _candidateDisplayLimit = 10;
+const _foodSearchResultLimit = 10;
 
-class _TranscriptDebugCard extends StatelessWidget {
-  const _TranscriptDebugCard({required this.transcript});
+bool _shouldShowManualFoodSearch(VoiceLogViewModel viewModel) {
+  final hasPrimaryResult = viewModel.proposal != null ||
+      viewModel.autoCommittedMeal != null ||
+      viewModel.summary != null ||
+      viewModel.remaining != null ||
+      viewModel.meals != null ||
+      viewModel.items != null ||
+      viewModel.templates != null ||
+      viewModel.template != null;
+  if (hasPrimaryResult || viewModel.transcript.trim().isNotEmpty) {
+    return false;
+  }
+  return viewModel.state == VoiceLogState.idle ||
+      viewModel.state == VoiceLogState.ready ||
+      viewModel.state == VoiceLogState.error;
+}
+
+class _VoiceTranscriptCard extends StatelessWidget {
+  const _VoiceTranscriptCard({required this.transcript});
 
   final String transcript;
 
@@ -200,23 +221,260 @@ class _TranscriptDebugCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return FreshCard(
-      key: const ValueKey('transcript_debug_card'),
-      padding: const EdgeInsets.all(FreshSpacing.lg),
+      key: const ValueKey('voice_transcript_card'),
+      padding: const EdgeInsets.symmetric(
+        horizontal: FreshSpacing.md,
+        vertical: FreshSpacing.sm,
+      ),
+      radius: FreshRadii.md,
       color: FreshColors.surfaceSoft,
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Debug transcript',
+            context.l10n.voiceTranscriptHeardLabel,
             style: textTheme.labelLarge?.copyWith(
               color: FreshColors.inkMuted,
               fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: FreshSpacing.sm),
-          Text(transcript, style: textTheme.bodyMedium),
+          const SizedBox(width: FreshSpacing.sm),
+          Expanded(
+            child: Text(
+              transcript,
+              style: textTheme.bodySmall?.copyWith(
+                color: FreshColors.inkSoft,
+                height: 1.25,
+                letterSpacing: 0,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
+    );
+  }
+}
+
+class _ManualFoodSearchPanel extends StatefulWidget {
+  const _ManualFoodSearchPanel({required this.viewModel});
+
+  final VoiceLogViewModel viewModel;
+
+  @override
+  State<_ManualFoodSearchPanel> createState() => _ManualFoodSearchPanelState();
+}
+
+class _ManualFoodSearchPanelState extends State<_ManualFoodSearchPanel> {
+  final List<_EditableMealItem> _items = [];
+
+  @override
+  void dispose() {
+    for (final item in _items) {
+      item.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return FreshCard(
+      key: const ValueKey('manual_food_search_panel'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const FreshIconChip(
+                icon: Icons.search_rounded,
+                color: FreshColors.limeDeep,
+                backgroundColor: FreshColors.limeWash,
+              ),
+              const SizedBox(width: FreshSpacing.md),
+              Expanded(
+                child: Text(
+                  context.l10n.foodSearchTitle,
+                  style: textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: FreshSpacing.md),
+          _FoodSearchBox(
+            keyPrefix: 'manual_food_search',
+            actionLabel: context.l10n.foodSearchAddAction,
+            actionIcon: Icons.add_rounded,
+            hintText: context.l10n.foodSearchHint,
+            onSelected: (candidate) {
+              setState(() {
+                _items.add(_EditableMealItem(candidate));
+              });
+            },
+          ),
+          if (_items.isNotEmpty) ...[
+            const SizedBox(height: FreshSpacing.lg),
+            Text(
+              context.l10n.foodSearchSelectedFoods,
+              style: textTheme.labelLarge?.copyWith(
+                color: FreshColors.inkMuted,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0,
+              ),
+            ),
+            const SizedBox(height: FreshSpacing.sm),
+            for (var index = 0; index < _items.length; index++) ...[
+              _ManualDraftIngredientRow(
+                key: ValueKey('manual_food_draft_item_$index'),
+                item: _items[index],
+                index: index,
+                onNutritionEdit: () => _editNutrition(index),
+                onDelete: () {
+                  setState(() {
+                    _items.removeAt(index).dispose();
+                  });
+                },
+              ),
+              if (index != _items.length - 1)
+                const Divider(height: FreshSpacing.lg),
+            ],
+            const SizedBox(height: FreshSpacing.md),
+            FilledButton.icon(
+              key: const ValueKey('manual_food_review_meal_button'),
+              onPressed: widget.viewModel.isLoading ? null : _reviewMeal,
+              icon: const Icon(Icons.restaurant_menu_rounded),
+              label: Text(context.l10n.foodSearchReviewMeal),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _editNutrition(int index) async {
+    final edited = await showModalBottomSheet<_NutritionEdit>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _NutritionEditorSheet(item: _items[index]),
+    );
+    if (edited == null) return;
+    setState(() {
+      _items[index].setNutritionOverride(edited);
+    });
+  }
+
+  Future<void> _reviewMeal() async {
+    final edited = <MealItem>[];
+    for (final item in _items) {
+      final name = item.nameController.text.trim();
+      final quantity = double.tryParse(item.quantityController.text.trim());
+      final unit = item.unitController.text.trim();
+      if (name.isEmpty || quantity == null || quantity <= 0 || unit.isEmpty) {
+        continue;
+      }
+      edited.add(item.toMealItem(name: name, quantity: quantity, unit: unit));
+    }
+    if (edited.isEmpty) return;
+    await widget.viewModel.createProposalFromManualItems(edited);
+    if (!mounted) return;
+    if (widget.viewModel.proposal != null) {
+      setState(() {
+        for (final item in _items) {
+          item.dispose();
+        }
+        _items.clear();
+      });
+    }
+  }
+}
+
+class _ManualDraftIngredientRow extends StatelessWidget {
+  const _ManualDraftIngredientRow({
+    super.key,
+    required this.item,
+    required this.index,
+    required this.onNutritionEdit,
+    required this.onDelete,
+  });
+
+  final _EditableMealItem item;
+  final int index;
+  final VoidCallback onNutritionEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final nutrition = item.currentNutrition();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextField(
+          key: ValueKey('manual_food_item_name_$index'),
+          controller: item.nameController,
+          decoration: InputDecoration(labelText: context.l10n.foodSearchName),
+        ),
+        const SizedBox(height: FreshSpacing.sm),
+        Row(
+          children: [
+            Expanded(
+              child: TextField(
+                key: ValueKey('manual_food_item_quantity_$index'),
+                controller: item.quantityController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: InputDecoration(
+                  labelText: context.l10n.foodSearchQuantity,
+                ),
+              ),
+            ),
+            const SizedBox(width: FreshSpacing.sm),
+            SizedBox(
+              width: 82,
+              child: TextField(
+                key: ValueKey('manual_food_item_unit_$index'),
+                controller: item.unitController,
+                decoration: InputDecoration(
+                  labelText: context.l10n.foodSearchUnit,
+                ),
+              ),
+            ),
+            const SizedBox(width: FreshSpacing.sm),
+            IconButton(
+              key: ValueKey('manual_food_item_delete_$index'),
+              onPressed: onDelete,
+              icon: const Icon(Icons.delete_outline_rounded),
+              tooltip: context.l10n.foodSearchRemoveDraft,
+            ),
+          ],
+        ),
+        const SizedBox(height: FreshSpacing.xs),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                _nutritionLabel(nutrition),
+                style: textTheme.labelMedium?.copyWith(
+                  color: FreshColors.inkMuted,
+                  letterSpacing: 0,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            TextButton.icon(
+              key: ValueKey('manual_food_item_nutrition_$index'),
+              onPressed: onNutritionEdit,
+              icon: const Icon(Icons.tune_rounded, size: 18),
+              label: Text(context.l10n.foodSearchNutrition),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -285,6 +543,7 @@ class _ResolverClarificationCard extends StatefulWidget {
 class _ResolverClarificationCardState
     extends State<_ResolverClarificationCard> {
   final Set<String> _expandedGroups = <String>{};
+  final Set<String> _searchExpandedGroups = <String>{};
 
   @override
   Widget build(BuildContext context) {
@@ -294,7 +553,7 @@ class _ResolverClarificationCardState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const FreshSectionTitle(title: 'Food matches'),
+          FreshSectionTitle(title: context.l10n.voiceFoodMatches),
           const SizedBox(height: FreshSpacing.sm),
           for (final group in widget.groups) ...[
             Text(
@@ -338,6 +597,19 @@ class _ResolverClarificationCardState
                 onCandidateSelected: widget.onCandidateSelected,
                 onToggleExpanded: () => _toggleExpanded(group),
               ),
+            const SizedBox(height: FreshSpacing.sm),
+            _ClarificationFoodSearch(
+              group: group,
+              expanded: group.candidates.isEmpty ||
+                  _searchExpandedGroups.contains(_groupKey(group)),
+              onToggleExpanded: () => _toggleSearchExpanded(group),
+              onSelected: (candidate) async {
+                await widget.onCandidateSelected(
+                  group,
+                  _candidateWithMentionQuantity(candidate, group.mention),
+                );
+              },
+            ),
             const SizedBox(height: FreshSpacing.md),
           ],
         ],
@@ -354,6 +626,15 @@ class _ResolverClarificationCardState
     });
   }
 
+  void _toggleSearchExpanded(FoodCandidateGroup group) {
+    final key = _groupKey(group);
+    setState(() {
+      if (!_searchExpandedGroups.add(key)) {
+        _searchExpandedGroups.remove(key);
+      }
+    });
+  }
+
   String _groupKey(FoodCandidateGroup group) {
     final mention = group.mention;
     return [
@@ -362,6 +643,333 @@ class _ResolverClarificationCardState
       mention.quantity.toStringAsFixed(3),
       mention.unit,
     ].join('|');
+  }
+}
+
+class _ClarificationFoodSearch extends StatelessWidget {
+  const _ClarificationFoodSearch({
+    required this.group,
+    required this.expanded,
+    required this.onToggleExpanded,
+    required this.onSelected,
+  });
+
+  final FoodCandidateGroup group;
+  final bool expanded;
+  final VoidCallback onToggleExpanded;
+  final Future<void> Function(MealItem candidate) onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!expanded) {
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          key: ValueKey(
+            'food_candidate_search_toggle_${group.mention.canonicalName}',
+          ),
+          onPressed: onToggleExpanded,
+          icon: const Icon(Icons.search_rounded, size: 18),
+          label: Text(context.l10n.foodSearchSearchInstead),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _FoodSearchBox(
+          keyPrefix: 'clarification_food_search_${group.mention.canonicalName}',
+          actionLabel: context.l10n.foodSearchUseAction,
+          actionIcon: Icons.check_rounded,
+          hintText: context.l10n.foodSearchHint,
+          initialQuery: group.mention.canonicalName,
+          onSelected: onSelected,
+        ),
+        if (group.candidates.isNotEmpty)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              key: ValueKey(
+                'food_candidate_search_collapse_${group.mention.canonicalName}',
+              ),
+              onPressed: onToggleExpanded,
+              icon: const Icon(Icons.keyboard_arrow_up_rounded, size: 18),
+              label: Text(context.l10n.foodSearchHideSearch),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _FoodSearchBox extends StatefulWidget {
+  const _FoodSearchBox({
+    required this.keyPrefix,
+    required this.actionLabel,
+    required this.actionIcon,
+    required this.hintText,
+    required this.onSelected,
+    this.initialQuery,
+  });
+
+  final String keyPrefix;
+  final String actionLabel;
+  final IconData actionIcon;
+  final String hintText;
+  final FutureOr<void> Function(MealItem candidate) onSelected;
+  final String? initialQuery;
+
+  @override
+  State<_FoodSearchBox> createState() => _FoodSearchBoxState();
+}
+
+class _FoodSearchBoxState extends State<_FoodSearchBox> {
+  late final TextEditingController _controller;
+  Timer? _debounce;
+  List<MealItem> _results = const [];
+  bool _loading = false;
+  String? _error;
+  int _requestSerial = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialQuery ?? '');
+    if (_controller.text.trim().length >= 2) {
+      _queueSearchAfterBuild();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _FoodSearchBox oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialQuery != oldWidget.initialQuery &&
+        widget.initialQuery != null &&
+        widget.initialQuery != _controller.text) {
+      _controller.text = widget.initialQuery!;
+      _queueSearchAfterBuild();
+    }
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextField(
+          key: ValueKey('${widget.keyPrefix}_field'),
+          controller: _controller,
+          textInputAction: TextInputAction.search,
+          onChanged: (_) => _scheduleSearch(),
+          onSubmitted: (_) => _scheduleSearch(immediate: true),
+          decoration: InputDecoration(
+            hintText: widget.hintText,
+            prefixIcon: const Icon(Icons.search_rounded),
+            suffixIcon: _controller.text.trim().isEmpty
+                ? null
+                : IconButton(
+                    key: ValueKey('${widget.keyPrefix}_clear'),
+                    tooltip: context.l10n.foodSearchClear,
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: _clear,
+                  ),
+          ),
+        ),
+        if (_loading) ...[
+          const SizedBox(height: FreshSpacing.sm),
+          LinearProgressIndicator(
+            key: ValueKey('${widget.keyPrefix}_loading'),
+            minHeight: 3,
+          ),
+        ],
+        if (_error != null) ...[
+          const SizedBox(height: FreshSpacing.sm),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  _error!,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: FreshColors.coral,
+                    letterSpacing: 0,
+                  ),
+                ),
+              ),
+              TextButton(
+                key: ValueKey('${widget.keyPrefix}_retry'),
+                onPressed: () => _scheduleSearch(immediate: true),
+                child: Text(context.l10n.foodSearchRetry),
+              ),
+            ],
+          ),
+        ],
+        if (!_loading &&
+            _error == null &&
+            _controller.text.trim().length >= 2 &&
+            _results.isEmpty) ...[
+          const SizedBox(height: FreshSpacing.sm),
+          Text(
+            context.l10n.foodSearchEmpty,
+            key: ValueKey('${widget.keyPrefix}_empty'),
+            style: textTheme.bodySmall?.copyWith(
+              color: FreshColors.inkMuted,
+              letterSpacing: 0,
+            ),
+          ),
+        ],
+        if (_results.isNotEmpty) ...[
+          const SizedBox(height: FreshSpacing.sm),
+          for (var index = 0; index < _results.length; index++) ...[
+            _FoodSearchResultLine(
+              key: ValueKey('${widget.keyPrefix}_result_$index'),
+              buttonKey: ValueKey('${widget.keyPrefix}_result_button_$index'),
+              item: _results[index],
+              actionLabel: widget.actionLabel,
+              actionIcon: widget.actionIcon,
+              onSelected: () => widget.onSelected(_results[index]),
+            ),
+            if (index != _results.length - 1)
+              const Divider(height: FreshSpacing.md),
+          ],
+        ],
+      ],
+    );
+  }
+
+  void _clear() {
+    _debounce?.cancel();
+    setState(() {
+      _controller.clear();
+      _results = const [];
+      _loading = false;
+      _error = null;
+    });
+  }
+
+  void _queueSearchAfterBuild() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _scheduleSearch(immediate: true);
+    });
+  }
+
+  void _scheduleSearch({bool immediate = false}) {
+    _debounce?.cancel();
+    final query = _controller.text.trim();
+    if (query.length < 2) {
+      setState(() {
+        _results = const [];
+        _loading = false;
+        _error = null;
+      });
+      return;
+    }
+
+    if (immediate) {
+      unawaited(_search(query));
+      return;
+    }
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      unawaited(_search(query));
+    });
+  }
+
+  Future<void> _search(String query) async {
+    final serial = ++_requestSerial;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final result = await context.read<VoiceLogViewModel>().searchFoods(
+            query,
+            limit: _foodSearchResultLimit,
+          );
+      if (!mounted || serial != _requestSerial) return;
+      setState(() {
+        _results = result.items.take(_foodSearchResultLimit).toList();
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted || serial != _requestSerial) return;
+      setState(() {
+        _results = const [];
+        _loading = false;
+        _error = context.l10n.foodSearchError;
+      });
+    }
+  }
+}
+
+class _FoodSearchResultLine extends StatelessWidget {
+  const _FoodSearchResultLine({
+    super.key,
+    required this.buttonKey,
+    required this.item,
+    required this.actionLabel,
+    required this.actionIcon,
+    required this.onSelected,
+  });
+
+  final Key buttonKey;
+  final MealItem item;
+  final String actionLabel;
+  final IconData actionIcon;
+  final VoidCallback onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                item.name,
+                style: textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                _foodSearchItemSubtitle(item),
+                style: textTheme.labelMedium?.copyWith(
+                  color: FreshColors.inkMuted,
+                  letterSpacing: 0,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: FreshSpacing.sm),
+        TextButton.icon(
+          key: buttonKey,
+          onPressed: () {
+            FocusScope.of(context).unfocus();
+            onSelected();
+          },
+          icon: Icon(actionIcon, size: 18),
+          label: Text(actionLabel),
+        ),
+      ],
+    );
   }
 }
 
@@ -1253,6 +1861,13 @@ class _ProposalEditorSheetState extends State<_ProposalEditorSheet> {
                       _items[index].replaceWith(candidate);
                     });
                   },
+                  onSearchReplacementSelected: (candidate) {
+                    setState(() {
+                      _items[index].replaceWith(
+                        _replacementCandidateFor(_items[index], candidate),
+                      );
+                    });
+                  },
                   onNutritionEdit: () => _editNutrition(index),
                   onDelete: _items.length == 1
                       ? null
@@ -1326,6 +1941,16 @@ class _ProposalEditorSheetState extends State<_ProposalEditorSheet> {
     }
     return const [];
   }
+
+  MealItem _replacementCandidateFor(
+    _EditableMealItem item,
+    MealItem candidate,
+  ) {
+    final quantity = double.tryParse(item.quantityController.text.trim());
+    final unit = item.unitController.text.trim();
+    if (quantity == null || quantity <= 0 || unit.isEmpty) return candidate;
+    return _candidateWithQuantity(candidate, quantity: quantity, unit: unit);
+  }
 }
 
 class _EditableIngredientRow extends StatelessWidget {
@@ -1335,6 +1960,7 @@ class _EditableIngredientRow extends StatelessWidget {
     required this.index,
     required this.candidates,
     required this.onCandidateSelected,
+    required this.onSearchReplacementSelected,
     required this.onNutritionEdit,
     required this.onDelete,
   });
@@ -1343,6 +1969,7 @@ class _EditableIngredientRow extends StatelessWidget {
   final int index;
   final List<MealItem> candidates;
   final ValueChanged<MealItem> onCandidateSelected;
+  final ValueChanged<MealItem> onSearchReplacementSelected;
   final VoidCallback onNutritionEdit;
   final VoidCallback? onDelete;
 
@@ -1365,6 +1992,12 @@ class _EditableIngredientRow extends StatelessWidget {
             ),
             const SizedBox(height: FreshSpacing.sm),
           ],
+          _InlineReplacementFoodSearch(
+            index: index,
+            item: item,
+            onSelected: onSearchReplacementSelected,
+          ),
+          const SizedBox(height: FreshSpacing.sm),
           TextField(
             key: ValueKey('proposal_item_name_$index'),
             controller: item.nameController,
@@ -1461,6 +2094,68 @@ class _CandidateSwapStripState extends State<_CandidateSwapStrip> {
       isSelected: (candidate) => _sameMealItem(candidate, widget.selectedItem),
       onSelected: widget.onSelected,
       onToggleExpanded: () => setState(() => _expanded = !_expanded),
+    );
+  }
+}
+
+class _InlineReplacementFoodSearch extends StatefulWidget {
+  const _InlineReplacementFoodSearch({
+    required this.index,
+    required this.item,
+    required this.onSelected,
+  });
+
+  final int index;
+  final _EditableMealItem item;
+  final ValueChanged<MealItem> onSelected;
+
+  @override
+  State<_InlineReplacementFoodSearch> createState() =>
+      _InlineReplacementFoodSearchState();
+}
+
+class _InlineReplacementFoodSearchState
+    extends State<_InlineReplacementFoodSearch> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_expanded) {
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          key: ValueKey('proposal_item_${widget.index}_search_toggle'),
+          onPressed: () => setState(() => _expanded = true),
+          icon: const Icon(Icons.search_rounded, size: 18),
+          label: Text(context.l10n.foodSearchReplaceSearch),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _FoodSearchBox(
+          keyPrefix: 'proposal_item_${widget.index}_search',
+          actionLabel: context.l10n.foodSearchReplaceAction,
+          actionIcon: Icons.swap_horiz_rounded,
+          hintText: context.l10n.foodSearchHint,
+          initialQuery: widget.item.nameController.text,
+          onSelected: (candidate) {
+            widget.onSelected(candidate);
+            setState(() => _expanded = false);
+          },
+        ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            key: ValueKey('proposal_item_${widget.index}_search_collapse'),
+            onPressed: () => setState(() => _expanded = false),
+            icon: const Icon(Icons.keyboard_arrow_up_rounded, size: 18),
+            label: Text(context.l10n.foodSearchHideSearch),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1640,6 +2335,55 @@ class _NutritionEdit {
   final double proteinGrams;
   final double carbsGrams;
   final double fatGrams;
+}
+
+MealItem _candidateWithMentionQuantity(
+  MealItem candidate,
+  FoodMention mention,
+) {
+  return _candidateWithQuantity(
+    candidate,
+    quantity: mention.quantity,
+    unit: mention.unit,
+  );
+}
+
+MealItem _candidateWithQuantity(
+  MealItem candidate, {
+  required double quantity,
+  required String unit,
+}) {
+  if (_normalizedText(candidate.unit) != _normalizedText(unit) ||
+      candidate.quantity <= 0 ||
+      quantity <= 0) {
+    return candidate;
+  }
+  final factor = quantity / candidate.quantity;
+  return candidate.copyWith(
+    quantity: quantity,
+    unit: unit,
+    calories: (candidate.calories * factor).round(),
+    proteinGrams: _roundMacro(candidate.proteinGrams * factor),
+    carbsGrams: _roundMacro(candidate.carbsGrams * factor),
+    fatGrams: _roundMacro(candidate.fatGrams * factor),
+  );
+}
+
+String _foodSearchItemSubtitle(MealItem item) {
+  return '${_formatQuantity(item.quantity)} ${item.unit} · '
+      '${_nutritionLabel(_NutritionEdit(
+    calories: item.calories,
+    proteinGrams: item.proteinGrams,
+    carbsGrams: item.carbsGrams,
+    fatGrams: item.fatGrams,
+  ))}';
+}
+
+String _nutritionLabel(_NutritionEdit nutrition) {
+  return '${nutrition.calories} Kcal · '
+      '${_formatMacro(nutrition.proteinGrams)}P · '
+      '${_formatMacro(nutrition.carbsGrams)}C · '
+      '${_formatMacro(nutrition.fatGrams)}F';
 }
 
 class _EditableMealItem {

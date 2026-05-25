@@ -12,6 +12,8 @@ import {
   errorResponseSchema,
   executeActionRequestSchema,
   executeActionResponseSchema,
+  foodSearchRequestSchema,
+  foodSearchResponseSchema,
   goalsResponseSchema,
   goalsUpdateSchema,
   googleLoginRequestSchema,
@@ -82,6 +84,8 @@ const spec = {
       CalorieEstimateResponse: schema("CalorieEstimateResponse", calorieEstimateResponseSchema),
       ExecuteActionRequest: schema("ExecuteActionRequest", executeActionRequestSchema),
       ExecuteActionResponse: schema("ExecuteActionResponse", executeActionResponseSchema),
+      FoodSearchRequest: schema("FoodSearchRequest", foodSearchRequestSchema),
+      FoodSearchResponse: schema("FoodSearchResponse", foodSearchResponseSchema),
       AgentRunRequest: schema("AgentRunRequest", agentRunRequestSchema),
       AgentRunResponse: schema("AgentRunResponse", agentRunResponseSchema),
       TranscriptionResponse: schema("TranscriptionResponse", transcriptionResponseSchema),
@@ -214,6 +218,19 @@ const spec = {
         },
         responses: {
           "200": { description: "Action result", content: { "application/json": { schema: { $ref: "#/components/schemas/ExecuteActionResponse" } } } }
+        }
+      }
+    },
+    "/v1/foods/search": {
+      post: {
+        operationId: "searchFoods",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/FoodSearchRequest" } } }
+        },
+        responses: {
+          "200": { description: "Food search results", content: { "application/json": { schema: { $ref: "#/components/schemas/FoodSearchResponse" } } } }
         }
       }
     },

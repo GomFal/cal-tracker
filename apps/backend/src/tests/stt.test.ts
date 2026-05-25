@@ -262,6 +262,43 @@ describe("STT endpoint", () => {
     expect(agentProvider.calls).toBe(0);
   });
 
+  it("returns the transcript when the agent fails after transcription", async () => {
+    const { request } = buildTestApp({
+      sttProvider: new FakeSpeechToTextProvider(
+        "300 grams of chicken and 200 of bread",
+      ),
+      agentProvider: new FakeChatAgentProvider({
+        toolCalls: [
+          {
+            id: "call_bad_tool",
+            type: "function",
+            function: {
+              name: "commit_meal",
+              arguments: JSON.stringify({}),
+            },
+          },
+        ],
+        rawResponse: {},
+      }),
+    });
+    const { authHeader } = await registerAndAuth(request);
+
+    const body = new FormData();
+    body.append("audio", new Blob(["fake audio"], { type: "audio/m4a" }), "test.m4a");
+
+    const res = await request("http://localhost/v1/voice/meal-runs", {
+      method: "POST",
+      headers: bearerOnly(authHeader),
+      body,
+    });
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.transcript).toBe("300 grams of chicken and 200 of bread");
+    expect(json.result.kind).toBe("clarification_required");
+    expect(json.result.message).toContain("I heard the recording");
+  });
+
   it("does not return raw provider errors to clients", async () => {
     const { request } = buildTestApp({
       sttProvider: new ThrowingSpeechToTextProvider(),

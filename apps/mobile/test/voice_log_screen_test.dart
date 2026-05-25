@@ -144,9 +144,10 @@ void main() {
       expect(hapticCalls, contains('HapticFeedbackType.mediumImpact'));
       expect(find.text('Chicken and rice'), findsOneWidget);
       expect(
-        find.byKey(const ValueKey('transcript_debug_card')),
+        find.byKey(const ValueKey('voice_transcript_card')),
         findsOneWidget,
       );
+      expect(find.text('I heard:'), findsOneWidget);
       expect(find.text('chicken and rice'), findsOneWidget);
       expect(find.byKey(const ValueKey('confirm_proposal_button')),
           findsOneWidget);
@@ -167,14 +168,14 @@ void main() {
       expect(find.byKey(const ValueKey('meal_text_field')), findsNothing);
       expect(find.byKey(const ValueKey('submit_meal_button')), findsNothing);
       expect(
-        find.byKey(const ValueKey('transcript_debug_card')),
+        find.byKey(const ValueKey('voice_transcript_card')),
         findsNothing,
       );
       expect(find.byKey(const ValueKey('mic_button')), findsOneWidget);
     });
 
     testWidgets(
-      'shows debug transcript during clarification',
+      'does not show voice transcript during text clarification',
       (tester) async {
         const transcript =
             'Añade 100 gramos de arroz, 100 gramos de pollo y 100 gramos de pan.';
@@ -209,14 +210,186 @@ void main() {
         expect(find.byKey(const ValueKey('meal_text_field')), findsNothing);
         expect(find.byKey(const ValueKey('submit_meal_button')), findsNothing);
         expect(
-          find.byKey(const ValueKey('transcript_debug_card')),
-          findsOneWidget,
+          find.byKey(const ValueKey('voice_transcript_card')),
+          findsNothing,
         );
-        expect(find.text(transcript), findsOneWidget);
         expect(
           find.byKey(const ValueKey('resolver_clarification_card')),
           findsOneWidget,
         );
+      },
+    );
+
+    testWidgets('searches manual foods and creates a proposal', (tester) async {
+      final bread = _mealItem(
+        name: 'Bread',
+        calories: 265,
+        externalId: 'bread',
+      );
+      final proposal = MealProposal(
+        id: 'prop_bread',
+        title: 'Bread',
+        confidence: 0.9,
+        requiresConfirmation: true,
+        trustedAutoCommitEligible: false,
+        nutrition: const NutritionSnapshot(
+          calories: 265,
+          proteinGrams: 7,
+          carbsGrams: 1,
+          fatGrams: 8,
+        ),
+        items: [bread],
+      );
+      when(() => nutritionRepository.searchFoods('bread', limit: 10))
+          .thenAnswer(
+        (_) async => FoodSearchResult(items: [bread]),
+      );
+      when(
+        () => nutritionRepository.createProposalFromItems(
+          phrase: any(named: 'phrase'),
+          items: any(named: 'items'),
+        ),
+      ).thenAnswer((_) async => proposal);
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<VoiceLogViewModel>.value(
+          value: viewModel,
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            theme: buildTheme(),
+            home: const MealCreateScreen(),
+          ),
+        ),
+      );
+
+      expect(find.byKey(const ValueKey('manual_food_search_panel')),
+          findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const ValueKey('manual_food_search_field')),
+        'bread',
+      );
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('manual_food_search_result_button_0')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('manual_food_draft_item_0')),
+          findsOneWidget);
+
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('manual_food_review_meal_button')),
+      );
+      final reviewButton =
+          find.byKey(const ValueKey('manual_food_review_meal_button'));
+      await tester.tapAt(tester.getCenter(reviewButton) - const Offset(180, 0));
+      await tester.pumpAndSettle();
+
+      final captured = verify(
+        () => nutritionRepository.createProposalFromItems(
+          phrase: any(named: 'phrase'),
+          items: captureAny(named: 'items'),
+        ),
+      ).captured.single as List<MealItem>;
+      expect(captured.single.name, 'Bread');
+      expect(find.text('Bread'), findsWidgets);
+      expect(find.byKey(const ValueKey('confirm_proposal_button')),
+          findsOneWidget);
+    });
+
+    testWidgets(
+      'uses manual search to resolve an ingredient without candidates',
+      (tester) async {
+        final bread = _mealItem(
+          name: 'Bread',
+          calories: 265,
+          externalId: 'bread',
+        );
+        final group = _candidateGroup(
+          canonicalEnglishName: 'red meat',
+          candidates: const [],
+        );
+        final proposal = MealProposal(
+          id: 'prop_bread',
+          title: 'Bread',
+          confidence: 0.9,
+          requiresConfirmation: true,
+          trustedAutoCommitEligible: false,
+          nutrition: const NutritionSnapshot(
+            calories: 265,
+            proteinGrams: 7,
+            carbsGrams: 1,
+            fatGrams: 8,
+          ),
+          items: [bread],
+        );
+        when(() => nutritionRepository.logText('red meat')).thenAnswer(
+          (_) async => AgentRunResult(
+            kind: 'clarification_required',
+            message: 'Choose a food match.',
+            candidateGroups: [group],
+          ),
+        );
+        when(() => nutritionRepository.searchFoods('red meat', limit: 10))
+            .thenAnswer((_) async => const FoodSearchResult(items: []));
+        when(() => nutritionRepository.searchFoods('bread', limit: 10))
+            .thenAnswer((_) async => FoodSearchResult(items: [bread]));
+        when(
+          () => nutritionRepository.createProposalFromItems(
+            phrase: any(named: 'phrase'),
+            items: any(named: 'items'),
+          ),
+        ).thenAnswer((_) async => proposal);
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider<VoiceLogViewModel>.value(
+            value: viewModel,
+            child: MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              theme: buildTheme(),
+              home: const MealCreateScreen(),
+            ),
+          ),
+        );
+
+        await viewModel.submitText('red meat');
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(
+            const ValueKey('clarification_food_search_red meat_field'),
+          ),
+          findsOneWidget,
+        );
+
+        await tester.enterText(
+          find.byKey(
+            const ValueKey('clarification_food_search_red meat_field'),
+          ),
+          'bread',
+        );
+        await tester.pump(const Duration(milliseconds: 350));
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(
+            const ValueKey(
+              'clarification_food_search_red meat_result_button_0',
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        verify(
+          () => nutritionRepository.createProposalFromItems(
+            phrase: any(named: 'phrase'),
+            items: any(named: 'items'),
+          ),
+        ).called(1);
+        expect(find.byKey(const ValueKey('confirm_proposal_button')),
+            findsOneWidget);
       },
     );
 
@@ -497,6 +670,122 @@ void main() {
       );
     });
 
+    testWidgets('searches a replacement in the proposal editor', (
+      tester,
+    ) async {
+      final chicken = _mealItem(
+        name: 'Chicken breast',
+        calories: 165,
+        externalId: 'chicken',
+      ).copyWith(quantity: 150, calories: 248, proteinGrams: 46.5);
+      final bread = _mealItem(
+        name: 'Bread',
+        calories: 265,
+        externalId: 'bread',
+      );
+      final breadReplacement = bread.copyWith(
+        quantity: 150,
+        calories: 398,
+        proteinGrams: 10.5,
+        carbsGrams: 1.5,
+        fatGrams: 12,
+      );
+      final proposal = MealProposal(
+        id: 'prop_chicken',
+        title: 'Chicken',
+        confidence: 0.82,
+        requiresConfirmation: true,
+        trustedAutoCommitEligible: false,
+        nutrition: const NutritionSnapshot(
+          calories: 248,
+          proteinGrams: 46.5,
+          carbsGrams: 1,
+          fatGrams: 8,
+        ),
+        items: [chicken],
+      );
+      final updatedProposal = MealProposal(
+        id: 'prop_chicken',
+        title: 'Bread',
+        confidence: 0.82,
+        requiresConfirmation: true,
+        trustedAutoCommitEligible: false,
+        nutrition: const NutritionSnapshot(
+          calories: 398,
+          proteinGrams: 10.5,
+          carbsGrams: 1.5,
+          fatGrams: 12,
+        ),
+        items: [breadReplacement],
+      );
+      when(() => nutritionRepository.logText('chicken')).thenAnswer(
+        (_) async => AgentRunResult(
+          kind: 'proposal',
+          message: 'Meal proposal created.',
+          proposal: proposal,
+        ),
+      );
+      when(() => nutritionRepository.searchFoods('Chicken breast', limit: 10))
+          .thenAnswer((_) async => const FoodSearchResult(items: []));
+      when(() => nutritionRepository.searchFoods('bread', limit: 10))
+          .thenAnswer((_) async => FoodSearchResult(items: [bread]));
+      when(
+        () => nutritionRepository.updateProposalItems(
+          'prop_chicken',
+          any(),
+        ),
+      ).thenAnswer((_) async => updatedProposal);
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<VoiceLogViewModel>.value(
+          value: viewModel,
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            theme: buildTheme(),
+            home: const MealCreateScreen(),
+          ),
+        ),
+      );
+
+      await viewModel.submitText('chicken');
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('edit_proposal_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('proposal_item_0_search_toggle')),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('proposal_item_0_search_field')),
+        'bread',
+      );
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('proposal_item_0_search_result_button_0')),
+      );
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('save_proposal_edits_button')),
+      );
+      await tester
+          .tap(find.byKey(const ValueKey('save_proposal_edits_button')));
+      await tester.pumpAndSettle();
+
+      final captured = verify(
+        () => nutritionRepository.updateProposalItems(
+          'prop_chicken',
+          captureAny(),
+        ),
+      ).captured.single as List<MealItem>;
+      expect(captured.single.name, 'Bread');
+      expect(captured.single.quantity, 150);
+      expect(captured.single.calories, 398);
+      expect(find.text('Bread'), findsWidgets);
+      await tester.pump(VoiceLogViewModel.proposalChangeSuccessDuration);
+    });
+
     testWidgets('shows proposal item canonical names in request language', (
       tester,
     ) async {
@@ -710,7 +999,7 @@ void main() {
         expect(viewModel.state, VoiceLogState.recording);
         expect(viewModel.proposal, initialProposal);
         expect(
-            find.byKey(const ValueKey('transcript_debug_card')), findsNothing);
+            find.byKey(const ValueKey('voice_transcript_card')), findsNothing);
 
         await tester.tap(find.byKey(const ValueKey('mic_button')));
         await tester.pumpAndSettle();
@@ -722,7 +1011,7 @@ void main() {
         );
         expect(find.text('Changes applied'), findsOneWidget);
         expect(
-          find.byKey(const ValueKey('transcript_debug_card')),
+          find.byKey(const ValueKey('voice_transcript_card')),
           findsOneWidget,
         );
         expect(find.text('make the butter 40 grams'), findsOneWidget);
@@ -831,7 +1120,7 @@ void main() {
     );
 
     testWidgets(
-      'shows debug transcript when voice correction needs clarification',
+      'shows voice transcript when voice correction needs clarification',
       (tester) async {
         const initialProposal = MealProposal(
           id: 'prop_rice',
@@ -904,11 +1193,12 @@ void main() {
         expect(viewModel.proposal, initialProposal);
         expect(find.text('Rice noodles, cooked'), findsOneWidget);
         expect(
-          find.byKey(const ValueKey('transcript_debug_card')),
+          find.byKey(const ValueKey('voice_transcript_card')),
           findsOneWidget,
         );
         expect(find.text('change it to rice with chicken'), findsOneWidget);
         expect(find.text('Needs a little more detail'), findsOneWidget);
+        expect(find.byKey(const ValueKey('mic_button')), findsOneWidget);
         expect(find.byKey(const ValueKey('meal_text_field')), findsNothing);
         expect(
           find.byKey(const ValueKey('submit_meal_button')),

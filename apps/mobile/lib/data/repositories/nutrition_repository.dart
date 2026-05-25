@@ -58,6 +58,16 @@ class VoiceMealRunResult {
   final AgentRunResult result;
 }
 
+class FoodSearchResult {
+  const FoodSearchResult({
+    required this.items,
+    this.candidateGroups,
+  });
+
+  final List<MealItem> items;
+  final List<FoodCandidateGroup>? candidateGroups;
+}
+
 class NutritionRepository {
   NutritionRepository({required CalTrackerApiClient apiClient})
       : _apiClient = apiClient;
@@ -91,6 +101,25 @@ class NutritionRepository {
       model: json['model'] as String,
       traceId: json['traceId'] as String,
       result: _parseAgentRunResult(json['result'] as Map<String, Object?>),
+    );
+  }
+
+  Future<FoodSearchResult> searchFoods(
+    String query, {
+    int limit = 10,
+    String? barcode,
+  }) async {
+    final json = await _apiClient.searchFoods(
+      query: query,
+      barcode: barcode,
+      limit: limit,
+    );
+    return FoodSearchResult(
+      items: (json['items'] as List<Object?>? ?? const [])
+          .cast<Map<String, Object?>>()
+          .map(MealItem.fromJson)
+          .toList(),
+      candidateGroups: _parseCandidateGroups(json['candidateGroups']),
     );
   }
 

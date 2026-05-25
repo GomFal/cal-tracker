@@ -30,6 +30,7 @@ class VoiceLogUiState {
     this.errorMessage,
     this.message,
     this.transcript = '',
+    this.transcriptFromVoice = false,
     this.recordingDuration = Duration.zero,
     this.proposal,
     this.autoCommittedMeal,
@@ -53,6 +54,7 @@ class VoiceLogUiState {
   final String? errorMessage;
   final String? message;
   final String transcript;
+  final bool transcriptFromVoice;
   final Duration recordingDuration;
   final MealProposal? proposal;
   final Meal? autoCommittedMeal;
@@ -81,6 +83,7 @@ class VoiceLogUiState {
     Object? errorMessage = _unchanged,
     Object? message = _unchanged,
     String? transcript,
+    bool? transcriptFromVoice,
     Duration? recordingDuration,
     Object? proposal = _unchanged,
     Object? autoCommittedMeal = _unchanged,
@@ -107,6 +110,7 @@ class VoiceLogUiState {
       message:
           identical(message, _unchanged) ? this.message : message as String?,
       transcript: transcript ?? this.transcript,
+      transcriptFromVoice: transcriptFromVoice ?? this.transcriptFromVoice,
       recordingDuration: recordingDuration ?? this.recordingDuration,
       proposal: identical(proposal, _unchanged)
           ? this.proposal
@@ -178,6 +182,9 @@ class VoiceLogViewModel extends ChangeNotifier {
 
   String get transcript => _uiState.transcript;
 
+  bool get hasVoiceTranscript =>
+      _uiState.transcriptFromVoice && _uiState.transcript.trim().isNotEmpty;
+
   Duration get recordingDuration => _uiState.recordingDuration;
 
   Timer? _durationTimer;
@@ -232,6 +239,13 @@ class VoiceLogViewModel extends ChangeNotifier {
 
   bool get canStopRecording => state == VoiceLogState.recording;
 
+  Future<FoodSearchResult> searchFoods(
+    String query, {
+    int limit = 10,
+  }) {
+    return _nutritionRepository.searchFoods(query, limit: limit);
+  }
+
   Future<void> toggleRecording({bool submitAfterTranscription = false}) async {
     if (_canStartRecording) {
       await startRecording();
@@ -267,6 +281,7 @@ class VoiceLogViewModel extends ChangeNotifier {
       _uiState.copyWith(
         phase: VoiceLogState.requestingPermission,
         transcript: '',
+        transcriptFromVoice: false,
         errorMessage: null,
         message: null,
         proposal: activeProposal,
@@ -365,6 +380,7 @@ class VoiceLogViewModel extends ChangeNotifier {
         _setUiState(
           _uiState.copyWith(
             transcript: voiceResult.transcript,
+            transcriptFromVoice: true,
             errorMessage: null,
           ),
         );
@@ -377,7 +393,11 @@ class VoiceLogViewModel extends ChangeNotifier {
           File(path),
         );
         _setUiState(
-          _uiState.copyWith(transcript: transcript, errorMessage: null),
+          _uiState.copyWith(
+            transcript: transcript,
+            transcriptFromVoice: true,
+            errorMessage: null,
+          ),
         );
         _setState(VoiceLogState.transcriptReady);
       }
@@ -400,17 +420,23 @@ class VoiceLogViewModel extends ChangeNotifier {
   }
 
   void updateTranscript(String value) {
-    _setUiState(_uiState.copyWith(transcript: value));
+    _setUiState(
+      _uiState.copyWith(transcript: value, transcriptFromVoice: false),
+    );
   }
 
   Future<void> submitText([String? overrideText]) async {
     final text = (overrideText ?? _uiState.transcript).trim();
     if (text.isEmpty) return;
     final activeProposal = _uiState.proposal;
+    final keepVoiceTranscript = overrideText == null &&
+        _uiState.transcriptFromVoice &&
+        text == _uiState.transcript.trim();
     _setUiState(
       _uiState.copyWith(
         phase: VoiceLogState.agentRunning,
         transcript: text,
+        transcriptFromVoice: keepVoiceTranscript,
         errorMessage: null,
         message: null,
         proposal: activeProposal,
@@ -598,6 +624,56 @@ class VoiceLogViewModel extends ChangeNotifier {
     }
   }
 
+  Future<void> createProposalFromManualItems(List<MealItem> items) async {
+    if (items.isEmpty) return;
+    _setUiState(
+      _uiState.copyWith(
+        phase: VoiceLogState.agentRunning,
+        transcript: '',
+        transcriptFromVoice: false,
+        errorMessage: null,
+        message: null,
+        proposal: null,
+        autoCommittedMeal: null,
+        summary: null,
+        remaining: null,
+        meals: null,
+        items: null,
+        resolvedItems: null,
+        templates: null,
+        template: null,
+        deleted: null,
+        confirmationActionId: null,
+        confirmationInput: null,
+        clarificationOptions: null,
+        candidateGroups: null,
+        selectedCandidateItems: const {},
+        showProposalChangeSuccess: false,
+      ),
+    );
+    try {
+      final proposal = await _nutritionRepository.createProposalFromItems(
+        phrase: _manualFoodPhrase(items),
+        items: items,
+      );
+      _setUiState(
+        _uiState.copyWith(
+          phase: VoiceLogState.proposalReady,
+          proposal: proposal,
+          message: 'Meal proposal created.',
+          errorMessage: null,
+        ),
+      );
+    } catch (error) {
+      _setError(
+        userVisibleErrorMessage(
+          error,
+          context: UserErrorContext.voiceProposalEdit,
+        ),
+      );
+    }
+  }
+
   Future<void> selectCandidate(
     FoodCandidateGroup group,
     MealItem candidate,
@@ -614,14 +690,11 @@ class VoiceLogViewModel extends ChangeNotifier {
       return;
     }
 
-    final selectableGroups =
-        visibleGroups.where((group) => group.candidates.isNotEmpty).toList();
     final requiredGroups =
-        selectableGroups.where(_needsCandidateSelection).toList();
-    if (selectableGroups.isEmpty ||
-        !requiredGroups.every(
-          (group) => selections.containsKey(_candidateGroupKey(group)),
-        )) {
+        visibleGroups.where(_needsCandidateSelection).toList();
+    if (!requiredGroups.every(
+      (group) => selections.containsKey(_candidateGroupKey(group)),
+    )) {
       return;
     }
 
@@ -782,7 +855,7 @@ class VoiceLogViewModel extends ChangeNotifier {
   }
 
   bool _needsCandidateSelection(FoodCandidateGroup group) {
-    if (group.candidates.isEmpty) return false;
+    if (group.candidates.isEmpty) return true;
     return _resolvedItemForGroup(
           group,
           _uiState.resolvedItems ?? const <MealItem>[],
@@ -876,6 +949,20 @@ class VoiceLogViewModel extends ChangeNotifier {
   String _normalizedText(String value) => value.trim().toLowerCase();
 
   bool _sameNumber(double a, double b) => (a - b).abs() < 0.05;
+
+  String _manualFoodPhrase(List<MealItem> items) {
+    return items
+        .map(
+          (item) =>
+              '${_formatQuantityForPhrase(item.quantity)} ${item.unit} ${item.name}',
+        )
+        .join(', ');
+  }
+
+  String _formatQuantityForPhrase(double value) {
+    if (value == value.roundToDouble()) return value.toInt().toString();
+    return value.toStringAsFixed(1).replaceFirst(RegExp(r'\.0$'), '');
+  }
 
   List<FoodCandidateGroup>? _mergeCandidateGroups(
     List<FoodCandidateGroup>? existing,

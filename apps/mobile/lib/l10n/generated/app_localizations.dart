@@ -1898,6 +1898,12 @@ abstract class AppLocalizations {
   /// **'Changes applied'**
   String get voiceChangesApplied;
 
+  /// No description provided for @voiceTranscriptHeardLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'I heard:'**
+  String get voiceTranscriptHeardLabel;
+
   /// No description provided for @voiceTodaySection.
   ///
   /// In en, this message translates to:
@@ -2005,6 +2011,120 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Voice or text input'**
   String get voiceStateInput;
+
+  /// No description provided for @foodSearchTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add food'**
+  String get foodSearchTitle;
+
+  /// No description provided for @foodSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search foods'**
+  String get foodSearchHint;
+
+  /// No description provided for @foodSearchAddAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get foodSearchAddAction;
+
+  /// No description provided for @foodSearchUseAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Use'**
+  String get foodSearchUseAction;
+
+  /// No description provided for @foodSearchReplaceAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace'**
+  String get foodSearchReplaceAction;
+
+  /// No description provided for @foodSearchSearchInstead.
+  ///
+  /// In en, this message translates to:
+  /// **'Search instead'**
+  String get foodSearchSearchInstead;
+
+  /// No description provided for @foodSearchHideSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide search'**
+  String get foodSearchHideSearch;
+
+  /// No description provided for @foodSearchReplaceSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search replacement'**
+  String get foodSearchReplaceSearch;
+
+  /// No description provided for @foodSearchSelectedFoods.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected foods'**
+  String get foodSearchSelectedFoods;
+
+  /// No description provided for @foodSearchReviewMeal.
+  ///
+  /// In en, this message translates to:
+  /// **'Review meal'**
+  String get foodSearchReviewMeal;
+
+  /// No description provided for @foodSearchName.
+  ///
+  /// In en, this message translates to:
+  /// **'Food'**
+  String get foodSearchName;
+
+  /// No description provided for @foodSearchQuantity.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity'**
+  String get foodSearchQuantity;
+
+  /// No description provided for @foodSearchUnit.
+  ///
+  /// In en, this message translates to:
+  /// **'Unit'**
+  String get foodSearchUnit;
+
+  /// No description provided for @foodSearchNutrition.
+  ///
+  /// In en, this message translates to:
+  /// **'Nutrition'**
+  String get foodSearchNutrition;
+
+  /// No description provided for @foodSearchRemoveDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove food'**
+  String get foodSearchRemoveDraft;
+
+  /// No description provided for @foodSearchClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear search'**
+  String get foodSearchClear;
+
+  /// No description provided for @foodSearchRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get foodSearchRetry;
+
+  /// No description provided for @foodSearchEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No foods found'**
+  String get foodSearchEmpty;
+
+  /// No description provided for @foodSearchError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not search foods.'**
+  String get foodSearchError;
 
   /// No description provided for @mealLabelQuestion.
   ///

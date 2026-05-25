@@ -308,6 +308,67 @@ describe("AgentService", () => {
     );
   });
 
+  it("falls back to text parsing when model mentions omit a unit", async () => {
+    const { request } = buildTestApp({
+      agentProvider: new FakeChatAgentProvider({
+        toolCalls: [
+          {
+            id: "call_1",
+            type: "function",
+            function: {
+              name: "propose_meal_log",
+              arguments: JSON.stringify({
+                text: "Add 100 grams of bread and 50 of ham.",
+                mentions: [
+                  {
+                    originalText: "100 grams of bread",
+                    canonicalEnglishName: "bread",
+                    quantity: 100,
+                    unit: "g",
+                    rawUnitText: "grams",
+                    unitKind: "metric",
+                    confidence: 0.95,
+                    marketProduct: false,
+                  },
+                  {
+                    originalText: "50 of ham",
+                    canonicalEnglishName: "ham",
+                    quantity: 50,
+                    confidence: 0.9,
+                    marketProduct: false,
+                  },
+                ],
+              }),
+            },
+          },
+        ],
+        rawResponse: {},
+      }),
+    });
+    const { authHeader } = await registerAndAuth(request);
+    const res = await request("http://localhost/v1/agent/runs", {
+      method: "POST",
+      headers: authHeader,
+      body: JSON.stringify({
+        text: "Add 100 grams of bread and 50 of ham.",
+        source: "flutter",
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      kind: string;
+      proposal: { items: { name: string; quantity: number; unit: string }[] };
+    };
+    expect(body.kind).toBe("proposal");
+    expect(body.proposal.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Bread", quantity: 100, unit: "g" }),
+        expect.objectContaining({ name: "Ham", quantity: 50, unit: "g" }),
+      ]),
+    );
+  });
+
   it("returns clarification instead of dropping unresolved ingredients", async () => {
     const { request } = buildTestApp({
       agentProvider: new FakeChatAgentProvider({

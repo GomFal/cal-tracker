@@ -404,8 +404,21 @@ export class DeterministicFoodTextExtractor implements FoodTextExtractor {
     const normalized = normalizeText(text);
     const language = inferDeterministicFoodLanguage(normalized);
     const measuredMentions = extractQuantityMentions(normalized, language);
-    const countedMentions = extractCountMentions(normalized, language);
-    return mergeDuplicateMentions([...measuredMentions, ...countedMentions]);
+    const contextualMentions = extractContextualMetricMentions(
+      normalized,
+      language,
+    );
+    const contextualKeys = new Set(
+      contextualMentions.map(quantityFoodMentionKey),
+    );
+    const countedMentions = extractCountMentions(normalized, language).filter(
+      (mention) => !contextualKeys.has(quantityFoodMentionKey(mention)),
+    );
+    return mergeDuplicateMentions([
+      ...measuredMentions,
+      ...contextualMentions,
+      ...countedMentions,
+    ]);
   }
 }
 
@@ -443,6 +456,7 @@ export class OpenRouterFoodTextExtractor implements FoodTextExtractor {
                 'Return {"mentions":[{"originalText":"...","canonicalName":"...","canonicalEnglishName":"...","language":"es","quantity":100,"unit":"g","rawUnitText":"grams","unitKind":"metric","portionDescriptorRaw":"extra large","portionDescriptor":"extra large","confidence":0.9,"marketProduct":false}]}',
                 "Use the text only to parse quantity, raw unit, and food name; do not decide whether a non-metric unit is valid.",
                 "Use grams when the user gives gram quantities.",
+                "In same-list phrases like '300 gramos de pollo y 200 de pan', reuse the last explicit unit and parse the second item as 200 grams of bread.",
                 "Use household for explicit measures like cup, tbsp, slice, breast, or egg.",
                 "Use implicit_count when the user gives only a number and food name, for example one egg, 1 banana, or 1 rice.",
                 "Preserve count-size descriptors such as small, medium, large, extra large, XL, and jumbo.",
@@ -1013,6 +1027,47 @@ function extractQuantityMentions(
   return mergeDuplicateMentions(mentions);
 }
 
+function extractContextualMetricMentions(
+  text: string,
+  language?: string,
+): FoodMention[] {
+  const mentions: FoodMention[] = [];
+  const metricUnitPattern =
+    "g|gr|gramo|gramos|gram|grams|kg|kilogram|kilograms|kilo|kilos|oz|ounce|ounces";
+  const segment = new RegExp(
+    `\\b(\\d+(?:[\\.,]\\d+)?)(?:\\s*(${metricUnitPattern})\\b)?\\s+(?:de|of)\\s+([a-z][a-z\\s]{0,40}?)(?=\\s+(?:y|and)\\s+\\d|,\\s*\\d|\\.|$)`,
+    "g",
+  );
+  let inheritedUnit: string | null = null;
+  for (const match of text.matchAll(segment)) {
+    const rawUnitText = match[2];
+    if (rawUnitText) {
+      inheritedUnit = rawUnitText;
+      continue;
+    }
+    if (!inheritedUnit) continue;
+    const quantity = normalizeQuantity(
+      Number(match[1]!.replace(",", ".")),
+      inheritedUnit,
+    );
+    if (!Number.isFinite(quantity) || quantity <= 0) continue;
+    const foodText = match[3]!.trim();
+    if (!foodText) continue;
+    mentions.push(
+      buildMention(
+        foodText,
+        quantity,
+        normalizeUnit(inheritedUnit),
+        inheritedUnit,
+        "metric",
+        match[0]!.trim(),
+        language,
+      ),
+    );
+  }
+  return mergeDuplicateMentions(mentions);
+}
+
 function extractCountMentions(text: string, language?: string): FoodMention[] {
   const mentions: FoodMention[] = [];
   const countPattern = countTokenPattern();
@@ -1049,6 +1104,10 @@ function extractCountMentions(text: string, language?: string): FoodMention[] {
     });
   }
   return mergeDuplicateMentions(mentions);
+}
+
+function quantityFoodMentionKey(mention: FoodMention): string {
+  return `${canonicalNameForMention(mention)}:${mention.quantity}`;
 }
 
 function buildMention(

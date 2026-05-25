@@ -93,6 +93,17 @@ export const voiceMealRunResponseSchema = z.object({
   result: agentRunResponseSchema
 });
 
+export const foodSearchRequestSchema = z.object({
+  query: z.string().trim().min(1),
+  barcode: z.string().trim().min(1).optional(),
+  limit: z.number().int().min(1).max(25).default(10)
+});
+
+export const foodSearchResponseSchema = z.object({
+  items: z.array(mealItemSchema),
+  candidateGroups: z.array(foodCandidateSchema).optional()
+});
+
 export const settingsUpdateSchema = z.object({
   trustedModeEnabled: z.boolean().optional()
 });

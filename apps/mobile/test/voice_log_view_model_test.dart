@@ -47,6 +47,56 @@ void main() {
       expect(viewModel.errorMessage, isNull);
     });
 
+    test('searchFoods delegates to repository', () async {
+      final bread = _mealItem(name: 'Bread', calories: 265);
+      when(
+        () => mockNutritionRepository.searchFoods('bread', limit: 10),
+      ).thenAnswer((_) async => FoodSearchResult(items: [bread]));
+
+      final result = await viewModel.searchFoods('bread');
+
+      expect(result.items.single.name, 'Bread');
+      verify(
+        () => mockNutritionRepository.searchFoods('bread', limit: 10),
+      ).called(1);
+    });
+
+    test('creates proposal from manually selected foods', () async {
+      final bread = _mealItem(name: 'Bread', calories: 265);
+      const proposal = MealProposal(
+        id: 'manual_prop',
+        title: 'Bread',
+        confidence: 0.9,
+        requiresConfirmation: true,
+        trustedAutoCommitEligible: false,
+        nutrition: NutritionSnapshot(
+          calories: 265,
+          proteinGrams: 7,
+          carbsGrams: 1,
+          fatGrams: 8,
+        ),
+        items: [],
+      );
+      when(
+        () => mockNutritionRepository.createProposalFromItems(
+          phrase: any(named: 'phrase'),
+          items: any(named: 'items'),
+        ),
+      ).thenAnswer((_) async => proposal);
+
+      await viewModel.createProposalFromManualItems([bread]);
+
+      expect(viewModel.state, VoiceLogState.proposalReady);
+      expect(viewModel.proposal, proposal);
+      final captured = verify(
+        () => mockNutritionRepository.createProposalFromItems(
+          phrase: any(named: 'phrase'),
+          items: captureAny(named: 'items'),
+        ),
+      ).captured.single as List<MealItem>;
+      expect(captured.single.name, 'Bread');
+    });
+
     group('toggleRecording', () {
       test('starts recording when idle', () async {
         when(
@@ -90,6 +140,7 @@ void main() {
 
         expect(viewModel.state, VoiceLogState.transcriptReady);
         expect(viewModel.transcript, 'chicken and rice');
+        expect(viewModel.hasVoiceTranscript, isTrue);
       });
 
       test('stops global recording and creates proposal from audio', () async {
@@ -140,6 +191,7 @@ void main() {
 
         expect(viewModel.state, VoiceLogState.proposalReady);
         expect(viewModel.transcript, 'chicken and rice');
+        expect(viewModel.hasVoiceTranscript, isTrue);
         expect(viewModel.proposal, proposal);
         verify(() => mockNutritionRepository.logAudio(any())).called(1);
         verifyNever(() => mockNutritionRepository.logText(any()));
@@ -230,6 +282,7 @@ void main() {
 
           expect(viewModel.state, VoiceLogState.proposalReady);
           expect(viewModel.transcript, 'no, the butter was 40 grams');
+          expect(viewModel.hasVoiceTranscript, isTrue);
           expect(viewModel.proposal, updatedProposal);
           verify(
             () => mockNutritionRepository.logAudio(
@@ -378,6 +431,7 @@ void main() {
         expect(viewModel.state, VoiceLogState.proposalReady);
         expect(viewModel.proposal, proposal);
         expect(viewModel.message, 'Meal proposal created.');
+        expect(viewModel.hasVoiceTranscript, isFalse);
         expect(viewModel.showProposalChangeSuccess, isFalse);
       });
 

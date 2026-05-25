@@ -1026,6 +1026,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get voiceChangesApplied => 'Cambios aplicados';
 
   @override
+  String get voiceTranscriptHeardLabel => 'He oído:';
+
+  @override
   String get voiceTodaySection => 'Hoy';
 
   @override
@@ -1087,6 +1090,63 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get voiceStateInput => 'Entrada por voz o texto';
+
+  @override
+  String get foodSearchTitle => 'Añadir alimento';
+
+  @override
+  String get foodSearchHint => 'Buscar alimentos';
+
+  @override
+  String get foodSearchAddAction => 'Añadir';
+
+  @override
+  String get foodSearchUseAction => 'Usar';
+
+  @override
+  String get foodSearchReplaceAction => 'Sustituir';
+
+  @override
+  String get foodSearchSearchInstead => 'Buscar otro';
+
+  @override
+  String get foodSearchHideSearch => 'Ocultar buscador';
+
+  @override
+  String get foodSearchReplaceSearch => 'Buscar sustituto';
+
+  @override
+  String get foodSearchSelectedFoods => 'Alimentos seleccionados';
+
+  @override
+  String get foodSearchReviewMeal => 'Revisar comida';
+
+  @override
+  String get foodSearchName => 'Alimento';
+
+  @override
+  String get foodSearchQuantity => 'Cantidad';
+
+  @override
+  String get foodSearchUnit => 'Unidad';
+
+  @override
+  String get foodSearchNutrition => 'Nutrición';
+
+  @override
+  String get foodSearchRemoveDraft => 'Quitar alimento';
+
+  @override
+  String get foodSearchClear => 'Limpiar búsqueda';
+
+  @override
+  String get foodSearchRetry => 'Reintentar';
+
+  @override
+  String get foodSearchEmpty => 'No hay resultados';
+
+  @override
+  String get foodSearchError => 'No se pudieron buscar alimentos.';
 
   @override
   String get mealLabelQuestion => '¿Qué tipo de comida es?';

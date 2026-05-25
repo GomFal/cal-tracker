@@ -8,6 +8,7 @@ import {
   type MealProposal,
   type MealTemplate,
   actionDefinitions,
+  proposeMealLogInputSchema,
 } from "@cal-tracker/contracts";
 import {
   ActionExecutor,
@@ -311,6 +312,9 @@ export class AgentService {
     }
 
     const originalActionId = actionId;
+    if (actionId === "propose_meal_log") {
+      parsedInput = resilientProposeMealInput(parsedInput, text);
+    }
     if (
       activeProposal &&
       actionId === "revise_meal_proposal" &&
@@ -673,6 +677,22 @@ function prioritizeDefaultTool<T extends { id: string }>(actions: T[]): T[] {
     if (b.id === "propose_meal_log") return 1;
     return 0;
   });
+}
+
+function resilientProposeMealInput(input: unknown, fallbackText: string): unknown {
+  if (typeof input !== "object" || input === null || Array.isArray(input)) {
+    return input;
+  }
+
+  const value = input as Record<string, unknown>;
+  const text =
+    typeof value.text === "string" && value.text.trim().length > 0
+      ? value.text
+      : fallbackText;
+  const candidate = { ...value, text };
+  const parsed = proposeMealLogInputSchema.safeParse(candidate);
+  if (parsed.success) return parsed.data;
+  return { text };
 }
 
 function isMealLoggingIntent(text: string): boolean {

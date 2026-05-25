@@ -129,6 +129,18 @@ class CalTrackerApiClient {
     });
   }
 
+  Future<Map<String, Object?>> searchFoods({
+    required String query,
+    String? barcode,
+    int limit = 10,
+  }) {
+    return _post('/v1/foods/search', {
+      'query': query,
+      if (barcode != null) 'barcode': barcode,
+      'limit': limit,
+    });
+  }
+
   Future<Map<String, Object?>> proposeMeal(String text) {
     return _post('/v1/meals/proposals', {'text': text});
   }

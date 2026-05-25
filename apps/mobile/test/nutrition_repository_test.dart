@@ -111,6 +111,62 @@ void main() {
       expect(result.result.proposal?.title, 'Bread');
     });
 
+    test('searches foods and parses candidate groups', () async {
+      final apiClient = MockCalTrackerApiClient();
+      final repository = NutritionRepository(apiClient: apiClient);
+      when(
+        () => apiClient.searchFoods(query: 'bread', limit: 10),
+      ).thenAnswer(
+        (_) async => {
+          'items': [
+            {
+              'name': 'Bread',
+              'quantity': 100,
+              'unit': 'g',
+              'calories': 265,
+              'proteinGrams': 9,
+              'carbsGrams': 49,
+              'fatGrams': 3.2,
+              'source': 'test_fixture',
+              'externalId': 'bread_1',
+            },
+          ],
+          'candidateGroups': [
+            {
+              'mention': {
+                'originalText': 'bread',
+                'canonicalName': 'bread',
+                'canonicalEnglishName': 'bread',
+                'quantity': 100,
+                'unit': 'g',
+                'confidence': 0.95,
+                'marketProduct': false,
+              },
+              'candidates': [
+                {
+                  'name': 'Bread',
+                  'quantity': 100,
+                  'unit': 'g',
+                  'calories': 265,
+                  'proteinGrams': 9,
+                  'carbsGrams': 49,
+                  'fatGrams': 3.2,
+                  'source': 'test_fixture',
+                  'externalId': 'bread_1',
+                },
+              ],
+            },
+          ],
+        },
+      );
+
+      final result = await repository.searchFoods('bread');
+
+      expect(result.items.single.name, 'Bread');
+      expect(result.candidateGroups, hasLength(1));
+      expect(result.candidateGroups!.single.candidates.single.name, 'Bread');
+    });
+
     test('passes active proposal id to agent and voice meal runs', () async {
       final apiClient = MockCalTrackerApiClient();
       final repository = NutritionRepository(apiClient: apiClient);

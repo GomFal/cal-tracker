@@ -3,6 +3,7 @@ import {
   calorieEstimateRequestSchema,
   dailyHydrationUpdateSchema,
   executeActionRequestSchema,
+  foodSearchRequestSchema,
   goalsUpdateSchema,
   googleLoginRequestSchema,
   loginRequestSchema,
@@ -242,6 +243,20 @@ export function createApp(input: {
     return c.json(await actionExecutor.execute(c.req.param("actionId"), body.input, context));
   });
 
+  app.post("/v1/foods/search", async (c) => {
+    const user = c.get("authUser");
+    const body = foodSearchRequestSchema.parse(await c.req.json());
+    const result = await actionExecutor.execute(
+      "search_nutrition_database",
+      {
+        query: body.query,
+        ...(body.barcode ? { barcode: body.barcode } : {}),
+      },
+      buildActionContext(c, user, "flutter"),
+    );
+    return c.json(limitFoodSearchOutput(result.output, body.limit));
+  });
+
   app.post("/v1/agent/runs", async (c) => {
     const user = c.get("authUser");
     const body = agentRunRequestSchema.parse(await c.req.json());
@@ -388,6 +403,13 @@ export function createApp(input: {
         activeProposal: activeProposal ?? null,
       });
     } catch (error) {
+      const fallbackResult = {
+        kind: "clarification_required" as const,
+        ...(activeProposal ? { proposal: activeProposal } : {}),
+        message:
+          "I heard the recording, but could not turn it into a meal. Please try recording again or rephrase it.",
+        options: [],
+      } satisfies AgentRunResult;
       await logLocalRun(runLogger, {
         type: "voice.meal_run",
         traceId,
@@ -403,13 +425,20 @@ export function createApp(input: {
         model: transcription.model,
         errorStage: "agent",
         error: summarizeError(error),
+        resultKind: fallbackResult.kind,
         timingsMs: {
           stt: sttMs,
           agent: Date.now() - routeStarted - sttMs,
           total: Date.now() - routeStarted,
         },
       });
-      throw error;
+      return c.json({
+        transcript,
+        provider: transcription.provider,
+        model: transcription.model,
+        traceId,
+        result: fallbackResult,
+      });
     }
 
     console.info("voice.meal_run.completed", {
@@ -646,6 +675,40 @@ async function logLocalRun(
   } catch (error) {
     console.warn("local_run_log.failed", summarizeError(error));
   }
+}
+
+function limitFoodSearchOutput(output: unknown, limit: number): {
+  items: unknown[];
+  candidateGroups?: unknown[];
+} {
+  if (typeof output !== "object" || output === null || Array.isArray(output)) {
+    return { items: [] };
+  }
+
+  const value = output as {
+    items?: unknown;
+    candidateGroups?: unknown;
+    candidates?: unknown;
+  };
+  const items = Array.isArray(value.items) ? value.items.slice(0, limit) : [];
+  const groupsValue = value.candidateGroups ?? value.candidates;
+  const candidateGroups = Array.isArray(groupsValue)
+    ? groupsValue.map((group) => limitFoodCandidateGroup(group, limit))
+    : undefined;
+
+  return {
+    items,
+    ...(candidateGroups ? { candidateGroups } : {}),
+  };
+}
+
+function limitFoodCandidateGroup(group: unknown, limit: number): unknown {
+  if (typeof group !== "object" || group === null || Array.isArray(group)) {
+    return group;
+  }
+  const value = group as { candidates?: unknown };
+  if (!Array.isArray(value.candidates)) return group;
+  return { ...value, candidates: value.candidates.slice(0, limit) };
 }
 
 function buildActionContext(c: Context, user: StoredUser, source: ActionSource): ActionContext {

@@ -405,6 +405,58 @@ describe("FoodResolver", () => {
     );
   });
 
+  it("inherits the previous metric unit for same-list quantities without units", async () => {
+    const mentions = await new DeterministicFoodTextExtractor().extract(
+      "Añade 300 gramos de pollo y 200 de pan.",
+    );
+
+    expect(mentions).toHaveLength(2);
+    expect(mentions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          canonicalName: "pollo",
+          language: "es",
+          quantity: 300,
+          unit: "g",
+          unitKind: "metric",
+        }),
+        expect.objectContaining({
+          originalText: "200 de pan",
+          canonicalName: "pan",
+          language: "es",
+          quantity: 200,
+          unit: "g",
+          rawUnitText: "gramos",
+          unitKind: "metric",
+        }),
+      ]),
+    );
+  });
+
+  it("does not inherit metric units for ordinary count foods", async () => {
+    const mentions = await new DeterministicFoodTextExtractor().extract(
+      "Añade 300 gramos de pollo y 2 huevos.",
+    );
+
+    expect(mentions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          canonicalName: "pollo",
+          quantity: 300,
+          unit: "g",
+        }),
+        expect.objectContaining({
+          canonicalName: "huevo",
+          quantity: 2,
+          unitKind: "implicit_count",
+        }),
+      ]),
+    );
+    expect(
+      mentions.find((mention) => mention.canonicalName === "huevo")?.unit,
+    ).not.toBe("g");
+  });
+
   it("does not include polite trailing text in the canonical food name", async () => {
     const mentions = await new DeterministicFoodTextExtractor().extract(
       "Añádeme 200 gramos de pechuga de pollo y 300 gramos de arroz por favor",

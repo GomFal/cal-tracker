@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../l10n/app_localizations_context.dart';
 import '../features/voice_log/view_models/voice_log_view_model.dart';
 import 'design_system.dart';
+import 'voice_action_button.dart';
 
 class AppShell extends StatelessWidget {
   const AppShell({super.key, required this.navigationShell});
@@ -419,20 +420,10 @@ class _CenterVoiceButtonState extends State<_CenterVoiceButton> {
               : (details) => unawaited(_handleLongPressEnd(details)),
           onLongPressCancel:
               isBusy ? null : () => unawaited(_handleLongPressCancel()),
-          child: Container(
-            width: 62,
-            height: 62,
-            decoration: BoxDecoration(
-              color: backgroundColor,
-              shape: BoxShape.circle,
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x369ad32a),
-                  blurRadius: 22,
-                  offset: Offset(0, 10),
-                ),
-              ],
-            ),
+          child: VoiceActionButtonChrome(
+            dimension: 62,
+            backgroundColor: backgroundColor,
+            isRecording: isRecording,
             child: Icon(icon, color: palette.ink, size: 28),
           ),
         ),
@@ -444,9 +435,13 @@ class _CenterVoiceButtonState extends State<_CenterVoiceButton> {
     final viewModel = context.read<VoiceLogViewModel>();
     if (viewModel.canStartRecording) {
       await viewModel.startRecording();
+      if (viewModel.state == VoiceLogState.recording) {
+        VoiceActionHaptics.recordingStarted();
+      }
       return;
     }
     if (viewModel.canStopRecording) {
+      VoiceActionHaptics.recordingStopped();
       await _stopAndOpen(viewModel);
     }
   }
@@ -456,6 +451,9 @@ class _CenterVoiceButtonState extends State<_CenterVoiceButton> {
     if (!viewModel.canStartRecording) return;
     _longPressRecording = true;
     await viewModel.startRecording();
+    if (viewModel.state == VoiceLogState.recording) {
+      VoiceActionHaptics.recordingStarted();
+    }
   }
 
   Future<void> _handleLongPressEnd(LongPressEndDetails details) async {
@@ -471,6 +469,7 @@ class _CenterVoiceButtonState extends State<_CenterVoiceButton> {
     _longPressRecording = false;
     final viewModel = context.read<VoiceLogViewModel>();
     if (viewModel.canStopRecording) {
+      VoiceActionHaptics.recordingStopped();
       await _stopAndOpen(viewModel);
     }
   }

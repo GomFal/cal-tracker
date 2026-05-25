@@ -8,6 +8,7 @@ import 'package:cal_tracker_mobile/l10n/generated/app_localizations.dart';
 import 'package:cal_tracker_mobile/ui/features/voice_log/view_models/voice_log_view_model.dart';
 import 'package:cal_tracker_mobile/ui/features/voice_log/views/voice_log_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:provider/provider.dart';
@@ -94,6 +95,20 @@ void main() {
           ),
         ),
       );
+      final hapticCalls = <String>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        (call) async {
+          if (call.method == 'HapticFeedback.vibrate') {
+            hapticCalls.add(call.arguments as String);
+          }
+          return null;
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.platform, null),
+      );
 
       await tester.pumpWidget(
         ChangeNotifierProvider<VoiceLogViewModel>.value(
@@ -119,10 +134,14 @@ void main() {
       await tester.pump();
 
       expect(viewModel.state, VoiceLogState.recording);
+      expect(hapticCalls, contains('HapticFeedbackType.lightImpact'));
+      expect(find.byKey(const ValueKey('voice_action_recording_pulse')),
+          findsOneWidget);
 
       await tester.tap(find.byKey(const ValueKey('mic_button')));
       await tester.pumpAndSettle();
 
+      expect(hapticCalls, contains('HapticFeedbackType.mediumImpact'));
       expect(find.text('Chicken and rice'), findsOneWidget);
       expect(
         find.byKey(const ValueKey('transcript_debug_card')),

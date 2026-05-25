@@ -7,6 +7,7 @@ import '../../../../domain/models/nutrition_models.dart';
 import '../../../../l10n/app_localizations_context.dart';
 import '../../../core/content_frame.dart';
 import '../../../core/design_system.dart';
+import '../../../core/voice_action_button.dart';
 import '../view_models/voice_log_view_model.dart';
 
 class MealCreateScreen extends StatefulWidget {
@@ -686,33 +687,22 @@ class _MealCreateVoiceActionButton extends StatelessWidget {
         label: tooltip,
         child: Tooltip(
           message: tooltip,
-          child: SizedBox.square(
+          child: VoiceActionButtonChrome(
             dimension: 72,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: backgroundColor,
-                shape: BoxShape.circle,
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x369ad32a),
-                    blurRadius: 22,
-                    offset: Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: IconButton(
-                key: const ValueKey('mic_button'),
-                tooltip: tooltip,
-                onPressed: isDisabled ? null : () => _handleTap(viewModel),
-                icon: Icon(icon),
-                color: palette.ink,
-                disabledColor: palette.inkMuted,
-                iconSize: 32,
-                style: IconButton.styleFrom(
-                  backgroundColor: Colors.transparent,
-                  disabledBackgroundColor: Colors.transparent,
-                  shape: const CircleBorder(),
-                ),
+            backgroundColor: backgroundColor,
+            isRecording: isRecording,
+            child: IconButton(
+              key: const ValueKey('mic_button'),
+              tooltip: tooltip,
+              onPressed: isDisabled ? null : () => _handleTap(viewModel),
+              icon: Icon(icon),
+              color: palette.ink,
+              disabledColor: palette.inkMuted,
+              iconSize: 32,
+              style: IconButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                disabledBackgroundColor: Colors.transparent,
+                shape: const CircleBorder(),
               ),
             ),
           ),
@@ -724,9 +714,13 @@ class _MealCreateVoiceActionButton extends StatelessWidget {
   Future<void> _handleTap(VoiceLogViewModel viewModel) async {
     if (viewModel.canStartRecording) {
       await viewModel.startRecording();
+      if (viewModel.state == VoiceLogState.recording) {
+        VoiceActionHaptics.recordingStarted();
+      }
       return;
     }
     if (viewModel.canStopRecording) {
+      VoiceActionHaptics.recordingStopped();
       await viewModel.stopRecording(submitAfterTranscription: true);
     }
   }

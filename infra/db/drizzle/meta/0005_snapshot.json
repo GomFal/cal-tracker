@@ -1,5 +1,5 @@
 {
-  "id": "151c29be-c375-4a4c-b7c4-03421991b5ab",
+  "id": "ec759285-b7fd-4b7e-a8ac-32f8f71c228c",
   "prevId": "016c8cb0-d528-4bb0-971e-09c74c7789b3",
   "version": "7",
   "dialect": "postgresql",
@@ -82,15 +82,15 @@
         "action_calls_user_id_users_id_fk": {
           "name": "action_calls_user_id_users_id_fk",
           "tableFrom": "action_calls",
-          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
+          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -147,15 +147,15 @@
         "agent_connections_user_id_users_id_fk": {
           "name": "agent_connections_user_id_users_id_fk",
           "tableFrom": "agent_connections",
-          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
+          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -213,15 +213,15 @@
         "audit_events_user_id_users_id_fk": {
           "name": "audit_events_user_id_users_id_fk",
           "tableFrom": "audit_events",
-          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
+          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "set null"
         }
       },
       "compositePrimaryKeys": {},
@@ -298,9 +298,9 @@
             }
           ],
           "isUnique": true,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         },
         "auth_identities_user_idx": {
           "name": "auth_identities_user_idx",
@@ -313,24 +313,24 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "auth_identities_user_id_users_id_fk": {
           "name": "auth_identities_user_id_users_id_fk",
           "tableFrom": "auth_identities",
-          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
+          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -406,25 +406,25 @@
             }
           ],
           "isUnique": false,
-          "where": "\"auth_sessions\".\"revoked_at\" IS NULL",
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "where": "\"auth_sessions\".\"revoked_at\" IS NULL",
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "auth_sessions_user_id_users_id_fk": {
           "name": "auth_sessions_user_id_users_id_fk",
           "tableFrom": "auth_sessions",
-          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
+          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -487,15 +487,15 @@
         "confirmation_requests_user_id_users_id_fk": {
           "name": "confirmation_requests_user_id_users_id_fk",
           "tableFrom": "confirmation_requests",
-          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
+          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -552,41 +552,41 @@
         "corrections_user_id_users_id_fk": {
           "name": "corrections_user_id_users_id_fk",
           "tableFrom": "corrections",
-          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
+          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         },
         "corrections_meal_id_meals_id_fk": {
           "name": "corrections_meal_id_meals_id_fk",
           "tableFrom": "corrections",
-          "tableTo": "meals",
           "columnsFrom": [
             "meal_id"
           ],
+          "tableTo": "meals",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         },
         "corrections_proposal_id_meal_proposals_id_fk": {
           "name": "corrections_proposal_id_meal_proposals_id_fk",
           "tableFrom": "corrections",
-          "tableTo": "meal_proposals",
           "columnsFrom": [
             "proposal_id"
           ],
+          "tableTo": "meal_proposals",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -757,24 +757,24 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "daily_goal_snapshots_user_id_users_id_fk": {
           "name": "daily_goal_snapshots_user_id_users_id_fk",
           "tableFrom": "daily_goal_snapshots",
-          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
+          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {
@@ -786,6 +786,79 @@
           ]
         }
       },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.embedding_models": {
+      "name": "embedding_models",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "model": {
+          "name": "model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dimensions": {
+          "name": "dimensions",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "embedding_models_lookup_idx": {
+          "name": "embedding_models_lookup_idx",
+          "columns": [
+            {
+              "expression": "provider",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "model",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "dimensions",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
@@ -872,37 +945,37 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "food_aliases_user_id_users_id_fk": {
           "name": "food_aliases_user_id_users_id_fk",
           "tableFrom": "food_aliases",
-          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
+          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         },
         "food_aliases_food_item_id_food_items_id_fk": {
           "name": "food_aliases_food_item_id_food_items_id_fk",
           "tableFrom": "food_aliases",
-          "tableTo": "food_items",
           "columnsFrom": [
             "food_item_id"
           ],
+          "tableTo": "food_items",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "set null"
         }
       },
       "compositePrimaryKeys": {},
@@ -924,6 +997,12 @@
         },
         "food_item_id": {
           "name": "food_item_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "embedding_model_id": {
+          "name": "embedding_model_id",
           "type": "uuid",
           "primaryKey": false,
           "notNull": true
@@ -962,24 +1041,51 @@
         }
       },
       "indexes": {
-        "food_item_embeddings_food_unique": {
-          "name": "food_item_embeddings_food_unique",
+        "food_item_embeddings_food_model_unique": {
+          "name": "food_item_embeddings_food_model_unique",
           "columns": [
             {
               "expression": "food_item_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
+            },
+            {
+              "expression": "embedding_model_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
             }
           ],
           "isUnique": true,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
+        },
+        "food_item_embeddings_model_idx": {
+          "name": "food_item_embeddings_model_idx",
+          "columns": [
+            {
+              "expression": "embedding_model_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
         },
         "food_item_embeddings_hash_idx": {
           "name": "food_item_embeddings_hash_idx",
           "columns": [
+            {
+              "expression": "embedding_model_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
             {
               "expression": "embedded_text_hash",
               "isExpression": false,
@@ -988,24 +1094,37 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "food_item_embeddings_food_item_id_food_items_id_fk": {
           "name": "food_item_embeddings_food_item_id_food_items_id_fk",
           "tableFrom": "food_item_embeddings",
-          "tableTo": "food_items",
           "columnsFrom": [
             "food_item_id"
           ],
+          "tableTo": "food_items",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "food_item_embeddings_embedding_model_id_embedding_models_id_fk": {
+          "name": "food_item_embeddings_embedding_model_id_embedding_models_id_fk",
+          "tableFrom": "food_item_embeddings",
+          "columnsFrom": [
+            "embedding_model_id"
+          ],
+          "tableTo": "embedding_models",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1209,10 +1328,10 @@
             }
           ],
           "isUnique": false,
-          "where": "\"food_items\".\"external_source\" IS NOT NULL AND \"food_items\".\"external_id\" IS NOT NULL",
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "where": "\"food_items\".\"external_source\" IS NOT NULL AND \"food_items\".\"external_id\" IS NOT NULL",
+          "concurrently": false
         },
         "food_items_external_source_id_lookup_idx": {
           "name": "food_items_external_source_id_lookup_idx",
@@ -1231,10 +1350,10 @@
             }
           ],
           "isUnique": false,
-          "where": "\"food_items\".\"external_source\" IS NOT NULL AND \"food_items\".\"external_id\" IS NOT NULL",
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "where": "\"food_items\".\"external_source\" IS NOT NULL AND \"food_items\".\"external_id\" IS NOT NULL",
+          "concurrently": false
         },
         "food_items_barcode_lookup_idx": {
           "name": "food_items_barcode_lookup_idx",
@@ -1247,10 +1366,10 @@
             }
           ],
           "isUnique": false,
-          "where": "\"food_items\".\"barcode\" IS NOT NULL",
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "where": "\"food_items\".\"barcode\" IS NOT NULL",
+          "concurrently": false
         },
         "food_items_data_type_lookup_idx": {
           "name": "food_items_data_type_lookup_idx",
@@ -1263,10 +1382,10 @@
             }
           ],
           "isUnique": false,
-          "where": "\"food_items\".\"data_type\" IS NOT NULL",
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "where": "\"food_items\".\"data_type\" IS NOT NULL",
+          "concurrently": false
         },
         "food_items_food_key_lookup_idx": {
           "name": "food_items_food_key_lookup_idx",
@@ -1279,10 +1398,10 @@
             }
           ],
           "isUnique": false,
-          "where": "\"food_items\".\"food_key\" IS NOT NULL",
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "where": "\"food_items\".\"food_key\" IS NOT NULL",
+          "concurrently": false
         },
         "food_items_ndb_number_lookup_idx": {
           "name": "food_items_ndb_number_lookup_idx",
@@ -1295,10 +1414,10 @@
             }
           ],
           "isUnique": false,
-          "where": "\"food_items\".\"ndb_number\" IS NOT NULL",
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "where": "\"food_items\".\"ndb_number\" IS NOT NULL",
+          "concurrently": false
         },
         "food_items_canonical_name_idx": {
           "name": "food_items_canonical_name_idx",
@@ -1311,10 +1430,10 @@
             }
           ],
           "isUnique": false,
-          "where": "\"food_items\".\"canonical_name\" IS NOT NULL",
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "where": "\"food_items\".\"canonical_name\" IS NOT NULL",
+          "concurrently": false
         },
         "food_items_normalized_name_trgm_idx": {
           "name": "food_items_normalized_name_trgm_idx",
@@ -1328,9 +1447,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "gin",
-          "with": {}
+          "concurrently": false
         },
         "food_items_canonical_name_trgm_idx": {
           "name": "food_items_canonical_name_trgm_idx",
@@ -1344,10 +1463,10 @@
             }
           ],
           "isUnique": false,
-          "where": "\"food_items\".\"canonical_name\" IS NOT NULL",
-          "concurrently": false,
+          "with": {},
           "method": "gin",
-          "with": {}
+          "where": "\"food_items\".\"canonical_name\" IS NOT NULL",
+          "concurrently": false
         },
         "food_items_brand_trgm_idx": {
           "name": "food_items_brand_trgm_idx",
@@ -1361,10 +1480,10 @@
             }
           ],
           "isUnique": false,
-          "where": "\"food_items\".\"brand\" IS NOT NULL",
-          "concurrently": false,
+          "with": {},
           "method": "gin",
-          "with": {}
+          "where": "\"food_items\".\"brand\" IS NOT NULL",
+          "concurrently": false
         },
         "food_items_usda_normalized_name_trgm_idx": {
           "name": "food_items_usda_normalized_name_trgm_idx",
@@ -1378,10 +1497,10 @@
             }
           ],
           "isUnique": false,
-          "where": "\"food_items\".\"external_source\" = 'usda_fdc'",
-          "concurrently": false,
+          "with": {},
           "method": "gin",
-          "with": {}
+          "where": "\"food_items\".\"external_source\" = 'usda_fdc'",
+          "concurrently": false
         },
         "food_items_usda_canonical_name_trgm_idx": {
           "name": "food_items_usda_canonical_name_trgm_idx",
@@ -1395,10 +1514,10 @@
             }
           ],
           "isUnique": false,
-          "where": "\"food_items\".\"external_source\" = 'usda_fdc' AND \"food_items\".\"canonical_name\" IS NOT NULL",
-          "concurrently": false,
+          "with": {},
           "method": "gin",
-          "with": {}
+          "where": "\"food_items\".\"external_source\" = 'usda_fdc' AND \"food_items\".\"canonical_name\" IS NOT NULL",
+          "concurrently": false
         },
         "food_items_usda_brand_trgm_idx": {
           "name": "food_items_usda_brand_trgm_idx",
@@ -1412,25 +1531,25 @@
             }
           ],
           "isUnique": false,
-          "where": "\"food_items\".\"external_source\" = 'usda_fdc' AND \"food_items\".\"brand\" IS NOT NULL",
-          "concurrently": false,
+          "with": {},
           "method": "gin",
-          "with": {}
+          "where": "\"food_items\".\"external_source\" = 'usda_fdc' AND \"food_items\".\"brand\" IS NOT NULL",
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "food_items_user_id_users_id_fk": {
           "name": "food_items_user_id_users_id_fk",
           "tableFrom": "food_items",
-          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
+          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -1520,37 +1639,37 @@
             }
           ],
           "isUnique": true,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "food_memories_user_id_users_id_fk": {
           "name": "food_memories_user_id_users_id_fk",
           "tableFrom": "food_memories",
-          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
+          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         },
         "food_memories_meal_template_id_meal_templates_id_fk": {
           "name": "food_memories_meal_template_id_meal_templates_id_fk",
           "tableFrom": "food_memories",
-          "tableTo": "meal_templates",
           "columnsFrom": [
             "meal_template_id"
           ],
+          "tableTo": "meal_templates",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1576,6 +1695,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "embedding_model_id": {
+          "name": "embedding_model_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
         "embedding": {
           "name": "embedding",
           "type": "vector(1024)",
@@ -1590,36 +1715,33 @@
           "default": "now()"
         }
       },
-      "indexes": {
-        "food_memory_embeddings_memory_unique": {
-          "name": "food_memory_embeddings_memory_unique",
-          "columns": [
-            {
-              "expression": "food_memory_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
+      "indexes": {},
       "foreignKeys": {
         "food_memory_embeddings_food_memory_id_food_memories_id_fk": {
           "name": "food_memory_embeddings_food_memory_id_food_memories_id_fk",
           "tableFrom": "food_memory_embeddings",
-          "tableTo": "food_memories",
           "columnsFrom": [
             "food_memory_id"
           ],
+          "tableTo": "food_memories",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        },
+        "food_memory_embeddings_embedding_model_id_embedding_models_id_fk": {
+          "name": "food_memory_embeddings_embedding_model_id_embedding_models_id_fk",
+          "tableFrom": "food_memory_embeddings",
+          "columnsFrom": [
+            "embedding_model_id"
+          ],
+          "tableTo": "embedding_models",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1721,9 +1843,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         },
         "food_portions_aliases_gin_idx": {
           "name": "food_portions_aliases_gin_idx",
@@ -1736,9 +1858,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "gin",
-          "with": {}
+          "concurrently": false
         },
         "food_portions_food_usda_portion_unique": {
           "name": "food_portions_food_usda_portion_unique",
@@ -1757,25 +1879,25 @@
             }
           ],
           "isUnique": true,
-          "where": "\"food_portions\".\"usda_portion_id\" IS NOT NULL",
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "where": "\"food_portions\".\"usda_portion_id\" IS NOT NULL",
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "food_portions_food_item_id_food_items_id_fk": {
           "name": "food_portions_food_item_id_food_items_id_fk",
           "tableFrom": "food_portions",
-          "tableTo": "food_items",
           "columnsFrom": [
             "food_item_id"
           ],
+          "tableTo": "food_items",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -1869,10 +1991,10 @@
             }
           ],
           "isUnique": false,
-          "where": "\"food_search_documents\".\"scope\" = 'generic' AND \"food_search_documents\".\"locale\" = 'es'",
-          "concurrently": false,
+          "with": {},
           "method": "gin",
-          "with": {}
+          "where": "\"food_search_documents\".\"scope\" = 'generic' AND \"food_search_documents\".\"locale\" = 'es'",
+          "concurrently": false
         },
         "food_search_documents_generic_en_trgm_idx": {
           "name": "food_search_documents_generic_en_trgm_idx",
@@ -1886,10 +2008,10 @@
             }
           ],
           "isUnique": false,
-          "where": "\"food_search_documents\".\"scope\" = 'generic' AND \"food_search_documents\".\"locale\" = 'en'",
-          "concurrently": false,
+          "with": {},
           "method": "gin",
-          "with": {}
+          "where": "\"food_search_documents\".\"scope\" = 'generic' AND \"food_search_documents\".\"locale\" = 'en'",
+          "concurrently": false
         },
         "food_search_documents_market_trgm_idx": {
           "name": "food_search_documents_market_trgm_idx",
@@ -1903,10 +2025,10 @@
             }
           ],
           "isUnique": false,
-          "where": "\"food_search_documents\".\"scope\" = 'market'",
-          "concurrently": false,
+          "with": {},
           "method": "gin",
-          "with": {}
+          "where": "\"food_search_documents\".\"scope\" = 'market'",
+          "concurrently": false
         },
         "food_search_documents_scope_locale_rank_idx": {
           "name": "food_search_documents_scope_locale_rank_idx",
@@ -1931,9 +2053,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         },
         "food_search_documents_user_idx": {
           "name": "food_search_documents_user_idx",
@@ -1946,38 +2068,38 @@
             }
           ],
           "isUnique": false,
-          "where": "\"food_search_documents\".\"user_id\" IS NOT NULL",
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "where": "\"food_search_documents\".\"user_id\" IS NOT NULL",
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "food_search_documents_food_item_id_food_items_id_fk": {
           "name": "food_search_documents_food_item_id_food_items_id_fk",
           "tableFrom": "food_search_documents",
-          "tableTo": "food_items",
           "columnsFrom": [
             "food_item_id"
           ],
+          "tableTo": "food_items",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         },
         "food_search_documents_user_id_users_id_fk": {
           "name": "food_search_documents_user_id_users_id_fk",
           "tableFrom": "food_search_documents",
-          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
+          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -2107,15 +2229,15 @@
         "meal_items_meal_id_meals_id_fk": {
           "name": "meal_items_meal_id_meals_id_fk",
           "tableFrom": "meal_items",
-          "tableTo": "meals",
           "columnsFrom": [
             "meal_id"
           ],
+          "tableTo": "meals",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -2251,28 +2373,28 @@
         "meal_proposal_items_proposal_id_meal_proposals_id_fk": {
           "name": "meal_proposal_items_proposal_id_meal_proposals_id_fk",
           "tableFrom": "meal_proposal_items",
-          "tableTo": "meal_proposals",
           "columnsFrom": [
             "proposal_id"
           ],
+          "tableTo": "meal_proposals",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         },
         "meal_proposal_items_food_item_id_food_items_id_fk": {
           "name": "meal_proposal_items_food_item_id_food_items_id_fk",
           "tableFrom": "meal_proposal_items",
-          "tableTo": "food_items",
           "columnsFrom": [
             "food_item_id"
           ],
+          "tableTo": "food_items",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2379,15 +2501,15 @@
         "meal_proposals_user_id_users_id_fk": {
           "name": "meal_proposals_user_id_users_id_fk",
           "tableFrom": "meal_proposals",
-          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
+          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -2517,15 +2639,15 @@
         "meal_template_items_template_id_meal_templates_id_fk": {
           "name": "meal_template_items_template_id_meal_templates_id_fk",
           "tableFrom": "meal_template_items",
-          "tableTo": "meal_templates",
           "columnsFrom": [
             "template_id"
           ],
+          "tableTo": "meal_templates",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -2613,15 +2735,15 @@
         "meal_templates_user_id_users_id_fk": {
           "name": "meal_templates_user_id_users_id_fk",
           "tableFrom": "meal_templates",
-          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
+          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -2733,38 +2855,38 @@
             }
           ],
           "isUnique": false,
-          "where": "\"meals\".\"deleted_at\" IS NULL",
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "where": "\"meals\".\"deleted_at\" IS NULL",
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "meals_user_id_users_id_fk": {
           "name": "meals_user_id_users_id_fk",
           "tableFrom": "meals",
-          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
+          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         },
         "meals_proposal_id_meal_proposals_id_fk": {
           "name": "meals_proposal_id_meal_proposals_id_fk",
           "tableFrom": "meals",
-          "tableTo": "meal_proposals",
           "columnsFrom": [
             "proposal_id"
           ],
+          "tableTo": "meal_proposals",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -2907,15 +3029,15 @@
         "nutrition_targets_user_id_users_id_fk": {
           "name": "nutrition_targets_user_id_users_id_fk",
           "tableFrom": "nutrition_targets",
-          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
+          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -3039,15 +3161,15 @@
         "password_reset_tokens_user_id_users_id_fk": {
           "name": "password_reset_tokens_user_id_users_id_fk",
           "tableFrom": "password_reset_tokens",
-          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
+          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -3135,9 +3257,9 @@
             }
           ],
           "isUnique": true,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         },
         "reference_data_imports_source_imported_at_idx": {
           "name": "reference_data_imports_source_imported_at_idx",
@@ -3156,9 +3278,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {},
@@ -3223,15 +3345,15 @@
         "user_credentials_user_id_users_id_fk": {
           "name": "user_credentials_user_id_users_id_fk",
           "tableFrom": "user_credentials",
-          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
+          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -3314,9 +3436,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         },
         "user_food_feedback_events_user_food_idx": {
           "name": "user_food_feedback_events_user_food_idx",
@@ -3341,9 +3463,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         },
         "user_food_feedback_events_query_idx": {
           "name": "user_food_feedback_events_query_idx",
@@ -3362,37 +3484,37 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "user_food_feedback_events_user_id_users_id_fk": {
           "name": "user_food_feedback_events_user_id_users_id_fk",
           "tableFrom": "user_food_feedback_events",
-          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
+          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         },
         "user_food_feedback_events_food_item_id_food_items_id_fk": {
           "name": "user_food_feedback_events_food_item_id_food_items_id_fk",
           "tableFrom": "user_food_feedback_events",
-          "tableTo": "food_items",
           "columnsFrom": [
             "food_item_id"
           ],
+          "tableTo": "food_items",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {},
@@ -3477,9 +3599,9 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         },
         "user_food_preferences_food_idx": {
           "name": "user_food_preferences_food_idx",
@@ -3492,37 +3614,37 @@
             }
           ],
           "isUnique": false,
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "concurrently": false
         }
       },
       "foreignKeys": {
         "user_food_preferences_user_id_users_id_fk": {
           "name": "user_food_preferences_user_id_users_id_fk",
           "tableFrom": "user_food_preferences",
-          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
+          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         },
         "user_food_preferences_food_item_id_food_items_id_fk": {
           "name": "user_food_preferences_food_item_id_food_items_id_fk",
           "tableFrom": "user_food_preferences",
-          "tableTo": "food_items",
           "columnsFrom": [
             "food_item_id"
           ],
+          "tableTo": "food_items",
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
+          "onUpdate": "no action",
+          "onDelete": "cascade"
         }
       },
       "compositePrimaryKeys": {
@@ -3589,16 +3711,16 @@
           "columns": [
             {
               "expression": "lower(\"email\")",
-              "asc": true,
               "isExpression": true,
+              "asc": true,
               "nulls": "last"
             }
           ],
           "isUnique": true,
-          "where": "\"users\".\"deleted_at\" IS NULL",
-          "concurrently": false,
+          "with": {},
           "method": "btree",
-          "with": {}
+          "where": "\"users\".\"deleted_at\" IS NULL",
+          "concurrently": false
         }
       },
       "foreignKeys": {},
@@ -3611,10 +3733,10 @@
   },
   "enums": {},
   "schemas": {},
+  "views": {},
   "sequences": {},
   "roles": {},
   "policies": {},
-  "views": {},
   "_meta": {
     "columns": {},
     "schemas": {},

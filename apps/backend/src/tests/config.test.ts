@@ -13,6 +13,10 @@ describe("config", () => {
     expect(config.OPENROUTER_PROVIDER_MIN_THROUGHPUT_P90).toBe(40);
     expect(config.OPENROUTER_PROVIDER_REQUIRE_PARAMETERS).toBe(false);
     expect(config.OPENROUTER_PROVIDER_ALLOW_FALLBACKS).toBe(true);
+    expect(config.EMBEDDINGS_ENABLED).toBe(false);
+    expect(config.EMBEDDING_PROVIDER).toBe("openrouter");
+    expect(config.EMBEDDING_MODEL).toBe("baai/bge-m3");
+    expect(config.EMBEDDING_DIMENSIONS).toBe(1024);
   });
 
   it("allows OpenRouter provider routing overrides from env", () => {

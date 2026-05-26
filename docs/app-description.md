@@ -185,9 +185,9 @@ PostgreSQL stores users, credentials, sessions, password reset tokens, nutrition
 
 The backend uses Drizzle ORM for type-safe PostgreSQL schema definitions, query builders, parameterized SQL fragments, and forward migration metadata. Existing legacy migrations in `infra/db/migrations` remain immutable history and still run first; all new migrations are generated or authored under `infra/db/drizzle`.
 
-pgvector stores 1024-dimensional embeddings for local `bge-m3` retrieval. Vector rows must point back to structured relational records.
+pgvector stores 1024-dimensional embeddings for the global `baai/bge-m3` embedding space. Vector rows must point back to structured relational records.
 
-Embedding generation is handled by backend-owned embedding providers. The current configured MVP provider is local `bge-m3` (`EMBEDDING_PROVIDER=local`, `EMBEDDING_MODEL=bge-m3`, `EMBEDDING_DIMENSIONS=1024`), used for multilingual food search and memory retrieval. Flutter must never generate embeddings or call an embedding model provider directly.
+Embedding generation is handled by backend-owned embedding providers and is disabled by default while costs are evaluated (`EMBEDDINGS_ENABLED=false`). When enabled, the configured provider is OpenRouter `baai/bge-m3` (`EMBEDDING_PROVIDER=openrouter`, `EMBEDDING_MODEL=baai/bge-m3`, `EMBEDDING_DIMENSIONS=1024`). Flutter must never generate embeddings or call an embedding model provider directly.
 
 ### LLM Provider
 
@@ -795,7 +795,7 @@ pgvector = semantic retrieval
 templates = structured recurring user defaults
 nutrition providers = factual nutrition source
 LLM = interpretation and tool-selection layer
-OpenRouter openai/text-embedding-3-small = multilingual embedding generation
+OpenRouter baai/bge-m3 = optional multilingual embedding generation
 ```
 
 Vector memory is for fuzzy retrieval of:

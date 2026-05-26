@@ -653,35 +653,27 @@ export class LocalFoodDataProvider implements FoodDataProvider {
 
     if (this.options.embeddingProvider) {
       try {
-        const model = await withSpan(
-          "Repository.getActiveEmbeddingModel",
-          undefined,
-          () => this.repository.getActiveEmbeddingModel(),
-        );
-        if (model) {
-          const embedding = (await withSpan(
-            "EmbeddingProvider.embed",
-            { inputCount: 1 },
-            () => this.options.embeddingProvider!.embed([query]),
-          )).data[0]?.embedding;
-          if (embedding) {
-            const vector = await withSpan(
-              "Repository.searchFoodsHybrid",
-              { query, mode: "hybrid" },
-              () => this.repository.searchFoodsHybrid(userId, {
-                query,
-                barcode: mention.barcode,
-                embedding,
-                embeddingModelId: model.id,
-                limit: 50,
-                excludeBranded: !marketIntent,
-                locale,
-                scope: marketIntent ? "market" : "generic",
-              }),
-            );
-            this.setSearchCache(cacheKey, vector);
-            return vector.map(cloneLocalFoodCandidate);
-          }
+        const embedding = (await withSpan(
+          "EmbeddingProvider.embed",
+          { inputCount: 1 },
+          () => this.options.embeddingProvider!.embed([query]),
+        )).data[0]?.embedding;
+        if (embedding) {
+          const vector = await withSpan(
+            "Repository.searchFoodsHybrid",
+            { query, mode: "hybrid" },
+            () => this.repository.searchFoodsHybrid(userId, {
+              query,
+              barcode: mention.barcode,
+              embedding,
+              limit: 50,
+              excludeBranded: !marketIntent,
+              locale,
+              scope: marketIntent ? "market" : "generic",
+            }),
+          );
+          this.setSearchCache(cacheKey, vector);
+          return vector.map(cloneLocalFoodCandidate);
         }
       } catch {
         // Fall back to lexical search if embeddings are unavailable.

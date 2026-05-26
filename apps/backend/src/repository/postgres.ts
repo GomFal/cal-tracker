@@ -13,7 +13,6 @@ import type {
   AuditEventRecord,
   AuthIdentityProvider,
   AuthIdentityRecord,
-  EmbeddingModelRecord,
   FoodFeedbackRecord,
   FoodItemRecord,
   FoodItemEmbeddingRecord,
@@ -28,7 +27,7 @@ import type {
   UserFoodPreference
 } from "./types.js";
 
-const ACTIVE_EMBEDDING_MODEL = { provider: "local", model: "bge-m3", dimensions: 1024 };
+const ACTIVE_EMBEDDING_DIMENSIONS = 1024;
 const DEFAULT_FOOD_SEARCH_LIMIT = 50;
 const MAX_FOOD_SEARCH_LIMIT = 100;
 const LEXICAL_SCORE_WEIGHT = 0.7;
@@ -248,9 +247,8 @@ export class PostgresRepository implements AppRepository {
       }
     }
 
-    if (candidateRows.size === 0 && !input.barcode && input.embedding && input.embeddingModelId) {
+    if (candidateRows.size === 0 && !input.barcode && input.embedding) {
       const vectorLiteral = toVectorLiteral(input.embedding);
-      const embeddingModelId = input.embeddingModelId;
       const rows = await withSpan(
         "PostgresRepository.searchFoodsHybrid.vectorQuery",
         { limit: Math.max(limit, DEFAULT_FOOD_SEARCH_LIMIT), includeBranded },
@@ -259,8 +257,7 @@ export class PostgresRepository implements AppRepository {
                1 - (food_item_embeddings.embedding <=> ${vectorLiteral}::vector) AS vector_score
         FROM food_item_embeddings
         JOIN food_items ON food_items.id = food_item_embeddings.food_item_id
-        WHERE food_item_embeddings.embedding_model_id = ${embeddingModelId}
-          AND (food_items.user_id IS NULL OR food_items.user_id = ${userId})
+        WHERE (food_items.user_id IS NULL OR food_items.user_id = ${userId})
           AND (${includeBranded} OR food_items.data_type IS DISTINCT FROM 'Branded')
         ORDER BY food_item_embeddings.embedding <=> ${vectorLiteral}::vector
         LIMIT ${Math.max(limit, DEFAULT_FOOD_SEARCH_LIMIT)}
@@ -644,34 +641,20 @@ export class PostgresRepository implements AppRepository {
     return rows.map(mapUserFoodPreference);
   }
 
-  async getActiveEmbeddingModel(): Promise<EmbeddingModelRecord | undefined> {
-    const [row] = await this.execute(dbSql`
-      SELECT *
-      FROM embedding_models
-      WHERE provider = ${ACTIVE_EMBEDDING_MODEL.provider}
-        AND model = ${ACTIVE_EMBEDDING_MODEL.model}
-        AND dimensions = ${ACTIVE_EMBEDDING_MODEL.dimensions}
-      ORDER BY created_at DESC
-      LIMIT 1
-    `);
-    return row ? mapEmbeddingModel(row) : undefined;
-  }
-
   async upsertFoodItemEmbedding(input: UpsertFoodItemEmbeddingInput): Promise<FoodItemEmbeddingRecord> {
     const embedding = toVectorLiteral(input.embedding);
     const [row] = await this.execute(dbSql`
       INSERT INTO food_item_embeddings (
-        food_item_id, embedding_model_id, embedded_text, embedded_text_hash, embedding, updated_at
+        food_item_id, embedded_text, embedded_text_hash, embedding, updated_at
       )
       VALUES (
         ${input.foodItemId},
-        ${input.embeddingModelId},
         ${input.embeddedText},
         ${input.embeddedTextHash},
         ${embedding}::vector,
         now()
       )
-      ON CONFLICT (food_item_id, embedding_model_id)
+      ON CONFLICT (food_item_id)
       DO UPDATE SET
         embedded_text = EXCLUDED.embedded_text,
         embedded_text_hash = EXCLUDED.embedded_text_hash,
@@ -1341,20 +1324,10 @@ function mapFoodPortion(row: Record<string, unknown>): FoodPortionRecord {
   };
 }
 
-function mapEmbeddingModel(row: Record<string, unknown>): EmbeddingModelRecord {
-  return {
-    id: row.id as string,
-    provider: row.provider as string,
-    model: row.model as string,
-    dimensions: Number(row.dimensions)
-  };
-}
-
 function mapFoodItemEmbedding(row: Record<string, unknown>): FoodItemEmbeddingRecord {
   return {
     id: row.id as string,
     foodItemId: row.food_item_id as string,
-    embeddingModelId: row.embedding_model_id as string,
     embeddedText: row.embedded_text as string,
     embeddedTextHash: row.embedded_text_hash as string,
     createdAt: toIso(row.created_at),
@@ -1812,7 +1785,7 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 function toVectorLiteral(embedding: number[]): string {
-  if (embedding.length !== ACTIVE_EMBEDDING_MODEL.dimensions) {
+  if (embedding.length !== ACTIVE_EMBEDDING_DIMENSIONS) {
     throw new Error("invalid_embedding_dimensions");
   }
   return `[${embedding.map((value) => {

@@ -71,7 +71,7 @@ Minimum OS versions: Android 10/API 29 for core app, iOS 17.0 for core app.
 OS-agent spikes: Android AppFunctions on API 36+, iOS App Intents on iOS 17+.
 Nutrition source priority: user data first, USDA FoodData Central for generic single ingredients and portion metadata, Open Food Facts for branded/barcode packaged products, then explicit user-provided custom nutrition. LLM-only and unprovenanced seed nutrition values are not authoritative.
 Production database: self-hosted PostgreSQL + pgvector in Docker on the VPS.
-Embeddings: OpenRouter `openai/text-embedding-3-small` with 1536-dimensional vectors; the embedding model is not hosted by us.
+Embeddings: disabled by default while costs are evaluated; when enabled, OpenRouter `baai/bge-m3` with 1024-dimensional vectors.
 Trusted auto-commit: included in MVP, off by default, safe familiar templates only.
 ```
 

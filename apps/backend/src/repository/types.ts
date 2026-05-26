@@ -105,17 +105,9 @@ export type FoodPortionRecord = {
   sourceDescription: string;
 };
 
-export type EmbeddingModelRecord = {
-  id: string;
-  provider: string;
-  model: string;
-  dimensions: number;
-};
-
 export type FoodItemEmbeddingRecord = {
   id: string;
   foodItemId: string;
-  embeddingModelId: string;
   embeddedText: string;
   embeddedTextHash: string;
   createdAt: string;
@@ -129,7 +121,7 @@ export type FoodSearchCandidate = FoodItemRecord & {
   finalScore: number;
 };
 
-export type FoodSearchScope = "generic" | "market";
+export type FoodSearchScope = "generic" | "market" | "all";
 
 export type FoodFeedbackAction = "selected" | "logged" | "corrected" | "dismissed" | "rejected";
 
@@ -157,7 +149,6 @@ export type FoodHybridSearchInput = {
   query: string;
   barcode?: string;
   embedding?: number[];
-  embeddingModelId?: string;
   limit?: number;
   excludeBranded?: boolean;
   locale?: string;
@@ -166,7 +157,6 @@ export type FoodHybridSearchInput = {
 
 export type UpsertFoodItemEmbeddingInput = {
   foodItemId: string;
-  embeddingModelId: string;
   embeddedText: string;
   embeddedTextHash: string;
   embedding: number[];
@@ -227,7 +217,6 @@ export interface AppRepository {
   upsertFoodItem(input: Omit<FoodItemRecord, "id">): Promise<FoodItemRecord>;
   recordFoodFeedback(input: FoodFeedbackRecord): Promise<UserFoodPreference | undefined>;
   getUserFoodPreferences(userId: string): Promise<UserFoodPreference[]>;
-  getActiveEmbeddingModel(): Promise<EmbeddingModelRecord | undefined>;
   upsertFoodItemEmbedding(input: UpsertFoodItemEmbeddingInput): Promise<FoodItemEmbeddingRecord>;
 
   getNutritionTarget(userId: string): Promise<NutritionSnapshot>;

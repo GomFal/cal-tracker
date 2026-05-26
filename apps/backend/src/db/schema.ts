@@ -313,37 +313,26 @@ export const foodMemories = pgTable("food_memories", {
   uniqueIndex("food_memories_user_normalized_unique").on(table.userId, table.normalizedText)
 ]);
 
-export const embeddingModels = pgTable("embedding_models", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  provider: text("provider").notNull(),
-  model: text("model").notNull(),
-  dimensions: integer("dimensions").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
-}, (table) => [
-  index("embedding_models_lookup_idx").on(table.provider, table.model, table.dimensions)
-]);
-
 export const foodMemoryEmbeddings = pgTable("food_memory_embeddings", {
   id: uuid("id").primaryKey().defaultRandom(),
   foodMemoryId: uuid("food_memory_id").notNull().references(() => foodMemories.id, { onDelete: "cascade" }),
-  embeddingModelId: uuid("embedding_model_id").notNull().references(() => embeddingModels.id),
   embedding: vector("embedding", { dimensions: 1024 }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
-});
+}, (table) => [
+  uniqueIndex("food_memory_embeddings_memory_unique").on(table.foodMemoryId)
+]);
 
 export const foodItemEmbeddings = pgTable("food_item_embeddings", {
   id: uuid("id").primaryKey().defaultRandom(),
   foodItemId: uuid("food_item_id").notNull().references(() => foodItems.id, { onDelete: "cascade" }),
-  embeddingModelId: uuid("embedding_model_id").notNull().references(() => embeddingModels.id),
   embeddedText: text("embedded_text").notNull(),
   embeddedTextHash: text("embedded_text_hash").notNull(),
   embedding: vector("embedding", { dimensions: 1024 }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
 }, (table) => [
-  uniqueIndex("food_item_embeddings_food_model_unique").on(table.foodItemId, table.embeddingModelId),
-  index("food_item_embeddings_model_idx").on(table.embeddingModelId),
-  index("food_item_embeddings_hash_idx").on(table.embeddingModelId, table.embeddedTextHash)
+  uniqueIndex("food_item_embeddings_food_unique").on(table.foodItemId),
+  index("food_item_embeddings_hash_idx").on(table.embeddedTextHash)
 ]);
 
 export const userFoodFeedbackEvents = pgTable("user_food_feedback_events", {

@@ -36,6 +36,13 @@
       "when": 1779483840322,
       "tag": "0004_hydration_liters",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1779812425782,
+      "tag": "0005_global_embeddings",
+      "breakpoints": true
     }
   ]
 }

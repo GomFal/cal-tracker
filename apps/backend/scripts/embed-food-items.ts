@@ -3,14 +3,18 @@ import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { loadConfig } from "../src/config/env.js";
 import { createDbClient } from "../src/db/client.js";
 import { foodItemEmbeddings, foodItems } from "../src/db/schema.js";
-import { LocalBgeM3EmbeddingProvider } from "../src/embeddings/provider.js";
+import { OpenRouterEmbeddingProvider } from "../src/embeddings/provider.js";
 import { PostgresRepository } from "../src/repository/postgres.js";
 
 const config = loadConfig();
+if (!config.EMBEDDINGS_ENABLED) {
+  throw new Error("embeddings_disabled_set_EMBEDDINGS_ENABLED_true_to_backfill");
+}
+
 const client = createDbClient(config.DATABASE_URL, { max: 1 });
 const repository = new PostgresRepository(config.DATABASE_URL);
-const embeddingProvider = new LocalBgeM3EmbeddingProvider(
-  config.EMBEDDING_BASE_URL ?? "http://localhost:8081",
+const embeddingProvider = new OpenRouterEmbeddingProvider(
+  config.OPENROUTER_API_KEY,
   config.EMBEDDING_MODEL,
   config.EMBEDDING_DIMENSIONS,
 );
@@ -19,11 +23,6 @@ const batchSize = Number(process.env.FOOD_EMBEDDING_BATCH_SIZE ?? 64);
 const limit = process.env.FOOD_EMBEDDING_LIMIT
   ? Number(process.env.FOOD_EMBEDDING_LIMIT)
   : undefined;
-
-const model = await repository.getActiveEmbeddingModel();
-if (!model) {
-  throw new Error("active_embedding_model_not_found");
-}
 
 const foodQuery = client.db
   .select()
@@ -57,10 +56,7 @@ for (let offset = 0; offset < rows.length; offset += batchSize) {
       embeddedTextHash: foodItemEmbeddings.embeddedTextHash,
     })
     .from(foodItemEmbeddings)
-    .where(and(
-      eq(foodItemEmbeddings.embeddingModelId, model.id),
-      inArray(foodItemEmbeddings.foodItemId, batch.map((item) => item.foodItemId)),
-    ));
+    .where(inArray(foodItemEmbeddings.foodItemId, batch.map((item) => item.foodItemId)));
   const hashes = new Map(
     existing.map((row) => [
       row.foodItemId,
@@ -77,7 +73,6 @@ for (let offset = 0; offset < rows.length; offset += batchSize) {
     if (!embedding) throw new Error("missing_embedding_result");
     await repository.upsertFoodItemEmbedding({
       foodItemId: item.foodItemId,
-      embeddingModelId: model.id,
       embeddedText: item.text,
       embeddedTextHash: item.hash,
       embedding,

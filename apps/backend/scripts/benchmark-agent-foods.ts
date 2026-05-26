@@ -7,7 +7,7 @@ import { AuthService } from "../src/auth/service.js";
 import { loadConfig } from "../src/config/env.js";
 import { createDbClient, type AppDb } from "../src/db/client.js";
 import { foodItems, users } from "../src/db/schema.js";
-import { LocalBgeM3EmbeddingProvider } from "../src/embeddings/provider.js";
+import { OpenRouterEmbeddingProvider } from "../src/embeddings/provider.js";
 import { createApp } from "../src/http/app.js";
 import { MemoryRetrievalService } from "../src/memory/retrieval.js";
 import {
@@ -150,9 +150,9 @@ function createBenchmarkApp(
   runLogger: LocalRunLogger,
 ) {
   const authService = new AuthService(config, repository);
-  const embeddingProvider = config.EMBEDDING_BASE_URL
-    ? new LocalBgeM3EmbeddingProvider(
-        config.EMBEDDING_BASE_URL,
+  const embeddingProvider = config.EMBEDDINGS_ENABLED
+    ? new OpenRouterEmbeddingProvider(
+        config.OPENROUTER_API_KEY,
         config.EMBEDDING_MODEL,
         config.EMBEDDING_DIMENSIONS,
       )

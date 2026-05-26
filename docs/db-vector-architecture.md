@@ -94,7 +94,6 @@ auth_sessions
 confirmation_requests
 corrections
 daily_goal_snapshots
-embedding_models
 food_aliases
 food_item_embeddings
 food_items
@@ -164,7 +163,6 @@ food_items
 food_portions
 food_search_documents
 reference_data_imports
-embedding_models
 food_item_embeddings
 user_food_feedback_events
 user_food_preferences
@@ -197,11 +195,12 @@ outbox_jobs
 
 ## Vector Implementation
 
-The active embedding metadata is:
+The active embedding configuration is a single global vector space:
 
 ```text
-provider: local
-model: bge-m3
+enabled: false by default
+provider: openrouter
+model: baai/bge-m3
 dimensions: 1024
 ```
 
@@ -212,7 +211,7 @@ food_item_embeddings.embedding vector(1024)
 food_memory_embeddings.embedding vector(1024)
 ```
 
-`food_item_embeddings` is active for hybrid food search. The backend uses local `bge-m3` embeddings when an embedding provider is configured, then combines:
+`food_item_embeddings` is prepared for hybrid food search. Runtime embeddings are currently disabled while costs are evaluated, so food search relies on lexical exact/prefix/trigram matching unless `EMBEDDINGS_ENABLED=true`. When enabled, the backend uses OpenRouter `baai/bge-m3` embeddings and combines:
 
 - lexical exact/prefix/trigram matches from `food_search_documents`,
 - pgvector similarity from `food_item_embeddings`,

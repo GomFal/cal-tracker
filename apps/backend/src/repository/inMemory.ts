@@ -10,7 +10,6 @@ import type {
   AuditEventRecord,
   AuthIdentityProvider,
   AuthIdentityRecord,
-  EmbeddingModelRecord,
   FoodFeedbackRecord,
   FoodItemRecord,
   FoodItemEmbeddingRecord,
@@ -24,12 +23,7 @@ import type {
   UpdateDailyGoalsInput
 } from "./types.js";
 
-const ACTIVE_EMBEDDING_MODEL: EmbeddingModelRecord = {
-  id: "local-bge-m3-1024",
-  provider: "local",
-  model: "bge-m3",
-  dimensions: 1024
-};
+const ACTIVE_EMBEDDING_DIMENSIONS = 1024;
 const DEFAULT_FOOD_SEARCH_LIMIT = 50;
 const MAX_FOOD_SEARCH_LIMIT = 100;
 const LEXICAL_SCORE_WEIGHT = 0.7;
@@ -200,9 +194,8 @@ export class InMemoryRepository implements AppRepository {
       }
     }
 
-    if (!input.barcode && input.embedding && input.embeddingModelId) {
+    if (!input.barcode && input.embedding) {
       for (const embedding of this.foodEmbeddings.values()) {
-        if (embedding.embeddingModelId !== input.embeddingModelId) continue;
         const food = this.foods.get(embedding.foodItemId);
         if (!food || (food.userId && food.userId !== userId)) continue;
         const vectorScore = clampScore(cosineSimilarity(input.embedding, embedding.embedding));
@@ -302,19 +295,14 @@ export class InMemoryRepository implements AppRepository {
       .sort((a, b) => b.affinityScore - a.affinityScore || Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
   }
 
-  async getActiveEmbeddingModel(): Promise<EmbeddingModelRecord | undefined> {
-    return ACTIVE_EMBEDDING_MODEL;
-  }
-
   async upsertFoodItemEmbedding(input: UpsertFoodItemEmbeddingInput): Promise<FoodItemEmbeddingRecord> {
-    if (input.embedding.length !== ACTIVE_EMBEDDING_MODEL.dimensions) throw new Error("invalid_embedding_dimensions");
+    if (input.embedding.length !== ACTIVE_EMBEDDING_DIMENSIONS) throw new Error("invalid_embedding_dimensions");
     const now = new Date().toISOString();
-    const key = `${input.foodItemId}:${input.embeddingModelId}`;
+    const key = input.foodItemId;
     const existing = this.foodEmbeddings.get(key);
     const record = {
       id: existing?.id ?? newId(),
       foodItemId: input.foodItemId,
-      embeddingModelId: input.embeddingModelId,
       embeddedText: input.embeddedText,
       embeddedTextHash: input.embeddedTextHash,
       embedding: input.embedding,

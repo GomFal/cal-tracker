@@ -2,7 +2,7 @@ import { serve } from "@hono/node-server";
 import { ActionExecutor } from "./actions/executor.js";
 import { AuthService } from "./auth/service.js";
 import { loadConfig } from "./config/env.js";
-import { LocalBgeM3EmbeddingProvider } from "./embeddings/provider.js";
+import { OpenRouterEmbeddingProvider } from "./embeddings/provider.js";
 import { createApp } from "./http/app.js";
 import { MemoryRetrievalService } from "./memory/retrieval.js";
 import {
@@ -20,9 +20,9 @@ import { RemoteSpeechToTextProvider } from "./stt/speechToTextProvider.js";
 const config = loadConfig();
 const repository = new PostgresRepository(config.DATABASE_URL);
 const authService = new AuthService(config, repository);
-const embeddingProvider = config.EMBEDDING_BASE_URL
-  ? new LocalBgeM3EmbeddingProvider(
-      config.EMBEDDING_BASE_URL,
+const embeddingProvider = config.EMBEDDINGS_ENABLED
+  ? new OpenRouterEmbeddingProvider(
+      config.OPENROUTER_API_KEY,
       config.EMBEDDING_MODEL,
       config.EMBEDDING_DIMENSIONS,
     )

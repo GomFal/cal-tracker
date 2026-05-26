@@ -563,7 +563,7 @@ No meal parsing, nutrition reasoning, vector retrieval, or committed data mutati
 
 ### Flutter Development Skills
 
-Flutter implementation work must use the existing project skills under `.agents/skills` when the task matches them:
+Flutter implementation work should use the installed Codex skills recorded in `skills-lock.json` when the task matches them:
 
 * Use `flutter-apply-architecture-best-practices` when creating or refactoring the Flutter MVVM structure.
 * Use `flutter-setup-declarative-routing` when adding app navigation, deep links, or route guards.

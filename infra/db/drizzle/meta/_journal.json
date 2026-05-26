@@ -36,6 +36,13 @@
       "when": 1779483840322,
       "tag": "0004_hydration_liters",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1779813545427,
+      "tag": "0005_openfoodfacts_market_scope",
+      "breakpoints": true
     }
   ]
 }

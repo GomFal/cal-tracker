@@ -759,23 +759,46 @@ export class OpenFoodFactsFoodDataProvider implements FoodDataProvider {
   private async fetchBarcode(
     barcode: string,
   ): Promise<OpenFoodFactsProduct | null> {
-    const response = await withSpan(
-      "OpenFoodFacts.fetchBarcode",
-      undefined,
-      () => fetch(
-        `${this.baseUrl}/api/v2/product/${encodeURIComponent(barcode)}.json`,
-        {
-          signal: timeoutSignal(this.timeoutMs),
-          headers: { "User-Agent": this.userAgent },
-        },
-      ),
+    const url = `${this.baseUrl}/api/v2/product/${encodeURIComponent(barcode)}.json`;
+    const result = await trackFoodExternalSearch(
+      {
+        provider: "openfoodfacts",
+        operation: "barcode",
+        barcode,
+        host: new URL(this.baseUrl).host,
+      },
+      async () => {
+        const response = await withSpan(
+          "OpenFoodFacts.fetchBarcode",
+          undefined,
+          () => fetch(
+            url,
+            {
+              signal: timeoutSignal(this.timeoutMs),
+              headers: { "User-Agent": this.userAgent },
+            },
+          ),
+        );
+        if (!response.ok) {
+          return { ok: false, httpStatus: response.status, product: null };
+        }
+        const json = (await response.json()) as {
+          status?: number;
+          product?: OpenFoodFactsProduct;
+        };
+        return {
+          ok: true,
+          httpStatus: response.status,
+          product: json.status === 1 ? (json.product ?? null) : null,
+        };
+      },
+      (result) => ({
+        httpStatus: result.httpStatus,
+        ok: result.ok,
+        found: Boolean(result.product),
+      }),
     );
-    if (!response.ok) return null;
-    const json = (await response.json()) as {
-      status?: number;
-      product?: OpenFoodFactsProduct;
-    };
-    return json.status === 1 ? (json.product ?? null) : null;
+    return result.product;
   }
 
   private async searchFirst(
@@ -791,19 +814,47 @@ export class OpenFoodFactsFoodDataProvider implements FoodDataProvider {
       url.searchParams.set("action", "process");
       url.searchParams.set("json", "1");
       url.searchParams.set("page_size", "1");
-      const response = await withSpan(
-        "OpenFoodFacts.search",
-        { query },
-        () => fetch(url, {
-          signal: timeoutSignal(this.timeoutMs),
-          headers: { "User-Agent": this.userAgent },
+      const result = await trackFoodExternalSearch(
+        {
+          provider: "openfoodfacts",
+          operation: "search",
+          query,
+          host: url.host,
+        },
+        async () => {
+          const response = await withSpan(
+            "OpenFoodFacts.search",
+            { query },
+            () => fetch(url, {
+              signal: timeoutSignal(this.timeoutMs),
+              headers: { "User-Agent": this.userAgent },
+            }),
+          );
+          if (!response.ok) {
+            return {
+              ok: false,
+              httpStatus: response.status,
+              products: [] as OpenFoodFactsProduct[],
+            };
+          }
+          const json = (await response.json()) as {
+            products?: OpenFoodFactsProduct[];
+          };
+          return {
+            ok: true,
+            httpStatus: response.status,
+            products: json.products ?? [],
+          };
+        },
+        (result) => ({
+          httpStatus: result.httpStatus,
+          ok: result.ok,
+          resultCount: result.products.length,
+          found: Boolean(result.products[0]),
         }),
       );
-      if (!response.ok) continue;
-      const json = (await response.json()) as {
-        products?: OpenFoodFactsProduct[];
-      };
-      const product = json.products?.[0];
+      if (!result.ok) continue;
+      const product = result.products[0];
       if (product) return product;
     }
     return null;
@@ -850,22 +901,54 @@ export class UsdaFoodDataProvider implements FoodDataProvider {
       url.searchParams.set("query", query);
       url.searchParams.set("pageSize", "25");
       url.searchParams.set("dataType", "Foundation,SR Legacy");
-      const response = await withSpan(
-        "USDA.foods.search",
-        { query },
-        () => fetch(url, {
-          signal: timeoutSignal(this.timeoutMs),
+      const searchResult = await trackFoodExternalSearch(
+        {
+          provider: "usda_fdc",
+          operation: "search",
+          query,
+          host: url.host,
+        },
+        async () => {
+          const response = await withSpan(
+            "USDA.foods.search",
+            { query },
+            () => fetch(url, {
+              signal: timeoutSignal(this.timeoutMs),
+            }),
+          );
+          if (!response.ok) {
+            return {
+              ok: false,
+              httpStatus: response.status,
+              foods: [] as UsdaFood[],
+            };
+          }
+          try {
+            const json = (await response.json()) as { foods?: UsdaFood[] };
+            return {
+              ok: true,
+              httpStatus: response.status,
+              foods: json.foods ?? [],
+            };
+          } catch {
+            return {
+              ok: false,
+              httpStatus: response.status,
+              foods: [] as UsdaFood[],
+              parseError: true,
+            };
+          }
+        },
+        (result) => ({
+          httpStatus: result.httpStatus,
+          ok: result.ok,
+          resultCount: result.foods.length,
+          parseError: Boolean(result.parseError),
         }),
       );
-      if (!response.ok) continue;
-      let json: { foods?: UsdaFood[] };
-      try {
-        json = (await response.json()) as { foods?: UsdaFood[] };
-      } catch {
-        continue;
-      }
+      if (!searchResult.ok) continue;
       const items: MealItem[] = [];
-      const scoredFoods = (json.foods ?? [])
+      const scoredFoods = searchResult.foods
         .map((food) => ({
           food,
           score: scoreUsdaCandidate(food, searchMention),
@@ -944,19 +1027,113 @@ export class UsdaFoodDataProvider implements FoodDataProvider {
     const url = new URL(`${this.baseUrl}/food/${fdcId}`);
     url.searchParams.set("api_key", this.apiKey!);
     try {
-      const response = await withSpan(
-        "USDA.food.detail",
-        { fdcId },
-        () => fetch(url, {
-          signal: timeoutSignal(this.timeoutMs),
+      const result = await trackFoodExternalSearch(
+        {
+          provider: "usda_fdc",
+          operation: "detail",
+          fdcId,
+          host: url.host,
+        },
+        async () => {
+          const response = await withSpan(
+            "USDA.food.detail",
+            { fdcId },
+            () => fetch(url, {
+              signal: timeoutSignal(this.timeoutMs),
+            }),
+          );
+          if (!response.ok) {
+            return { ok: false, httpStatus: response.status, food: null };
+          }
+          try {
+            return {
+              ok: true,
+              httpStatus: response.status,
+              food: (await response.json()) as UsdaFood,
+            };
+          } catch {
+            return {
+              ok: false,
+              httpStatus: response.status,
+              food: null,
+              parseError: true,
+            };
+          }
+        },
+        (result) => ({
+          httpStatus: result.httpStatus,
+          ok: result.ok,
+          found: Boolean(result.food),
+          parseError: Boolean(result.parseError),
         }),
       );
-      if (!response.ok) return null;
-      return (await response.json()) as UsdaFood;
+      return result.food;
     } catch {
       return null;
     }
   }
+}
+
+type FoodExternalSearchMetadata = {
+  provider: "openfoodfacts" | "usda_fdc";
+  operation: "barcode" | "search" | "detail";
+  host: string;
+  query?: string;
+  barcode?: string;
+  fdcId?: number;
+};
+
+async function trackFoodExternalSearch<T>(
+  metadata: FoodExternalSearchMetadata,
+  callback: () => Promise<T>,
+  completedMetadata: (result: T) => Record<string, unknown>,
+): Promise<T> {
+  const startedAt = Date.now();
+  emitFoodExternalSearchEvent("started", metadata);
+  try {
+    const result = await callback();
+    emitFoodExternalSearchEvent("completed", {
+      ...metadata,
+      durationMs: Date.now() - startedAt,
+      ...completedMetadata(result),
+    });
+    return result;
+  } catch (error) {
+    emitFoodExternalSearchEvent("failed", {
+      ...metadata,
+      durationMs: Date.now() - startedAt,
+      error: summarizeExternalSearchError(error),
+    });
+    throw error;
+  }
+}
+
+function emitFoodExternalSearchEvent(
+  phase: "started" | "completed" | "failed",
+  metadata: Record<string, unknown>,
+): void {
+  if (
+    process.env.NODE_ENV === "test" &&
+    process.env.FOOD_EXTERNAL_SEARCH_LOGS_ENABLED !== "true"
+  ) {
+    return;
+  }
+  const event = `food.external_search.${phase}`;
+  if (phase === "failed") {
+    console.warn(event, metadata);
+    return;
+  }
+  console.info(event, metadata);
+}
+
+function summarizeExternalSearchError(error: unknown): Record<string, unknown> {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+    };
+  }
+  return { message: String(error) };
 }
 
 function extractQuantityMentions(

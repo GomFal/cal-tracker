@@ -14,9 +14,16 @@ import { InMemoryRepository } from "../repository/inMemory.js";
 import { seedTestFoods } from "./foodFixtures.js";
 
 const originalFetch = globalThis.fetch;
+const originalFoodExternalSearchLogsEnabled = process.env.FOOD_EXTERNAL_SEARCH_LOGS_ENABLED;
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  if (originalFoodExternalSearchLogsEnabled === undefined) {
+    delete process.env.FOOD_EXTERNAL_SEARCH_LOGS_ENABLED;
+  } else {
+    process.env.FOOD_EXTERNAL_SEARCH_LOGS_ENABLED = originalFoodExternalSearchLogsEnabled;
+  }
+  vi.restoreAllMocks();
 });
 
 function usdaFood(fdcId: number, description: string) {
@@ -1803,6 +1810,65 @@ describe("FoodResolver", () => {
         proteinGrams: 16,
         carbsGrams: 96,
         fatGrams: 4,
+      }),
+    );
+  });
+
+  it("logs external food search events with provider and duration metadata", async () => {
+    process.env.FOOD_EXTERNAL_SEARCH_LOGS_ENABLED = "true";
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    globalThis.fetch = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            status: 1,
+            product: {
+              code: "8410000000000",
+              product_name: "Market Bread",
+              nutriments: {
+                "energy-kcal_100g": 250,
+                proteins_100g: 8,
+                carbohydrates_100g: 48,
+                fat_100g: 2,
+              },
+            },
+          }),
+          { status: 200 },
+        ),
+    ) as typeof fetch;
+    const provider = new OpenFoodFactsFoodDataProvider(
+      "https://off.example.test",
+      "CalTrackerTests/1.0",
+    );
+
+    await provider.resolve("user-1", {
+      originalText: "Market Bread",
+      canonicalEnglishName: "bread",
+      quantity: 100,
+      unit: "g",
+      barcode: "8410000000000",
+      confidence: 0.95,
+      marketProduct: true,
+    });
+
+    expect(info).toHaveBeenCalledWith(
+      "food.external_search.started",
+      expect.objectContaining({
+        provider: "openfoodfacts",
+        operation: "barcode",
+        barcode: "8410000000000",
+        host: "off.example.test",
+      }),
+    );
+    expect(info).toHaveBeenCalledWith(
+      "food.external_search.completed",
+      expect.objectContaining({
+        provider: "openfoodfacts",
+        operation: "barcode",
+        httpStatus: 200,
+        ok: true,
+        found: true,
+        durationMs: expect.any(Number),
       }),
     );
   });

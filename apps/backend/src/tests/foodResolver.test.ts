@@ -1,12 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { FoodMention, MealItem } from "@cal-tracker/contracts";
+import type { FoodMention } from "@cal-tracker/contracts";
 import {
   DeterministicFoodTextExtractor,
   FoodResolver,
   LocalFoodDataProvider,
-  OpenFoodFactsFoodDataProvider,
   OpenRouterFoodTextExtractor,
-  UsdaFoodDataProvider,
   scoreUsdaCandidate,
   type FoodDataProvider,
 } from "../nutrition/foodResolver.js";
@@ -14,43 +12,11 @@ import { InMemoryRepository } from "../repository/inMemory.js";
 import { seedTestFoods } from "./foodFixtures.js";
 
 const originalFetch = globalThis.fetch;
-const originalFoodExternalSearchLogsEnabled = process.env.FOOD_EXTERNAL_SEARCH_LOGS_ENABLED;
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
-  if (originalFoodExternalSearchLogsEnabled === undefined) {
-    delete process.env.FOOD_EXTERNAL_SEARCH_LOGS_ENABLED;
-  } else {
-    process.env.FOOD_EXTERNAL_SEARCH_LOGS_ENABLED = originalFoodExternalSearchLogsEnabled;
-  }
   vi.restoreAllMocks();
 });
-
-function usdaFood(fdcId: number, description: string) {
-  return {
-    fdcId,
-    description,
-    dataType: "Foundation",
-    foodNutrients: [
-      {
-        nutrientNumber: 1008,
-        value: description.toLowerCase().includes("rice") ? 130 : 144,
-      },
-      {
-        nutrientNumber: 1003,
-        value: description.toLowerCase().includes("rice") ? 2.7 : 12.6,
-      },
-      {
-        nutrientNumber: 1005,
-        value: description.toLowerCase().includes("rice") ? 28 : 0.8,
-      },
-      {
-        nutrientNumber: 1004,
-        value: description.toLowerCase().includes("rice") ? 0.3 : 9.6,
-      },
-    ],
-  };
-}
 
 function testFoodRepository(): InMemoryRepository {
   const repository = InMemoryRepository.seeded();
@@ -228,7 +194,6 @@ describe("scoreUsdaCandidate", () => {
 
 describe("FoodResolver candidate groups", () => {
   it("keeps up to ten ranked alternatives for every detected mention", async () => {
-    const repository = testFoodRepository();
     const provider: FoodDataProvider = {
       id: "test-provider",
       async resolve() {
@@ -251,8 +216,7 @@ describe("FoodResolver candidate groups", () => {
           return [mention("candidate")];
         },
       },
-      [provider],
-      repository,
+      provider,
       0.75,
     );
 
@@ -273,7 +237,6 @@ describe("FoodResolver candidate groups", () => {
   });
 
   it("orders alternatives by the visible recommendation probability", async () => {
-    const repository = testFoodRepository();
     const provider: FoodDataProvider = {
       id: "test-provider",
       async resolve() {
@@ -329,8 +292,7 @@ describe("FoodResolver candidate groups", () => {
           return [mention("candidate")];
         },
       },
-      [provider],
-      repository,
+      provider,
       0.75,
     );
 
@@ -751,8 +713,7 @@ describe("FoodResolver", () => {
       }
       const resolver = new FoodResolver(
         new DeterministicFoodTextExtractor(),
-        [new LocalFoodDataProvider(repository)],
-        repository,
+        new LocalFoodDataProvider(repository),
         0.75,
       );
 
@@ -803,8 +764,7 @@ describe("FoodResolver", () => {
     });
     const resolver = new FoodResolver(
       new DeterministicFoodTextExtractor(),
-      [new LocalFoodDataProvider(repository)],
-      repository,
+      new LocalFoodDataProvider(repository),
       0.65,
     );
 
@@ -823,113 +783,6 @@ describe("FoodResolver", () => {
       }),
     );
     expect(result.candidateGroups[0]?.mention.language).toBe("es");
-  });
-
-  it("uses the request language before English fallback for Spanish bread and butter", async () => {
-    const queries: string[] = [];
-    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.includes("/chat/completions")) {
-        return new Response(
-          JSON.stringify({
-            choices: [
-              {
-                message: {
-                  content: JSON.stringify({
-                    mentions: [
-                      {
-                        originalText: "pan",
-                        canonicalName: "pan",
-                        canonicalEnglishName: "bread",
-                        language: "es",
-                        quantity: 100,
-                        unit: "g",
-                        rawUnitText: "gramos",
-                        unitKind: "metric",
-                        confidence: 0.92,
-                        marketProduct: false,
-                      },
-                      {
-                        originalText: "mantequilla",
-                        canonicalName: "mantequilla",
-                        canonicalEnglishName: "butter",
-                        language: "es",
-                        quantity: 100,
-                        unit: "g",
-                        rawUnitText: "gramos",
-                        unitKind: "metric",
-                        confidence: 0.92,
-                        marketProduct: false,
-                      },
-                    ],
-                  }),
-                },
-              },
-            ],
-          }),
-          { status: 200 },
-        );
-      }
-      if (url.includes("/foods/search")) {
-        const requestUrl = new URL(url);
-        const query = requestUrl.searchParams.get("query") ?? "";
-        queries.push(query);
-        return new Response(
-          JSON.stringify({
-            foods:
-              query === "butter"
-                ? [usdaFood(502, "Butter, salted")]
-                : query === "bread"
-                  ? [usdaFood(501, "Bread, white, commercially prepared")]
-                  : [],
-          }),
-          { status: 200 },
-        );
-      }
-      return new Response("{}", { status: 404 });
-    }) as typeof fetch;
-    const repository = InMemoryRepository.seeded();
-    const resolver = new FoodResolver(
-      new OpenRouterFoodTextExtractor(
-        "test-key",
-        "test-model",
-        "https://openrouter.example.test",
-      ),
-      [
-        new LocalFoodDataProvider(repository),
-        new UsdaFoodDataProvider("test-usda-key", "https://fdc.example.test"),
-      ],
-      repository,
-      0.75,
-    );
-
-    const result = await resolver.resolveMealText(
-      "user-1",
-      "Añade a mi desayuno 100 gramos de pan y 100 gramos de mantequilla.",
-    );
-
-    expect(queries).toEqual(
-      expect.arrayContaining(["pan", "bread", "mantequilla", "butter"]),
-    );
-    expect(queries.indexOf("pan")).toBeLessThan(queries.indexOf("bread"));
-    expect(queries.indexOf("mantequilla")).toBeLessThan(
-      queries.indexOf("butter"),
-    );
-    expect(result.clarificationRequired).toBe(false);
-    expect(result.items).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          canonicalName: "pan",
-          externalSource: "usda_fdc",
-          externalId: "501",
-        }),
-        expect.objectContaining({
-          canonicalName: "mantequilla",
-          externalSource: "usda_fdc",
-          externalId: "502",
-        }),
-      ]),
-    );
   });
 
   it("extracts count-based egg units in Spanish and English", async () => {
@@ -1024,194 +877,11 @@ describe("FoodResolver", () => {
     );
   });
 
-  it("validates count-based foods through USDA portions when mixed with gram-based foods", async () => {
-    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.includes("/foods/search")) {
-        return new Response(
-          JSON.stringify({
-            foods: [usdaFood(321, "Egg, whole, raw")],
-          }),
-          { status: 200 },
-        );
-      }
-      if (url.includes("/food/321")) {
-        return new Response(
-          JSON.stringify({
-            fdcId: 321,
-            foodPortions: [
-              {
-                amount: 1,
-                gramWeight: 50,
-                measureUnit: { name: "egg" },
-                portionDescription: "1 large egg",
-              },
-            ],
-          }),
-          { status: 200 },
-        );
-      }
-      return new Response("{}", { status: 404 });
-    }) as typeof fetch;
-    const repository = testFoodRepository();
-    const resolver = new FoodResolver(
-      new DeterministicFoodTextExtractor(),
-      [
-        new LocalFoodDataProvider(repository),
-        new UsdaFoodDataProvider("test-key", "https://fdc.example.test"),
-      ],
-      repository,
-      0.75,
-    );
-
-    const result = await resolver.resolveMealText(
-      "user-1",
-      "Add one egg and 100 grams of rice.",
-    );
-
-    expect(result.clarificationRequired).toBe(false);
-    expect(result.items).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          name: "Egg, Whole, Raw",
-          quantity: 1,
-          unit: "large egg",
-          calories: 72,
-          resolvedGrams: 50,
-        }),
-        expect.objectContaining({
-          name: "Cooked rice",
-          quantity: 100,
-          unit: "g",
-          calories: 130,
-        }),
-      ]),
-    );
-
-    const twoEggs = await resolver.resolveMealText("user-1", "Add 2 eggs");
-    expect(twoEggs.clarificationRequired).toBe(false);
-    expect(twoEggs.items[0]).toEqual(
-      expect.objectContaining({
-        name: "Egg, Whole, Raw",
-        quantity: 2,
-        unit: "large eggs",
-        calories: 144,
-        resolvedGrams: 100,
-      }),
-    );
-  });
-
-  it("asks for a portion choice when an unsized count has multiple USDA sizes", async () => {
-    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.includes("/foods/search")) {
-        return new Response(
-          JSON.stringify({
-            foods: [usdaFood(322, "Egg, whole, raw")],
-          }),
-          { status: 200 },
-        );
-      }
-      if (url.includes("/food/322")) {
-        return new Response(
-          JSON.stringify({
-            fdcId: 322,
-            foodPortions: [
-              {
-                amount: 1,
-                gramWeight: 243,
-                measureUnit: { name: "undetermined" },
-                modifier: "cup (4.86 large eggs)",
-              },
-              {
-                amount: 1,
-                gramWeight: 56,
-                measureUnit: { name: "undetermined" },
-                modifier: "extra large",
-              },
-              {
-                amount: 1,
-                gramWeight: 50,
-                measureUnit: { name: "undetermined" },
-                modifier: "large",
-              },
-            ],
-          }),
-          { status: 200 },
-        );
-      }
-      return new Response("{}", { status: 404 });
-    }) as typeof fetch;
-    const repository = testFoodRepository();
-    const resolver = new FoodResolver(
-      new DeterministicFoodTextExtractor(),
-      [
-        new LocalFoodDataProvider(repository),
-        new UsdaFoodDataProvider("test-key", "https://fdc.example.test"),
-      ],
-      repository,
-      0.75,
-    );
-
-    const result = await resolver.resolveMealText("user-1", "Add one egg");
-
-    expect(result.clarificationRequired).toBe(true);
-    expect(result.items).toHaveLength(0);
-    expect(result.candidateGroups[0]).toEqual(
-      expect.objectContaining({
-        reason: "ambiguous_portion",
-        portionOptions: expect.arrayContaining([
-          expect.objectContaining({
-            label: "1 large egg",
-            unit: "large egg",
-            gramWeight: 50,
-            actionText: "Add 1 large egg",
-          }),
-          expect.objectContaining({
-            label: "1 extra large egg",
-            unit: "extra large egg",
-            gramWeight: 56,
-            actionText: "Add 1 extra large egg",
-          }),
-          expect.objectContaining({ label: "Use grams", unit: "g" }),
-        ]),
-      }),
-    );
-
-    const largeEgg = await resolver.resolveMealText(
-      "user-1",
-      "Add one large egg",
-    );
-    expect(largeEgg.clarificationRequired).toBe(false);
-    expect(largeEgg.items[0]).toEqual(
-      expect.objectContaining({
-        name: "Egg, Whole, Raw",
-        quantity: 1,
-        unit: "large egg",
-        calories: 72,
-        resolvedGrams: 50,
-      }),
-    );
-
-    const xlEgg = await resolver.resolveMealText("user-1", "Add one XL egg");
-    expect(xlEgg.clarificationRequired).toBe(false);
-    expect(xlEgg.items[0]).toEqual(
-      expect.objectContaining({
-        name: "Egg, Whole, Raw",
-        quantity: 1,
-        unit: "extra large egg",
-        calories: 81,
-        resolvedGrams: 56,
-      }),
-    );
-  });
-
   it("rejects unsupported bare count units instead of defaulting to grams", async () => {
     const repository = testFoodRepository();
     const resolver = new FoodResolver(
       new DeterministicFoodTextExtractor(),
-      [new LocalFoodDataProvider(repository)],
-      repository,
+      new LocalFoodDataProvider(repository),
       0.75,
     );
 
@@ -1238,62 +908,7 @@ describe("FoodResolver", () => {
     );
   });
 
-  it("resolves household cup portions using USDA gram weights", async () => {
-    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.includes("/foods/search")) {
-        return new Response(
-          JSON.stringify({
-            foods: [usdaFood(654, "Rice, white, cooked")],
-          }),
-          { status: 200 },
-        );
-      }
-      if (url.includes("/food/654")) {
-        return new Response(
-          JSON.stringify({
-            fdcId: 654,
-            foodPortions: [
-              {
-                amount: 1,
-                gramWeight: 200,
-                measureUnit: { name: "cup" },
-                portionDescription: "1 cup cooked",
-              },
-            ],
-          }),
-          { status: 200 },
-        );
-      }
-      return new Response("{}", { status: 404 });
-    }) as typeof fetch;
-    const repository = testFoodRepository();
-    const resolver = new FoodResolver(
-      new DeterministicFoodTextExtractor(),
-      [
-        new LocalFoodDataProvider(repository),
-        new UsdaFoodDataProvider("test-key", "https://fdc.example.test"),
-      ],
-      repository,
-      0.75,
-    );
-
-    const result = await resolver.resolveMealText("user-1", "Add 1 cup rice");
-
-    expect(result.clarificationRequired).toBe(false);
-    expect(result.items[0]).toEqual(
-      expect.objectContaining({
-        canonicalName: "rice",
-        quantity: 1,
-        unit: "cup",
-        calories: 260,
-        externalSource: "usda_fdc",
-        externalId: "654",
-      }),
-    );
-  });
-
-  it("uses imported local USDA portions before live USDA and does not re-cache scaled values", async () => {
+  it("uses imported local USDA portions without external lookup", async () => {
     globalThis.fetch = vi.fn(async () => new Response("{}", { status: 500 })) as typeof fetch;
     const repository = InMemoryRepository.seeded();
     await repository.upsertFoodItem({
@@ -1325,11 +940,7 @@ describe("FoodResolver", () => {
     });
     const resolver = new FoodResolver(
       new DeterministicFoodTextExtractor(),
-      [
-        new LocalFoodDataProvider(repository),
-        new UsdaFoodDataProvider("test-key", "https://fdc.example.test"),
-      ],
-      repository,
+      new LocalFoodDataProvider(repository),
       0.75,
     );
 
@@ -1390,8 +1001,7 @@ describe("FoodResolver", () => {
     });
     const resolver = new FoodResolver(
       new DeterministicFoodTextExtractor(),
-      [new LocalFoodDataProvider(repository)],
-      repository,
+      new LocalFoodDataProvider(repository),
       0.75,
     );
 
@@ -1429,8 +1039,7 @@ describe("FoodResolver", () => {
     });
     const resolver = new FoodResolver(
       new DeterministicFoodTextExtractor(),
-      [new LocalFoodDataProvider(repository)],
-      repository,
+      new LocalFoodDataProvider(repository),
       0.75,
     );
 
@@ -1471,8 +1080,7 @@ describe("FoodResolver", () => {
     });
     const resolver = new FoodResolver(
       new DeterministicFoodTextExtractor(),
-      [new LocalFoodDataProvider(repository)],
-      repository,
+      new LocalFoodDataProvider(repository),
       0.75,
     );
 
@@ -1490,178 +1098,11 @@ describe("FoodResolver", () => {
     expect(barcode.candidateGroups[0]?.candidates[0]).toBe(barcode.items[0]);
   });
 
-  it("resolves explicit USDA count sizes for bananas and apples", async () => {
-    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.includes("/foods/search") && url.includes("banana")) {
-        return new Response(
-          JSON.stringify({
-            foods: [usdaFood(701, "Bananas, raw")],
-          }),
-          { status: 200 },
-        );
-      }
-      if (url.includes("/foods/search") && url.includes("apple")) {
-        return new Response(
-          JSON.stringify({
-            foods: [usdaFood(702, "Apples, raw, golden delicious, with skin")],
-          }),
-          { status: 200 },
-        );
-      }
-      if (url.includes("/food/701")) {
-        return new Response(
-          JSON.stringify({
-            fdcId: 701,
-            foodPortions: [
-              {
-                amount: 1,
-                gramWeight: 101,
-                modifier: 'small (6" to 6-7/8" long)',
-                measureUnit: { name: "undetermined" },
-              },
-              {
-                amount: 1,
-                gramWeight: 118,
-                modifier: 'medium (7" to 7-7/8" long)',
-                measureUnit: { name: "undetermined" },
-              },
-            ],
-          }),
-          { status: 200 },
-        );
-      }
-      if (url.includes("/food/702")) {
-        return new Response(
-          JSON.stringify({
-            fdcId: 702,
-            foodPortions: [
-              {
-                amount: 1,
-                gramWeight: 129,
-                modifier: "small",
-                measureUnit: { name: "undetermined" },
-              },
-              {
-                amount: 1,
-                gramWeight: 169,
-                modifier: "medium",
-                measureUnit: { name: "undetermined" },
-              },
-            ],
-          }),
-          { status: 200 },
-        );
-      }
-      return new Response("{}", { status: 404 });
-    }) as typeof fetch;
-    const repository = testFoodRepository();
-    const resolver = new FoodResolver(
-      new DeterministicFoodTextExtractor(),
-      [
-        new LocalFoodDataProvider(repository),
-        new UsdaFoodDataProvider("test-key", "https://fdc.example.test"),
-      ],
-      repository,
-      0.75,
-    );
-
-    const bananas = await resolver.resolveMealText(
-      "user-1",
-      "Add 2 small bananas",
-    );
-    expect(bananas.clarificationRequired).toBe(false);
-    expect(bananas.items[0]).toEqual(
-      expect.objectContaining({
-        name: "Bananas, Raw",
-        quantity: 2,
-        unit: "small bananas",
-        calories: 291,
-        resolvedGrams: 202,
-      }),
-    );
-
-    const apple = await resolver.resolveMealText(
-      "user-1",
-      "Add one medium apple",
-    );
-    expect(apple.clarificationRequired).toBe(false);
-    expect(apple.items[0]).toEqual(
-      expect.objectContaining({
-        name: "Apples, Raw, Golden Delicious, With Skin",
-        quantity: 1,
-        unit: "medium apple",
-        calories: 243,
-        resolvedGrams: 169,
-      }),
-    );
-  });
-
-  it("suggests USDA household alternatives for invalid bare counts", async () => {
-    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.includes("/foods/search")) {
-        return new Response(
-          JSON.stringify({
-            foods: [usdaFood(655, "Rice, white, cooked")],
-          }),
-          { status: 200 },
-        );
-      }
-      if (url.includes("/food/655")) {
-        return new Response(
-          JSON.stringify({
-            fdcId: 655,
-            foodPortions: [
-              {
-                amount: 1,
-                gramWeight: 200,
-                measureUnit: { name: "cup" },
-                portionDescription: "1 cup cooked",
-              },
-            ],
-          }),
-          { status: 200 },
-        );
-      }
-      return new Response("{}", { status: 404 });
-    }) as typeof fetch;
-    const repository = testFoodRepository();
-    const resolver = new FoodResolver(
-      new DeterministicFoodTextExtractor(),
-      [
-        new LocalFoodDataProvider(repository),
-        new UsdaFoodDataProvider("test-key", "https://fdc.example.test"),
-      ],
-      repository,
-      0.75,
-    );
-
-    const result = await resolver.resolveMealText("user-1", "Add 1 rice");
-
-    expect(result.clarificationRequired).toBe(true);
-    expect(result.candidateGroups[0]).toEqual(
-      expect.objectContaining({
-        reason: "unsupported_unit",
-        portionOptions: expect.arrayContaining([
-          expect.objectContaining({
-            label: "1 cup rice",
-            unit: "cup",
-            gramWeight: 200,
-            actionText: "Add 1 cup rice",
-          }),
-          expect.objectContaining({ label: "Use grams", unit: "g" }),
-        ]),
-      }),
-    );
-  });
-
   it("keeps gram-based egg quantities when the user gives grams", async () => {
     const repository = testFoodRepository();
     const resolver = new FoodResolver(
       new DeterministicFoodTextExtractor(),
-      [new LocalFoodDataProvider(repository)],
-      repository,
+      new LocalFoodDataProvider(repository),
       0.75,
     );
 
@@ -1685,8 +1126,7 @@ describe("FoodResolver", () => {
     const repository = testFoodRepository();
     const resolver = new FoodResolver(
       new DeterministicFoodTextExtractor(),
-      [new LocalFoodDataProvider(repository)],
-      repository,
+      new LocalFoodDataProvider(repository),
       0.75,
     );
 
@@ -1705,225 +1145,4 @@ describe("FoodResolver", () => {
     );
   });
 
-  it("resolves and caches a generic simple food from USDA FDC", async () => {
-    globalThis.fetch = vi.fn(
-      async () =>
-        new Response(
-          JSON.stringify({
-            foods: [
-              {
-                fdcId: 123,
-                description: "Cheese, cheddar",
-                dataType: "Foundation",
-                foodNutrients: [
-                  { nutrientNumber: 1008, value: 403 },
-                  { nutrientNumber: 1003, value: 24.9 },
-                  { nutrientNumber: 1005, value: 1.3 },
-                  { nutrientNumber: 1004, value: 33.1 },
-                ],
-              },
-            ],
-          }),
-          { status: 200 },
-        ),
-    ) as typeof fetch;
-    const repository = testFoodRepository();
-    const resolver = new FoodResolver(
-      new DeterministicFoodTextExtractor(),
-      [
-        new LocalFoodDataProvider(repository),
-        new UsdaFoodDataProvider("test-key", "https://fdc.example.test"),
-      ],
-      repository,
-      0.75,
-    );
-
-    const result = await resolver.resolveMealText(
-      "user-1",
-      "100 grams of cheese",
-    );
-
-    expect(result.clarificationRequired).toBe(false);
-    expect(result.items[0]).toEqual(
-      expect.objectContaining({
-        canonicalName: "cheese",
-        externalSource: "usda_fdc",
-        externalId: "123",
-        calories: 403,
-      }),
-    );
-    expect(await repository.searchFoods("user-1", "cheese")).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          externalSource: "usda_fdc",
-          externalId: "123",
-        }),
-      ]),
-    );
-  });
-
-  it("uses Open Food Facts for barcode or market-product resolution", async () => {
-    globalThis.fetch = vi.fn(
-      async () =>
-        new Response(
-          JSON.stringify({
-            status: 1,
-            product: {
-              code: "8410000000000",
-              url: "https://world.openfoodfacts.org/product/8410000000000",
-              product_name: "Market Bread",
-              brands: "Test Brand",
-              nutriments: {
-                "energy-kcal_100g": 250,
-                proteins_100g: 8,
-                carbohydrates_100g: 48,
-                fat_100g: 2,
-              },
-            },
-          }),
-          { status: 200 },
-        ),
-    ) as typeof fetch;
-    const provider = new OpenFoodFactsFoodDataProvider(
-      "https://off.example.test",
-      "CalTrackerTests/1.0",
-    );
-
-    const items = await provider.resolve("user-1", {
-      originalText: "Market Bread",
-      canonicalEnglishName: "bread",
-      quantity: 200,
-      unit: "g",
-      barcode: "8410000000000",
-      confidence: 0.95,
-      marketProduct: true,
-    });
-
-    expect(items[0]).toEqual(
-      expect.objectContaining({
-        name: "Market Bread",
-        source: "openfoodfacts",
-        externalSource: "openfoodfacts",
-        externalId: "8410000000000",
-        license: "ODbL-1.0",
-        calories: 500,
-        proteinGrams: 16,
-        carbsGrams: 96,
-        fatGrams: 4,
-      }),
-    );
-  });
-
-  it("logs external food search events with provider and duration metadata", async () => {
-    process.env.FOOD_EXTERNAL_SEARCH_LOGS_ENABLED = "true";
-    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
-    globalThis.fetch = vi.fn(
-      async () =>
-        new Response(
-          JSON.stringify({
-            status: 1,
-            product: {
-              code: "8410000000000",
-              product_name: "Market Bread",
-              nutriments: {
-                "energy-kcal_100g": 250,
-                proteins_100g: 8,
-                carbohydrates_100g: 48,
-                fat_100g: 2,
-              },
-            },
-          }),
-          { status: 200 },
-        ),
-    ) as typeof fetch;
-    const provider = new OpenFoodFactsFoodDataProvider(
-      "https://off.example.test",
-      "CalTrackerTests/1.0",
-    );
-
-    await provider.resolve("user-1", {
-      originalText: "Market Bread",
-      canonicalEnglishName: "bread",
-      quantity: 100,
-      unit: "g",
-      barcode: "8410000000000",
-      confidence: 0.95,
-      marketProduct: true,
-    });
-
-    expect(info).toHaveBeenCalledWith(
-      "food.external_search.started",
-      expect.objectContaining({
-        provider: "openfoodfacts",
-        operation: "barcode",
-        barcode: "8410000000000",
-        host: "off.example.test",
-      }),
-    );
-    expect(info).toHaveBeenCalledWith(
-      "food.external_search.completed",
-      expect.objectContaining({
-        provider: "openfoodfacts",
-        operation: "barcode",
-        httpStatus: 200,
-        ok: true,
-        found: true,
-        durationMs: expect.any(Number),
-      }),
-    );
-  });
-
-  it("continues provider resolution when the local cache is below confidence", async () => {
-    const lowConfidenceProvider: FoodDataProvider = {
-      id: "low",
-      async resolve(): Promise<MealItem[]> {
-        return [
-          {
-            name: "Loose match",
-            quantity: 100,
-            unit: "g",
-            calories: 1,
-            proteinGrams: 0,
-            carbsGrams: 0,
-            fatGrams: 0,
-            source: "test",
-            confidence: 0.2,
-          },
-        ];
-      },
-    };
-    const highConfidenceProvider: FoodDataProvider = {
-      id: "high",
-      async resolve(): Promise<MealItem[]> {
-        return [
-          {
-            name: "Cheese",
-            quantity: 100,
-            unit: "g",
-            calories: 400,
-            proteinGrams: 25,
-            carbsGrams: 1,
-            fatGrams: 33,
-            source: "test",
-            confidence: 0.95,
-          },
-        ];
-      },
-    };
-    const repository = testFoodRepository();
-    const resolver = new FoodResolver(
-      new DeterministicFoodTextExtractor(),
-      [lowConfidenceProvider, highConfidenceProvider],
-      repository,
-      0.75,
-    );
-
-    const result = await resolver.resolveMealText(
-      "user-1",
-      "100 gramos de queso",
-    );
-
-    expect(result.clarificationRequired).toBe(false);
-    expect(result.items[0]?.name).toBe("Cheese");
-  });
 });

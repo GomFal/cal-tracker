@@ -4,7 +4,6 @@ import type {
   FoodPortionChoice,
   MealItem,
 } from "@cal-tracker/contracts";
-import type { EmbeddingProvider } from "../embeddings/provider.js";
 import { withSpan } from "../observability/profiler.js";
 import type { AppRepository, FoodItemRecord, FoodPortionRecord, FoodSearchCandidate } from "../repository/types.js";
 import { normalizeText } from "../utils/normalize.js";
@@ -63,9 +62,7 @@ type PortionOption = {
 };
 
 const resolvedGramsSymbol = Symbol("resolvedGrams");
-const localCandidateSymbol = Symbol("localCandidate");
 type MealItemWithResolvedGrams = MealItem & { [resolvedGramsSymbol]?: number };
-type MealItemWithLocalMarker = MealItem & { [localCandidateSymbol]?: boolean };
 
 function canonicalNameForMention(mention: FoodMention): string {
   return normalizeFoodName(
@@ -106,8 +103,7 @@ function mentionForSearchQuery(
 export class FoodResolver {
   constructor(
     private readonly extractor: FoodTextExtractor,
-    private readonly providers: FoodDataProvider[],
-    private readonly repository: AppRepository,
+    private readonly provider: FoodDataProvider,
     private readonly minConfidence: number,
   ) {}
 
@@ -188,7 +184,6 @@ export class FoodResolver {
         continue;
       }
       items.push(selected);
-      await this.cacheExternalCandidate(selected);
     }
 
     return {
@@ -236,13 +231,7 @@ export class FoodResolver {
     const { candidates, reason, portionOptions } = await this.resolveMention(
       userId,
       mention,
-      {
-        includeMarketSearch: true,
-      },
     );
-    for (const candidate of candidates.slice(0, 3)) {
-      await this.cacheExternalCandidate(candidate);
-    }
     return {
       items: candidates,
       candidateGroups: [
@@ -259,7 +248,6 @@ export class FoodResolver {
   private async resolveMention(
     userId: string,
     mention: FoodMention,
-    options: { includeMarketSearch?: boolean } = {},
   ): Promise<{
     candidates: MealItem[];
     reason?: FoodCandidateGroup["reason"];
@@ -268,46 +256,23 @@ export class FoodResolver {
     const candidates: MealItem[] = [];
     let reason: FoodCandidateGroup["reason"] | undefined;
     let portionOptions: FoodPortionChoice[] | undefined;
-    for (const provider of this.providers) {
-      if (
-        provider.id === "openfoodfacts" &&
-        !options.includeMarketSearch &&
-        !mention.barcode &&
-        !mention.brand &&
-        !mention.marketProduct
-      ) {
-        continue;
-      }
-      let resolved: FoodProviderResolution;
-      try {
-        resolved = normalizeProviderResolution(
-          await withSpan(
-            "FoodDataProvider.resolve",
-            { provider: provider.id },
-            () => provider.resolve(userId, mention),
-          ),
-        );
-      } catch {
-        resolved = { items: [] };
-      }
-      if (resolved.items.length === 0 && resolved.reason) {
-        if (
-          !reason ||
-          resolved.reason === "ambiguous_portion" ||
-          resolved.portionOptions?.length
-        ) {
-          reason = resolved.reason;
-          portionOptions = resolved.portionOptions ?? portionOptions;
-        }
-      }
-      candidates.push(...resolved.items);
-      if (
-        resolved.items.some(
-          (item) => (item.confidence ?? 0) >= this.minConfidence,
-        )
-      )
-        break;
+    let resolved: FoodProviderResolution;
+    try {
+      resolved = normalizeProviderResolution(
+        await withSpan(
+          "FoodDataProvider.resolve",
+          { provider: this.provider.id },
+          () => this.provider.resolve(userId, mention),
+        ),
+      );
+    } catch {
+      resolved = { items: [] };
     }
+    if (resolved.items.length === 0 && resolved.reason) {
+      reason = resolved.reason;
+      portionOptions = resolved.portionOptions;
+    }
+    candidates.push(...resolved.items);
     candidates.sort(compareFoodCandidates);
     if (
       candidates.length === 0 &&
@@ -322,30 +287,6 @@ export class FoodResolver {
     };
   }
 
-  private async cacheExternalCandidate(item: MealItem): Promise<void> {
-    if ((item as MealItemWithLocalMarker)[localCandidateSymbol]) return;
-    if (!item.externalSource || !item.externalId) return;
-    await withSpan(
-      "Repository.upsertFoodItem.cacheExternalCandidate",
-      { externalSource: item.externalSource },
-      () => this.repository.upsertFoodItem({
-        name: item.name,
-        normalizedName: normalizeText(item.canonicalName ?? item.name),
-        canonicalName: item.canonicalName ?? item.name,
-        source: item.source,
-        externalSource: item.externalSource,
-        externalId: item.externalId,
-        sourceUrl: item.sourceUrl,
-        license: item.license,
-        fetchedAt: new Date().toISOString(),
-        servingGrams: servingGramsForMealItem(item),
-        calories: item.calories,
-        proteinGrams: item.proteinGrams,
-        carbsGrams: item.carbsGrams,
-        fatGrams: item.fatGrams,
-      }),
-    );
-  }
 }
 
 function mentionWithLocale(mention: FoodMention, locale?: string): FoodMention {
@@ -381,22 +322,6 @@ async function mapWithConcurrency<T, R>(
   );
   await Promise.all(workers);
   return results;
-}
-
-function servingGramsForMealItem(item: MealItem): number {
-  const grams = item.resolvedGrams ?? resolvedGrams(item);
-  if (grams) return grams;
-  if (item.unit === "g") return item.quantity;
-  const fallbackPortion = seededFallbackPortionForMention({
-    originalText: item.originalText ?? item.name,
-    canonicalName: item.canonicalName ?? item.name,
-    canonicalEnglishName: item.canonicalName ?? item.name,
-    quantity: item.quantity,
-    unit: item.unit,
-    confidence: item.confidence ?? 0.8,
-    marketProduct: false,
-  });
-  return (fallbackPortion?.gramWeight ?? 100) * item.quantity;
 }
 
 export class DeterministicFoodTextExtractor implements FoodTextExtractor {
@@ -507,7 +432,6 @@ export class LocalFoodDataProvider implements FoodDataProvider {
     private readonly repository: AppRepository,
     private readonly options: {
       allowSeededPortionFallback?: boolean;
-      embeddingProvider?: EmbeddingProvider;
     } = {},
   ) {}
 
@@ -548,19 +472,6 @@ export class LocalFoodDataProvider implements FoodDataProvider {
       scoringMention = searchMention;
       if (compatibleFoods.length > 0) break;
     }
-    if (
-      compatibleFoods.length === 0 &&
-      this.options.embeddingProvider &&
-      !hasMarketProductIntent(mention)
-    ) {
-      compatibleFoods = (await this.searchFoods(userId, mention, canonicalNameForMention(mention)))
-        .filter((food) => cachedFoodIsCompatible(food, mention))
-        .sort(
-          (a, b) =>
-            localFoodPriority(a, mention) - localFoodPriority(b, mention),
-        );
-      scoringMention = mention;
-    }
     const items: MealItem[] = [];
     let reason: FoodCandidateGroup["reason"] | undefined;
     let portionOptions: FoodPortionChoice[] | undefined;
@@ -582,7 +493,7 @@ export class LocalFoodDataProvider implements FoodDataProvider {
         item.preferenceScore = food.preferenceScore ?? item.preferenceScore;
         item.matchScore = food.finalScore ?? item.matchScore;
         item.matchReason = food.vectorScore ? "hybrid_search" : item.matchReason;
-        items.push(markLocalCandidate(item));
+        items.push(item);
         continue;
       }
       if (requiresPortionValidation(mention) && localPortionOptions.length > 0) {
@@ -616,7 +527,6 @@ export class LocalFoodDataProvider implements FoodDataProvider {
       "LocalFoodDataProvider.searchFoods",
       {
         query,
-        hasEmbeddingProvider: Boolean(this.options.embeddingProvider),
         excludeBranded: !hasMarketProductIntent(mention),
       },
       () => this.searchFoodsInternal(userId, mention, query),
@@ -651,34 +561,6 @@ export class LocalFoodDataProvider implements FoodDataProvider {
       return lexical.map(cloneLocalFoodCandidate);
     }
 
-    if (this.options.embeddingProvider) {
-      try {
-        const embedding = (await withSpan(
-          "EmbeddingProvider.embed",
-          { inputCount: 1 },
-          () => this.options.embeddingProvider!.embed([query]),
-        )).data[0]?.embedding;
-        if (embedding) {
-          const vector = await withSpan(
-            "Repository.searchFoodsHybrid",
-            { query, mode: "hybrid" },
-            () => this.repository.searchFoodsHybrid(userId, {
-              query,
-              barcode: mention.barcode,
-              embedding,
-              limit: 50,
-              excludeBranded: !marketIntent,
-              locale,
-              scope: marketIntent ? "market" : "generic",
-            }),
-          );
-          this.setSearchCache(cacheKey, vector);
-          return vector.map(cloneLocalFoodCandidate);
-        }
-      } catch {
-        // Fall back to lexical search if embeddings are unavailable.
-      }
-    }
     this.setSearchCache(cacheKey, []);
     return [];
   }
@@ -726,414 +608,6 @@ function localFoodPriority(food: FoodItemRecord, mention: FoodMention): number {
   if (food.dataType === "Foundation") return 3;
   if (isBrandedFood(food)) return 6;
   return 4;
-}
-
-function markLocalCandidate(item: MealItem): MealItem {
-  Object.defineProperty(item, localCandidateSymbol, { value: true });
-  return item;
-}
-
-export class OpenFoodFactsFoodDataProvider implements FoodDataProvider {
-  readonly id = "openfoodfacts";
-
-  constructor(
-    private readonly baseUrl: string,
-    private readonly userAgent: string,
-    private readonly timeoutMs = 5000,
-  ) {}
-
-  async resolve(_userId: string, mention: FoodMention): Promise<MealItem[]> {
-    return withSpan(
-      "OpenFoodFactsFoodDataProvider.resolve",
-      { hasBarcode: Boolean(mention.barcode), canonicalName: canonicalNameForMention(mention) },
-      async () => {
-        const product = mention.barcode
-          ? await this.fetchBarcode(mention.barcode)
-          : await this.searchFirst(mention);
-        const item = product ? mapOpenFoodFactsProduct(product, mention) : null;
-        return item ? [item] : [];
-      },
-    );
-  }
-
-  private async fetchBarcode(
-    barcode: string,
-  ): Promise<OpenFoodFactsProduct | null> {
-    const url = `${this.baseUrl}/api/v2/product/${encodeURIComponent(barcode)}.json`;
-    const result = await trackFoodExternalSearch(
-      {
-        provider: "openfoodfacts",
-        operation: "barcode",
-        barcode,
-        host: new URL(this.baseUrl).host,
-      },
-      async () => {
-        const response = await withSpan(
-          "OpenFoodFacts.fetchBarcode",
-          undefined,
-          () => fetch(
-            url,
-            {
-              signal: timeoutSignal(this.timeoutMs),
-              headers: { "User-Agent": this.userAgent },
-            },
-          ),
-        );
-        if (!response.ok) {
-          return { ok: false, httpStatus: response.status, product: null };
-        }
-        const json = (await response.json()) as {
-          status?: number;
-          product?: OpenFoodFactsProduct;
-        };
-        return {
-          ok: true,
-          httpStatus: response.status,
-          product: json.status === 1 ? (json.product ?? null) : null,
-        };
-      },
-      (result) => ({
-        httpStatus: result.httpStatus,
-        ok: result.ok,
-        found: Boolean(result.product),
-      }),
-    );
-    return result.product;
-  }
-
-  private async searchFirst(
-    mention: FoodMention,
-  ): Promise<OpenFoodFactsProduct | null> {
-    for (const query of searchQueriesForMention(mention)) {
-      const url = new URL(`${this.baseUrl}/cgi/search.pl`);
-      url.searchParams.set(
-        "search_terms",
-        [mention.brand, query].filter(Boolean).join(" "),
-      );
-      url.searchParams.set("search_simple", "1");
-      url.searchParams.set("action", "process");
-      url.searchParams.set("json", "1");
-      url.searchParams.set("page_size", "1");
-      const result = await trackFoodExternalSearch(
-        {
-          provider: "openfoodfacts",
-          operation: "search",
-          query,
-          host: url.host,
-        },
-        async () => {
-          const response = await withSpan(
-            "OpenFoodFacts.search",
-            { query },
-            () => fetch(url, {
-              signal: timeoutSignal(this.timeoutMs),
-              headers: { "User-Agent": this.userAgent },
-            }),
-          );
-          if (!response.ok) {
-            return {
-              ok: false,
-              httpStatus: response.status,
-              products: [] as OpenFoodFactsProduct[],
-            };
-          }
-          const json = (await response.json()) as {
-            products?: OpenFoodFactsProduct[];
-          };
-          return {
-            ok: true,
-            httpStatus: response.status,
-            products: json.products ?? [],
-          };
-        },
-        (result) => ({
-          httpStatus: result.httpStatus,
-          ok: result.ok,
-          resultCount: result.products.length,
-          found: Boolean(result.products[0]),
-        }),
-      );
-      if (!result.ok) continue;
-      const product = result.products[0];
-      if (product) return product;
-    }
-    return null;
-  }
-}
-
-export class UsdaFoodDataProvider implements FoodDataProvider {
-  readonly id = "usda_fdc";
-  private readonly portionCache = new Map<number, PortionOption[]>();
-
-  constructor(
-    private readonly apiKey?: string,
-    private readonly baseUrl = "https://api.nal.usda.gov/fdc/v1",
-    private readonly timeoutMs = 5000,
-  ) {}
-
-  async resolve(
-    _userId: string,
-    mention: FoodMention,
-  ): Promise<FoodProviderResolution> {
-    return withSpan(
-      "UsdaFoodDataProvider.resolve",
-      { canonicalName: canonicalNameForMention(mention) },
-      () => this.resolveInternal(mention),
-    );
-  }
-
-  private async resolveInternal(
-    mention: FoodMention,
-  ): Promise<FoodProviderResolution> {
-    if (!this.apiKey)
-      return {
-        items: [],
-        reason: requiresPortionValidation(mention)
-          ? "unsupported_unit"
-          : undefined,
-      };
-    let reason: FoodCandidateGroup["reason"] | undefined;
-    let portionChoices: FoodPortionChoice[] | undefined;
-    for (const query of searchQueriesForMention(mention)) {
-      const searchMention = mentionForSearchQuery(mention, query);
-      const url = new URL(`${this.baseUrl}/foods/search`);
-      url.searchParams.set("api_key", this.apiKey);
-      url.searchParams.set("query", query);
-      url.searchParams.set("pageSize", "25");
-      url.searchParams.set("dataType", "Foundation,SR Legacy");
-      const searchResult = await trackFoodExternalSearch(
-        {
-          provider: "usda_fdc",
-          operation: "search",
-          query,
-          host: url.host,
-        },
-        async () => {
-          const response = await withSpan(
-            "USDA.foods.search",
-            { query },
-            () => fetch(url, {
-              signal: timeoutSignal(this.timeoutMs),
-            }),
-          );
-          if (!response.ok) {
-            return {
-              ok: false,
-              httpStatus: response.status,
-              foods: [] as UsdaFood[],
-            };
-          }
-          try {
-            const json = (await response.json()) as { foods?: UsdaFood[] };
-            return {
-              ok: true,
-              httpStatus: response.status,
-              foods: json.foods ?? [],
-            };
-          } catch {
-            return {
-              ok: false,
-              httpStatus: response.status,
-              foods: [] as UsdaFood[],
-              parseError: true,
-            };
-          }
-        },
-        (result) => ({
-          httpStatus: result.httpStatus,
-          ok: result.ok,
-          resultCount: result.foods.length,
-          parseError: Boolean(result.parseError),
-        }),
-      );
-      if (!searchResult.ok) continue;
-      const items: MealItem[] = [];
-      const scoredFoods = searchResult.foods
-        .map((food) => ({
-          food,
-          score: scoreUsdaCandidate(food, searchMention),
-        }))
-        .filter(
-          (entry): entry is { food: UsdaFood; score: UsdaCandidateScore } =>
-            Boolean(entry.score),
-        )
-        .sort((a, b) => b.score.confidence - a.score.confidence);
-      for (const { food, score } of scoredFoods) {
-        const foodWithNutrition = hasUsdaNutrition(food)
-          ? food
-          : ((await this.fetchFoodDetail(food.fdcId)) ?? food);
-        let portionOptions: PortionOption[] | undefined;
-        let portionResolution: PortionResolution | undefined;
-        if (requiresPortionValidation(mention)) {
-          portionOptions = await this.fetchPortionOptions(food.fdcId);
-          portionResolution = resolvePortionForMention(
-            mention,
-            portionOptions,
-          );
-          if (portionResolution.reason) {
-            reason ??= portionResolution.reason;
-            portionChoices ??= portionResolution.choices;
-          }
-        }
-        const item = mapUsdaFood(
-          foodWithNutrition,
-          mention,
-          portionOptions,
-          portionResolution?.portion,
-          score,
-        );
-        if (item) {
-          items.push(item);
-          continue;
-        }
-        if (
-          requiresPortionValidation(mention) &&
-          hasUsdaNutrition(foodWithNutrition)
-        ) {
-          reason ??= portionResolution?.reason ?? "unsupported_unit";
-          portionChoices ??= portionResolution?.choices;
-        }
-      }
-      items.sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0));
-      if (items.length > 0) {
-        return {
-          items,
-          reason: undefined,
-          portionOptions: undefined,
-        };
-      }
-    }
-    return {
-      items: [],
-      reason,
-      portionOptions: portionChoices,
-    };
-  }
-
-  private async fetchPortionOptions(fdcId: number): Promise<PortionOption[]> {
-    const cached = this.portionCache.get(fdcId);
-    if (cached) return cached;
-    const detail = await withSpan(
-      "USDA.fetchFoodDetail.forPortions",
-      { fdcId },
-      () => this.fetchFoodDetail(fdcId),
-    );
-    const options = detail ? normalizeUsdaPortions(detail, String(fdcId)) : [];
-    this.portionCache.set(fdcId, options);
-    return options;
-  }
-
-  private async fetchFoodDetail(fdcId: number): Promise<UsdaFood | null> {
-    const url = new URL(`${this.baseUrl}/food/${fdcId}`);
-    url.searchParams.set("api_key", this.apiKey!);
-    try {
-      const result = await trackFoodExternalSearch(
-        {
-          provider: "usda_fdc",
-          operation: "detail",
-          fdcId,
-          host: url.host,
-        },
-        async () => {
-          const response = await withSpan(
-            "USDA.food.detail",
-            { fdcId },
-            () => fetch(url, {
-              signal: timeoutSignal(this.timeoutMs),
-            }),
-          );
-          if (!response.ok) {
-            return { ok: false, httpStatus: response.status, food: null };
-          }
-          try {
-            return {
-              ok: true,
-              httpStatus: response.status,
-              food: (await response.json()) as UsdaFood,
-            };
-          } catch {
-            return {
-              ok: false,
-              httpStatus: response.status,
-              food: null,
-              parseError: true,
-            };
-          }
-        },
-        (result) => ({
-          httpStatus: result.httpStatus,
-          ok: result.ok,
-          found: Boolean(result.food),
-          parseError: Boolean(result.parseError),
-        }),
-      );
-      return result.food;
-    } catch {
-      return null;
-    }
-  }
-}
-
-type FoodExternalSearchMetadata = {
-  provider: "openfoodfacts" | "usda_fdc";
-  operation: "barcode" | "search" | "detail";
-  host: string;
-  query?: string;
-  barcode?: string;
-  fdcId?: number;
-};
-
-async function trackFoodExternalSearch<T>(
-  metadata: FoodExternalSearchMetadata,
-  callback: () => Promise<T>,
-  completedMetadata: (result: T) => Record<string, unknown>,
-): Promise<T> {
-  const startedAt = Date.now();
-  emitFoodExternalSearchEvent("started", metadata);
-  try {
-    const result = await callback();
-    emitFoodExternalSearchEvent("completed", {
-      ...metadata,
-      durationMs: Date.now() - startedAt,
-      ...completedMetadata(result),
-    });
-    return result;
-  } catch (error) {
-    emitFoodExternalSearchEvent("failed", {
-      ...metadata,
-      durationMs: Date.now() - startedAt,
-      error: summarizeExternalSearchError(error),
-    });
-    throw error;
-  }
-}
-
-function emitFoodExternalSearchEvent(
-  phase: "started" | "completed" | "failed",
-  metadata: Record<string, unknown>,
-): void {
-  if (
-    process.env.NODE_ENV === "test" &&
-    process.env.FOOD_EXTERNAL_SEARCH_LOGS_ENABLED !== "true"
-  ) {
-    return;
-  }
-  const event = `food.external_search.${phase}`;
-  if (phase === "failed") {
-    console.warn(event, metadata);
-    return;
-  }
-  console.info(event, metadata);
-}
-
-function summarizeExternalSearchError(error: unknown): Record<string, unknown> {
-  if (error instanceof Error) {
-    return {
-      name: error.name,
-      message: error.message,
-    };
-  }
-  return { message: String(error) };
 }
 
 function extractQuantityMentions(
@@ -1427,99 +901,6 @@ function usdaFoodFromRecord(food: FoodItemRecord): UsdaFood {
   };
 }
 
-function mapOpenFoodFactsProduct(
-  product: OpenFoodFactsProduct,
-  mention: FoodMention,
-): MealItem | null {
-  const nutriments = product.nutriments;
-  const calories = nutriments?.["energy-kcal_100g"];
-  const proteinGrams = nutriments?.["proteins_100g"];
-  const carbsGrams = nutriments?.["carbohydrates_100g"];
-  const fatGrams = nutriments?.["fat_100g"];
-  if (
-    !isNumber(calories) ||
-    !isNumber(proteinGrams) ||
-    !isNumber(carbsGrams) ||
-    !isNumber(fatGrams)
-  )
-    return null;
-  const canonicalName = canonicalNameForMention(mention);
-  const base: FoodItemRecord = {
-    id: product.code ?? canonicalName,
-    name:
-      product.product_name ||
-      product.product_name_en ||
-      product.brands ||
-      canonicalName,
-    normalizedName: normalizeText(canonicalName),
-    canonicalName,
-    brand: product.brands,
-    barcode: product.code,
-    source: "openfoodfacts",
-    externalSource: "openfoodfacts",
-    externalId: product.code,
-    sourceUrl: product.url,
-    license: "ODbL-1.0",
-    servingGrams: 100,
-    calories,
-    proteinGrams,
-    carbsGrams,
-    fatGrams,
-  };
-  return itemFromFood(base, mention, {
-    confidence: mention.barcode ? 0.98 : 0.86,
-    source: "openfoodfacts",
-  });
-}
-
-function mapUsdaFood(
-  food: UsdaFood,
-  mention: FoodMention,
-  portionOptions?: PortionOption[],
-  selectedPortion?: PortionOption,
-  candidateScore?: UsdaCandidateScore,
-): MealItem | null {
-  const calories = findUsdaNutrient(food, 1008);
-  const proteinGrams = findUsdaNutrient(food, 1003);
-  const carbsGrams = findUsdaNutrient(food, 1005);
-  const fatGrams = findUsdaNutrient(food, 1004);
-  if (
-    !isNumber(calories) ||
-    !isNumber(proteinGrams) ||
-    !isNumber(carbsGrams) ||
-    !isNumber(fatGrams)
-  )
-    return null;
-  const canonicalName = canonicalNameForMention(mention);
-  const description = food.description ?? canonicalName;
-  const base: FoodItemRecord = {
-    id: String(food.fdcId),
-    name: titleCase(description),
-    normalizedName: normalizeText(canonicalName),
-    canonicalName,
-    source: "usda_fdc",
-    externalSource: "usda_fdc",
-    externalId: String(food.fdcId),
-    dataType: food.dataType,
-    sourceUrl: `https://fdc.nal.usda.gov/fdc-app.html#/food-details/${food.fdcId}/nutrients`,
-    license: "CC0-1.0",
-    servingGrams: 100,
-    calories,
-    proteinGrams,
-    carbsGrams,
-    fatGrams,
-  };
-  return itemFromFood(base, mention, {
-    confidence:
-      candidateScore?.confidence ??
-      scoreUsdaCandidate(food, mention)?.confidence ??
-      0.74,
-    source: "usda_fdc",
-    portionOptions,
-    selectedPortion,
-  });
-}
-
 type UsdaCandidateScore = {
   confidence: number;
   matchedTokenCount: number;
@@ -1716,29 +1097,6 @@ function singularizeToken(token: string): string {
 
 function roundTwo(value: number): number {
   return Math.round(value * 100) / 100;
-}
-
-function findUsdaNutrient(
-  food: UsdaFood,
-  nutrientNumber: number,
-): number | undefined {
-  const match = food.foodNutrients?.find((nutrient) => {
-    const numbers = [
-      nutrient.nutrientNumber,
-      nutrient.nutrientId,
-      nutrient.nutrient?.number,
-      nutrient.nutrient?.id,
-    ].map((value) => (typeof value === "string" ? Number(value) : value));
-    return numbers.includes(nutrientNumber);
-  });
-  const value = match?.value ?? match?.amount;
-  return isNumber(value) ? value : undefined;
-}
-
-function hasUsdaNutrition(food: UsdaFood): boolean {
-  return [1008, 1003, 1005, 1004].every((nutrient) =>
-    isNumber(findUsdaNutrient(food, nutrient)),
-  );
 }
 
 function parseMention(input: unknown): FoodMention | null {
@@ -2477,15 +1835,6 @@ function aliasesForCanonical(canonicalName: string): string[] {
   return [...new Set([normalized, ...normalized.split(" ").filter(Boolean)])];
 }
 
-function normalizeUsdaPortions(
-  food: UsdaFood,
-  externalFoodId: string,
-): PortionOption[] {
-  return (food.foodPortions ?? [])
-    .map((portion) => normalizeUsdaPortion(portion, externalFoodId))
-    .filter((portion): portion is PortionOption => Boolean(portion));
-}
-
 function portionOptionsFromFoodPortions(
   portions: FoodPortionRecord[],
   externalFoodId?: string,
@@ -2534,46 +1883,6 @@ function portionOptionFromFoodPortion(
 
 function isKnownPortionKind(value: string): value is PortionKind {
   return ["count_size", "whole_item", "household", "piece_shape", "serving"].includes(value);
-}
-
-function normalizeUsdaPortion(
-  portion: UsdaFoodPortion,
-  externalFoodId: string,
-): PortionOption | null {
-  if (!isNumber(portion.gramWeight) || portion.gramWeight <= 0) return null;
-  const amount =
-    isNumber(portion.amount) && portion.amount > 0 ? portion.amount : 1;
-  const gramWeight = roundOne(portion.gramWeight / amount);
-  const sourceParts = [
-    isNumber(portion.amount) ? String(portion.amount) : undefined,
-    portion.measureUnit?.name,
-    portion.measureUnit?.abbreviation,
-    portion.modifier,
-    portion.portionDescription,
-  ].filter((part): part is string => Boolean(part && part.trim()));
-  const sourceDescription = sourceParts.join(" ");
-  const aliases = [
-    ...aliasesFromPortionUnit(portion.measureUnit?.name),
-    ...aliasesFromPortionUnit(portion.measureUnit?.abbreviation),
-    ...aliasesFromPortionDescription(portion.modifier),
-    ...aliasesFromPortionDescription(portion.portionDescription),
-  ];
-  const sourceText = normalizeText(sourceDescription);
-  const size = normalizePortionDescriptor(sourceText);
-  const kind = classifyPortionKind(sourceText, size);
-  const shape = shapeFromPortionDescription(sourceText, kind);
-  const unitName = unitNameForPortion(kind, size, shape, aliases, sourceText);
-  if (aliases.length === 0) return null;
-  return {
-    unitName,
-    aliases: [...new Set(aliases)],
-    gramWeight,
-    sourceDescription,
-    externalFoodId,
-    kind,
-    size,
-    shape,
-  };
 }
 
 function classifyPortionKind(
@@ -2699,10 +2008,6 @@ function isNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
-function titleCase(value: string): string {
-  return value.toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
 function timeoutSignal(timeoutMs: number): AbortSignal | undefined {
   return (
     AbortSignal as typeof AbortSignal & {
@@ -2711,44 +2016,8 @@ function timeoutSignal(timeoutMs: number): AbortSignal | undefined {
   ).timeout?.(timeoutMs);
 }
 
-type OpenFoodFactsProduct = {
-  code?: string;
-  url?: string;
-  product_name?: string;
-  product_name_en?: string;
-  brands?: string;
-  nutriments?: {
-    "energy-kcal_100g"?: number;
-    proteins_100g?: number;
-    carbohydrates_100g?: number;
-    fat_100g?: number;
-  };
-};
-
 type UsdaFood = {
-  fdcId: number;
+  fdcId?: number;
   description?: string;
   dataType?: string;
-  foodPortions?: UsdaFoodPortion[];
-  foodNutrients?: Array<{
-    nutrientId?: number;
-    nutrientNumber?: number | string;
-    value?: number;
-    amount?: number;
-    nutrient?: {
-      id?: number;
-      number?: string;
-    };
-  }>;
-};
-
-type UsdaFoodPortion = {
-  amount?: number;
-  gramWeight?: number;
-  modifier?: string;
-  portionDescription?: string;
-  measureUnit?: {
-    name?: string;
-    abbreviation?: string;
-  };
 };

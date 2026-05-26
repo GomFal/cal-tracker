@@ -63,8 +63,7 @@ export function buildTestApp(options?: {
   const authService = new AuthService(config, repository, options?.googleTokenVerifier);
   const foodResolver = new FoodResolver(
     options?.foodTextExtractor ?? new DeterministicFoodTextExtractor(),
-    [new LocalFoodDataProvider(repository, { allowSeededPortionFallback: true })],
-    repository,
+    new LocalFoodDataProvider(repository, { allowSeededPortionFallback: true }),
     config.FOOD_RESOLVER_MIN_CONFIDENCE
   );
   const nutritionProvider = new ResolverNutritionProvider(foodResolver);

@@ -9,8 +9,6 @@ import {
   DeterministicFoodTextExtractor,
   FoodResolver,
   LocalFoodDataProvider,
-  OpenFoodFactsFoodDataProvider,
-  UsdaFoodDataProvider,
 } from "./nutrition/foodResolver.js";
 import { ResolverNutritionProvider } from "./nutrition/provider.js";
 import { createLocalRunLogger } from "./observability/localRunLogger.js";
@@ -29,17 +27,7 @@ const embeddingProvider = config.EMBEDDINGS_ENABLED
   : undefined;
 const foodResolver = new FoodResolver(
   new DeterministicFoodTextExtractor(),
-  [
-    new LocalFoodDataProvider(repository, { embeddingProvider }),
-    new OpenFoodFactsFoodDataProvider(
-      config.OPENFOODFACTS_BASE_URL,
-      config.OPENFOODFACTS_USER_AGENT,
-    ),
-    ...(config.USDA_LIVE_FALLBACK_ENABLED
-      ? [new UsdaFoodDataProvider(config.USDA_FDC_API_KEY)]
-      : []),
-  ],
-  repository,
+  new LocalFoodDataProvider(repository),
   config.FOOD_RESOLVER_MIN_CONFIDENCE,
 );
 const nutritionProvider = new ResolverNutritionProvider(foodResolver);

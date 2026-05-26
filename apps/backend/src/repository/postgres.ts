@@ -41,6 +41,7 @@ const FOOD_SEARCH_CACHE_MAX_ENTRIES = 500;
 type FoodSearchProfile = {
   scope: "generic" | "market";
   locales: string[];
+  continueAfterLimit?: boolean;
 };
 
 type DbExecutor = {
@@ -258,7 +259,11 @@ export class PostgresRepository implements AppRepository {
         FROM food_item_embeddings
         JOIN food_items ON food_items.id = food_item_embeddings.food_item_id
         WHERE (food_items.user_id IS NULL OR food_items.user_id = ${userId})
-          AND (${includeBranded} OR food_items.data_type IS DISTINCT FROM 'Branded')
+          AND (${includeBranded} OR (
+            food_items.data_type IS DISTINCT FROM 'Branded'
+            AND food_items.source IS DISTINCT FROM 'usda_branded'
+            AND food_items.source IS DISTINCT FROM 'openfoodfacts'
+          ))
         ORDER BY food_item_embeddings.embedding <=> ${vectorLiteral}::vector
         LIMIT ${Math.max(limit, DEFAULT_FOOD_SEARCH_LIMIT)}
       `),
@@ -346,7 +351,7 @@ export class PostgresRepository implements AppRepository {
       const profileRows = await withSpan(
         "PostgresRepository.searchFoodsHybrid.documentQuery",
         { limit: Math.max(limit * 4, DEFAULT_FOOD_SEARCH_LIMIT), scope: profile.scope, locales: profile.locales },
-        () => this.queryFoodSearchDocuments(userId, normalized, profile, limit),
+        () => this.queryFoodSearchDocuments(userId, normalized, profile, limit, includeBranded),
       );
       for (const row of profileRows) {
         const id = row.id as string;
@@ -354,7 +359,7 @@ export class PostgresRepository implements AppRepository {
         seen.add(id);
         rows.push(row);
       }
-      if (rows.length >= limit) break;
+      if (rows.length >= limit && !profile.continueAfterLimit) break;
     }
     return rows;
   }
@@ -364,25 +369,27 @@ export class PostgresRepository implements AppRepository {
     normalized: string,
     profile: FoodSearchProfile,
     limit: number,
+    includeBranded: boolean,
   ): Promise<Record<string, unknown>[]> {
-    const exactRows = await this.queryFoodSearchDocumentsExact(userId, normalized, profile, limit);
-    if (exactRows.length >= limit) return exactRows;
-    const seen = new Set(exactRows.map((row) => row.id as string));
-    const fuzzyRows = await this.queryFoodSearchDocumentsFuzzy(userId, normalized, profile, limit);
+    const textRows = await this.queryFoodSearchDocumentsText(userId, normalized, profile, limit, includeBranded);
+    if (textRows.length >= limit) return textRows;
+    const seen = new Set(textRows.map((row) => row.id as string));
+    const fuzzyRows = await this.queryFoodSearchDocumentsFuzzy(userId, normalized, profile, limit, includeBranded);
     return [
-      ...exactRows,
+      ...textRows,
       ...fuzzyRows.filter((row) => !seen.has(row.id as string)),
     ];
   }
 
-  private async queryFoodSearchDocumentsExact(
+  private async queryFoodSearchDocumentsText(
     userId: string,
     normalized: string,
     profile: FoodSearchProfile,
     limit: number,
+    includeBranded: boolean,
   ): Promise<Record<string, unknown>[]> {
     const searchLimit = Math.max(limit * 4, DEFAULT_FOOD_SEARCH_LIMIT);
-    const searchScore = foodSearchScoreSql(normalized);
+    const searchScore = foodTextSearchScoreSql(normalized);
     const locale0 = profile.locales[0] ?? "any";
     const locale1 = profile.locales[1] ?? locale0;
     const locale2 = profile.locales[2] ?? locale1;
@@ -395,9 +402,11 @@ export class PostgresRepository implements AppRepository {
       WHERE (food_search_documents.user_id IS NULL OR food_search_documents.user_id = ${userId})
         AND food_search_documents.scope = ${profile.scope}
         AND food_search_documents.locale IN ${sqlList(profile.locales)}
-        AND (${foodSearchPredicateSql(normalized)})
+        AND (${includeBranded} OR (food_items.data_type IS DISTINCT FROM 'Branded' AND food_items.source IS DISTINCT FROM 'usda_branded'))
+        AND (${foodTextSearchPredicateSql(normalized)})
       ORDER BY
         CASE WHEN food_search_documents.user_id = ${userId} THEN 0 ELSE 1 END,
+        search_score DESC,
         CASE
           WHEN food_search_documents.locale = ${locale0} THEN 0
           WHEN food_search_documents.locale = ${locale1} THEN 1
@@ -405,7 +414,6 @@ export class PostgresRepository implements AppRepository {
           WHEN food_search_documents.locale = ${locale3} THEN 3
           ELSE 4
         END,
-        search_score DESC,
         food_search_documents.rank_bucket,
         char_length(food_search_documents.search_text),
         food_items.name
@@ -418,6 +426,7 @@ export class PostgresRepository implements AppRepository {
     normalized: string,
     profile: FoodSearchProfile,
     limit: number,
+    includeBranded: boolean,
   ): Promise<Record<string, unknown>[]> {
     const searchLimit = Math.max(limit * 4, DEFAULT_FOOD_SEARCH_LIMIT);
     const locale0 = profile.locales[0] ?? "any";
@@ -428,6 +437,8 @@ export class PostgresRepository implements AppRepository {
       SELECT food_items.*,
              GREATEST(
                similarity(food_search_documents.search_text, ${normalized}),
+               word_similarity(${normalized}, food_search_documents.search_text),
+               strict_word_similarity(${normalized}, food_search_documents.search_text),
                ${foodSearchScoreSql(normalized)}
              ) AS search_score
       FROM food_search_documents
@@ -435,9 +446,15 @@ export class PostgresRepository implements AppRepository {
       WHERE (food_search_documents.user_id IS NULL OR food_search_documents.user_id = ${userId})
         AND food_search_documents.scope = ${profile.scope}
         AND food_search_documents.locale IN ${sqlList(profile.locales)}
-        AND food_search_documents.search_text % ${normalized}
+        AND (${includeBranded} OR (food_items.data_type IS DISTINCT FROM 'Branded' AND food_items.source IS DISTINCT FROM 'usda_branded'))
+        AND (
+          food_search_documents.search_text % ${normalized}
+          OR ${normalized} <% food_search_documents.search_text
+          OR ${normalized} <<% food_search_documents.search_text
+        )
       ORDER BY
         CASE WHEN food_search_documents.user_id = ${userId} THEN 0 ELSE 1 END,
+        search_score DESC,
         CASE
           WHEN food_search_documents.locale = ${locale0} THEN 0
           WHEN food_search_documents.locale = ${locale1} THEN 1
@@ -445,7 +462,6 @@ export class PostgresRepository implements AppRepository {
           WHEN food_search_documents.locale = ${locale3} THEN 3
           ELSE 4
         END,
-        search_score DESC,
         food_search_documents.rank_bucket,
         char_length(food_search_documents.search_text),
         food_items.name
@@ -559,12 +575,12 @@ export class PostgresRepository implements AppRepository {
     if (!document) return;
     await this.execute(dbSql`
       INSERT INTO food_search_documents (
-        food_item_id, user_id, locale, scope, search_text, rank_bucket,
+        food_item_id, user_id, locale, scope, search_text, search_vector, rank_bucket,
         source, external_source, data_type, food_key, updated_at
       )
       VALUES (
         ${food.id}, ${food.userId ?? null}, ${document.locale}, ${document.scope},
-        ${document.searchText}, ${document.rankBucket}, ${food.source},
+        ${document.searchText}, to_tsvector('simple', ${document.searchText}), ${document.rankBucket}, ${food.source},
         ${food.externalSource ?? null}, ${food.dataType ?? null}, ${food.foodKey ?? null}, now()
       )
       ON CONFLICT (food_item_id) DO UPDATE SET
@@ -572,6 +588,7 @@ export class PostgresRepository implements AppRepository {
         locale = EXCLUDED.locale,
         scope = EXCLUDED.scope,
         search_text = EXCLUDED.search_text,
+        search_vector = EXCLUDED.search_vector,
         rank_bucket = EXCLUDED.rank_bucket,
         source = EXCLUDED.source,
         external_source = EXCLUDED.external_source,
@@ -1529,22 +1546,21 @@ function foodSearchCacheKey(
   });
 }
 
-function foodSearchPredicateSql(normalized: string): SQL {
-  const prefix = `${normalized}%`;
-  const tokenContains = `% ${normalized}%`;
-  const multiTokenQuery = normalized.split(/\s+/).filter(Boolean).length > 1;
-  const normalizedName = dbSql`COALESCE(food_items.normalized_name, '')`;
-  const canonicalName = dbSql`COALESCE(food_items.canonical_name, '')`;
+function foodTextSearchPredicateSql(normalized: string): SQL {
+  const prefixQuery = foodSearchPrefixTsQuery(normalized);
   return dbSql`
-    food_search_documents.search_text = ${normalized}
-    OR food_search_documents.search_text LIKE ${prefix}
-    OR food_search_documents.search_text LIKE ${tokenContains}
-    OR (
-      ${multiTokenQuery}
-      AND (
-        ${candidatePhraseInQuerySql(normalizedName, normalized)}
-        OR ${candidatePhraseInQuerySql(canonicalName, normalized)}
-      )
+    food_search_documents.search_vector @@ websearch_to_tsquery('simple', ${normalized})
+    OR food_search_documents.search_vector @@ to_tsquery('simple', ${prefixQuery})
+  `;
+}
+
+function foodTextSearchScoreSql(normalized: string): SQL {
+  const prefixQuery = foodSearchPrefixTsQuery(normalized);
+  return dbSql`
+    GREATEST(
+      ts_rank_cd(food_search_documents.search_vector, websearch_to_tsquery('simple', ${normalized}))::float,
+      (ts_rank_cd(food_search_documents.search_vector, to_tsquery('simple', ${prefixQuery})) * 0.9)::float,
+      ${foodSearchScoreSql(normalized)}
     )
   `;
 }
@@ -1634,6 +1650,14 @@ function foodSearchScoreSql(normalized: string): SQL {
   `;
 }
 
+function foodSearchPrefixTsQuery(normalized: string): string {
+  return normalized
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((token) => `${token}:*`)
+    .join(" & ");
+}
+
 function candidatePhraseInQuerySql(text: SQL, normalized: string): SQL {
   const paddedQuery = ` ${normalized} `;
   return dbSql`${text} <> '' AND POSITION(' ' || ${text} || ' ' IN ${paddedQuery}) > 0`;
@@ -1658,15 +1682,17 @@ function foodSearchProfiles(
 ): FoodSearchProfile[] {
   const locale = normalizeSearchLocale(input.locale);
   const scope = input.scope ?? (includeBranded ? "market" : "generic");
+  const marketLocales = uniqueStrings([locale, "en", "es", "any"].filter(Boolean) as string[]);
   if (scope === "market") {
     return [
       {
         scope: "market",
-        locales: uniqueStrings([locale, "en", "es", "any"].filter(Boolean) as string[]),
+        locales: marketLocales,
+        continueAfterLimit: true,
       },
       {
         scope: "generic",
-        locales: uniqueStrings([locale, "en", "es", "any"].filter(Boolean) as string[]),
+        locales: marketLocales,
       },
     ];
   }
@@ -1711,13 +1737,16 @@ function foodSearchDocumentForFood(food: FoodItemRecord):
         : "any";
   const scope =
     food.userId ||
-    (food.source === "openfoodfacts" && food.foodKey === "es") ||
-    (food.dataType !== "Branded" && food.source !== "usda_branded" && food.source !== "openfoodfacts")
+    (
+      food.dataType !== "Branded" &&
+      food.source !== "usda_branded" &&
+      (food.source !== "openfoodfacts" || (!food.barcode && !food.brand))
+    )
       ? "generic"
       : "market";
   const rankBucket = food.userId
     ? 0
-    : food.source === "openfoodfacts" && food.foodKey === "es"
+    : food.source === "openfoodfacts" && food.foodKey === "es" && !food.barcode && !food.brand
       ? 1
       : food.dataType === "SR Legacy"
         ? 2
@@ -1725,7 +1754,7 @@ function foodSearchDocumentForFood(food: FoodItemRecord):
           ? 3
           : food.dataType === "Survey (FNDDS)"
             ? 4
-            : food.source === "openfoodfacts" && food.foodKey === "en"
+            : food.source === "openfoodfacts"
               ? 7
               : food.dataType === "Branded"
                 ? 8

@@ -32,6 +32,28 @@ export function lexicalFoodScore(food: FoodItemRecord, normalizedQuery: string):
   return clampScore(Math.max(primaryScore, brandScore, categoryScore));
 }
 
+export function fuzzyFoodScore(food: FoodItemRecord, normalizedQuery: string): number {
+  const query = normalizeText(normalizedQuery);
+  if (!query) return 0;
+  const queryTokens = tokenizeSearchText(query);
+  if (queryTokens.length === 0) return 0;
+
+  const primaryScore = Math.max(
+    scoreFuzzySearchText(food.normalizedName, query, queryTokens),
+    scoreFuzzySearchText(food.canonicalName, query, queryTokens),
+    scoreFuzzySearchText(food.name, query, queryTokens),
+  );
+  const brandScore = Math.min(
+    BRAND_SCORE_CAP,
+    scoreFuzzySearchText(food.brand, query, queryTokens),
+  );
+  const categoryScore = Math.min(
+    CATEGORY_SCORE_CAP,
+    scoreFuzzySearchText(food.foodCategory, query, queryTokens),
+  );
+  return clampScore(Math.max(primaryScore, brandScore, categoryScore));
+}
+
 function scoreSearchText(value: string | undefined, query: string, queryTokens: string[]): number {
   if (!value) return 0;
   const text = normalizeText(value);
@@ -68,6 +90,34 @@ function scoreSearchText(value: string | undefined, query: string, queryTokens: 
   return 0;
 }
 
+function scoreFuzzySearchText(value: string | undefined, query: string, queryTokens: string[]): number {
+  if (!value) return 0;
+  const text = normalizeText(value);
+  if (!text) return 0;
+  const textTokens = tokenizeSearchText(text);
+  if (textTokens.length === 0) return 0;
+
+  const fullTextScore = Math.max(
+    trigramSimilarity(text, query),
+    editSimilarity(text, query),
+  );
+  const tokenScores = queryTokens.map((queryToken) =>
+    Math.max(
+      ...textTokens.map((textToken) => Math.max(
+        trigramSimilarity(textToken, queryToken),
+        editSimilarity(textToken, queryToken),
+      )),
+    ),
+  );
+  const everyTokenMatched = tokenScores.every((score) => score >= 0.65);
+  if (everyTokenMatched) {
+    const averageTokenScore = tokenScores.reduce((sum, score) => sum + score, 0) / tokenScores.length;
+    return clampScore(Math.min(0.74, averageTokenScore * 0.82));
+  }
+  if (fullTextScore >= 0.55) return clampScore(fullTextScore * 0.68);
+  return 0;
+}
+
 function compactnessAdjustedScore(score: number, textTokens: string[], queryTokens: string[]): number {
   const extraTokenCount = Math.max(0, textTokens.length - queryTokens.length);
   const extraCharCount = Math.max(0, textTokens.join(" ").length - queryTokens.join(" ").length);
@@ -79,6 +129,53 @@ function tokenizeSearchText(value: string): string[] {
     .split(/\s+/)
     .filter(Boolean)
     .map(singularizeToken);
+}
+
+function trigramSimilarity(left: string, right: string): number {
+  if (left === right) return 1;
+  const leftTrigrams = trigrams(left);
+  const rightTrigrams = trigrams(right);
+  if (leftTrigrams.size === 0 || rightTrigrams.size === 0) return 0;
+  let intersection = 0;
+  for (const trigram of leftTrigrams) {
+    if (rightTrigrams.has(trigram)) intersection += 1;
+  }
+  return (2 * intersection) / (leftTrigrams.size + rightTrigrams.size);
+}
+
+function trigrams(value: string): Set<string> {
+  const padded = `  ${value} `;
+  const result = new Set<string>();
+  for (let index = 0; index <= padded.length - 3; index++) {
+    result.add(padded.slice(index, index + 3));
+  }
+  return result;
+}
+
+function editSimilarity(left: string, right: string): number {
+  const maxLength = Math.max(left.length, right.length);
+  if (maxLength === 0) return 1;
+  return 1 - levenshteinDistance(left, right) / maxLength;
+}
+
+function levenshteinDistance(left: string, right: string): number {
+  const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  const current = Array.from({ length: right.length + 1 }, () => 0);
+  for (let leftIndex = 1; leftIndex <= left.length; leftIndex++) {
+    current[0] = leftIndex;
+    for (let rightIndex = 1; rightIndex <= right.length; rightIndex++) {
+      const substitutionCost = left[leftIndex - 1] === right[rightIndex - 1] ? 0 : 1;
+      current[rightIndex] = Math.min(
+        previous[rightIndex] + 1,
+        current[rightIndex - 1] + 1,
+        previous[rightIndex - 1] + substitutionCost,
+      );
+    }
+    for (let index = 0; index < previous.length; index++) {
+      previous[index] = current[index]!;
+    }
+  }
+  return previous[right.length]!;
 }
 
 function singularizeToken(token: string): string {

@@ -479,12 +479,14 @@ describe("FoodResolver", () => {
     );
   });
 
-  it("routes local food search by locale and generic market scope", async () => {
+  it("keeps Open Food Facts products out of generic search and available in market search", async () => {
     const repository = InMemoryRepository.seeded();
     await repository.upsertFoodItem({
       name: "Arroz",
       normalizedName: "arroz",
       canonicalName: "arroz",
+      brand: "Producto Test",
+      barcode: "1111111111111",
       source: "openfoodfacts",
       externalSource: "openfoodfacts",
       externalId: "es-arroz",
@@ -514,6 +516,8 @@ describe("FoodResolver", () => {
       name: "Rice Brand Snack",
       normalizedName: "rice brand snack",
       canonicalName: "rice snack",
+      brand: "Rice Brand",
+      barcode: "2222222222222",
       source: "openfoodfacts",
       externalSource: "openfoodfacts",
       externalId: "en-rice-product",
@@ -531,6 +535,13 @@ describe("FoodResolver", () => {
         query: "arroz",
         locale: "es-ES",
         scope: "generic",
+      }),
+    ).resolves.toEqual([]);
+    await expect(
+      repository.searchFoodsHybrid("user-1", {
+        query: "arroz",
+        locale: "es-ES",
+        scope: "market",
       }),
     ).resolves.toEqual([
       expect.objectContaining({ externalId: "es-arroz", foodKey: "es" }),
@@ -610,6 +621,68 @@ describe("FoodResolver", () => {
     expect(noodleResults[0]).toEqual(
       expect.objectContaining({ externalId: "usda-rice-noodles" }),
     );
+  });
+
+  it("matches food names with typos and prefix queries", async () => {
+    const repository = InMemoryRepository.seeded();
+    await repository.upsertFoodItem({
+      name: "Pechuga de pollo",
+      normalizedName: "pechuga pollo",
+      canonicalName: "pechuga pollo",
+      source: "openfoodfacts",
+      externalSource: "openfoodfacts",
+      externalId: "es-pechuga-pollo",
+      dataType: "Open Food Facts",
+      foodKey: "es",
+      servingGrams: 100,
+      calories: 165,
+      proteinGrams: 31,
+      carbsGrams: 0,
+      fatGrams: 3.6,
+    });
+    await repository.upsertFoodItem({
+      name: "Yogur natural",
+      normalizedName: "yogur natural",
+      canonicalName: "yogur natural",
+      source: "openfoodfacts",
+      externalSource: "openfoodfacts",
+      externalId: "es-yogur-natural",
+      dataType: "Open Food Facts",
+      foodKey: "es",
+      servingGrams: 100,
+      calories: 63,
+      proteinGrams: 3.5,
+      carbsGrams: 4.7,
+      fatGrams: 3.3,
+    });
+
+    await expect(
+      repository.searchFoodsHybrid("user-1", {
+        query: "pechga pollo",
+        locale: "es-ES",
+        scope: "generic",
+      }),
+    ).resolves.toEqual([
+      expect.objectContaining({ externalId: "es-pechuga-pollo" }),
+    ]);
+    await expect(
+      repository.searchFoodsHybrid("user-1", {
+        query: "iogur",
+        locale: "es-ES",
+        scope: "generic",
+      }),
+    ).resolves.toEqual([
+      expect.objectContaining({ externalId: "es-yogur-natural" }),
+    ]);
+    await expect(
+      repository.searchFoodsHybrid("user-1", {
+        query: "yog",
+        locale: "es-ES",
+        scope: "generic",
+      }),
+    ).resolves.toEqual([
+      expect.objectContaining({ externalId: "es-yogur-natural" }),
+    ]);
   });
 
   it.each([
@@ -710,10 +783,10 @@ describe("FoodResolver", () => {
       name: "Pan",
       normalizedName: "pan",
       canonicalName: "pan",
-      source: "openfoodfacts",
-      externalSource: "openfoodfacts",
-      externalId: "off-pan-es",
-      dataType: "Open Food Facts",
+      source: "test_fixture",
+      externalSource: "test_fixture",
+      externalId: "generic-pan-es",
+      dataType: "Generic",
       foodKey: "es",
       servingGrams: 100,
       calories: 269,
@@ -737,8 +810,8 @@ describe("FoodResolver", () => {
     expect(result.items[0]).toEqual(
       expect.objectContaining({
         name: "Pan",
-        externalSource: "openfoodfacts",
-        externalId: "off-pan-es",
+        externalSource: "test_fixture",
+        externalId: "generic-pan-es",
         calories: 538,
       }),
     );

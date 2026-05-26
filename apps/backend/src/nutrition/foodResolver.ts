@@ -231,7 +231,7 @@ export class FoodResolver {
       language: languageFromLocale(locale),
       barcode,
       confidence: 0.95,
-      marketProduct: Boolean(barcode),
+      marketProduct: true,
     };
     const { candidates, reason, portionOptions } = await this.resolveMention(
       userId,

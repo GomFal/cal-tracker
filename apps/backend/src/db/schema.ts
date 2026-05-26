@@ -1,7 +1,13 @@
 import { relations, sql } from "drizzle-orm";
-import { boolean, check, date, index, integer, jsonb, numeric, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid, vector } from "drizzle-orm/pg-core";
+import { boolean, check, customType, date, index, integer, jsonb, numeric, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid, vector } from "drizzle-orm/pg-core";
 
 type JsonObject = Record<string, unknown>;
+
+const tsvector = customType<{ data: string }>({
+  dataType() {
+    return "tsvector";
+  }
+});
 
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
@@ -183,6 +189,7 @@ export const foodSearchDocuments = pgTable("food_search_documents", {
   locale: text("locale").notNull(),
   scope: text("scope").notNull(),
   searchText: text("search_text").notNull(),
+  searchVector: tsvector("search_vector").notNull(),
   rankBucket: integer("rank_bucket").notNull(),
   source: text("source").notNull(),
   externalSource: text("external_source"),
@@ -192,7 +199,9 @@ export const foodSearchDocuments = pgTable("food_search_documents", {
 }, (table) => [
   index("food_search_documents_generic_es_trgm_idx").using("gin", table.searchText.op("gin_trgm_ops")).where(sql`${table.scope} = 'generic' AND ${table.locale} = 'es'`),
   index("food_search_documents_generic_en_trgm_idx").using("gin", table.searchText.op("gin_trgm_ops")).where(sql`${table.scope} = 'generic' AND ${table.locale} = 'en'`),
+  index("food_search_documents_generic_trgm_idx").using("gin", table.searchText.op("gin_trgm_ops")).where(sql`${table.scope} = 'generic'`),
   index("food_search_documents_market_trgm_idx").using("gin", table.searchText.op("gin_trgm_ops")).where(sql`${table.scope} = 'market'`),
+  index("food_search_documents_search_vector_idx").using("gin", table.searchVector),
   index("food_search_documents_scope_locale_rank_idx").on(table.scope, table.locale, table.rankBucket),
   index("food_search_documents_user_idx").on(table.userId).where(sql`${table.userId} IS NOT NULL`)
 ]);

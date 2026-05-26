@@ -43,6 +43,13 @@
       "when": 1779812425782,
       "tag": "0005_global_embeddings",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1779814926487,
+      "tag": "0006_food_search_full_text",
+      "breakpoints": true
     }
   ]
 }

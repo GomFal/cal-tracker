@@ -1,0 +1,27 @@
+services:
+  typesense:
+    image: typesense/typesense:30.2
+    environment:
+      TYPESENSE_API_KEY: ${TYPESENSE_API_KEY:-xyz}
+    command:
+      - --data-dir=/data
+      - --api-key=${TYPESENSE_API_KEY:-xyz}
+      - --enable-cors
+    ports:
+      - "127.0.0.1:8108:8108"
+    volumes:
+      - cal_tracker_typesense:/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >
+          bash -ec 'exec 3<>/dev/tcp/127.0.0.1/8108;
+          printf "GET /health HTTP/1.1\r\nHost: 127.0.0.1:8108\r\nX-TYPESENSE-API-KEY: %s\r\nConnection: close\r\n\r\n" "$${TYPESENSE_API_KEY}" >&3;
+          grep -q " 200 " <&3'
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+volumes:
+  cal_tracker_typesense:

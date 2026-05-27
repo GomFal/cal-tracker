@@ -13,10 +13,20 @@ import {
 import { ResolverNutritionProvider } from "./nutrition/provider.js";
 import { createLocalRunLogger } from "./observability/localRunLogger.js";
 import { PostgresRepository } from "./repository/postgres.js";
+import { TypesenseFoodSearch } from "./repository/typesenseFoodSearch.js";
 import { RemoteSpeechToTextProvider } from "./stt/speechToTextProvider.js";
 
 const config = loadConfig();
 const repository = new PostgresRepository(config.DATABASE_URL);
+const foodSearchBackend = config.FOOD_SEARCH_BACKEND === "typesense"
+  ? new TypesenseFoodSearch({
+      protocol: config.TYPESENSE_PROTOCOL,
+      host: config.TYPESENSE_HOST,
+      port: config.TYPESENSE_PORT,
+      apiKey: config.TYPESENSE_API_KEY,
+      collection: config.TYPESENSE_COLLECTION,
+    })
+  : repository;
 const authService = new AuthService(config, repository);
 const embeddingProvider = config.EMBEDDINGS_ENABLED
   ? new OpenRouterEmbeddingProvider(
@@ -27,7 +37,7 @@ const embeddingProvider = config.EMBEDDINGS_ENABLED
   : undefined;
 const foodResolver = new FoodResolver(
   new DeterministicFoodTextExtractor(),
-  new LocalFoodDataProvider(repository),
+  new LocalFoodDataProvider(foodSearchBackend),
   config.FOOD_RESOLVER_MIN_CONFIDENCE,
 );
 const nutritionProvider = new ResolverNutritionProvider(foodResolver);

@@ -5,7 +5,8 @@ import type {
   MealItem,
 } from "@cal-tracker/contracts";
 import { withSpan } from "../observability/profiler.js";
-import type { AppRepository, FoodItemRecord, FoodPortionRecord, FoodSearchCandidate } from "../repository/types.js";
+import type { FoodSearchBackend } from "../repository/foodSearchBackend.js";
+import type { FoodItemRecord, FoodPortionRecord, FoodSearchCandidate } from "../repository/types.js";
 import { normalizeText } from "../utils/normalize.js";
 import { scaleFood } from "../utils/nutrition.js";
 
@@ -429,7 +430,7 @@ export class LocalFoodDataProvider implements FoodDataProvider {
   private readonly searchCache = new Map<string, Array<FoodItemRecord & Partial<FoodSearchCandidate>>>();
 
   constructor(
-    private readonly repository: AppRepository,
+    private readonly repository: FoodSearchBackend,
     private readonly options: {
       allowSeededPortionFallback?: boolean;
     } = {},

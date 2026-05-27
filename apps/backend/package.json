@@ -18,6 +18,8 @@
     "db:seed": "tsx scripts/seed.ts",
     "db:seed:dist": "bun dist/scripts/seed.js",
     "embed:foods": "tsx scripts/embed-food-items.ts",
+    "typesense:sync-foods": "tsx scripts/sync-typesense-foods.ts",
+    "benchmark:food-retrieval": "tsx scripts/benchmark-food-retrieval.ts",
     "benchmark:agent-foods": "tsx scripts/benchmark-agent-foods.ts",
     "generate:flutter-client": "tsx scripts/generate-flutter-client.ts"
   },

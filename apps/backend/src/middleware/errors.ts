@@ -3,6 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import { errors } from "jose";
 import { ZodError } from "zod";
 import { ActionExecutionError } from "../actions/executor.js";
+import { AgentProviderUnavailableError } from "../agent/agentService.js";
 import { AuthError } from "../auth/service.js";
 import { getTraceId } from "./requestContext.js";
 
@@ -20,6 +21,15 @@ export function formatErrorResponse(c: Context, error: unknown) {
   if (error instanceof ActionExecutionError) {
     const status = error.code === "permission_denied" ? 403 : 400;
     return c.json({ error: { code: error.code, message: actionErrorMessage(error.code), traceId } }, status);
+  }
+  if (error instanceof AgentProviderUnavailableError) {
+    return c.json({
+      error: {
+        code: error.code,
+        message: "An error ocurred. Please, try again.",
+        traceId,
+      },
+    }, 503);
   }
   if (error instanceof HTTPException) {
     return c.json({ error: { code: httpErrorCode(error.status), message: httpErrorMessage(error.status), traceId } }, error.status);

@@ -60,6 +60,44 @@ const testRiceItem: MealItem = {
   confidence: 0.9,
 };
 
+const testChickenItem: MealItem = {
+  name: "Chicken breast",
+  quantity: 100,
+  unit: "g",
+  calories: 165,
+  proteinGrams: 31,
+  carbsGrams: 0,
+  fatGrams: 3.6,
+  source: "test_fixture",
+  originalText: "100 grams of chicken breast",
+  canonicalName: "chicken breast",
+  confidence: 0.9,
+};
+
+function mention(
+  canonicalEnglishName: string,
+  quantity: number,
+  overrides: Partial<FoodMention> = {},
+): FoodMention {
+  const unit = overrides.unit ?? "g";
+  const rawUnitText = overrides.rawUnitText ?? (unit === "g" ? "grams" : unit);
+  return {
+    originalText:
+      overrides.originalText ??
+      `${quantity} ${rawUnitText} of ${canonicalEnglishName}`,
+    canonicalName: overrides.canonicalName ?? canonicalEnglishName,
+    canonicalEnglishName,
+    language: overrides.language ?? "en",
+    quantity,
+    unit,
+    rawUnitText,
+    unitKind: overrides.unitKind ?? (unit === "g" ? "metric" : "unknown"),
+    confidence: overrides.confidence ?? 0.95,
+    marketProduct: overrides.marketProduct ?? false,
+    ...overrides,
+  };
+}
+
 async function createProposalFromItems(
   request: (input: string, init?: RequestInit) => Promise<Response>,
   authHeader: Record<string, string>,
@@ -87,11 +125,6 @@ async function createProposalFromItems(
 describe("AgentService", () => {
   it("maps chicken and rice with quantities to propose_meal_log", async () => {
     const { request } = buildTestApp({
-      foodTextExtractor: {
-        async extract(): Promise<FoodMention[]> {
-          throw new Error("text extractor should not be called");
-        },
-      },
       agentProvider: new FakeChatAgentProvider({
         toolCalls: [
           {
@@ -206,7 +239,7 @@ describe("AgentService", () => {
     );
   });
 
-  it("defaults to a complete Spanish meal proposal when the model returns no tool", async () => {
+  it("asks for clarification when the model returns no tool", async () => {
     const { request, repository } = buildTestApp({
       agentProvider: new FakeChatAgentProvider({
         toolCalls: [],
@@ -255,18 +288,15 @@ describe("AgentService", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       kind: string;
-      proposal: { items: { name: string; quantity: number }[] };
+      message: string;
+      proposal?: unknown;
     };
-    expect(body.kind).toBe("proposal");
-    expect(body.proposal.items).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ name: "Pechuga de pollo", quantity: 200 }),
-        expect.objectContaining({ name: "Arroz", quantity: 300 }),
-      ]),
-    );
+    expect(body.kind).toBe("clarification_required");
+    expect(body.proposal).toBeUndefined();
+    expect(body.message).toContain("rephrase");
   });
 
-  it("parses bread and ham quantities into a complete proposal", async () => {
+  it("uses model-provided bread and ham mentions for a complete proposal", async () => {
     const { request } = buildTestApp({
       agentProvider: new FakeChatAgentProvider({
         toolCalls: [
@@ -277,6 +307,12 @@ describe("AgentService", () => {
               name: "propose_meal_log",
               arguments: JSON.stringify({
                 text: "Add 100 grams of bread and 100 grams of ham.",
+                mentions: [
+                  mention("bread", 100, {
+                    originalText: "100 grams of bread",
+                  }),
+                  mention("ham", 100, { originalText: "100 grams of ham" }),
+                ],
               }),
             },
           },
@@ -308,7 +344,7 @@ describe("AgentService", () => {
     );
   });
 
-  it("falls back to text parsing when model mentions omit a unit", async () => {
+  it("rejects malformed model mentions instead of parsing raw text", async () => {
     const { request } = buildTestApp({
       agentProvider: new FakeChatAgentProvider({
         toolCalls: [
@@ -355,18 +391,11 @@ describe("AgentService", () => {
       }),
     });
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(400);
     const body = (await res.json()) as {
-      kind: string;
-      proposal: { items: { name: string; quantity: number; unit: string }[] };
+      error: { code: string };
     };
-    expect(body.kind).toBe("proposal");
-    expect(body.proposal.items).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ name: "Bread", quantity: 100, unit: "g" }),
-        expect.objectContaining({ name: "Ham", quantity: 50, unit: "g" }),
-      ]),
-    );
+    expect(body.error.code).toBe("validation_error");
   });
 
   it("returns clarification instead of dropping unresolved ingredients", async () => {
@@ -380,6 +409,14 @@ describe("AgentService", () => {
               name: "propose_meal_log",
               arguments: JSON.stringify({
                 text: "Add 100 grams of bread and 100 grams of cheese.",
+                mentions: [
+                  mention("bread", 100, {
+                    originalText: "100 grams of bread",
+                  }),
+                  mention("cheese", 100, {
+                    originalText: "100 grams of cheese",
+                  }),
+                ],
               }),
             },
           },
@@ -420,7 +457,17 @@ describe("AgentService", () => {
             type: "function",
             function: {
               name: "propose_meal_log",
-              arguments: JSON.stringify({ text: "Add 1 rice" }),
+              arguments: JSON.stringify({
+                text: "Add 1 rice",
+                mentions: [
+                  mention("rice", 1, {
+                    originalText: "1 rice",
+                    unit: "rice",
+                    rawUnitText: "rice",
+                    unitKind: "implicit_count",
+                  }),
+                ],
+              }),
             },
           },
         ],
@@ -450,7 +497,7 @@ describe("AgentService", () => {
     );
   });
 
-  it("falls back to deterministic meal logging when the agent provider is unavailable", async () => {
+  it("returns a provider unavailable error when the agent provider is unavailable", async () => {
     const { request } = buildTestApp({
       agentProvider: new ThrowingChatAgentProvider(),
     });
@@ -464,19 +511,12 @@ describe("AgentService", () => {
       }),
     });
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(503);
     const body = (await res.json()) as {
-      kind: string;
-      options: Array<{ mention: { canonicalEnglishName: string } }>;
+      error: { code: string; message: string };
     };
-    expect(body.kind).toBe("clarification_required");
-    expect(body.options).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          mention: expect.objectContaining({ canonicalEnglishName: "cheese" }),
-        }),
-      ]),
-    );
+    expect(body.error.code).toBe("agent_provider_unavailable");
+    expect(body.error.message).toBe("An error ocurred. Please, try again.");
   });
 
   it("maps calories left to get_remaining_targets", async () => {
@@ -778,35 +818,25 @@ describe("AgentService", () => {
     const agentProvider = new QueueChatAgentProvider();
     const { request } = buildTestApp({ agentProvider });
     const { authHeader } = await registerAndAuth(request);
-    const proposal = await request(
-      "http://localhost/v1/actions/propose_meal_log/execute",
-      {
-        method: "POST",
-        headers: authHeader,
-        body: JSON.stringify({
-          input: {
-            text: "Add 100 grams of chicken breast and 100 grams of rice",
-          },
-          source: "flutter",
-        }),
-      },
-    ).then(
-      (response) =>
-        response.json() as Promise<{ output: { proposal: { id: string } } }>,
+    const proposal = await createProposalFromItems(
+      request,
+      authHeader,
+      [testChickenItem, testRiceItem],
+      "100 grams of chicken breast and 100 grams of rice",
     );
 
     agentProvider.push({
       toolCalls: [
-        {
-          id: "call_1",
-          type: "function",
-          function: {
-            name: "commit_meal",
-            arguments: JSON.stringify({
-              proposalId: proposal.output.proposal.id,
-            }),
+          {
+            id: "call_1",
+            type: "function",
+            function: {
+              name: "commit_meal",
+              arguments: JSON.stringify({
+                proposalId: proposal.id,
+              }),
+            },
           },
-        },
       ],
       rawResponse: {},
     });
@@ -1179,7 +1209,7 @@ describe("AgentService", () => {
     expect(agentProvider.messages[0]?.content).toContain(testBreadItem.name);
   });
 
-  it("falls back to a deterministic active proposal quantity revision when the provider is unavailable", async () => {
+  it("returns a provider unavailable error for active proposal revisions", async () => {
     const { request } = buildTestApp({
       agentProvider: new ThrowingChatAgentProvider(),
     });
@@ -1212,19 +1242,15 @@ describe("AgentService", () => {
       }),
     });
 
-    expect(revised.status).toBe(200);
+    expect(revised.status).toBe(503);
     const body = (await revised.json()) as {
-      kind: string;
-      proposal: { id: string; items: { name: string; quantity: number }[] };
+      error: { code: string; message: string };
     };
-    expect(body.kind).toBe("proposal");
-    expect(body.proposal.id).toBe(proposal.output.proposal.id);
-    expect(body.proposal.items[0]).toEqual(
-      expect.objectContaining({ name: "Bread", quantity: 200 }),
-    );
+    expect(body.error.code).toBe("agent_provider_unavailable");
+    expect(body.error.message).toBe("An error ocurred. Please, try again.");
   });
 
-  it("falls back to explicit add-item correction chunks when the model returns no tool call", async () => {
+  it("asks for clarification without changing the active proposal when the model returns no tool call", async () => {
     const { request } = buildTestApp({
       agentProvider: new FakeChatAgentProvider({
         toolCalls: [],
@@ -1252,18 +1278,18 @@ describe("AgentService", () => {
     expect(revised.status).toBe(200);
     const body = (await revised.json()) as {
       kind: string;
+      message: string;
       proposal: { id: string; items: Array<{ name: string; quantity: number }> };
     };
-    expect(body.kind).toBe("proposal");
+    expect(body.kind).toBe("clarification_required");
     expect(body.proposal.id).toBe(proposal.id);
     expect(body.proposal.items.map((item) => item.name)).toEqual([
       "Cooked rice",
-      "Bread",
-      "Butter",
     ]);
+    expect(body.message).toContain("could not safely apply");
   });
 
-  it("uses strict fallback for explicit add chunks and clarifies unresolved foods when the provider fails", async () => {
+  it("returns a provider unavailable error instead of applying add chunks when the provider fails", async () => {
     const { request } = buildTestApp({
       agentProvider: new ThrowingChatAgentProvider(),
     });
@@ -1285,40 +1311,15 @@ describe("AgentService", () => {
       }),
     });
 
-    expect(revised.status).toBe(200);
+    expect(revised.status).toBe(503);
     const body = (await revised.json()) as {
-      kind: string;
-      message: string;
-      proposal: { id: string; items: Array<{ name: string; quantity: number }> };
-      options?: Array<{ mention: { canonicalEnglishName?: string } }>;
-      candidateGroups?: Array<{ mention: { canonicalEnglishName?: string } }>;
+      error: { code: string; message: string };
     };
-    expect(body.kind).toBe("clarification_required");
-    expect(body.proposal.id).toBe(proposal.id);
-    expect(body.proposal.items.map((item) => item.name)).toEqual([
-      "Cooked rice",
-      "Butter",
-      "Bread",
-    ]);
-    expect(
-      body.proposal.items.filter((item) => item.name === "Cooked rice"),
-    ).toHaveLength(1);
-    expect(body.message).toContain("beef");
-    expect(body.options).toEqual([
-      expect.objectContaining({
-        mention: expect.objectContaining({ canonicalEnglishName: "beef" }),
-      }),
-    ]);
-    expect(body.candidateGroups).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          mention: expect.objectContaining({ canonicalEnglishName: "beef" }),
-        }),
-      ]),
-    );
+    expect(body.error.code).toBe("agent_provider_unavailable");
+    expect(body.error.message).toBe("An error ocurred. Please, try again.");
   });
 
-  it("does not mutate the proposal when strict fallback cannot account for the full correction", async () => {
+  it("returns a provider unavailable error for ambiguous corrections when the provider fails", async () => {
     const { request } = buildTestApp({
       agentProvider: new ThrowingChatAgentProvider(),
     });
@@ -1340,18 +1341,12 @@ describe("AgentService", () => {
       }),
     });
 
-    expect(revised.status).toBe(200);
+    expect(revised.status).toBe(503);
     const body = (await revised.json()) as {
-      kind: string;
-      message: string;
-      proposal: { id: string; items: Array<{ name: string; quantity: number }> };
+      error: { code: string; message: string };
     };
-    expect(body.kind).toBe("clarification_required");
-    expect(body.proposal.id).toBe(proposal.id);
-    expect(body.proposal.items).toEqual([
-      expect.objectContaining({ name: "Cooked rice", quantity: 100 }),
-    ]);
-    expect(body.message).toContain("could not safely apply");
+    expect(body.error.code).toBe("agent_provider_unavailable");
+    expect(body.error.message).toBe("An error ocurred. Please, try again.");
   });
 
   it("rejects unknown model-selected actions", async () => {

@@ -1,10 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { FoodMention } from "@cal-tracker/contracts";
 import {
-  DeterministicFoodTextExtractor,
   FoodResolver,
   LocalFoodDataProvider,
-  OpenRouterFoodTextExtractor,
   scoreUsdaCandidate,
   type FoodDataProvider,
 } from "../nutrition/foodResolver.js";
@@ -24,7 +22,11 @@ function testFoodRepository(): InMemoryRepository {
   return repository;
 }
 
-function mention(name: string, originalText = name): FoodMention {
+function mention(
+  name: string,
+  originalText = name,
+  overrides: Partial<FoodMention> = {},
+): FoodMention {
   return {
     originalText,
     canonicalName: name,
@@ -35,6 +37,7 @@ function mention(name: string, originalText = name): FoodMention {
     unitKind: "metric",
     confidence: 0.95,
     marketProduct: false,
+    ...overrides,
   };
 }
 
@@ -210,17 +213,11 @@ describe("FoodResolver candidate groups", () => {
         }));
       },
     };
-    const resolver = new FoodResolver(
-      {
-        async extract() {
-          return [mention("candidate")];
-        },
-      },
-      provider,
-      0.75,
-    );
+    const resolver = new FoodResolver(provider, 0.75);
 
-    const result = await resolver.resolveMealText("user-1", "candidate");
+    const result = await resolver.resolveMealMentions("user-1", [
+      mention("candidate"),
+    ]);
 
     expect(result.candidateGroups).toHaveLength(1);
     expect(result.candidateGroups[0]!.candidates).toHaveLength(10);
@@ -286,17 +283,11 @@ describe("FoodResolver candidate groups", () => {
         ];
       },
     };
-    const resolver = new FoodResolver(
-      {
-        async extract() {
-          return [mention("candidate")];
-        },
-      },
-      provider,
-      0.75,
-    );
+    const resolver = new FoodResolver(provider, 0.75);
 
-    const result = await resolver.resolveMealText("user-1", "candidate");
+    const result = await resolver.resolveMealMentions("user-1", [
+      mention("candidate"),
+    ]);
 
     expect(result.candidateGroups[0]!.candidates.map((item) => item.name)).toEqual(
       ["Best probability", "Middle probability", "Lexical favorite"],
@@ -311,143 +302,6 @@ describe("FoodResolver candidate groups", () => {
 });
 
 describe("FoodResolver", () => {
-  it("extracts every metric item in comma-separated ingredient lists", async () => {
-    const mentions = await new DeterministicFoodTextExtractor().extract(
-      "Add 100 grams of chicken, 100 grams of rice and 100 grams of meat.",
-    );
-
-    expect(mentions).toHaveLength(3);
-    expect(mentions).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          originalText: "chicken",
-          canonicalName: "chicken",
-          canonicalEnglishName: "chicken",
-          language: "en",
-          quantity: 100,
-          unit: "g",
-        }),
-        expect.objectContaining({
-          originalText: "rice",
-          canonicalName: "rice",
-          canonicalEnglishName: "rice",
-          language: "en",
-          quantity: 100,
-          unit: "g",
-        }),
-        expect.objectContaining({
-          originalText: "meat",
-          canonicalName: "meat",
-          canonicalEnglishName: "meat",
-          language: "en",
-          quantity: 100,
-          unit: "g",
-        }),
-      ]),
-    );
-  });
-
-  it("extracts Spanish quantities without translating food names in deterministic fallback", async () => {
-    const mentions = await new DeterministicFoodTextExtractor().extract(
-      "Añade a mi desayuno 100 gramos de pan y 100 gramos de jamón.",
-    );
-
-    expect(mentions).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          originalText: "pan",
-          canonicalName: "pan",
-          canonicalEnglishName: "pan",
-          language: "es",
-          quantity: 100,
-          unit: "g",
-        }),
-        expect.objectContaining({
-          originalText: "jamon",
-          canonicalName: "jamon",
-          canonicalEnglishName: "jamon",
-          language: "es",
-          quantity: 100,
-          unit: "g",
-        }),
-      ]),
-    );
-  });
-
-  it("inherits the previous metric unit for same-list quantities without units", async () => {
-    const mentions = await new DeterministicFoodTextExtractor().extract(
-      "Añade 300 gramos de pollo y 200 de pan.",
-    );
-
-    expect(mentions).toHaveLength(2);
-    expect(mentions).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          canonicalName: "pollo",
-          language: "es",
-          quantity: 300,
-          unit: "g",
-          unitKind: "metric",
-        }),
-        expect.objectContaining({
-          originalText: "200 de pan",
-          canonicalName: "pan",
-          language: "es",
-          quantity: 200,
-          unit: "g",
-          rawUnitText: "gramos",
-          unitKind: "metric",
-        }),
-      ]),
-    );
-  });
-
-  it("does not inherit metric units for ordinary count foods", async () => {
-    const mentions = await new DeterministicFoodTextExtractor().extract(
-      "Añade 300 gramos de pollo y 2 huevos.",
-    );
-
-    expect(mentions).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          canonicalName: "pollo",
-          quantity: 300,
-          unit: "g",
-        }),
-        expect.objectContaining({
-          canonicalName: "huevo",
-          quantity: 2,
-          unitKind: "implicit_count",
-        }),
-      ]),
-    );
-    expect(
-      mentions.find((mention) => mention.canonicalName === "huevo")?.unit,
-    ).not.toBe("g");
-  });
-
-  it("does not include polite trailing text in the canonical food name", async () => {
-    const mentions = await new DeterministicFoodTextExtractor().extract(
-      "Añádeme 200 gramos de pechuga de pollo y 300 gramos de arroz por favor",
-    );
-
-    expect(mentions).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          canonicalName: "pechuga pollo",
-          quantity: 200,
-          unit: "g",
-        }),
-        expect.objectContaining({
-          originalText: "arroz por favor",
-          canonicalName: "arroz",
-          quantity: 300,
-          unit: "g",
-        }),
-      ]),
-    );
-  });
-
   it("keeps Open Food Facts products out of generic search and available in market search", async () => {
     const repository = InMemoryRepository.seeded();
     await repository.upsertFoodItem({
@@ -712,14 +566,13 @@ describe("FoodResolver", () => {
         });
       }
       const resolver = new FoodResolver(
-        new DeterministicFoodTextExtractor(),
         new LocalFoodDataProvider(repository),
         0.75,
       );
 
-      const result = await resolver.resolveMealText(
+      const result = await resolver.resolveMealMentions(
         "user-1",
-        `Add 100 grams of ${query}`,
+        [mention(query, `100 grams of ${query}`)],
         "en-US",
       );
 
@@ -731,7 +584,7 @@ describe("FoodResolver", () => {
     },
   );
 
-  it("infers Spanish for deterministic fallback before local food search", async () => {
+  it("uses structured mention language before local food search", async () => {
     const repository = InMemoryRepository.seeded();
     await repository.upsertFoodItem({
       name: "Game meat, bison, ground, cooked, pan-broiled",
@@ -763,14 +616,19 @@ describe("FoodResolver", () => {
       fatGrams: 3.8,
     });
     const resolver = new FoodResolver(
-      new DeterministicFoodTextExtractor(),
       new LocalFoodDataProvider(repository),
       0.65,
     );
 
-    const result = await resolver.resolveMealText(
+    const result = await resolver.resolveMealMentions(
       "user-1",
-      "Añádeme 200 gramos de pan",
+      [
+        mention("pan", "200 gramos de pan", {
+          language: "es",
+          quantity: 200,
+          rawUnitText: "gramos",
+        }),
+      ],
     );
 
     expect(result.clarificationRequired).toBe(false);
@@ -785,107 +643,21 @@ describe("FoodResolver", () => {
     expect(result.candidateGroups[0]?.mention.language).toBe("es");
   });
 
-  it("extracts count-based egg units in Spanish and English", async () => {
-    const extractor = new DeterministicFoodTextExtractor();
-
-    await expect(extractor.extract("Añade un huevo")).resolves.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          originalText: "un huevo",
-          canonicalEnglishName: "huevo",
-          quantity: 1,
-          unit: "egg",
-          rawUnitText: "huevo",
-          unitKind: "implicit_count",
-        }),
-      ]),
-    );
-    await expect(extractor.extract("Add one egg")).resolves.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          originalText: "one egg",
-          canonicalEnglishName: "egg",
-          quantity: 1,
-          unit: "egg",
-          rawUnitText: "egg",
-          unitKind: "implicit_count",
-        }),
-      ]),
-    );
-    await expect(extractor.extract("Add 2 eggs")).resolves.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          originalText: "2 eggs",
-          canonicalEnglishName: "egg",
-          quantity: 2,
-          unit: "egg",
-          rawUnitText: "eggs",
-          unitKind: "implicit_count",
-        }),
-      ]),
-    );
-    await expect(extractor.extract("Add one XL egg")).resolves.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          originalText: "one xl egg",
-          canonicalEnglishName: "egg",
-          quantity: 1,
-          unit: "egg",
-          portionDescriptor: "extra large",
-        }),
-      ]),
-    );
-    await expect(extractor.extract("Add 2 small bananas")).resolves.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          originalText: "2 small bananas",
-          canonicalEnglishName: "banana",
-          quantity: 2,
-          unit: "bananas",
-          portionDescriptor: "small",
-        }),
-      ]),
-    );
-  });
-
-  it("extracts household portions and unsupported implicit counts without validating them", async () => {
-    const extractor = new DeterministicFoodTextExtractor();
-
-    await expect(extractor.extract("Add 1 cup rice")).resolves.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          originalText: "1 cup rice",
-          canonicalEnglishName: "rice",
-          quantity: 1,
-          unit: "cup",
-          rawUnitText: "cup",
-          unitKind: "household",
-        }),
-      ]),
-    );
-    await expect(extractor.extract("Add 1 rice")).resolves.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          originalText: "1 rice",
-          canonicalEnglishName: "rice",
-          quantity: 1,
-          unit: "rice",
-          rawUnitText: "rice",
-          unitKind: "implicit_count",
-        }),
-      ]),
-    );
-  });
-
   it("rejects unsupported bare count units instead of defaulting to grams", async () => {
     const repository = testFoodRepository();
     const resolver = new FoodResolver(
-      new DeterministicFoodTextExtractor(),
       new LocalFoodDataProvider(repository),
       0.75,
     );
 
-    const result = await resolver.resolveMealText("user-1", "Add 1 rice");
+    const result = await resolver.resolveMealMentions("user-1", [
+      mention("rice", "1 rice", {
+        quantity: 1,
+        unit: "rice",
+        rawUnitText: "rice",
+        unitKind: "implicit_count",
+      }),
+    ]);
 
     expect(result.clarificationRequired).toBe(true);
     expect(result.items).toHaveLength(0);
@@ -939,12 +711,18 @@ describe("FoodResolver", () => {
       ],
     });
     const resolver = new FoodResolver(
-      new DeterministicFoodTextExtractor(),
       new LocalFoodDataProvider(repository),
       0.75,
     );
 
-    const result = await resolver.resolveMealText("user-1", "Add 1 cup rice");
+    const result = await resolver.resolveMealMentions("user-1", [
+      mention("rice", "1 cup rice", {
+        quantity: 1,
+        unit: "cup",
+        rawUnitText: "cup",
+        unitKind: "household",
+      }),
+    ]);
 
     expect(globalThis.fetch).not.toHaveBeenCalled();
     expect(result.clarificationRequired).toBe(false);
@@ -1000,15 +778,13 @@ describe("FoodResolver", () => {
       fatGrams: 3.6,
     });
     const resolver = new FoodResolver(
-      new DeterministicFoodTextExtractor(),
       new LocalFoodDataProvider(repository),
       0.75,
     );
 
-    const result = await resolver.resolveMealText(
-      "user-1",
-      "Add 100 grams chicken breast",
-    );
+    const result = await resolver.resolveMealMentions("user-1", [
+      mention("chicken breast", "100 grams chicken breast"),
+    ]);
 
     expect(result.clarificationRequired).toBe(false);
     expect(result.items[0]).toEqual(
@@ -1038,7 +814,6 @@ describe("FoodResolver", () => {
       fatGrams: 3.2,
     });
     const resolver = new FoodResolver(
-      new DeterministicFoodTextExtractor(),
       new LocalFoodDataProvider(repository),
       0.75,
     );
@@ -1079,12 +854,13 @@ describe("FoodResolver", () => {
       fatGrams: 25,
     });
     const resolver = new FoodResolver(
-      new DeterministicFoodTextExtractor(),
       new LocalFoodDataProvider(repository),
       0.75,
     );
 
-    const generic = await resolver.resolveMealText("user-1", "Add 100 grams cheese");
+    const generic = await resolver.resolveMealMentions("user-1", [
+      mention("cheese", "100 grams cheese"),
+    ]);
     expect(generic.clarificationRequired).toBe(true);
     expect(generic.items).toHaveLength(0);
 
@@ -1101,15 +877,13 @@ describe("FoodResolver", () => {
   it("keeps gram-based egg quantities when the user gives grams", async () => {
     const repository = testFoodRepository();
     const resolver = new FoodResolver(
-      new DeterministicFoodTextExtractor(),
       new LocalFoodDataProvider(repository),
       0.75,
     );
 
-    const result = await resolver.resolveMealText(
-      "user-1",
-      "Add 100 grams of egg.",
-    );
+    const result = await resolver.resolveMealMentions("user-1", [
+      mention("egg", "100 grams of egg"),
+    ]);
 
     expect(result.clarificationRequired).toBe(false);
     expect(result.items[0]).toEqual(
@@ -1125,15 +899,14 @@ describe("FoodResolver", () => {
   it("does not silently create a partial proposal when one extracted ingredient is unresolved", async () => {
     const repository = testFoodRepository();
     const resolver = new FoodResolver(
-      new DeterministicFoodTextExtractor(),
       new LocalFoodDataProvider(repository),
       0.75,
     );
 
-    const result = await resolver.resolveMealText(
-      "user-1",
-      "Add 100 grams of bread and 100 grams of cheese.",
-    );
+    const result = await resolver.resolveMealMentions("user-1", [
+      mention("bread", "100 grams of bread"),
+      mention("cheese", "100 grams of cheese"),
+    ]);
 
     expect(result.clarificationRequired).toBe(true);
     expect(result.items).toHaveLength(1);

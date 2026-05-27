@@ -18,11 +18,9 @@ export interface NutritionProvider {
     barcode?: string,
     locale?: string,
   ): Promise<MealItem[] | NutritionSearchResult>;
-  estimateMeal(userId: string, text: string): Promise<MealItem[]>;
 }
 
-export interface MealTextResolutionProvider extends NutritionProvider {
-  resolveMealText(userId: string, text: string, locale?: string): Promise<FoodResolutionResult>;
+export interface MealMentionResolutionProvider extends NutritionProvider {
   resolveMealMentions(
     userId: string,
     mentions: FoodMention[],
@@ -30,7 +28,7 @@ export interface MealTextResolutionProvider extends NutritionProvider {
   ): Promise<FoodResolutionResult>;
 }
 
-export class ResolverNutritionProvider implements MealTextResolutionProvider {
+export class ResolverNutritionProvider implements MealMentionResolutionProvider {
   constructor(private readonly resolver: FoodResolver) {}
 
   search(
@@ -40,15 +38,6 @@ export class ResolverNutritionProvider implements MealTextResolutionProvider {
     locale?: string,
   ): Promise<NutritionSearchResult> {
     return this.resolver.search(userId, query, barcode, locale);
-  }
-
-  async estimateMeal(userId: string, text: string): Promise<MealItem[]> {
-    const result = await this.resolver.resolveMealText(userId, text);
-    return result.clarificationRequired ? [] : result.items;
-  }
-
-  resolveMealText(userId: string, text: string, locale?: string): Promise<FoodResolutionResult> {
-    return this.resolver.resolveMealText(userId, text, locale);
   }
 
   resolveMealMentions(

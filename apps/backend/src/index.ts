@@ -6,7 +6,6 @@ import { OpenRouterEmbeddingProvider } from "./embeddings/provider.js";
 import { createApp } from "./http/app.js";
 import { MemoryRetrievalService } from "./memory/retrieval.js";
 import {
-  DeterministicFoodTextExtractor,
   FoodResolver,
   LocalFoodDataProvider,
 } from "./nutrition/foodResolver.js";
@@ -26,7 +25,6 @@ const embeddingProvider = config.EMBEDDINGS_ENABLED
     )
   : undefined;
 const foodResolver = new FoodResolver(
-  new DeterministicFoodTextExtractor(),
   new LocalFoodDataProvider(repository),
   config.FOOD_RESOLVER_MIN_CONFIDENCE,
 );

@@ -107,7 +107,23 @@ describe("STT endpoint", () => {
             type: "function",
             function: {
               name: "propose_meal_log",
-              arguments: JSON.stringify({ text: "100 grams bread" }),
+              arguments: JSON.stringify({
+                text: "100 grams bread",
+                mentions: [
+                  {
+                    originalText: "100 grams bread",
+                    canonicalName: "bread",
+                    canonicalEnglishName: "bread",
+                    language: "en",
+                    quantity: 100,
+                    unit: "g",
+                    rawUnitText: "grams",
+                    unitKind: "metric",
+                    confidence: 0.95,
+                    marketProduct: false,
+                  },
+                ],
+              }),
             },
           },
         ],
@@ -262,7 +278,7 @@ describe("STT endpoint", () => {
     expect(agentProvider.calls).toBe(0);
   });
 
-  it("returns the transcript when the agent fails after transcription", async () => {
+  it("returns an action validation error when the agent selects invalid tool arguments", async () => {
     const { request } = buildTestApp({
       sttProvider: new FakeSpeechToTextProvider(
         "300 grams of chicken and 200 of bread",
@@ -292,11 +308,10 @@ describe("STT endpoint", () => {
       body,
     });
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.transcript).toBe("300 grams of chicken and 200 of bread");
-    expect(json.result.kind).toBe("clarification_required");
-    expect(json.result.message).toContain("I heard the recording");
+    expect(json.error.code).toBe("validation_error");
+    expect(json.error.message).toBe("Invalid request");
   });
 
   it("does not return raw provider errors to clients", async () => {

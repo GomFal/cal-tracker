@@ -391,55 +391,15 @@ export function createApp(input: {
     }
 
     const transcript = transcription.text;
-    let mealInput: MealInputRunResult;
-    try {
-      mealInput = await runMealInput({
-        c,
-        user,
-        text: transcript,
-        source: upload.source ?? "flutter",
-        inputMode: "voice",
-        activeProposalId: upload.activeProposalId,
-        activeProposal: activeProposal ?? null,
-      });
-    } catch (error) {
-      const fallbackResult = {
-        kind: "clarification_required" as const,
-        ...(activeProposal ? { proposal: activeProposal } : {}),
-        message:
-          "I heard the recording, but could not turn it into a meal. Please try recording again or rephrase it.",
-        options: [],
-      } satisfies AgentRunResult;
-      await logLocalRun(runLogger, {
-        type: "voice.meal_run",
-        traceId,
-        userId: user.id,
-        source: upload.source ?? "flutter",
-        audio: {
-          filename: upload.filename,
-          mimeType: upload.mimeType,
-          bytes: upload.buffer.byteLength,
-        },
-        transcript,
-        provider: transcription.provider,
-        model: transcription.model,
-        errorStage: "agent",
-        error: summarizeError(error),
-        resultKind: fallbackResult.kind,
-        timingsMs: {
-          stt: sttMs,
-          agent: Date.now() - routeStarted - sttMs,
-          total: Date.now() - routeStarted,
-        },
-      });
-      return c.json({
-        transcript,
-        provider: transcription.provider,
-        model: transcription.model,
-        traceId,
-        result: fallbackResult,
-      });
-    }
+    const mealInput = await runMealInput({
+      c,
+      user,
+      text: transcript,
+      source: upload.source ?? "flutter",
+      inputMode: "voice",
+      activeProposalId: upload.activeProposalId,
+      activeProposal: activeProposal ?? null,
+    });
 
     console.info("voice.meal_run.completed", {
       traceId,

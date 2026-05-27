@@ -25,7 +25,7 @@ import {
 } from "@cal-tracker/contracts";
 import type { AppConfig } from "../config/env.js";
 import type {
-  MealTextResolutionProvider,
+  MealMentionResolutionProvider,
   NutritionProvider,
   NutritionSearchResult,
 } from "../nutrition/provider.js";
@@ -393,8 +393,32 @@ export class ActionExecutor {
       parsed.mentions && parsed.mentions.length > 0 ? parsed.mentions : null;
     const inputMode = providedMentions
       ? "model_mentions"
-      : "deterministic_fallback";
+      : "structured_mentions_required";
     markPhase("parse_and_normalize", parseStarted);
+
+    if (!providedMentions) {
+      return {
+        clarificationRequired: true,
+        resolvedItems: [],
+        unresolvedMentions: [],
+        options: [],
+        candidateGroups: [],
+        message:
+          "I could not identify the ingredients in that meal. Please add quantities and food names.",
+        instrumentation: {
+          action: "propose_meal_log",
+          path: "structured_mentions_required",
+          inputMode,
+          usedTemplate: false,
+          memoryMatches: 0,
+          resolvedItems: 0,
+          unresolvedMentions: 0,
+          candidateGroups: 0,
+          phasesMs: phases,
+          totalMs: Date.now() - started,
+        },
+      };
+    }
 
     const memoryStarted = Date.now();
     const memories = (await withSpan(
@@ -412,23 +436,15 @@ export class ActionExecutor {
     const resolutionStarted = Date.now();
     const resolution = template
       ? null
-      : providedMentions
-        ? await withSpan(
-            "ActionExecutor.proposeMeal.resolveProvidedMentions",
-            { mentionCount: providedMentions.length },
-            () => this.resolveMealMentions(context.actorUserId, providedMentions, context.locale),
-          )
-        : await withSpan(
-            "ActionExecutor.proposeMeal.resolveMealText",
-            { textChars: parsed.text.length },
-            () => this.resolveMealText(context.actorUserId, parsed.text, context.locale),
-          );
+      : await withSpan(
+          "ActionExecutor.proposeMeal.resolveProvidedMentions",
+          { mentionCount: providedMentions.length },
+          () => this.resolveMealMentions(context.actorUserId, providedMentions, context.locale),
+        );
     markPhase(
       template
-        ? "resolve_meal_text_skipped_template"
-        : providedMentions
-          ? "resolve_provided_mentions"
-          : "resolve_meal_text",
+        ? "resolve_mentions_skipped_template"
+        : "resolve_provided_mentions",
       resolutionStarted,
     );
     if (resolution?.clarificationRequired) {
@@ -486,21 +502,11 @@ export class ActionExecutor {
     const itemStarted = Date.now();
     const items: MealItem[] = template
       ? template.items
-      : (resolution?.items ??
-        (await withSpan(
-          "ActionExecutor.proposeMeal.estimateMeal",
-          undefined,
-          () => this.nutritionProvider.estimateMeal(
-            context.actorUserId,
-            parsed.text,
-          ),
-        )));
+      : resolution!.items;
     markPhase(
       template
         ? "select_template_items"
-        : resolution?.items
-          ? "select_resolved_items"
-          : "estimate_meal",
+        : "select_resolved_items",
       itemStarted,
     );
     const nutritionStarted = Date.now();
@@ -631,20 +637,8 @@ export class ActionExecutor {
     return { proposal };
   }
 
-  private async resolveMealText(userId: string, text: string, locale?: string) {
-    if (hasMealTextResolution(this.nutritionProvider)) {
-      return this.nutritionProvider.resolveMealText(userId, text, locale);
-    }
-    return {
-      items: await this.nutritionProvider.estimateMeal(userId, text),
-      unresolvedMentions: [],
-      candidateGroups: [],
-      clarificationRequired: false,
-    };
-  }
-
   private async resolveMealMentions(userId: string, mentions: FoodMention[], locale?: string) {
-    if (hasMealTextResolution(this.nutritionProvider)) {
+    if (hasMealMentionResolution(this.nutritionProvider)) {
       return this.nutritionProvider.resolveMealMentions(userId, mentions, locale);
     }
     return {
@@ -965,11 +959,11 @@ export class ActionExecutor {
   }
 }
 
-function hasMealTextResolution(
+function hasMealMentionResolution(
   provider: NutritionProvider,
-): provider is MealTextResolutionProvider {
+): provider is MealMentionResolutionProvider {
   return (
-    typeof (provider as Partial<MealTextResolutionProvider>).resolveMealText ===
+    typeof (provider as Partial<MealMentionResolutionProvider>).resolveMealMentions ===
     "function"
   );
 }

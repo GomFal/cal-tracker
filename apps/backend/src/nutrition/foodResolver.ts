@@ -21,10 +21,6 @@ export type FoodSearchResult = {
   candidateGroups: FoodCandidateGroup[];
 };
 
-export interface FoodTextExtractor {
-  extract(text: string): Promise<FoodMention[]>;
-}
-
 export interface FoodDataProvider {
   readonly id: string;
   resolve(
@@ -72,18 +68,18 @@ function canonicalNameForMention(mention: FoodMention): string {
   );
 }
 
-function canonicalEnglishFallbackName(mention: FoodMention): string | undefined {
+function canonicalEnglishSearchName(mention: FoodMention): string | undefined {
   if (!mention.canonicalEnglishName) return undefined;
-  const fallback = normalizeFoodName(mention.canonicalEnglishName);
-  return fallback && fallback !== canonicalNameForMention(mention)
-    ? fallback
+  const searchName = normalizeFoodName(mention.canonicalEnglishName);
+  return searchName && searchName !== canonicalNameForMention(mention)
+    ? searchName
     : undefined;
 }
 
 function searchQueriesForMention(mention: FoodMention): string[] {
   const queries = [
     canonicalNameForMention(mention),
-    canonicalEnglishFallbackName(mention),
+    canonicalEnglishSearchName(mention),
   ].filter((query): query is string => Boolean(query));
   return [...new Set(queries)];
 }
@@ -102,29 +98,9 @@ function mentionForSearchQuery(
 
 export class FoodResolver {
   constructor(
-    private readonly extractor: FoodTextExtractor,
     private readonly provider: FoodDataProvider,
     private readonly minConfidence: number,
   ) {}
-
-  async resolveMealText(
-    userId: string,
-    text: string,
-    locale?: string,
-  ): Promise<FoodResolutionResult> {
-    return withSpan(
-      "FoodResolver.resolveMealText",
-      { textChars: text.length, locale },
-      async () => {
-        const mentions = await withSpan(
-          "FoodTextExtractor.extract",
-          undefined,
-          () => this.extractor.extract(text),
-        );
-        return this.resolveMealMentions(userId, mentions, locale);
-      },
-    );
-  }
 
   async resolveMealMentions(
     userId: string,
@@ -324,106 +300,6 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
-export class DeterministicFoodTextExtractor implements FoodTextExtractor {
-  async extract(text: string): Promise<FoodMention[]> {
-    const normalized = normalizeText(text);
-    const language = inferDeterministicFoodLanguage(normalized);
-    const measuredMentions = extractQuantityMentions(normalized, language);
-    const contextualMentions = extractContextualMetricMentions(
-      normalized,
-      language,
-    );
-    const contextualKeys = new Set(
-      contextualMentions.map(quantityFoodMentionKey),
-    );
-    const countedMentions = extractCountMentions(normalized, language).filter(
-      (mention) => !contextualKeys.has(quantityFoodMentionKey(mention)),
-    );
-    return mergeDuplicateMentions([
-      ...measuredMentions,
-      ...contextualMentions,
-      ...countedMentions,
-    ]);
-  }
-}
-
-export class OpenRouterFoodTextExtractor implements FoodTextExtractor {
-  constructor(
-    private readonly apiKey: string,
-    private readonly model: string,
-    private readonly baseUrl = "https://openrouter.ai/api/v1",
-    private readonly timeoutMs = 25000,
-  ) {}
-
-  async extract(text: string): Promise<FoodMention[]> {
-    let response: Response;
-    try {
-      response = await fetch(`${this.baseUrl}/chat/completions`, {
-        method: "POST",
-        signal: timeoutSignal(this.timeoutMs),
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: this.model,
-          response_format: { type: "json_object" },
-          messages: [
-            {
-              role: "system",
-              content: [
-                "Extract foods from meal text as strict JSON.",
-                "For every food, preserve the user's exact food phrase in originalText.",
-                "Normalize each food name in the same language as the meal text in canonicalName.",
-                "Include language as an ISO 639-1 code when clear.",
-                "Optionally include canonicalEnglishName as an English fallback search term, but do not replace canonicalName with English unless the user wrote English.",
-                "Use common generic food names, not brands, recipes, or nutrition estimates.",
-                'Return {"mentions":[{"originalText":"...","canonicalName":"...","canonicalEnglishName":"...","language":"es","quantity":100,"unit":"g","rawUnitText":"grams","unitKind":"metric","portionDescriptorRaw":"extra large","portionDescriptor":"extra large","confidence":0.9,"marketProduct":false}]}',
-                "Use the text only to parse quantity, raw unit, and food name; do not decide whether a non-metric unit is valid.",
-                "Use grams when the user gives gram quantities.",
-                "In same-list phrases like '300 gramos de pollo y 200 de pan', reuse the last explicit unit and parse the second item as 200 grams of bread.",
-                "Use household for explicit measures like cup, tbsp, slice, breast, or egg.",
-                "Use implicit_count when the user gives only a number and food name, for example one egg, 1 banana, or 1 rice.",
-                "Preserve count-size descriptors such as small, medium, large, extra large, XL, and jumbo.",
-                "Do not invent nutrition values or calories.",
-              ].join(" "),
-            },
-            { role: "user", content: text },
-          ],
-        }),
-      });
-    } catch {
-      return [];
-    }
-    if (!response.ok) return [];
-    const json = (await response.json()) as {
-      choices?: Array<{ message?: { content?: string | null } }>;
-    };
-    const content = json.choices?.[0]?.message?.content;
-    if (!content) return [];
-    try {
-      const parsed = JSON.parse(content) as { mentions?: unknown[] };
-      return (parsed.mentions ?? [])
-        .map(parseMention)
-        .filter((mention): mention is FoodMention => Boolean(mention));
-    } catch {
-      return [];
-    }
-  }
-}
-
-export class CompositeFoodTextExtractor implements FoodTextExtractor {
-  constructor(private readonly extractors: FoodTextExtractor[]) {}
-
-  async extract(text: string): Promise<FoodMention[]> {
-    for (const extractor of this.extractors) {
-      const mentions = await extractor.extract(text);
-      if (mentions.length > 0) return mentions;
-    }
-    return [];
-  }
-}
-
 export class LocalFoodDataProvider implements FoodDataProvider {
   readonly id = "local";
   private readonly searchCache = new Map<string, Array<FoodItemRecord & Partial<FoodSearchCandidate>>>();
@@ -608,189 +484,6 @@ function localFoodPriority(food: FoodItemRecord, mention: FoodMention): number {
   if (food.dataType === "Foundation") return 3;
   if (isBrandedFood(food)) return 6;
   return 4;
-}
-
-function extractQuantityMentions(
-  text: string,
-  language?: string,
-): FoodMention[] {
-  const mentions: FoodMention[] = [];
-  const metricUnitPattern =
-    "g|gr|gramo|gramos|gram|grams|kg|kilogram|kilograms|kilo|kilos|oz|ounce|ounces";
-  const unit = `(${metricUnitPattern})`;
-  const followingMetricQuantity =
-    `\\s+\\d+(?:[\\.,]\\d+)?\\s*(?:${metricUnitPattern})\\b`;
-  const quantityBefore = new RegExp(
-    `(\\d+(?:[\\.,]\\d+)?)\\s*${unit}\\b\\s*(?:de\\s+|of\\s+)?([a-z][a-z\\s]{0,40}?)(?=\\s+(?:y|and)\\s+|${followingMetricQuantity}|,|\\.|$)`,
-    "g",
-  );
-  for (const match of text.matchAll(quantityBefore)) {
-    const quantity = normalizeQuantity(
-      Number(match[1]!.replace(",", ".")),
-      match[2]!,
-    );
-    const unitValue = normalizeUnit(match[2]!);
-    const originalText = match[3]!.trim();
-    mentions.push(
-      buildMention(
-        originalText,
-        quantity,
-        unitValue,
-        match[2],
-        "metric",
-        originalText,
-        language,
-      ),
-    );
-  }
-
-  const householdUnit = householdUnitPattern();
-  const countPattern = countTokenPattern();
-  const householdBefore = new RegExp(
-    `\\b(${countPattern})\\s+(${householdUnit})\\b\\s*(?:de\\s+|of\\s+)?([a-z][a-z\\s]{0,40}?)(?=\\s+(?:y|and)\\s+|,|\\.|$)`,
-    "g",
-  );
-  for (const match of text.matchAll(householdBefore)) {
-    const quantity = parseCountToken(match[1]!);
-    if (!quantity) continue;
-    const rawUnitText = match[2]!;
-    const foodText = match[3]!.trim();
-    mentions.push(
-      buildMention(
-        foodText,
-        quantity,
-        normalizeUnit(rawUnitText, normalizeFoodName(foodText)),
-        rawUnitText,
-        "household",
-        `${match[1]} ${rawUnitText} ${foodText}`,
-        language,
-      ),
-    );
-  }
-  return mergeDuplicateMentions(mentions);
-}
-
-function extractContextualMetricMentions(
-  text: string,
-  language?: string,
-): FoodMention[] {
-  const mentions: FoodMention[] = [];
-  const metricUnitPattern =
-    "g|gr|gramo|gramos|gram|grams|kg|kilogram|kilograms|kilo|kilos|oz|ounce|ounces";
-  const segment = new RegExp(
-    `\\b(\\d+(?:[\\.,]\\d+)?)(?:\\s*(${metricUnitPattern})\\b)?\\s+(?:de|of)\\s+([a-z][a-z\\s]{0,40}?)(?=\\s+(?:y|and)\\s+\\d|,\\s*\\d|\\.|$)`,
-    "g",
-  );
-  let inheritedUnit: string | null = null;
-  for (const match of text.matchAll(segment)) {
-    const rawUnitText = match[2];
-    if (rawUnitText) {
-      inheritedUnit = rawUnitText;
-      continue;
-    }
-    if (!inheritedUnit) continue;
-    const quantity = normalizeQuantity(
-      Number(match[1]!.replace(",", ".")),
-      inheritedUnit,
-    );
-    if (!Number.isFinite(quantity) || quantity <= 0) continue;
-    const foodText = match[3]!.trim();
-    if (!foodText) continue;
-    mentions.push(
-      buildMention(
-        foodText,
-        quantity,
-        normalizeUnit(inheritedUnit),
-        inheritedUnit,
-        "metric",
-        match[0]!.trim(),
-        language,
-      ),
-    );
-  }
-  return mergeDuplicateMentions(mentions);
-}
-
-function extractCountMentions(text: string, language?: string): FoodMention[] {
-  const mentions: FoodMention[] = [];
-  const countPattern = countTokenPattern();
-  const descriptorPattern = portionDescriptorPattern();
-  const pattern = new RegExp(
-    `\\b(${countPattern})\\s+(?:(${descriptorPattern})\\s+)?(?:de\\s+|of\\s+)?([a-z][a-z\\s]{0,40}?)(?=\\s+(?:y|and)\\s+|,|\\.|$)`,
-    "g",
-  );
-  for (const match of text.matchAll(pattern)) {
-    const quantity = parseCountToken(match[1]!);
-    if (!quantity) continue;
-    const portionDescriptorRaw = match[2]?.trim();
-    const portionDescriptor = normalizePortionDescriptor(portionDescriptorRaw);
-    const foodText = match[3]!.trim();
-    const firstFoodToken = normalizeText(foodText).split(" ")[0] ?? "";
-    if (metricUnits.has(firstFoodToken) || countPrefixUnits.has(firstFoodToken))
-      continue;
-    const canonical = normalizeFoodName(foodText);
-    mentions.push({
-      originalText: [match[1], portionDescriptorRaw, foodText]
-        .filter(Boolean)
-        .join(" "),
-      canonicalName: canonical,
-      canonicalEnglishName: canonical,
-      quantity,
-      unit: normalizeUnit(foodText, canonical),
-      rawUnitText: foodText,
-      unitKind: "implicit_count",
-      portionDescriptorRaw,
-      portionDescriptor,
-      confidence: 0.86,
-      marketProduct: false,
-      ...(language ? { language } : {}),
-    });
-  }
-  return mergeDuplicateMentions(mentions);
-}
-
-function quantityFoodMentionKey(mention: FoodMention): string {
-  return `${canonicalNameForMention(mention)}:${mention.quantity}`;
-}
-
-function buildMention(
-  foodText: string,
-  quantity: number,
-  unit: string,
-  rawUnitText: string,
-  unitKind: UnitKind,
-  originalText = foodText,
-  language?: string,
-): FoodMention {
-  const canonicalName = normalizeFoodName(foodText);
-  return {
-    originalText,
-    canonicalName,
-    canonicalEnglishName: canonicalName,
-    quantity,
-    unit,
-    rawUnitText,
-    unitKind,
-    confidence: unitKind === "metric" || unitKind === "household" ? 0.86 : 0.78,
-    marketProduct: false,
-    ...(language ? { language } : {}),
-  };
-}
-
-function inferDeterministicFoodLanguage(text: string): "es" | "en" | undefined {
-  if (
-    /\b(anade|anademe|agrega|agregame|gramo|gramos|kilo|kilos|taza|tazas|cucharada|cucharadas|cucharadita|cucharaditas|rebanada|rebanadas|pieza|piezas|desayuno|comida|cena|almuerzo|merienda|por favor)\b/.test(
-      text,
-    )
-  )
-    return "es";
-  if (
-    /\b(add|please|gram|grams|kilogram|kilograms|ounce|ounces|cup|cups|tablespoon|tablespoons|teaspoon|teaspoons|slice|slices|piece|pieces|breakfast|lunch|dinner|snack)\b/.test(
-      text,
-    )
-  )
-    return "en";
-  return undefined;
 }
 
 function normalizeFoodName(value: string): string {
@@ -1097,79 +790,6 @@ function singularizeToken(token: string): string {
 
 function roundTwo(value: number): number {
   return Math.round(value * 100) / 100;
-}
-
-function parseMention(input: unknown): FoodMention | null {
-  if (!input || typeof input !== "object") return null;
-  const value = input as Record<string, unknown>;
-  const originalText =
-    typeof value.originalText === "string" ? value.originalText : undefined;
-  const canonicalName =
-    typeof value.canonicalName === "string" ? value.canonicalName : undefined;
-  const canonicalEnglishName =
-    typeof value.canonicalEnglishName === "string"
-      ? value.canonicalEnglishName
-      : undefined;
-  const quantity =
-    typeof value.quantity === "number" ? value.quantity : undefined;
-  const unit = typeof value.unit === "string" ? value.unit : undefined;
-  if (
-    !originalText ||
-    (!canonicalName && !canonicalEnglishName) ||
-    !quantity ||
-    !unit
-  )
-    return null;
-  const normalizedCanonical = normalizeFoodName(
-    canonicalName ?? canonicalEnglishName!,
-  );
-  const normalizedCanonicalEnglish =
-    canonicalEnglishName ? normalizeFoodName(canonicalEnglishName) : undefined;
-  const rawUnitText =
-    typeof value.rawUnitText === "string" ? value.rawUnitText : unit;
-  const unitKind = parseUnitKind(
-    value.unitKind,
-    rawUnitText,
-    unit,
-    normalizedCanonical,
-  );
-  const portionDescriptorRaw =
-    typeof value.portionDescriptorRaw === "string"
-      ? value.portionDescriptorRaw
-      : undefined;
-  const portionDescriptor = normalizePortionDescriptor(
-    typeof value.portionDescriptor === "string"
-      ? value.portionDescriptor
-      : portionDescriptorRaw,
-  );
-  return {
-    originalText,
-    canonicalName: normalizedCanonical,
-    canonicalEnglishName: normalizedCanonicalEnglish,
-    language: typeof value.language === "string" ? value.language : undefined,
-    quantity:
-      unitKind === "metric"
-        ? normalizeQuantity(quantity, rawUnitText)
-        : quantity,
-    unit: normalizeUnit(unit, normalizedCanonical),
-    rawUnitText,
-    unitKind,
-    portionDescriptorRaw,
-    portionDescriptor,
-    brand: typeof value.brand === "string" ? value.brand : undefined,
-    barcode: typeof value.barcode === "string" ? value.barcode : undefined,
-    confidence: typeof value.confidence === "number" ? value.confidence : 0.78,
-    marketProduct: Boolean(value.marketProduct),
-  };
-}
-
-function normalizeQuantity(quantity: number, unit: string): number {
-  const normalized = normalizeText(unit);
-  if (["kg", "kilogram", "kilograms", "kilo", "kilos"].includes(normalized))
-    return quantity * 1000;
-  if (["oz", "ounce", "ounces"].includes(normalized))
-    return Math.round(quantity * 28.3495 * 10) / 10;
-  return quantity;
 }
 
 function normalizeUnit(unit: string, canonicalName?: string): string {
@@ -1588,7 +1208,7 @@ const seededPortionFallbacks = new Map<string, PortionOption[]>([
         unitName: "egg",
         aliases: ["egg", "eggs", "huevo", "huevos"],
         gramWeight: 50,
-        sourceDescription: "local seeded egg fallback",
+        sourceDescription: "local seeded egg portion",
         kind: "whole_item",
       },
     ],
@@ -2006,14 +1626,6 @@ function escapeRegExp(value: string): string {
 
 function isNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
-}
-
-function timeoutSignal(timeoutMs: number): AbortSignal | undefined {
-  return (
-    AbortSignal as typeof AbortSignal & {
-      timeout?: (milliseconds: number) => AbortSignal;
-    }
-  ).timeout?.(timeoutMs);
 }
 
 type UsdaFood = {

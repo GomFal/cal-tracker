@@ -9,6 +9,40 @@ import {
 
 type TestRequest = (input: string, init?: RequestInit) => Promise<Response>;
 
+function mention(
+  canonicalEnglishName: string,
+  quantity: number,
+  overrides: Partial<FoodMention> = {},
+): FoodMention {
+  const unit = overrides.unit ?? "g";
+  const rawUnitText = overrides.rawUnitText ?? (unit === "g" ? "grams" : unit);
+  return {
+    originalText:
+      overrides.originalText ??
+      `${quantity} ${rawUnitText} of ${canonicalEnglishName}`,
+    canonicalName: overrides.canonicalName ?? canonicalEnglishName,
+    canonicalEnglishName,
+    language: overrides.language ?? "en",
+    quantity,
+    unit,
+    rawUnitText,
+    unitKind: overrides.unitKind ?? (unit === "g" ? "metric" : "unknown"),
+    confidence: overrides.confidence ?? 0.95,
+    marketProduct: overrides.marketProduct ?? false,
+    ...overrides,
+  };
+}
+
+const chickenRiceInput = {
+  text: "Add 100 grams of chicken breast and 100 grams of rice",
+  mentions: [
+    mention("chicken breast", 100, {
+      originalText: "100 grams of chicken breast",
+    }),
+    mention("rice", 100, { originalText: "100 grams of rice" }),
+  ],
+};
+
 async function createChickenBreadRiceButterProposal(
   request: TestRequest,
   authHeader: Record<string, string>,
@@ -21,6 +55,12 @@ async function createChickenBreadRiceButterProposal(
       body: JSON.stringify({
         input: {
           text: "Add 100g of chicken, 100g of bread, 100g of rice and 100g of butter.",
+          mentions: [
+            mention("chicken", 100, { originalText: "100g of chicken" }),
+            mention("bread", 100, { originalText: "100g of bread" }),
+            mention("rice", 100, { originalText: "100g of rice" }),
+            mention("butter", 100, { originalText: "100g of butter" }),
+          ],
         },
         source: "flutter",
       }),
@@ -391,9 +431,7 @@ describe("action loop", () => {
         method: "POST",
         headers: auth.authHeader,
         body: JSON.stringify({
-          input: {
-            text: "Add 100 grams of chicken breast and 100 grams of rice",
-          },
+          input: chickenRiceInput,
           source: "flutter",
         }),
       },
@@ -846,9 +884,7 @@ describe("action loop", () => {
         method: "POST",
         headers: auth.authHeader,
         body: JSON.stringify({
-          input: {
-            text: "Add 100 grams of chicken breast and 100 grams of rice",
-          },
+          input: chickenRiceInput,
           source: "flutter",
         }),
       },
@@ -893,6 +929,13 @@ describe("action loop", () => {
         body: JSON.stringify({
           input: {
             text: "Add 100 grams of chicken, 100 grams of rice and 100 grams of meat.",
+            mentions: [
+              mention("chicken", 100, {
+                originalText: "100 grams of chicken",
+              }),
+              mention("rice", 100, { originalText: "100 grams of rice" }),
+              mention("meat", 100, { originalText: "100 grams of meat" }),
+            ],
           },
           source: "flutter",
         }),
@@ -939,6 +982,14 @@ describe("action loop", () => {
         body: JSON.stringify({
           input: {
             text: "Add 100 grams of rice, 100 grams of beef, 100 grams of butter and 100 grams of bread.",
+            mentions: [
+              mention("rice", 100, { originalText: "100 grams of rice" }),
+              mention("beef", 100, { originalText: "100 grams of beef" }),
+              mention("butter", 100, {
+                originalText: "100 grams of butter",
+              }),
+              mention("bread", 100, { originalText: "100 grams of bread" }),
+            ],
           },
           source: "flutter",
         }),
@@ -1003,13 +1054,8 @@ describe("action loop", () => {
     expect(body.output.message).not.toContain("bread");
   });
 
-  it("uses model-provided food mentions without extracting text again", async () => {
-    const throwingExtractor = {
-      async extract(): Promise<FoodMention[]> {
-        throw new Error("text extractor should not be called");
-      },
-    };
-    const { request } = buildTestApp({ foodTextExtractor: throwingExtractor });
+  it("uses model-provided food mentions directly", async () => {
+    const { request } = buildTestApp();
     const auth = await registerAndAuth(request);
 
     const proposalResponse = await request(
@@ -1068,9 +1114,6 @@ describe("action loop", () => {
     expect(body.output.instrumentation.phasesMs).toHaveProperty(
       "resolve_provided_mentions",
     );
-    expect(body.output.instrumentation.phasesMs).not.toHaveProperty(
-      "resolve_meal_text",
-    );
     expect(body.output.proposal.items).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: "Chicken breast", quantity: 100 }),
@@ -1095,7 +1138,17 @@ describe("action loop", () => {
         method: "POST",
         headers: auth.authHeader,
         body: JSON.stringify({
-          input: { text: "Add 1 rice" },
+          input: {
+            text: "Add 1 rice",
+            mentions: [
+              mention("rice", 1, {
+                originalText: "1 rice",
+                unit: "rice",
+                rawUnitText: "rice",
+                unitKind: "implicit_count",
+              }),
+            ],
+          },
           source: "flutter",
         }),
       },
@@ -1173,9 +1226,7 @@ describe("action loop", () => {
         method: "POST",
         headers: auth.authHeader,
         body: JSON.stringify({
-          input: {
-            text: "Add 100 grams of chicken breast and 100 grams of rice",
-          },
+          input: chickenRiceInput,
           source: "flutter",
         }),
       },
@@ -1261,9 +1312,7 @@ describe("action loop", () => {
         method: "POST",
         headers: auth.authHeader,
         body: JSON.stringify({
-          input: {
-            text: "Add 100 grams of chicken breast and 100 grams of rice",
-          },
+          input: chickenRiceInput,
           source: "flutter",
         }),
       },
@@ -1306,7 +1355,17 @@ describe("action loop", () => {
         method: "POST",
         headers: auth.authHeader,
         body: JSON.stringify({
-          input: { text: "two eggs" },
+          input: {
+            text: "two eggs",
+            mentions: [
+              mention("egg", 2, {
+                originalText: "two eggs",
+                unit: "egg",
+                rawUnitText: "eggs",
+                unitKind: "implicit_count",
+              }),
+            ],
+          },
           source: "flutter",
         }),
       },

@@ -5,10 +5,8 @@ import { loadConfig } from "../config/env.js";
 import { createApp } from "../http/app.js";
 import type { MealItem } from "@cal-tracker/contracts";
 import {
-  DeterministicFoodTextExtractor,
   FoodResolver,
   LocalFoodDataProvider,
-  type FoodTextExtractor,
 } from "../nutrition/foodResolver.js";
 import { ResolverNutritionProvider } from "../nutrition/provider.js";
 import { InMemoryRepository } from "../repository/inMemory.js";
@@ -54,7 +52,6 @@ export function buildTestApp(options?: {
   agentProvider?: ChatAgentProvider;
   sttProvider?: SpeechToTextProvider;
   runLogger?: LocalRunLogger;
-  foodTextExtractor?: FoodTextExtractor;
   googleTokenVerifier?: GoogleTokenVerifier;
 }) {
   const config = loadConfig({ NODE_ENV: "test" } as NodeJS.ProcessEnv);
@@ -62,7 +59,6 @@ export function buildTestApp(options?: {
   seedTestFoods(repository);
   const authService = new AuthService(config, repository, options?.googleTokenVerifier);
   const foodResolver = new FoodResolver(
-    options?.foodTextExtractor ?? new DeterministicFoodTextExtractor(),
     new LocalFoodDataProvider(repository, { allowSeededPortionFallback: true }),
     config.FOOD_RESOLVER_MIN_CONFIDENCE
   );
@@ -76,7 +72,23 @@ export function buildTestApp(options?: {
         type: "function",
         function: {
           name: "propose_meal_log",
-          arguments: JSON.stringify({ text: "usual breakfast" }),
+          arguments: JSON.stringify({
+            text: "usual breakfast",
+            mentions: [
+              {
+                originalText: "100 grams of bread",
+                canonicalName: "bread",
+                canonicalEnglishName: "bread",
+                language: "en",
+                quantity: 100,
+                unit: "g",
+                rawUnitText: "grams",
+                unitKind: "metric",
+                confidence: 0.95,
+                marketProduct: false,
+              },
+            ],
+          }),
         },
       },
     ],

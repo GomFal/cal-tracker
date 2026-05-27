@@ -3,12 +3,10 @@ import {
   type DailySummary,
   type Meal,
   type MealItem,
-  type FoodMention,
   type NutritionSnapshot,
   type MealProposal,
   type MealTemplate,
   actionDefinitions,
-  proposeMealLogInputSchema,
 } from "@cal-tracker/contracts";
 import {
   ActionExecutor,
@@ -16,7 +14,6 @@ import {
 } from "../actions/executor.js";
 import type {
   AgentMessage,
-  AgentToolCall,
   AgentToolDecision,
   ChatAgentProvider,
 } from "./chatAgentProvider.js";
@@ -31,6 +28,16 @@ import {
   type LocalRunLogger,
 } from "../observability/localRunLogger.js";
 import { withSpan, withSyncSpan } from "../observability/profiler.js";
+
+export class AgentProviderUnavailableError extends Error {
+  readonly code = "agent_provider_unavailable";
+
+  constructor(cause?: unknown) {
+    super("agent_provider_unavailable");
+    this.name = "AgentProviderUnavailableError";
+    this.cause = cause;
+  }
+}
 
 export type AgentRunResult =
   | {
@@ -180,51 +187,16 @@ export class AgentService {
       );
       llmMs = Date.now() - llmStarted;
     } catch (error) {
-      const fallbackToolCall = activeProposal
-        ? fallbackRevisionToolCallForText(text, activeProposal)
-        : fallbackToolCallForText(text);
-      if (fallbackToolCall) {
-        return this.executeFallbackTool({
-          text,
-          context,
-          runStarted,
-          baseLog,
-          fallbackToolCall,
-          decisionSource: "provider_error_fallback",
-          providerError: summarizeError(error),
-        });
-      }
-      const mapped = {
-        kind: "clarification_required",
-        proposal: activeProposal,
-        message: providerFallbackFailureMessage(activeProposal),
-      } satisfies AgentRunResult;
       await this.logRun({
         ...baseLog,
-        decisionSource: "provider_error_no_fallback",
+        decisionSource: "provider_error",
         providerError: summarizeError(error),
-        resultKind: mapped.kind,
         timingsMs: { total: Date.now() - runStarted },
       });
-      return mapped;
+      throw new AgentProviderUnavailableError(error);
     }
 
     if (decision.toolCalls.length === 0) {
-      const fallbackToolCall = activeProposal
-        ? fallbackRevisionToolCallForText(text, activeProposal)
-        : fallbackToolCallForText(text);
-      if (fallbackToolCall) {
-        return this.executeFallbackTool({
-          text,
-          context,
-          runStarted,
-          baseLog,
-          fallbackToolCall,
-          decisionSource: "empty_tool_call_fallback",
-          decision,
-          llmMs,
-        });
-      }
       const mapped = {
         kind: "clarification_required",
         proposal: activeProposal,
@@ -312,9 +284,6 @@ export class AgentService {
     }
 
     const originalActionId = actionId;
-    if (actionId === "propose_meal_log") {
-      parsedInput = resilientProposeMealInput(parsedInput, text);
-    }
     if (
       activeProposal &&
       actionId === "revise_meal_proposal" &&
@@ -384,66 +353,6 @@ export class AgentService {
       });
       throw error;
     }
-  }
-
-  private async executeFallbackTool(input: {
-    text: string;
-    context: ActionContext;
-    runStarted: number;
-    baseLog: Record<string, unknown>;
-    fallbackToolCall: AgentToolCall;
-    decisionSource: string;
-    decision?: AgentToolDecision;
-    llmMs?: number;
-    providerError?: Record<string, unknown>;
-  }): Promise<AgentRunResult> {
-    const parsedArguments = JSON.parse(input.fallbackToolCall.function.arguments);
-    const actionStarted = Date.now();
-    const result = await withSpan(
-      "AgentService.executeFallbackAction",
-      { actionId: input.fallbackToolCall.function.name },
-      () => this.actionExecutor.execute(
-        input.fallbackToolCall.function.name,
-        parsedArguments,
-        {
-          ...input.context,
-          source: "internal_agent",
-        },
-      ),
-    );
-    const mapped = this.mapResult(
-      input.fallbackToolCall.function.name,
-      result,
-      input.text,
-    );
-    await this.logRun({
-      ...input.baseLog,
-      decisionSource: input.decisionSource,
-      selectedTool: input.fallbackToolCall.function.name,
-      selectedArguments: parsedArguments,
-      providerError: input.providerError,
-      usage: input.decision
-        ? extractTokenUsage(input.decision.rawResponse)
-        : undefined,
-      reasoningTokens: input.decision
-        ? extractReasoningTokens(input.decision.rawResponse)
-        : undefined,
-      generationId: input.decision
-        ? extractGenerationId(input.decision.rawResponse)
-        : undefined,
-      providerTimingsMs: input.decision?.timingsMs,
-      providerRouting: input.decision?.providerRouting,
-      modelInteraction: input.decision?.interaction,
-      actionInstrumentation: result.instrumentation,
-      actionCallId: result.actionCallId,
-      resultKind: mapped.kind,
-      timingsMs: {
-        llm: input.decision?.timingsMs?.totalMs ?? input.llmMs,
-        action: Date.now() - actionStarted,
-        total: Date.now() - input.runStarted,
-      },
-    });
-    return mapped;
   }
 
   private async logRun(event: Record<string, unknown>): Promise<void> {
@@ -677,484 +586,4 @@ function prioritizeDefaultTool<T extends { id: string }>(actions: T[]): T[] {
     if (b.id === "propose_meal_log") return 1;
     return 0;
   });
-}
-
-function resilientProposeMealInput(input: unknown, fallbackText: string): unknown {
-  if (typeof input !== "object" || input === null || Array.isArray(input)) {
-    return input;
-  }
-
-  const value = input as Record<string, unknown>;
-  const text =
-    typeof value.text === "string" && value.text.trim().length > 0
-      ? value.text
-      : fallbackText;
-  const candidate = { ...value, text };
-  const parsed = proposeMealLogInputSchema.safeParse(candidate);
-  if (parsed.success) return parsed.data;
-  return { text };
-}
-
-function isMealLoggingIntent(text: string): boolean {
-  const normalized = normalizeIntentText(text);
-
-  if (/^(how|cuanto|cuanta|cuantas|cuantos|que|what)\b/.test(normalized)) {
-    return false;
-  }
-  if (
-    /\b(delete|remove|borrar|eliminar|corrige|correct|corregir)\b/.test(
-      normalized,
-    )
-  ) {
-    return false;
-  }
-  return (
-    /\b(log|add|ate|had|consumed|record|registrar|registro|anade|anadir|agrega|agregar|apunta|apuntar|pon|ponme|poner|mete|meteme|put|comi|comido|tome|consumi|desayuno|almuerzo|comida|cena|merienda|snack)\b/.test(
-      normalized,
-    ) || hasExplicitFoodQuantity(normalized)
-  );
-}
-
-function hasExplicitFoodQuantity(normalized: string): boolean {
-  return /\b\d+(?:[.,]\d+)?\s*(?:g|gr|gramo|gramos|gram|grams|kg|kilo|kilos|ml|mililitro|mililitros|l|litro|litros|oz|ounce|ounces|cup|cups|taza|tazas)\b(?:\s+(?:de|of))?\s+[a-z]/.test(
-    normalized,
-  );
-}
-
-type FallbackParseResult =
-  | { status: "tool"; toolCall: AgentToolCall }
-  | { status: "invalid" }
-  | { status: "none" };
-
-type FallbackAction = "add" | "delete";
-
-type FallbackFoodChunk = {
-  action: FallbackAction;
-  quantity: number;
-  unit: string;
-  rawUnitText: string;
-  food: string;
-  start: number;
-  end: number;
-};
-
-function fallbackRevisionToolCallForText(
-  text: string,
-  activeProposal: MealProposal,
-): AgentToolCall | null {
-  const explicitListFallback = fallbackExplicitListRevisionToolCallForText(
-    text,
-    activeProposal,
-  );
-  if (explicitListFallback.status === "tool") {
-    return explicitListFallback.toolCall;
-  }
-  if (explicitListFallback.status === "invalid") {
-    return null;
-  }
-
-  return fallbackQuantityRevisionToolCallForText(text, activeProposal);
-}
-
-function fallbackExplicitListRevisionToolCallForText(
-  text: string,
-  activeProposal: MealProposal,
-): FallbackParseResult {
-  const normalized = normalizeIntentText(text);
-  const leadingMatch = leadingFallbackActionRegex().exec(normalized);
-  const leadingAction = leadingMatch?.groups?.action
-    ? normalizedFallbackAction(leadingMatch.groups.action)
-    : null;
-  const chunks = parseFallbackFoodChunks(normalized, leadingAction);
-
-  if (!leadingAction && chunks.length === 0) return { status: "none" };
-  if (leadingAction && chunks.length === 0) return { status: "invalid" };
-  if (chunks.length === 0) return { status: "none" };
-
-  const masks = Array.from({ length: normalized.length }, () => false);
-  if (leadingMatch) maskRange(masks, leadingMatch.index, leadingMatch[0].length);
-  for (const chunk of chunks) {
-    maskRange(masks, chunk.start, chunk.end - chunk.start);
-  }
-  if (hasMeaningfulFallbackRemainder(normalized, masks)) {
-    return { status: "invalid" };
-  }
-
-  const operations: Array<Record<string, unknown>> = [];
-  const projectedRemovedIndexes = new Set<number>();
-  for (const chunk of chunks) {
-    if (hasUnsafeFallbackFoodName(chunk.food)) return { status: "invalid" };
-    const itemIndex = activeProposal.items.findIndex((item, index) =>
-      !projectedRemovedIndexes.has(index) &&
-      proposalItemMentioned(chunk.food, item),
-    );
-
-    if (chunk.action === "delete") {
-      if (itemIndex < 0) return { status: "invalid" };
-      projectedRemovedIndexes.add(itemIndex);
-      operations.push({
-        type: "remove_item",
-        itemIndex,
-        matchText: chunk.food,
-      });
-      continue;
-    }
-
-    if (itemIndex >= 0) {
-      const item = activeProposal.items[itemIndex]!;
-      if (sameFallbackQuantity(item, chunk)) continue;
-      operations.push({
-        type: "update_item_quantity",
-        itemIndex,
-        quantity: chunk.quantity,
-        unit: chunk.unit,
-        rawUnitText: chunk.rawUnitText,
-      });
-      continue;
-    }
-
-    operations.push({
-      type: "add_item",
-      mention: foodMentionForFallbackChunk(chunk),
-    });
-  }
-
-  if (operations.length === 0) return { status: "invalid" };
-  if (
-    operations.every((operation) => operation.type === "remove_item") &&
-    projectedRemovedIndexes.size >= activeProposal.items.length
-  ) {
-    return { status: "invalid" };
-  }
-
-  return {
-    status: "tool",
-    toolCall: toolCall("revise_meal_proposal", {
-      proposalId: activeProposal.id,
-      instruction: text,
-      operations,
-    }),
-  };
-}
-
-function fallbackQuantityRevisionToolCallForText(
-  text: string,
-  activeProposal: MealProposal,
-): AgentToolCall | null {
-  const normalized = normalizeIntentText(text);
-  const quantity = extractQuantityAndUnit(normalized);
-  if (!quantity) return null;
-
-  const itemIndex = activeProposal.items.findIndex((item) =>
-    proposalItemMentioned(normalized, item),
-  );
-  if (itemIndex < 0) return null;
-  const item = activeProposal.items[itemIndex]!;
-  if (
-    item.unit === quantity.unit &&
-    Math.abs(item.quantity - quantity.quantity) < 0.000001
-  ) {
-    return null;
-  }
-
-  return toolCall("revise_meal_proposal", {
-    proposalId: activeProposal.id,
-    instruction: text,
-    operations: [
-      {
-        type: "update_item_quantity",
-        itemIndex,
-        quantity: quantity.quantity,
-        unit: quantity.unit,
-        rawUnitText: quantity.rawUnitText,
-      },
-    ],
-  });
-}
-
-function parseFallbackFoodChunks(
-  normalized: string,
-  leadingAction: FallbackAction | null,
-): FallbackFoodChunk[] {
-  const chunks: FallbackFoodChunk[] = [];
-  const regex = fallbackFoodChunkRegex();
-  for (const match of normalized.matchAll(regex)) {
-    const rawAction = match.groups?.itemAction;
-    const action = rawAction
-      ? normalizedFallbackAction(rawAction)
-      : leadingAction;
-    if (!action) continue;
-    const quantity = Number(match.groups!.quantity!.replace(",", "."));
-    if (!Number.isFinite(quantity) || quantity <= 0) continue;
-    const food = normalizeFallbackFoodName(match.groups!.food ?? "");
-    if (!food) continue;
-    const rawUnitText = match.groups!.unit!;
-    chunks.push({
-      action,
-      quantity,
-      unit: normalizedUnit(rawUnitText),
-      rawUnitText,
-      food,
-      start: match.index ?? 0,
-      end: (match.index ?? 0) + match[0].length,
-    });
-  }
-  return chunks;
-}
-
-function leadingFallbackActionRegex(): RegExp {
-  return new RegExp(
-    String.raw`^\s*(?:please\s+|por\s+favor\s+)?(?<action>${fallbackActionWords()})\b(?:\s+(?:to|into|in|a|al|en))?(?:\s+(?:this|the|este|esta|el|la))?(?:\s+(?:meal|food|dish|comida|plato))?`,
-    "iu",
-  );
-}
-
-function fallbackFoodChunkRegex(): RegExp {
-  const actionWords = fallbackActionWords();
-  const unitWords = fallbackUnitWords();
-  return new RegExp(
-    String.raw`(?:(?<itemAction>${actionWords})\s+(?:the|el|la)?\s*)?(?<quantity>\d+(?:[.,]\d+)?)\s*(?<unit>${unitWords})\b\s*(?:of|de)?\s*(?<food>.+?)(?=\s+(?:(?:and|y|e)\s+)?(?:(?:${actionWords})\s+(?:the|el|la)?\s*)?\d+(?:[.,]\d+)?\s*(?:${unitWords})\b|$)`,
-    "giu",
-  );
-}
-
-function fallbackActionWords(): string {
-  return [
-    "add",
-    "anade",
-    "agrega",
-    "incluye",
-    "include",
-    "delete",
-    "remove",
-    "elimina",
-    "quita",
-    "borra",
-  ].join("|");
-}
-
-function fallbackUnitWords(): string {
-  return [
-    "g",
-    "gr",
-    "gram",
-    "grams",
-    "gramo",
-    "gramos",
-    "kg",
-    "kilo",
-    "kilos",
-    "ml",
-    "mililitro",
-    "mililitros",
-    "l",
-    "litro",
-    "litros",
-    "oz",
-    "ounce",
-    "ounces",
-    "cup",
-    "cups",
-    "taza",
-    "tazas",
-  ].join("|");
-}
-
-function normalizedFallbackAction(action: string): FallbackAction {
-  switch (normalizeIntentText(action)) {
-    case "delete":
-    case "remove":
-    case "elimina":
-    case "quita":
-    case "borra":
-      return "delete";
-    default:
-      return "add";
-  }
-}
-
-function normalizeFallbackFoodName(food: string): string {
-  return food
-    .replace(/\b(?:and|y|e)\s*$/iu, "")
-    .replace(/\b(?:too|tambien)\s*$/iu, "")
-    .replace(/^\s*(?:the|el|la)\s+/iu, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function hasUnsafeFallbackFoodName(food: string): boolean {
-  return /\b(?:and|y|e|make|better|instead|rather|change|correct|update|actualiza|cambia|corrige)\b/iu.test(
-    food,
-  );
-}
-
-function hasMeaningfulFallbackRemainder(
-  normalized: string,
-  masks: boolean[],
-): boolean {
-  const remainder = normalized
-    .split("")
-    .filter((_, index) => !masks[index])
-    .join("")
-    .replace(
-      /\b(?:and|y|e|also|too|tambien|the|el|la|a|al|to|into|in|en|this|este|esta|food|meal|dish|comida|plato|please|por|favor)\b/giu,
-      " ",
-    )
-    .replace(/\s+/g, "")
-    .trim();
-  return remainder.length > 0;
-}
-
-function maskRange(masks: boolean[], start: number, length: number): void {
-  for (let index = start; index < start + length && index < masks.length; index++) {
-    masks[index] = true;
-  }
-}
-
-function sameFallbackQuantity(
-  item: MealItem,
-  chunk: FallbackFoodChunk,
-): boolean {
-  return (
-    item.unit === chunk.unit &&
-    Math.abs(item.quantity - chunk.quantity) < 0.000001
-  );
-}
-
-function foodMentionForFallbackChunk(chunk: FallbackFoodChunk): FoodMention {
-  return {
-    originalText: `${chunk.quantity} ${chunk.rawUnitText} ${chunk.food}`,
-    canonicalName: chunk.food,
-    canonicalEnglishName: chunk.food,
-    quantity: chunk.quantity,
-    unit: chunk.unit,
-    rawUnitText: chunk.rawUnitText,
-    unitKind: unitKindForFallbackUnit(chunk.unit),
-    confidence: 0.82,
-    marketProduct: false,
-  };
-}
-
-function unitKindForFallbackUnit(
-  unit: string,
-): NonNullable<FoodMention["unitKind"]> {
-  return unit === "cup" ? "household" : "metric";
-}
-
-function providerFallbackFailureMessage(activeProposal?: MealProposal): string {
-  return activeProposal
-    ? "The assistant took too long and I could not safely apply that correction. The meal was not changed. Please repeat the correction."
-    : "The agent provider is unavailable. Please rephrase or try again.";
-}
-
-function extractQuantityAndUnit(
-  normalized: string,
-): { quantity: number; unit: string; rawUnitText: string } | null {
-  const match =
-    /\b(\d+(?:[.,]\d+)?)\s*(g|gr|gramo|gramos|gram|grams|kg|kilo|kilos|ml|mililitro|mililitros|l|litro|litros|oz|ounce|ounces|cup|cups|taza|tazas)\b/.exec(
-      normalized,
-    );
-  if (!match) return null;
-  const quantity = Number(match[1]!.replace(",", "."));
-  if (!Number.isFinite(quantity) || quantity <= 0) return null;
-  const rawUnitText = match[2]!;
-  return {
-    quantity,
-    unit: normalizedUnit(rawUnitText),
-    rawUnitText,
-  };
-}
-
-function normalizedUnit(unit: string): string {
-  switch (unit) {
-    case "gr":
-    case "gramo":
-    case "gramos":
-    case "gram":
-    case "grams":
-      return "g";
-    case "kilo":
-    case "kilos":
-      return "kg";
-    case "mililitro":
-    case "mililitros":
-      return "ml";
-    case "litro":
-    case "litros":
-      return "l";
-    case "ounce":
-    case "ounces":
-      return "oz";
-    case "taza":
-    case "tazas":
-      return "cup";
-    default:
-      return unit;
-  }
-}
-
-function proposalItemMentioned(normalizedText: string, item: MealItem): boolean {
-  const names = [item.name, item.canonicalName, item.originalText]
-    .filter((value): value is string => Boolean(value))
-    .map(normalizeIntentText);
-  return names.some((name) => {
-    if (!name) return false;
-    if (normalizedText.includes(name)) return true;
-    const tokens = name.split(" ").filter((token) => token.length >= 4);
-    return tokens.some((token) => normalizedText.includes(token));
-  });
-}
-
-function fallbackToolCallForText(text: string): AgentToolCall | null {
-  const normalized = normalizeIntentText(text);
-  if (isMealLoggingIntent(text)) return toolCall("propose_meal_log", { text });
-  if (
-    /\b(remaining|left|quedan|restan|calorias restantes|calories left)\b/.test(
-      normalized,
-    )
-  ) {
-    return toolCall("get_remaining_targets", {});
-  }
-  if (/\b(summary|resumen|today|hoy)\b/.test(normalized))
-    return toolCall("get_daily_summary", {});
-  if (/\b(history|historial|ultimas comidas|recent meals)\b/.test(normalized))
-    return toolCall("get_meal_history", { limit: 10 });
-  if (
-    /\b(usual meals|templates|plantillas|comidas habituales|habituales)\b/.test(
-      normalized,
-    )
-  )
-    return toolCall("get_usual_meals", {});
-
-  const nutritionSearch =
-    /\b(?:search|buscar|lookup|consulta|consultar)\b.*\b(?:nutrition|nutricion|food|alimento|database|base)\b(?:\s+(?:for|de|para))?\s*(.*)$/.exec(
-      normalized,
-    );
-  if (nutritionSearch?.[1])
-    return toolCall("search_nutrition_database", {
-      query: nutritionSearch[1].trim(),
-    });
-
-  return null;
-}
-
-function toolCall(name: string, input: unknown): AgentToolCall {
-  return {
-    id: `fallback_${name}`,
-    type: "function",
-    function: {
-      name,
-      arguments: JSON.stringify(input),
-    },
-  };
-}
-
-function normalizeIntentText(text: string): string {
-  return text
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
 }

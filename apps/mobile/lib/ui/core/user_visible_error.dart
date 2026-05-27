@@ -71,6 +71,9 @@ String userVisibleErrorMessage(
     if (error.statusCode == 429) {
       return 'Too many tries. Wait a moment and try again.';
     }
+    if (code == 'agent_provider_unavailable') {
+      return error.message;
+    }
     if (code == 'validation_error' || error.statusCode == 400) {
       return _validationMessage(context);
     }

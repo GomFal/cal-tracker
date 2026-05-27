@@ -4,6 +4,12 @@ This file contains environment-specific instructions for coding agents working o
 
 ---
 
+## Food and LLM Flow Engineering Rules
+
+Do not hardcode ingredients, ingredient translations, meal names, meal proposal titles, or natural-language parsing fallbacks. Regex-based intent parsing, deterministic ingredient inference, and language-specific shortcuts are not acceptable in food logging, meal proposal, meal correction, or agent-provider fallback flows. These approaches are not scalable, are brittle across languages and datasets, and do not follow the software engineering principles expected in this project. Food understanding must come from structured LLM/tool output, database-backed resolution, explicit user input, or clarification/error responses.
+
+---
+
 ## Branch Workflow
 
 Always do development work on the `develop` branch. Before making code or documentation changes, switch to `develop` and update it from the remote when possible. Use `main` only when explicitly asked to sync, release, or inspect production-aligned history.

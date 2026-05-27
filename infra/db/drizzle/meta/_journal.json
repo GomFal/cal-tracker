@@ -57,6 +57,13 @@
       "when": 1779814926488,
       "tag": "0007_food_search_full_text",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1779898849230,
+      "tag": "0008_meal_item_language",
+      "breakpoints": true
     }
   ]
 }

@@ -250,6 +250,7 @@ function mealItemColumns() {
     source: text("source").notNull().default("snapshot"),
     originalText: text("original_text"),
     canonicalName: text("canonical_name"),
+    language: text("language"),
     externalSource: text("external_source"),
     externalId: text("external_id"),
     sourceUrl: text("source_url"),

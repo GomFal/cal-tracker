@@ -889,7 +889,7 @@ export class PostgresRepository implements AppRepository {
     await this.db.transaction(async (tx) => {
       await executeRows(tx, dbSql`
         UPDATE meal_proposals
-        SET status = ${proposal.status}, calories = ${proposal.nutrition.calories}, protein_grams = ${proposal.nutrition.proteinGrams}, carbs_grams = ${proposal.nutrition.carbsGrams}, fat_grams = ${proposal.nutrition.fatGrams}
+        SET title = ${proposal.title}, status = ${proposal.status}, calories = ${proposal.nutrition.calories}, protein_grams = ${proposal.nutrition.proteinGrams}, carbs_grams = ${proposal.nutrition.carbsGrams}, fat_grams = ${proposal.nutrition.fatGrams}
         WHERE id = ${proposal.id} AND user_id = ${userId}
       `);
       await executeRows(tx, dbSql`DELETE FROM meal_proposal_items WHERE proposal_id = ${proposal.id}`);
@@ -1254,11 +1254,11 @@ async function insertProposalItem(dbClient: DbExecutor, proposalId: string, item
   await executeRows(dbClient, dbSql`
     INSERT INTO meal_proposal_items (
       proposal_id, name, quantity, unit, calories, protein_grams, carbs_grams, fat_grams,
-      source, original_text, canonical_name, external_source, external_id, source_url, license, confidence, needs_review
+      source, original_text, canonical_name, language, external_source, external_id, source_url, license, confidence, needs_review
     )
     VALUES (
       ${proposalId}, ${item.name}, ${item.quantity}, ${item.unit}, ${item.calories}, ${item.proteinGrams}, ${item.carbsGrams}, ${item.fatGrams},
-      ${item.source}, ${item.originalText ?? null}, ${item.canonicalName ?? null}, ${item.externalSource ?? null}, ${item.externalId ?? null},
+      ${item.source}, ${item.originalText ?? null}, ${item.canonicalName ?? null}, ${item.language ?? null}, ${item.externalSource ?? null}, ${item.externalId ?? null},
       ${item.sourceUrl ?? null}, ${item.license ?? null}, ${item.confidence ?? null}, ${item.needsReview ?? false}
     )
   `);
@@ -1268,11 +1268,11 @@ async function insertMealItem(dbClient: DbExecutor, mealId: string, item: MealIt
   await executeRows(dbClient, dbSql`
     INSERT INTO meal_items (
       meal_id, name, quantity, unit, calories, protein_grams, carbs_grams, fat_grams,
-      source, original_text, canonical_name, external_source, external_id, source_url, license, confidence, needs_review
+      source, original_text, canonical_name, language, external_source, external_id, source_url, license, confidence, needs_review
     )
     VALUES (
       ${mealId}, ${item.name}, ${item.quantity}, ${item.unit}, ${item.calories}, ${item.proteinGrams}, ${item.carbsGrams}, ${item.fatGrams},
-      ${item.source}, ${item.originalText ?? null}, ${item.canonicalName ?? null}, ${item.externalSource ?? null}, ${item.externalId ?? null},
+      ${item.source}, ${item.originalText ?? null}, ${item.canonicalName ?? null}, ${item.language ?? null}, ${item.externalSource ?? null}, ${item.externalId ?? null},
       ${item.sourceUrl ?? null}, ${item.license ?? null}, ${item.confidence ?? null}, ${item.needsReview ?? false}
     )
   `);
@@ -1282,11 +1282,11 @@ async function insertTemplateItem(dbClient: DbExecutor, templateId: string, item
   await executeRows(dbClient, dbSql`
     INSERT INTO meal_template_items (
       template_id, name, quantity, unit, calories, protein_grams, carbs_grams, fat_grams,
-      source, original_text, canonical_name, external_source, external_id, source_url, license, confidence, needs_review
+      source, original_text, canonical_name, language, external_source, external_id, source_url, license, confidence, needs_review
     )
     VALUES (
       ${templateId}, ${item.name}, ${item.quantity}, ${item.unit}, ${item.calories}, ${item.proteinGrams}, ${item.carbsGrams}, ${item.fatGrams},
-      ${item.source}, ${item.originalText ?? null}, ${item.canonicalName ?? null}, ${item.externalSource ?? null}, ${item.externalId ?? null},
+      ${item.source}, ${item.originalText ?? null}, ${item.canonicalName ?? null}, ${item.language ?? null}, ${item.externalSource ?? null}, ${item.externalId ?? null},
       ${item.sourceUrl ?? null}, ${item.license ?? null}, ${item.confidence ?? null}, ${item.needsReview ?? false}
     )
   `);
@@ -1431,6 +1431,7 @@ function mapItem(row: Record<string, unknown>): MealItem {
     source: (row.source as string | undefined) ?? "snapshot",
     originalText: row.original_text as string | undefined,
     canonicalName: row.canonical_name as string | undefined,
+    language: row.language as string | undefined,
     externalSource: row.external_source as string | undefined,
     externalId: row.external_id as string | undefined,
     sourceUrl: row.source_url as string | undefined,

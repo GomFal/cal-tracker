@@ -800,6 +800,11 @@
                           "canonicalName": {
                             "type": "string"
                           },
+                          "language": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 16
+                          },
                           "externalSource": {
                             "type": "string"
                           },
@@ -1271,6 +1276,11 @@
                           "canonicalName": {
                             "type": "string"
                           },
+                          "language": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 16
+                          },
                           "externalSource": {
                             "type": "string"
                           },
@@ -1626,6 +1636,11 @@
                 "canonicalName": {
                   "type": "string"
                 },
+                "language": {
+                  "type": "string",
+                  "minLength": 2,
+                  "maxLength": 16
+                },
                 "externalSource": {
                   "type": "string"
                 },
@@ -1818,6 +1833,11 @@
                       },
                       "canonicalName": {
                         "type": "string"
+                      },
+                      "language": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 16
                       },
                       "externalSource": {
                         "type": "string"
@@ -2129,6 +2149,11 @@
                     "canonicalName": {
                       "type": "string"
                     },
+                    "language": {
+                      "type": "string",
+                      "minLength": 2,
+                      "maxLength": 16
+                    },
                     "externalSource": {
                       "type": "string"
                     },
@@ -2339,6 +2364,11 @@
                     },
                     "canonicalName": {
                       "type": "string"
+                    },
+                    "language": {
+                      "type": "string",
+                      "minLength": 2,
+                      "maxLength": 16
                     },
                     "externalSource": {
                       "type": "string"
@@ -2770,6 +2800,11 @@
                           "canonicalName": {
                             "type": "string"
                           },
+                          "language": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 16
+                          },
                           "externalSource": {
                             "type": "string"
                           },
@@ -3032,6 +3067,11 @@
                       "canonicalName": {
                         "type": "string"
                       },
+                      "language": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 16
+                      },
                       "externalSource": {
                         "type": "string"
                       },
@@ -3173,6 +3213,11 @@
                 },
                 "canonicalName": {
                   "type": "string"
+                },
+                "language": {
+                  "type": "string",
+                  "minLength": 2,
+                  "maxLength": 16
                 },
                 "externalSource": {
                   "type": "string"
@@ -3331,6 +3376,11 @@
                       },
                       "canonicalName": {
                         "type": "string"
+                      },
+                      "language": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 16
                       },
                       "externalSource": {
                         "type": "string"
@@ -3505,6 +3555,11 @@
                     },
                     "canonicalName": {
                       "type": "string"
+                    },
+                    "language": {
+                      "type": "string",
+                      "minLength": 2,
+                      "maxLength": 16
                     },
                     "externalSource": {
                       "type": "string"
@@ -3728,6 +3783,11 @@
                           },
                           "canonicalName": {
                             "type": "string"
+                          },
+                          "language": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 16
                           },
                           "externalSource": {
                             "type": "string"
@@ -4000,6 +4060,11 @@
                           },
                           "canonicalName": {
                             "type": "string"
+                          },
+                          "language": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 16
                           },
                           "externalSource": {
                             "type": "string"
@@ -4331,6 +4396,11 @@
                               "canonicalName": {
                                 "type": "string"
                               },
+                              "language": {
+                                "type": "string",
+                                "minLength": 2,
+                                "maxLength": 16
+                              },
                               "externalSource": {
                                 "type": "string"
                               },
@@ -4507,6 +4577,11 @@
                 },
                 "canonicalName": {
                   "type": "string"
+                },
+                "language": {
+                  "type": "string",
+                  "minLength": 2,
+                  "maxLength": 16
                 },
                 "externalSource": {
                   "type": "string"
@@ -4700,6 +4775,11 @@
                       },
                       "canonicalName": {
                         "type": "string"
+                      },
+                      "language": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 16
                       },
                       "externalSource": {
                         "type": "string"
@@ -4967,6 +5047,11 @@
                       },
                       "canonicalName": {
                         "type": "string"
+                      },
+                      "language": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 16
                       },
                       "externalSource": {
                         "type": "string"
@@ -5323,6 +5408,11 @@
                     "canonicalName": {
                       "type": "string"
                     },
+                    "language": {
+                      "type": "string",
+                      "minLength": 2,
+                      "maxLength": 16
+                    },
                     "externalSource": {
                       "type": "string"
                     },
@@ -5536,6 +5626,11 @@
                         "canonicalName": {
                           "type": "string"
                         },
+                        "language": {
+                          "type": "string",
+                          "minLength": 2,
+                          "maxLength": 16
+                        },
                         "externalSource": {
                           "type": "string"
                         },
@@ -5684,6 +5779,11 @@
                 },
                 "canonicalName": {
                   "type": "string"
+                },
+                "language": {
+                  "type": "string",
+                  "minLength": 2,
+                  "maxLength": 16
                 },
                 "externalSource": {
                   "type": "string"
@@ -5954,6 +6054,11 @@
                       "canonicalName": {
                         "type": "string"
                       },
+                      "language": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 16
+                      },
                       "externalSource": {
                         "type": "string"
                       },
@@ -6221,6 +6326,11 @@
                       "canonicalName": {
                         "type": "string"
                       },
+                      "language": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 16
+                      },
                       "externalSource": {
                         "type": "string"
                       },
@@ -6426,6 +6536,11 @@
                 },
                 "canonicalName": {
                   "type": "string"
+                },
+                "language": {
+                  "type": "string",
+                  "minLength": 2,
+                  "maxLength": 16
                 },
                 "externalSource": {
                   "type": "string"
@@ -6659,6 +6774,11 @@
                     "canonicalName": {
                       "type": "string"
                     },
+                    "language": {
+                      "type": "string",
+                      "minLength": 2,
+                      "maxLength": 16
+                    },
                     "externalSource": {
                       "type": "string"
                     },
@@ -6816,6 +6936,11 @@
                 },
                 "canonicalName": {
                   "type": "string"
+                },
+                "language": {
+                  "type": "string",
+                  "minLength": 2,
+                  "maxLength": 16
                 },
                 "externalSource": {
                   "type": "string"
@@ -7011,6 +7136,11 @@
                     "canonicalName": {
                       "type": "string"
                     },
+                    "language": {
+                      "type": "string",
+                      "minLength": 2,
+                      "maxLength": 16
+                    },
                     "externalSource": {
                       "type": "string"
                     },
@@ -7162,6 +7292,11 @@
                 },
                 "canonicalName": {
                   "type": "string"
+                },
+                "language": {
+                  "type": "string",
+                  "minLength": 2,
+                  "maxLength": 16
                 },
                 "externalSource": {
                   "type": "string"
@@ -7351,6 +7486,11 @@
                     },
                     "canonicalName": {
                       "type": "string"
+                    },
+                    "language": {
+                      "type": "string",
+                      "minLength": 2,
+                      "maxLength": 16
                     },
                     "externalSource": {
                       "type": "string"
@@ -7562,6 +7702,11 @@
                     },
                     "canonicalName": {
                       "type": "string"
+                    },
+                    "language": {
+                      "type": "string",
+                      "minLength": 2,
+                      "maxLength": 16
                     },
                     "externalSource": {
                       "type": "string"
@@ -8039,6 +8184,11 @@
                     "canonicalName": {
                       "type": "string"
                     },
+                    "language": {
+                      "type": "string",
+                      "minLength": 2,
+                      "maxLength": 16
+                    },
                     "externalSource": {
                       "type": "string"
                     },
@@ -8176,6 +8326,11 @@
                 },
                 "canonicalName": {
                   "type": "string"
+                },
+                "language": {
+                  "type": "string",
+                  "minLength": 2,
+                  "maxLength": 16
                 },
                 "externalSource": {
                   "type": "string"
@@ -8446,6 +8601,11 @@
                       "canonicalName": {
                         "type": "string"
                       },
+                      "language": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 16
+                      },
                       "externalSource": {
                         "type": "string"
                       },
@@ -8712,6 +8872,11 @@
                       },
                       "canonicalName": {
                         "type": "string"
+                      },
+                      "language": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 16
                       },
                       "externalSource": {
                         "type": "string"
@@ -9241,6 +9406,11 @@
                           "canonicalName": {
                             "type": "string"
                           },
+                          "language": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 16
+                          },
                           "externalSource": {
                             "type": "string"
                           },
@@ -9542,6 +9712,11 @@
                       "canonicalName": {
                         "type": "string"
                       },
+                      "language": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 16
+                      },
                       "externalSource": {
                         "type": "string"
                       },
@@ -9742,6 +9917,11 @@
                       "canonicalName": {
                         "type": "string"
                       },
+                      "language": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 16
+                      },
                       "externalSource": {
                         "type": "string"
                       },
@@ -9891,6 +10071,11 @@
                 },
                 "canonicalName": {
                   "type": "string"
+                },
+                "language": {
+                  "type": "string",
+                  "minLength": 2,
+                  "maxLength": 16
                 },
                 "externalSource": {
                   "type": "string"
@@ -10066,6 +10251,11 @@
                     "canonicalName": {
                       "type": "string"
                     },
+                    "language": {
+                      "type": "string",
+                      "minLength": 2,
+                      "maxLength": 16
+                    },
                     "externalSource": {
                       "type": "string"
                     },
@@ -10214,6 +10404,11 @@
                 },
                 "canonicalName": {
                   "type": "string"
+                },
+                "language": {
+                  "type": "string",
+                  "minLength": 2,
+                  "maxLength": 16
                 },
                 "externalSource": {
                   "type": "string"
@@ -10391,6 +10586,11 @@
                     },
                     "canonicalName": {
                       "type": "string"
+                    },
+                    "language": {
+                      "type": "string",
+                      "minLength": 2,
+                      "maxLength": 16
                     },
                     "externalSource": {
                       "type": "string"

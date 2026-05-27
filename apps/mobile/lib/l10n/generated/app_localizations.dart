@@ -278,6 +278,18 @@ abstract class AppLocalizations {
   /// **'Add at least one ingredient.'**
   String get commonAddAtLeastOneIngredient;
 
+  /// No description provided for @mealTitleListSeparator.
+  ///
+  /// In en, this message translates to:
+  /// **', '**
+  String get mealTitleListSeparator;
+
+  /// No description provided for @mealTitleListFinalSeparator.
+  ///
+  /// In en, this message translates to:
+  /// **' and '**
+  String get mealTitleListFinalSeparator;
+
   /// No description provided for @caloriesValue.
   ///
   /// In en, this message translates to:

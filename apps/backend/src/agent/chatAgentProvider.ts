@@ -127,76 +127,81 @@ export class RemoteChatAgentProvider implements ChatAgentProvider {
       stream_options: { include_usage: true },
       provider: this.providerRouting,
     };
-    const res = await withSpan(
-      "OpenRouter.chatCompletions.fetch",
-      {
-        requestBodyChars: JSON.stringify(requestBody).length,
-        toolCount: input.tools.length,
-      },
-      () => fetch(`${this.baseUrl}/chat/completions`, {
-        method: "POST",
-        signal: timeoutSignal(this.timeoutMs),
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": process.env.APP_BASE_URL ?? "",
-          "X-Title": "Cal Tracker Agent",
+    const timeout = providerTimeout(this.timeoutMs);
+    try {
+      const res = await withSpan(
+        "OpenRouter.chatCompletions.fetch",
+        {
+          requestBodyChars: JSON.stringify(requestBody).length,
+          toolCount: input.tools.length,
         },
-        body: JSON.stringify(requestBody),
-      }),
-    );
-
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`LLM provider error: ${res.status} ${err}`);
-    }
-
-    if (!res.body) throw new Error("Empty stream from LLM provider");
-
-    const streamed = await withSpan(
-      "OpenRouter.chatCompletions.readStream",
-      undefined,
-      () => readChatCompletionStream(res.body!),
-    );
-
-    return {
-      toolCalls: streamed.toolCalls.map((tc) => ({
-        id: tc.id,
-        type: "function",
-        function: {
-          name: tc.name,
-          arguments: tc.arguments,
-        },
-      })),
-      rawResponse: {
-        id: streamed.id,
-        choices: [
-          {
-            message: {
-              role: "assistant",
-              content: streamed.assistantContent || null,
-              tool_calls: streamed.toolCalls.map((tc) => ({
-                id: tc.id,
-                type: "function",
-                function: { name: tc.name, arguments: tc.arguments },
-              })),
-              reasoning: streamed.assistantReasoning || undefined,
-            },
+        () => timeout.run(fetch(`${this.baseUrl}/chat/completions`, {
+          method: "POST",
+          signal: timeout.signal,
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": process.env.APP_BASE_URL ?? "",
+            "X-Title": "Cal Tracker Agent",
           },
-        ],
-        usage: streamed.usage,
+          body: JSON.stringify(requestBody),
+        })),
+      );
+
+      if (!res.ok) {
+        const err = await timeout.run(res.text());
+        throw new Error(`LLM provider error: ${res.status} ${err}`);
+      }
+
+      if (!res.body) throw new Error("Empty stream from LLM provider");
+
+      const streamed = await withSpan(
+        "OpenRouter.chatCompletions.readStream",
+        undefined,
+        () => timeout.run(readChatCompletionStream(res.body!)),
+      );
+
+      return {
+        toolCalls: streamed.toolCalls.map((tc) => ({
+          id: tc.id,
+          type: "function",
+          function: {
+            name: tc.name,
+            arguments: tc.arguments,
+          },
+        })),
+        rawResponse: {
+          id: streamed.id,
+          choices: [
+            {
+              message: {
+                role: "assistant",
+                content: streamed.assistantContent || null,
+                tool_calls: streamed.toolCalls.map((tc) => ({
+                  id: tc.id,
+                  type: "function",
+                  function: { name: tc.name, arguments: tc.arguments },
+                })),
+                reasoning: streamed.assistantReasoning || undefined,
+              },
+            },
+          ],
+          usage: streamed.usage,
+          timingsMs: streamed.timingsMs,
+          providerRouting: this.providerRouting,
+        },
         timingsMs: streamed.timingsMs,
         providerRouting: this.providerRouting,
-      },
-      timingsMs: streamed.timingsMs,
-      providerRouting: this.providerRouting,
-      interaction: {
-        messages: input.messages,
-        assistantContent: streamed.assistantContent || undefined,
-        assistantReasoning: streamed.assistantReasoning || undefined,
-        streamEvents: streamed.streamEvents,
-      },
-    };
+        interaction: {
+          messages: input.messages,
+          assistantContent: streamed.assistantContent || undefined,
+          assistantReasoning: streamed.assistantReasoning || undefined,
+          streamEvents: streamed.streamEvents,
+        },
+      };
+    } finally {
+      timeout.clear();
+    }
   }
 }
 
@@ -391,8 +396,29 @@ function reasoningTextDelta(delta: Record<string, unknown>): string {
   return "";
 }
 
-function timeoutSignal(timeoutMs: number): AbortSignal | undefined {
-  return (AbortSignal as typeof AbortSignal & { timeout?: (milliseconds: number) => AbortSignal }).timeout?.(timeoutMs);
+function providerTimeout(timeoutMs: number): {
+  signal: AbortSignal;
+  run<T>(promise: Promise<T>): Promise<T>;
+  clear(): void;
+} {
+  const controller = new AbortController();
+  let timeout: ReturnType<typeof setTimeout>;
+  const timedOut = new Promise<never>((_, reject) => {
+    timeout = setTimeout(() => {
+      controller.abort();
+      reject(new Error(`LLM provider timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+    timeout.unref?.();
+  });
+  return {
+    signal: controller.signal,
+    run<T>(promise: Promise<T>): Promise<T> {
+      return Promise.race([promise, timedOut]);
+    },
+    clear(): void {
+      clearTimeout(timeout);
+    },
+  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

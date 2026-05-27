@@ -30,6 +30,8 @@
   "commonCheckIngredientDetails": "Check ingredient details",
   "commonIngredientDetailsError": "Each ingredient needs a name, amount, unit, calories, and non-negative macros.",
   "commonAddAtLeastOneIngredient": "Add at least one ingredient.",
+  "mealTitleListSeparator": ", ",
+  "mealTitleListFinalSeparator": " and ",
   "caloriesValue": "{calories} Kcal",
   "@caloriesValue": {
     "placeholders": {

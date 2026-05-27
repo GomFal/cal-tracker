@@ -100,6 +100,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commonAddAtLeastOneIngredient => 'Add at least one ingredient.';
 
   @override
+  String get mealTitleListSeparator => ', ';
+
+  @override
+  String get mealTitleListFinalSeparator => ' and ';
+
+  @override
   String caloriesValue(int calories) {
     return '$calories Kcal';
   }

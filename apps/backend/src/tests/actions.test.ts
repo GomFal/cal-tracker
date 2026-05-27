@@ -439,13 +439,17 @@ describe("action loop", () => {
     expect(proposalResponse.status).toBe(200);
     const proposalEnvelope = (await proposalResponse.json()) as {
       output: {
-        proposal: { id: string; title: string; items: unknown[] };
+        proposal: {
+          id: string;
+          title: string;
+          items: unknown[];
+        };
         options: Array<{ mention: { canonicalEnglishName: string } }>;
         candidateGroups: Array<{ mention: { canonicalEnglishName: string } }>;
       };
     };
     expect(proposalEnvelope.output.proposal.title).toBe(
-      "Chicken breast and Cooked rice",
+      "Chicken breast and rice",
     );
     expect(proposalEnvelope.output.proposal.items).toHaveLength(2);
     expect(proposalEnvelope.output.options).toEqual([]);
@@ -1104,7 +1108,13 @@ describe("action loop", () => {
     const body = (await proposalResponse.json()) as {
       output: {
         proposal: {
-          items: { name: string; canonicalName?: string; quantity: number }[];
+          title: string;
+          items: {
+            name: string;
+            canonicalName?: string;
+            language?: string;
+            quantity: number;
+          }[];
         };
         instrumentation: {
           inputMode: string;
@@ -1116,6 +1126,7 @@ describe("action loop", () => {
     expect(body.output.instrumentation.phasesMs).toHaveProperty(
       "resolve_provided_mentions",
     );
+    expect(body.output.proposal.title).toBe("Pollo y arroz");
     expect(body.output.proposal.items).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: "Chicken breast", quantity: 100 }),
@@ -1124,9 +1135,129 @@ describe("action loop", () => {
     );
     expect(body.output.proposal.items).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ canonicalName: "pollo" }),
-        expect.objectContaining({ canonicalName: "arroz" }),
+        expect.objectContaining({ canonicalName: "pollo", language: "es" }),
+        expect.objectContaining({ canonicalName: "arroz", language: "es" }),
       ]),
+    );
+  });
+
+  it("keeps same-language Spanish connectors after corrections", async () => {
+    const { request } = buildTestApp();
+    const auth = await registerAndAuth(request);
+
+    const created = await request(
+      "http://localhost/v1/actions/propose_meal_log/execute",
+      {
+        method: "POST",
+        headers: auth.authHeader,
+        body: JSON.stringify({
+          input: {
+            text: "Añade 100 gramos de pollo, 100 gramos de arroz y 100 gramos de pan",
+            mentions: [
+              mention("chicken breast", 100, {
+                originalText: "100 gramos de pollo",
+                canonicalName: "pollo",
+                language: "es",
+                rawUnitText: "gramos",
+              }),
+              mention("rice", 100, {
+                originalText: "100 gramos de arroz",
+                canonicalName: "arroz",
+                language: "es",
+                rawUnitText: "gramos",
+              }),
+              mention("bread", 100, {
+                originalText: "100 gramos de pan",
+                canonicalName: "pan",
+                language: "es",
+                rawUnitText: "gramos",
+              }),
+            ],
+          },
+          source: "flutter",
+        }),
+      },
+    );
+    expect(created.status).toBe(200);
+    const createdBody = (await created.json()) as {
+      output: { proposal: { id: string; title: string } };
+    };
+    expect(createdBody.output.proposal.title).toBe("Pollo, arroz y pan");
+
+    const revised = await request(
+      "http://localhost/v1/actions/revise_meal_proposal/execute",
+      {
+        method: "POST",
+        headers: { ...auth.authHeader, "accept-language": "en-US" },
+        body: JSON.stringify({
+          input: {
+            proposalId: createdBody.output.proposal.id,
+            instruction: "Remove the chicken.",
+            operations: [{ type: "remove_item", itemIndex: 0 }],
+          },
+          source: "flutter",
+        }),
+      },
+    );
+    expect(revised.status).toBe(200);
+    const revisedBody = (await revised.json()) as {
+      output: { proposal: { title: string } };
+    };
+    expect(revisedBody.output.proposal.title).toBe("Arroz y pan");
+  });
+
+  it("uses comma-only titles when corrections create mixed ingredient languages", async () => {
+    const { request } = buildTestApp();
+    const auth = await registerAndAuth(request);
+
+    const created = await request(
+      "http://localhost/v1/actions/propose_meal_log/execute",
+      {
+        method: "POST",
+        headers: { ...auth.authHeader, "accept-language": "en-US" },
+        body: JSON.stringify({
+          input: chickenRiceInput,
+          source: "flutter",
+        }),
+      },
+    );
+    expect(created.status).toBe(200);
+    const createdBody = (await created.json()) as {
+      output: { proposal: { id: string; title: string } };
+    };
+    expect(createdBody.output.proposal.title).toBe("Chicken breast and rice");
+
+    const revised = await request(
+      "http://localhost/v1/actions/revise_meal_proposal/execute",
+      {
+        method: "POST",
+        headers: { ...auth.authHeader, "accept-language": "es-ES" },
+        body: JSON.stringify({
+          input: {
+            proposalId: createdBody.output.proposal.id,
+            instruction: "Añade 100 gramos de pan.",
+            operations: [
+              {
+                type: "add_item",
+                mention: mention("bread", 100, {
+                  originalText: "100 gramos de pan",
+                  canonicalName: "pan",
+                  language: "es",
+                  rawUnitText: "gramos",
+                }),
+              },
+            ],
+          },
+          source: "flutter",
+        }),
+      },
+    );
+    expect(revised.status).toBe(200);
+    const revisedBody = (await revised.json()) as {
+      output: { proposal: { title: string } };
+    };
+    expect(revisedBody.output.proposal.title).toBe(
+      "Chicken breast, rice, pan",
     );
   });
 

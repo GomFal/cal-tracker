@@ -332,10 +332,13 @@ describe("AgentService", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       kind: string;
-      proposal: { title: string; items: { name: string; quantity: number }[] };
+      proposal: {
+        title: string;
+        items: { name: string; quantity: number }[];
+      };
     };
     expect(body.kind).toBe("proposal");
-    expect(body.proposal.title).toBe("Bread and Ham");
+    expect(body.proposal.title).toBe("Bread and ham");
     expect(body.proposal.items).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ name: "Bread", quantity: 100 }),

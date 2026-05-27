@@ -444,7 +444,9 @@ describe("action loop", () => {
         candidateGroups: Array<{ mention: { canonicalEnglishName: string } }>;
       };
     };
-    expect(proposalEnvelope.output.proposal.title).toBe("Chicken and rice");
+    expect(proposalEnvelope.output.proposal.title).toBe(
+      "Chicken breast and Cooked rice",
+    );
     expect(proposalEnvelope.output.proposal.items).toHaveLength(2);
     expect(proposalEnvelope.output.options).toEqual([]);
     expect(proposalEnvelope.output.candidateGroups).toEqual(

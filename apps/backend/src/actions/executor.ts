@@ -458,7 +458,7 @@ export class ActionExecutor {
       const proposal = resolution.items.length > 0
         ? await this.repository.createProposal(context.actorUserId, {
             phrase: parsed.text,
-            title: inferTitle(parsed.text, resolution.items),
+            title: inferTitle(resolution.items, context.locale),
             status: "pending",
             confidence: 0.68,
             requiresConfirmation: true,
@@ -530,7 +530,7 @@ export class ActionExecutor {
       { itemCount: items.length },
       () => this.repository.createProposal(context.actorUserId, {
         phrase: parsed.text,
-        title: template?.title ?? inferTitle(parsed.text, items),
+        title: template?.title ?? inferTitle(items, context.locale),
         status: "pending",
         confidence: fromTemplate ? memory!.confidence : 0.68,
         requiresConfirmation: true,
@@ -612,7 +612,7 @@ export class ActionExecutor {
     const parsed = createMealProposalFromItemsInputSchema.parse(input);
     const proposal = await this.repository.createProposal(context.actorUserId, {
       phrase: parsed.phrase,
-      title: parsed.title ?? inferTitle(parsed.phrase, parsed.items),
+      title: parsed.title ?? inferTitle(parsed.items, context.locale),
       status: "pending",
       confidence: Math.min(
         ...parsed.items.map((item) => item.confidence ?? 0.78),
@@ -847,7 +847,7 @@ export class ActionExecutor {
           {
             ...proposal,
             status: "corrected",
-            title: inferTitle(proposal.phrase, items),
+            title: inferTitle(items, context.locale),
             items,
             nutrition: sumNutrition(items),
           },
@@ -1232,15 +1232,13 @@ function roundOne(value: number): number {
   return Math.round(value * 10) / 10;
 }
 
-function inferTitle(text: string, items: MealItem[]): string {
-  if (items.length === 1) return items[0]!.name;
-  if (
-    normalizeText(text).includes("chicken") &&
-    normalizeText(text).includes("rice")
-  )
-    return "Chicken and rice";
-  if (items.length === 2) return `${items[0]!.name} and ${items[1]!.name}`;
-  return "Meal";
+function inferTitle(items: MealItem[], locale?: string): string {
+  const names = items.map((item) => item.name.trim()).filter(Boolean);
+  if (names.length === 0) throw new ActionExecutionError("proposal_empty");
+  return new Intl.ListFormat(locale ?? "en", {
+    style: "long",
+    type: "conjunction",
+  }).format(names);
 }
 
 const fixedMealLabels: Record<Exclude<MealLabel["type"], "other">, string> = {

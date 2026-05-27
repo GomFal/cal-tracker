@@ -68,7 +68,7 @@ describe("buildMealTitle", () => {
         item("Butter, salted", "butter", "en"),
         item("Ham", "ham", "en"),
       ],
-      expected: "Chicken, rice, bread +2",
+      expected: "Chicken, rice, bread, +2",
     },
     {
       label: "two Spanish ingredients",
@@ -96,7 +96,7 @@ describe("buildMealTitle", () => {
         item("Butter, salted", "mantequilla", "es"),
         item("Ham", "jamon", "es"),
       ],
-      expected: "Pollo, arroz, pan +2",
+      expected: "Pollo, arroz, pan, +2",
     },
     {
       label: "capitalized new first ingredient after deletion",
@@ -129,7 +129,7 @@ describe("buildMealTitle", () => {
         item("Rice, black, unenriched, raw", "arroz", "es"),
         item("Bread, wheat", "pan", "es"),
       ],
-      expected: "Pollo, jamon, beef +3",
+      expected: "Pollo, jamon, beef, +3",
     },
     {
       label: "missing item language",

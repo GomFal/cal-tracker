@@ -42,7 +42,7 @@ export function buildMealTitle(items: MealItem[]): string {
   if (hasOverflow || !connectorLanguage) {
     return capitalizeTitle(
       `${visibleNames.join(messages.listSeparator)}${
-        hasOverflow ? ` +${overflowCount}` : ""
+        hasOverflow ? `${messages.listSeparator}+${overflowCount}` : ""
       }`,
       capitalizationLocale,
     );

@@ -128,6 +128,7 @@ class MealItem {
     required this.source,
     this.originalText,
     this.canonicalName,
+    this.language,
     this.externalSource,
     this.externalId,
     this.sourceUrl,
@@ -148,6 +149,7 @@ class MealItem {
   final String source;
   final String? originalText;
   final String? canonicalName;
+  final String? language;
   final String? externalSource;
   final String? externalId;
   final String? sourceUrl;
@@ -169,6 +171,7 @@ class MealItem {
       source: json['source'] as String? ?? 'backend_estimate',
       originalText: json['originalText'] as String?,
       canonicalName: json['canonicalName'] as String?,
+      language: json['language'] as String?,
       externalSource: json['externalSource'] as String?,
       externalId: json['externalId'] as String?,
       sourceUrl: json['sourceUrl'] as String?,
@@ -191,6 +194,7 @@ class MealItem {
         'source': source,
         if (originalText != null) 'originalText': originalText,
         if (canonicalName != null) 'canonicalName': canonicalName,
+        if (language != null) 'language': language,
         if (externalSource != null) 'externalSource': externalSource,
         if (externalId != null) 'externalId': externalId,
         if (sourceUrl != null) 'sourceUrl': sourceUrl,
@@ -213,6 +217,7 @@ class MealItem {
     String? source,
     String? originalText,
     String? canonicalName,
+    String? language,
     String? externalSource,
     String? externalId,
     String? sourceUrl,
@@ -233,6 +238,7 @@ class MealItem {
       source: source ?? this.source,
       originalText: originalText ?? this.originalText,
       canonicalName: canonicalName ?? this.canonicalName,
+      language: language ?? this.language,
       externalSource: externalSource ?? this.externalSource,
       externalId: externalId ?? this.externalId,
       sourceUrl: sourceUrl ?? this.sourceUrl,

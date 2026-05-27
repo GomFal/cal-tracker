@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:cal_tracker_mobile/app/theme.dart';
@@ -172,6 +173,85 @@ void main() {
         findsNothing,
       );
       expect(find.byKey(const ValueKey('mic_button')), findsOneWidget);
+    });
+
+    testWidgets('hides start over while voice recording is starting and active',
+        (tester) async {
+      final proposal = MealProposal(
+        id: 'prop_chicken_rice',
+        title: 'Chicken and rice',
+        confidence: 0.85,
+        requiresConfirmation: true,
+        trustedAutoCommitEligible: false,
+        nutrition: const NutritionSnapshot(
+          calories: 295,
+          proteinGrams: 38,
+          carbsGrams: 29,
+          fatGrams: 4,
+        ),
+        items: [
+          _mealItem(
+            name: 'Chicken breast',
+            calories: 165,
+            externalId: 'chicken',
+          ),
+          _mealItem(
+            name: 'Cooked rice',
+            calories: 130,
+            externalId: 'rice',
+          ),
+        ],
+      );
+      final startCompleter = Completer<void>();
+      when(() => nutritionRepository.logText('chicken and rice')).thenAnswer(
+        (_) async => AgentRunResult(
+          kind: 'proposal',
+          message: 'Meal proposal created.',
+          proposal: proposal,
+        ),
+      );
+      when(() => audioRecorderService.start()).thenAnswer(
+        (_) => startCompleter.future,
+      );
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<VoiceLogViewModel>.value(
+          value: viewModel,
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            theme: buildTheme(),
+            home: const MealCreateScreen(),
+          ),
+        ),
+      );
+
+      await viewModel.submitText('chicken and rice');
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('voice_log_start_over_button')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('mic_button')));
+      await tester.pump();
+
+      expect(viewModel.state, VoiceLogState.requestingPermission);
+      expect(
+        find.byKey(const ValueKey('voice_log_start_over_button')),
+        findsNothing,
+      );
+
+      startCompleter.complete();
+      await tester.pump();
+
+      expect(viewModel.state, VoiceLogState.recording);
+      expect(
+        find.byKey(const ValueKey('voice_log_start_over_button')),
+        findsNothing,
+      );
+
+      viewModel.clearResult();
     });
 
     testWidgets(

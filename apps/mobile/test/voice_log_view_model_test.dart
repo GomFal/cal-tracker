@@ -41,6 +41,15 @@ void main() {
       viewModel.dispose();
     });
 
+    void recreateViewModel({DateTime Function()? now}) {
+      viewModel.dispose();
+      viewModel = VoiceLogViewModel(
+        nutritionRepository: mockNutritionRepository,
+        audioRecorderService: mockAudioRecorderService,
+        now: now,
+      );
+    }
+
     test('initial state is idle', () {
       expect(viewModel.state, VoiceLogState.idle);
       expect(viewModel.isLoading, isFalse);
@@ -98,6 +107,87 @@ void main() {
     });
 
     group('toggleRecording', () {
+      testWidgets('tracks recording duration from elapsed wall time',
+          (tester) async {
+        recreateViewModel(now: tester.binding.clock.now);
+        when(() => mockAudioRecorderService.start()).thenAnswer((_) async {});
+
+        await viewModel.startRecording();
+
+        expect(viewModel.state, VoiceLogState.recording);
+        expect(viewModel.recordingDuration, Duration.zero);
+
+        await tester.pump(const Duration(seconds: 1));
+        expect(viewModel.recordingDuration, const Duration(seconds: 1));
+
+        await tester.pump(const Duration(seconds: 2));
+        expect(viewModel.recordingDuration, const Duration(seconds: 3));
+
+        viewModel.clearResult();
+      });
+
+      testWidgets(
+          'ignores duplicate start requests while starting or recording',
+          (tester) async {
+        recreateViewModel(now: tester.binding.clock.now);
+        final startCompleter = Completer<void>();
+        when(
+          () => mockAudioRecorderService.start(),
+        ).thenAnswer((_) => startCompleter.future);
+
+        unawaited(viewModel.startRecording());
+        expect(viewModel.state, VoiceLogState.requestingPermission);
+
+        unawaited(viewModel.startRecording());
+        await tester.pump();
+        expect(viewModel.state, VoiceLogState.requestingPermission);
+
+        startCompleter.complete();
+        await tester.pump();
+        expect(viewModel.state, VoiceLogState.recording);
+
+        unawaited(viewModel.startRecording());
+        await tester.pump();
+
+        await tester.pump(const Duration(seconds: 2));
+        expect(viewModel.recordingDuration, const Duration(seconds: 2));
+
+        viewModel.clearResult();
+
+        verify(() => mockAudioRecorderService.start()).called(1);
+      });
+
+      testWidgets(
+          'clearResult cancels active recording timer before next recording',
+          (tester) async {
+        recreateViewModel(now: tester.binding.clock.now);
+        when(() => mockAudioRecorderService.start()).thenAnswer((_) async {});
+
+        await viewModel.startRecording();
+        expect(viewModel.state, VoiceLogState.recording);
+
+        await tester.pump(const Duration(seconds: 2));
+        expect(viewModel.recordingDuration, const Duration(seconds: 2));
+
+        viewModel.clearResult();
+        expect(viewModel.state, VoiceLogState.idle);
+        expect(viewModel.recordingDuration, Duration.zero);
+
+        await tester.pump(const Duration(seconds: 5));
+        expect(viewModel.recordingDuration, Duration.zero);
+
+        await viewModel.startRecording();
+        expect(viewModel.state, VoiceLogState.recording);
+        expect(viewModel.recordingDuration, Duration.zero);
+
+        await tester.pump(const Duration(seconds: 1));
+        expect(viewModel.recordingDuration, const Duration(seconds: 1));
+
+        viewModel.clearResult();
+
+        verify(() => mockAudioRecorderService.start()).called(2);
+      });
+
       test('starts recording when idle', () async {
         when(
           () => mockAudioRecorderService.hasPermission(),

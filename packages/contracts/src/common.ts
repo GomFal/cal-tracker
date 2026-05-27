@@ -78,6 +78,7 @@ export const mealItemSchema = z.object({
   source: z.string().default("backend_estimate"),
   originalText: foodResolutionProvenanceSchema.shape.originalText,
   canonicalName: foodResolutionProvenanceSchema.shape.canonicalName,
+  language: z.string().min(2).max(16).optional(),
   externalSource: foodResolutionProvenanceSchema.shape.externalSource,
   externalId: foodResolutionProvenanceSchema.shape.externalId,
   sourceUrl: foodResolutionProvenanceSchema.shape.sourceUrl,

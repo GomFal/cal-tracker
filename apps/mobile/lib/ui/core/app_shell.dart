@@ -379,7 +379,8 @@ class _CenterVoiceButtonState extends State<_CenterVoiceButton> {
     final palette = context.freshPalette;
     final viewModel = context.watch<VoiceLogViewModel>();
     final isRecording = viewModel.state == VoiceLogState.recording;
-    final isBusy = viewModel.state == VoiceLogState.stopping ||
+    final isBusy = viewModel.state == VoiceLogState.requestingPermission ||
+        viewModel.state == VoiceLogState.stopping ||
         viewModel.state == VoiceLogState.transcribing ||
         viewModel.state == VoiceLogState.agentRunning;
     final hasError = viewModel.state == VoiceLogState.error;

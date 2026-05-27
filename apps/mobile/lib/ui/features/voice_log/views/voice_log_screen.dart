@@ -22,6 +22,7 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
   @override
   Widget build(BuildContext context) {
     final viewModel = context.watch<VoiceLogViewModel>();
+    final canStartOver = _canStartOver(viewModel);
 
     return Scaffold(
       backgroundColor: FreshColors.screen,
@@ -39,9 +40,7 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
                 context.canPop() ? context.pop() : context.go('/dashboard'),
           ),
           actions: [
-            if (viewModel.transcript.isNotEmpty ||
-                viewModel.proposal != null ||
-                viewModel.autoCommittedMeal != null)
+            if (canStartOver)
               FreshIconButton(
                 key: const ValueKey('voice_log_start_over_button'),
                 icon: Icons.refresh_rounded,
@@ -209,6 +208,22 @@ bool _shouldShowManualFoodSearch(VoiceLogViewModel viewModel) {
   return viewModel.state == VoiceLogState.idle ||
       viewModel.state == VoiceLogState.ready ||
       viewModel.state == VoiceLogState.error;
+}
+
+bool _canStartOver(VoiceLogViewModel viewModel) {
+  final hasResettableResult = viewModel.transcript.isNotEmpty ||
+      viewModel.proposal != null ||
+      viewModel.autoCommittedMeal != null;
+  if (!hasResettableResult) return false;
+  return switch (viewModel.state) {
+    VoiceLogState.requestingPermission ||
+    VoiceLogState.recording ||
+    VoiceLogState.stopping ||
+    VoiceLogState.transcribing ||
+    VoiceLogState.agentRunning =>
+      false,
+    _ => true,
+  };
 }
 
 class _VoiceTranscriptCard extends StatelessWidget {
@@ -1261,7 +1276,8 @@ class _MealCreateVoiceActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
     final isRecording = viewModel.state == VoiceLogState.recording;
-    final isDisabled = viewModel.state == VoiceLogState.stopping ||
+    final isDisabled = viewModel.state == VoiceLogState.requestingPermission ||
+        viewModel.state == VoiceLogState.stopping ||
         viewModel.state == VoiceLogState.transcribing ||
         viewModel.state == VoiceLogState.agentRunning;
     final isCorrection = viewModel.proposal != null;

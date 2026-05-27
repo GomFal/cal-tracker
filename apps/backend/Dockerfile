@@ -10,6 +10,7 @@ RUN bun install --frozen-lockfile
 COPY tsconfig.base.json ./
 COPY packages/contracts packages/contracts
 COPY apps/backend apps/backend
+COPY apps/mobile/lib/l10n apps/mobile/lib/l10n
 COPY infra/db/migrations infra/db/migrations
 COPY infra/db/drizzle infra/db/drizzle
 
@@ -30,6 +31,7 @@ COPY --from=build /app/packages/contracts/package.json ./packages/contracts/pack
 COPY --from=build /app/packages/contracts/dist ./packages/contracts/dist
 COPY --from=build /app/apps/backend/package.json ./apps/backend/package.json
 COPY --from=build /app/apps/backend/dist ./apps/backend/dist
+COPY --from=build /app/apps/mobile/lib/l10n ./apps/mobile/lib/l10n
 COPY --from=build /app/infra/db/migrations ./infra/db/migrations
 COPY --from=build /app/infra/db/drizzle ./infra/db/drizzle
 

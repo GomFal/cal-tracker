@@ -93,4 +93,46 @@ describe("RemoteChatAgentProvider", () => {
       expect.objectContaining({ providerRouting: routing }),
     );
   });
+
+  it("times out when the provider stream does not finish", async () => {
+    globalThis.fetch = vi.fn(
+      async () =>
+        new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.enqueue(
+                new TextEncoder().encode(
+                  'data: {"choices":[{"delta":{"content":"thinking"}}]}\n\n',
+                ),
+              );
+            },
+          }),
+          { status: 200 },
+        ),
+    ) as typeof fetch;
+
+    const provider = new RemoteChatAgentProvider(
+      "test-key",
+      "https://openrouter.example.test",
+      10,
+    );
+
+    await expect(
+      provider.runWithTools({
+        model: "deepseek/deepseek-v4-flash:nitro",
+        traceId: "trace-test",
+        messages: [{ role: "user", content: "bread" }],
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "propose_meal_log",
+              description: "Propose meal",
+              parameters: { type: "object" },
+            },
+          },
+        ],
+      }),
+    ).rejects.toThrow("LLM provider timed out after 10ms");
+  });
 });

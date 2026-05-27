@@ -527,6 +527,7 @@ function itemFromFood(
     source: options.source,
     originalText: mention.originalText,
     canonicalName: canonicalNameForMention(mention),
+    language: mention.language,
     externalSource: food.externalSource,
     externalId: food.externalId,
     sourceUrl: food.sourceUrl,

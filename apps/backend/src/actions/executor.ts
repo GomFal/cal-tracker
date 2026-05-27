@@ -33,6 +33,10 @@ import type { AppRepository, FoodFeedbackAction, FoodFeedbackRecord } from "../r
 import type { MemoryRetrievalService } from "../memory/retrieval.js";
 import { withSpan, withSyncSpan } from "../observability/profiler.js";
 import { newId } from "../utils/ids.js";
+import {
+  buildMealTitle,
+  MealTitleError,
+} from "../utils/mealTitle.js";
 import { normalizeText } from "../utils/normalize.js";
 import { sumNutrition } from "../utils/nutrition.js";
 
@@ -458,7 +462,7 @@ export class ActionExecutor {
       const proposal = resolution.items.length > 0
         ? await this.repository.createProposal(context.actorUserId, {
             phrase: parsed.text,
-            title: inferTitle(parsed.text, resolution.items),
+            title: inferTitle(resolution.items),
             status: "pending",
             confidence: 0.68,
             requiresConfirmation: true,
@@ -530,7 +534,7 @@ export class ActionExecutor {
       { itemCount: items.length },
       () => this.repository.createProposal(context.actorUserId, {
         phrase: parsed.text,
-        title: template?.title ?? inferTitle(parsed.text, items),
+        title: template?.title ?? inferTitle(items),
         status: "pending",
         confidence: fromTemplate ? memory!.confidence : 0.68,
         requiresConfirmation: true,
@@ -612,7 +616,7 @@ export class ActionExecutor {
     const parsed = createMealProposalFromItemsInputSchema.parse(input);
     const proposal = await this.repository.createProposal(context.actorUserId, {
       phrase: parsed.phrase,
-      title: parsed.title ?? inferTitle(parsed.phrase, parsed.items),
+      title: parsed.title ?? inferTitle(parsed.items),
       status: "pending",
       confidence: Math.min(
         ...parsed.items.map((item) => item.confidence ?? 0.78),
@@ -665,6 +669,7 @@ export class ActionExecutor {
         {
           ...proposal,
           status: "corrected",
+          title: inferTitle(parsed.items),
           items: parsed.items,
           nutrition: sumNutrition(parsed.items),
         },
@@ -802,6 +807,7 @@ export class ActionExecutor {
               unit: operation.unit,
               rawUnitText: operation.rawUnitText ?? operation.unit,
               unitKind: operation.unit === "g" ? "metric" : "unknown",
+              language: current.language,
               confidence: current.confidence ?? 0.8,
               marketProduct: false,
             },
@@ -847,7 +853,7 @@ export class ActionExecutor {
           {
             ...proposal,
             status: "corrected",
-            title: inferTitle(proposal.phrase, items),
+            title: inferTitle(items),
             items,
             nutrition: sumNutrition(items),
           },
@@ -1232,15 +1238,15 @@ function roundOne(value: number): number {
   return Math.round(value * 10) / 10;
 }
 
-function inferTitle(text: string, items: MealItem[]): string {
-  if (items.length === 1) return items[0]!.name;
-  if (
-    normalizeText(text).includes("chicken") &&
-    normalizeText(text).includes("rice")
-  )
-    return "Chicken and rice";
-  if (items.length === 2) return `${items[0]!.name} and ${items[1]!.name}`;
-  return "Meal";
+function inferTitle(items: MealItem[]): string {
+  try {
+    return buildMealTitle(items);
+  } catch (error) {
+    if (error instanceof MealTitleError) {
+      throw new ActionExecutionError(error.code);
+    }
+    throw error;
+  }
 }
 
 const fixedMealLabels: Record<Exclude<MealLabel["type"], "other">, string> = {

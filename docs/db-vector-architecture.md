@@ -272,7 +272,6 @@ Food resolution currently follows this shape:
 3. Use barcode lookup when a barcode is present.
 4. Use vector search when lexical search is insufficient and embeddings are available.
 5. Rerank by lexical score, vector score, and user preference score.
-6. Fall back to external providers when local confidence is below threshold.
 ```
 
 Meal memory currently follows this shape:

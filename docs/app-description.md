@@ -833,12 +833,11 @@ Nutrition lookup priority:
 ```text
 1. User-confirmed meal templates and user custom foods.
 2. USDA FoodData Central cached generic ingredient match for basic single-ingredient foods.
-3. USDA FoodData Central live lookup when the generic ingredient is not cached.
-4. Open Food Facts barcode or exact branded/packaged product match.
-5. Manual user-provided nutrition values for explicit custom foods.
+3. Cached/imported Open Food Facts barcode or exact branded/packaged product match.
+4. Manual user-provided nutrition values for explicit custom foods.
 ```
 
-The backend must not use LLM-only nutrition values or unprovenanced seed values as authoritative nutrition data. If the backend cannot resolve nutrition values from USDA FoodData Central, Open Food Facts, user custom foods, or user-confirmed templates, the proposal must ask for clarification or explicit manual nutrition values rather than inventing calories/macros.
+The backend must not use LLM-only nutrition values or unprovenanced seed values as authoritative nutrition data. If the backend cannot resolve nutrition values from cached/imported USDA FoodData Central rows, cached/imported Open Food Facts rows, user custom foods, or user-confirmed templates, the proposal must ask for clarification or explicit manual nutrition values rather than inventing calories/macros.
 
 Provider roles:
 
@@ -1073,9 +1072,8 @@ Priority order:
 ```text
 1. User-confirmed meal templates and user custom foods.
 2. USDA FoodData Central cached generic ingredient match for basic single-ingredient foods.
-3. USDA FoodData Central live lookup when the generic ingredient is not cached.
-4. Open Food Facts barcode or exact branded/packaged product match.
-5. Manual user-provided nutrition values for explicit custom foods.
+3. Cached/imported Open Food Facts barcode or exact branded/packaged product match.
+4. Manual user-provided nutrition values for explicit custom foods.
 ```
 
 Rules:

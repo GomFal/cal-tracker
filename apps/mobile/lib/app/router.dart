@@ -56,6 +56,10 @@ GoRouter buildRouter(
           return SlidingBranchContainer(
             currentIndex: navigationShell.currentIndex,
             children: children,
+            onPageChanged: (index) {
+              if (index == navigationShell.currentIndex) return;
+              navigationShell.goBranch(index);
+            },
           );
         },
         branches: [

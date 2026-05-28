@@ -425,7 +425,7 @@ abstract class AppLocalizations {
   /// No description provided for @authHeroHeadline.
   ///
   /// In en, this message translates to:
-  /// **'Track your\ncalories better.'**
+  /// **'Track your\ncalories, better.'**
   String get authHeroHeadline;
 
   /// No description provided for @darkModeSwitchToLight.

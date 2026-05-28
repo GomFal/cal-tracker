@@ -23,7 +23,7 @@ void main() {
     final headline = tester.widget<Text>(
       find.byKey(const ValueKey('auth_hero_headline')),
     );
-    expect(headline.textSpan?.toPlainText(), 'Track your\ncalories better.');
+    expect(headline.textSpan?.toPlainText(), 'Track your\ncalories, better.');
     expect(find.byKey(const ValueKey('auth_brand_icon')), findsOneWidget);
     expect(find.byKey(const ValueKey('login_hero_carousel')), findsOneWidget);
     expect(find.byKey(const ValueKey('login_hero_image_0')), findsOneWidget);

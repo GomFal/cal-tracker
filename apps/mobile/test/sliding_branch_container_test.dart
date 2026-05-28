@@ -1,4 +1,5 @@
 import 'package:cal_tracker_mobile/ui/core/app_shell.dart';
+import 'package:cal_tracker_mobile/ui/core/shell_modal_lock.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -88,6 +89,109 @@ void main() {
     expect(_hitTestableBranch(2), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('user swipe does not change branches when disabled', (
+    tester,
+  ) async {
+    final changes = <int>[];
+
+    await tester.pumpWidget(
+      _StatefulBranchHarness(
+        initialIndex: 0,
+        userScrollEnabled: false,
+        onPageChanged: changes.add,
+      ),
+    );
+
+    expect(_hitTestableBranch(0), findsOneWidget);
+
+    await tester.drag(find.byType(PageView), const Offset(-500, 0));
+    await tester.pumpAndSettle();
+
+    expect(changes, isEmpty);
+    expect(_hitTestableBranch(0), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('programmatic branch changes still work when swipe is disabled', (
+    tester,
+  ) async {
+    final changes = <int>[];
+
+    await tester.pumpWidget(
+      _BranchHarness(
+        currentIndex: 0,
+        userScrollEnabled: false,
+        onPageChanged: changes.add,
+      ),
+    );
+
+    await tester.pumpWidget(
+      _BranchHarness(
+        currentIndex: 2,
+        userScrollEnabled: false,
+        onPageChanged: changes.add,
+      ),
+    );
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(changes, isEmpty);
+    expect(_hitTestableBranch(2), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  test('modal lock observer locks until all popup routes close', () {
+    final controller = ShellModalLockController();
+    final observer = ShellModalLockObserver(controller);
+    final firstPopup = _TestPopupRoute();
+    final secondPopup = _TestPopupRoute();
+
+    observer.didPush(firstPopup, null);
+    expect(controller.isLocked, isTrue);
+
+    observer.didPush(secondPopup, firstPopup);
+    expect(controller.isLocked, isTrue);
+
+    observer.didPop(secondPopup, firstPopup);
+    expect(controller.isLocked, isTrue);
+
+    observer.didRemove(firstPopup, null);
+    expect(controller.isLocked, isFalse);
+  });
+
+  test('modal lock controller tracks popup routes across observers', () {
+    final controller = ShellModalLockController();
+    final rootObserver = ShellModalLockObserver(controller);
+    final branchObserver = ShellModalLockObserver(controller);
+    final rootPopup = _TestPopupRoute();
+    final branchPopup = _TestPopupRoute();
+
+    rootObserver.didPush(rootPopup, null);
+    branchObserver.didPush(branchPopup, null);
+    expect(controller.isLocked, isTrue);
+
+    branchObserver.didPop(branchPopup, null);
+    expect(controller.isLocked, isTrue);
+
+    rootObserver.didPop(rootPopup, null);
+    expect(controller.isLocked, isFalse);
+  });
+
+  test('modal lock observer syncs replacements', () {
+    final controller = ShellModalLockController();
+    final observer = ShellModalLockObserver(controller);
+    final popup = _TestPopupRoute();
+    final page = MaterialPageRoute<void>(
+      builder: (_) => const SizedBox.shrink(),
+    );
+
+    observer.didPush(popup, null);
+    expect(controller.isLocked, isTrue);
+
+    observer.didReplace(newRoute: page, oldRoute: popup);
+    expect(controller.isLocked, isFalse);
+  });
 }
 
 Finder _hitTestableBranch(int index) {
@@ -98,10 +202,12 @@ class _StatefulBranchHarness extends StatefulWidget {
   const _StatefulBranchHarness({
     required this.initialIndex,
     required this.onPageChanged,
+    this.userScrollEnabled = true,
   });
 
   final int initialIndex;
   final ValueChanged<int> onPageChanged;
+  final bool userScrollEnabled;
 
   @override
   State<_StatefulBranchHarness> createState() => _StatefulBranchHarnessState();
@@ -120,6 +226,7 @@ class _StatefulBranchHarnessState extends State<_StatefulBranchHarness> {
   Widget build(BuildContext context) {
     return _BranchHarness(
       currentIndex: currentIndex,
+      userScrollEnabled: widget.userScrollEnabled,
       onPageChanged: (index) {
         setState(() => currentIndex = index);
         widget.onPageChanged(index);
@@ -132,10 +239,12 @@ class _BranchHarness extends StatelessWidget {
   const _BranchHarness({
     required this.currentIndex,
     required this.onPageChanged,
+    this.userScrollEnabled = true,
   });
 
   final int currentIndex;
   final ValueChanged<int> onPageChanged;
+  final bool userScrollEnabled;
 
   @override
   Widget build(BuildContext context) {
@@ -143,6 +252,7 @@ class _BranchHarness extends StatelessWidget {
       home: SizedBox.expand(
         child: SlidingBranchContainer(
           currentIndex: currentIndex,
+          userScrollEnabled: userScrollEnabled,
           onPageChanged: onPageChanged,
           children: [
             for (var index = 0; index < 4; index++)
@@ -156,5 +266,28 @@ class _BranchHarness extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _TestPopupRoute extends PopupRoute<void> {
+  @override
+  Color? get barrierColor => null;
+
+  @override
+  bool get barrierDismissible => false;
+
+  @override
+  String? get barrierLabel => null;
+
+  @override
+  Duration get transitionDuration => Duration.zero;
+
+  @override
+  Widget buildPage(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+  ) {
+    return const SizedBox.shrink();
   }
 }

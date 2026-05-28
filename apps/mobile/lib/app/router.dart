@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../l10n/app_localizations_context.dart';
 import '../ui/core/design_system.dart';
 import '../ui/core/app_shell.dart';
+import '../ui/core/shell_modal_lock.dart';
 import '../ui/features/auth/view_models/auth_view_model.dart';
 import '../ui/features/auth/views/auth_screen.dart';
 import '../ui/features/dashboard/views/dashboard_screen.dart';
@@ -18,8 +19,13 @@ GoRouter buildRouter(
   AuthViewModel authViewModel, {
   GlobalKey<NavigatorState>? navigatorKey,
 }) {
+  final modalLockController = ShellModalLockController();
+  List<NavigatorObserver> modalLockObservers() => [
+        ShellModalLockObserver(modalLockController),
+      ];
   return GoRouter(
     navigatorKey: navigatorKey,
+    observers: modalLockObservers(),
     initialLocation: '/dashboard',
     refreshListenable: authViewModel,
     redirect: (context, state) {
@@ -53,17 +59,24 @@ GoRouter buildRouter(
           child: AppShell(navigationShell: navigationShell),
         ),
         navigatorContainerBuilder: (context, navigationShell, children) {
-          return SlidingBranchContainer(
-            currentIndex: navigationShell.currentIndex,
-            children: children,
-            onPageChanged: (index) {
-              if (index == navigationShell.currentIndex) return;
-              navigationShell.goBranch(index);
+          return ListenableBuilder(
+            listenable: modalLockController,
+            builder: (context, _) {
+              return SlidingBranchContainer(
+                currentIndex: navigationShell.currentIndex,
+                userScrollEnabled: !modalLockController.isLocked,
+                onPageChanged: (index) {
+                  if (index == navigationShell.currentIndex) return;
+                  navigationShell.goBranch(index);
+                },
+                children: children,
+              );
             },
           );
         },
         branches: [
           StatefulShellBranch(
+            observers: modalLockObservers(),
             routes: [
               GoRoute(
                 path: '/dashboard',
@@ -78,6 +91,7 @@ GoRouter buildRouter(
             ],
           ),
           StatefulShellBranch(
+            observers: modalLockObservers(),
             routes: [
               GoRoute(
                 path: '/history',
@@ -92,6 +106,7 @@ GoRouter buildRouter(
             ],
           ),
           StatefulShellBranch(
+            observers: modalLockObservers(),
             routes: [
               GoRoute(
                 path: '/templates',
@@ -106,6 +121,7 @@ GoRouter buildRouter(
             ],
           ),
           StatefulShellBranch(
+            observers: modalLockObservers(),
             routes: [
               GoRoute(
                 path: '/settings',

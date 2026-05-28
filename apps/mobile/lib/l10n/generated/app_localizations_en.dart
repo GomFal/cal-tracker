@@ -179,7 +179,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authPasswordTooShortError => 'Use at least 8 characters.';
 
   @override
-  String get authHeroHeadline => 'Track your\ncalories better.';
+  String get authHeroHeadline => 'Track your\ncalories, better.';
 
   @override
   String get darkModeSwitchToLight => 'Switch to light mode';

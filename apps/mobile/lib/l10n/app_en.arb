@@ -30,6 +30,36 @@
   "commonCheckIngredientDetails": "Check ingredient details",
   "commonIngredientDetailsError": "Each ingredient needs a name, amount, unit, calories, and non-negative macros.",
   "commonAddAtLeastOneIngredient": "Add at least one ingredient.",
+  "mealEditorMealTotal": "Meal total",
+  "mealEditorIngredientsSection": "Ingredients",
+  "mealEditorEditDetails": "Edit details",
+  "mealEditorNutritionDetails": "Nutrition details",
+  "mealEditorApplySuggestion": "Apply suggestion",
+  "mealEditorCalculatedFromMacros": "Calculated from macros: {calories} kcal",
+  "@mealEditorCalculatedFromMacros": {
+    "placeholders": {
+      "calories": {
+        "type": "int"
+      }
+    }
+  },
+  "mealEditorMacroCaloriesShort": "{calories} kcal from macros",
+  "@mealEditorMacroCaloriesShort": {
+    "placeholders": {
+      "calories": {
+        "type": "int"
+      }
+    }
+  },
+  "mealEditorCaloriesMismatchTitle": "Calories differ from macros",
+  "mealEditorCaloriesMismatchMessage": "Calculated from macros: {calories} kcal",
+  "@mealEditorCaloriesMismatchMessage": {
+    "placeholders": {
+      "calories": {
+        "type": "int"
+      }
+    }
+  },
   "mealTitleListSeparator": ", ",
   "mealTitleListFinalSeparator": " and ",
   "caloriesValue": "{calories} Kcal",

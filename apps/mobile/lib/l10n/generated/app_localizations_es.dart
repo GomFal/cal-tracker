@@ -100,6 +100,40 @@ class AppLocalizationsEs extends AppLocalizations {
   String get commonAddAtLeastOneIngredient => 'Añade al menos un ingrediente.';
 
   @override
+  String get mealEditorMealTotal => 'Total de la comida';
+
+  @override
+  String get mealEditorIngredientsSection => 'Ingredientes';
+
+  @override
+  String get mealEditorEditDetails => 'Editar detalles';
+
+  @override
+  String get mealEditorNutritionDetails => 'Detalles nutricionales';
+
+  @override
+  String get mealEditorApplySuggestion => 'Aplicar sugerencia';
+
+  @override
+  String mealEditorCalculatedFromMacros(int calories) {
+    return 'Calculado desde macros: $calories kcal';
+  }
+
+  @override
+  String mealEditorMacroCaloriesShort(int calories) {
+    return '$calories kcal desde macros';
+  }
+
+  @override
+  String get mealEditorCaloriesMismatchTitle =>
+      'Las calorías no cuadran con los macros';
+
+  @override
+  String mealEditorCaloriesMismatchMessage(int calories) {
+    return 'Calculado desde macros: $calories kcal';
+  }
+
+  @override
   String get mealTitleListSeparator => ', ';
 
   @override

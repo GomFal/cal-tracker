@@ -17,9 +17,7 @@ void main() {
 
     await tester.pumpWidget(
       ChangeNotifierProvider(
-        create: (_) => MealHistoryViewModel(
-          nutritionRepository: repository,
-        ),
+        create: (_) => MealHistoryViewModel(nutritionRepository: repository),
         child: const _TestApp(),
       ),
     );
@@ -35,18 +33,41 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.enterText(
-      find.byKey(const ValueKey('history_item_quantity_0')),
+      find.byKey(const ValueKey('history_item_quantity_field_0')),
       '200',
     );
-    await tester.enterText(
-      find.byKey(const ValueKey('history_item_calories_0')),
-      '360',
+    final detailsFinder = find.byKey(
+      const ValueKey('history_item_edit_details_0'),
     );
+    await tester.ensureVisible(detailsFinder);
+    await tester.pumpAndSettle();
+    await tester.tap(detailsFinder.hitTestable());
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('history_item_protein_0')),
+      '90',
+    );
+    await tester.enterText(
+        find.byKey(const ValueKey('history_item_carbs_0')), '0');
+    await tester.enterText(
+        find.byKey(const ValueKey('history_item_fat_0')), '0');
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('history_item_apply_suggestion_0')),
+    );
+    await tester.pumpAndSettle();
+    final caloriesField = tester.widget<TextField>(
+      find.byKey(const ValueKey('history_item_calories_0')),
+    );
+    expect(caloriesField.controller!.text, '360');
+    await tester.tap(find.byKey(const ValueKey('history_item_save_details_0')));
+    await tester.pumpAndSettle();
     await tester.ensureVisible(
       find.byKey(const ValueKey('save_history_item_edits_button')),
     );
-    await tester
-        .tap(find.byKey(const ValueKey('save_history_item_edits_button')));
+    await tester.tap(
+      find.byKey(const ValueKey('save_history_item_edits_button')),
+    );
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
@@ -149,8 +170,10 @@ class _FakeNutritionRepository extends NutritionRepository {
       occurredAt: _meal.occurredAt,
       nutrition: NutritionSnapshot(
         calories: items.fold<int>(0, (sum, item) => sum + item.calories),
-        proteinGrams:
-            items.fold<double>(0, (sum, item) => sum + item.proteinGrams),
+        proteinGrams: items.fold<double>(
+          0,
+          (sum, item) => sum + item.proteinGrams,
+        ),
         carbsGrams: items.fold<double>(0, (sum, item) => sum + item.carbsGrams),
         fatGrams: items.fold<double>(0, (sum, item) => sum + item.fatGrams),
       ),
@@ -169,10 +192,7 @@ const _targetNutrition = NutritionSnapshot(
 
 NutritionSnapshot _sumMealNutrition(List<Meal> meals) {
   return NutritionSnapshot(
-    calories: meals.fold<int>(
-      0,
-      (sum, meal) => sum + meal.nutrition.calories,
-    ),
+    calories: meals.fold<int>(0, (sum, meal) => sum + meal.nutrition.calories),
     proteinGrams: meals.fold<double>(
       0,
       (sum, meal) => sum + meal.nutrition.proteinGrams,

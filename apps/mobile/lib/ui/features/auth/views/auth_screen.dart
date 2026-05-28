@@ -450,7 +450,6 @@ class _LoginHeroCarouselState extends State<_LoginHeroCarousel>
   @override
   Widget build(BuildContext context) {
     final height = MediaQuery.of(context).size.height < 740 ? 318.0 : 372.0;
-    final palette = context.freshPalette;
     final staticMode =
         MediaQuery.of(context).disableAnimations || widget.assets.length == 1;
     return SizedBox(

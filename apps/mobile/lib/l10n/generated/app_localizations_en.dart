@@ -100,6 +100,39 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commonAddAtLeastOneIngredient => 'Add at least one ingredient.';
 
   @override
+  String get mealEditorMealTotal => 'Meal total';
+
+  @override
+  String get mealEditorIngredientsSection => 'Ingredients';
+
+  @override
+  String get mealEditorEditDetails => 'Edit details';
+
+  @override
+  String get mealEditorNutritionDetails => 'Nutrition details';
+
+  @override
+  String get mealEditorApplySuggestion => 'Apply suggestion';
+
+  @override
+  String mealEditorCalculatedFromMacros(int calories) {
+    return 'Calculated from macros: $calories kcal';
+  }
+
+  @override
+  String mealEditorMacroCaloriesShort(int calories) {
+    return '$calories kcal from macros';
+  }
+
+  @override
+  String get mealEditorCaloriesMismatchTitle => 'Calories differ from macros';
+
+  @override
+  String mealEditorCaloriesMismatchMessage(int calories) {
+    return 'Calculated from macros: $calories kcal';
+  }
+
+  @override
   String get mealTitleListSeparator => ', ';
 
   @override

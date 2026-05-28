@@ -251,7 +251,7 @@ export const actionDefinitions = [
     id: "search_nutrition_database",
     version: "1.0.0",
     title: "Search Nutrition Database",
-    description: "Search user custom foods and generic nutrition entries.",
+    description: "Search user custom foods, products, and nutrition entries.",
     inputSchema: searchNutritionDatabaseInputSchema,
     outputSchema: searchNutritionDatabaseOutputSchema,
     permissionScope: PermissionScope.NutritionReadMemory,

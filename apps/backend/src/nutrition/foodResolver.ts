@@ -403,7 +403,7 @@ export class LocalFoodDataProvider implements FoodDataProvider {
       "LocalFoodDataProvider.searchFoods",
       {
         query,
-        excludeBranded: !hasMarketProductIntent(mention),
+        hasBarcode: Boolean(mention.barcode),
       },
       () => this.searchFoodsInternal(userId, mention, query),
     );
@@ -415,21 +415,18 @@ export class LocalFoodDataProvider implements FoodDataProvider {
     query: string,
   ): Promise<Array<FoodItemRecord & Partial<FoodSearchCandidate>>> {
     const locale = mention.language;
-    const marketIntent = hasMarketProductIntent(mention);
-    const cacheKey = JSON.stringify({ userId, query, barcode: mention.barcode, locale, marketIntent });
+    const cacheKey = JSON.stringify({ userId, query, barcode: mention.barcode, locale });
     const cached = this.searchCache.get(cacheKey);
     if (cached) return cached.map(cloneLocalFoodCandidate);
 
     const lexical = await withSpan(
       "Repository.searchFoodsHybrid",
-      { query, mode: "lexical", locale, marketIntent },
+      { query, mode: "lexical", locale, hasBarcode: Boolean(mention.barcode) },
       () => this.repository.searchFoodsHybrid(userId, {
         query,
         barcode: mention.barcode,
-        excludeBranded: !marketIntent,
         limit: 50,
         locale,
-        scope: marketIntent ? "market" : "generic",
       }),
     );
     if (lexical.length > 0 || mention.barcode) {
@@ -457,7 +454,6 @@ function cachedFoodIsCompatible(
   food: FoodItemRecord,
   mention: FoodMention,
 ): boolean {
-  if (isBrandedFood(food) && !hasMarketProductIntent(mention)) return false;
   if (food.externalSource !== "usda_fdc") return true;
   return Boolean(scoreUsdaCandidate(usdaFoodFromRecord(food), mention));
 }

@@ -175,21 +175,15 @@ export class InMemoryRepository implements AppRepository {
     const normalized = normalizeText(input.query);
     const limit = sanitizeLimit(input.limit);
     const candidates = new Map<string, { food: FoodItemRecord; lexicalScore: number; vectorScore?: number }>();
-    const baseFoods = [...this.foods.values()].filter((food) => {
-      if (food.userId && food.userId !== userId) return false;
-      if (input.excludeBranded && food.dataType === "Branded") return false;
-      return true;
-    });
-    const visibleFoods = baseFoods.filter((food) => foodMatchesSearchLocale(food, input));
-    const primaryFoods = visibleFoods.filter((food) => foodMatchesSearchScope(food, input));
-    const primaryFoodIds = new Set(primaryFoods.map((food) => food.id));
+    const visibleFoods = [...this.foods.values()].filter((food) => !food.userId || food.userId === userId);
+    const visibleFoodIds = new Set(visibleFoods.map((food) => food.id));
 
     if (input.barcode) {
-      for (const food of primaryFoods) {
+      for (const food of visibleFoods) {
         if (food.barcode === input.barcode) candidates.set(food.id, { food, lexicalScore: 1 });
       }
     } else if (normalized.length > 0) {
-      for (const food of primaryFoods) {
+      for (const food of visibleFoods) {
         const lexicalScore = lexicalFoodScore(food, normalized) || fuzzyFoodScore(food, normalized);
         if (lexicalScore > 0) candidates.set(food.id, { food, lexicalScore });
       }
@@ -199,7 +193,7 @@ export class InMemoryRepository implements AppRepository {
       for (const embedding of this.foodEmbeddings.values()) {
         const food = this.foods.get(embedding.foodItemId);
         if (!food || (food.userId && food.userId !== userId)) continue;
-        if (!primaryFoodIds.has(food.id)) continue;
+        if (!visibleFoodIds.has(food.id)) continue;
         const vectorScore = clampScore(cosineSimilarity(input.embedding, embedding.embedding));
         const existing = candidates.get(food.id);
         if (existing) {
@@ -607,47 +601,6 @@ function stripFoodSearchCandidate(candidate: FoodSearchCandidate): FoodItemRecor
     ...food
   } = candidate;
   return food;
-}
-
-function foodMatchesSearchScope(food: FoodItemRecord, input: FoodHybridSearchInput): boolean {
-  if (!input.scope) return true;
-  const scope = foodSearchScopeForFood(food);
-  if (input.scope === "market") return scope === "market" || scope === "generic";
-  return scope === input.scope;
-}
-
-function foodSearchScopeForFood(food: FoodItemRecord): "generic" | "market" {
-  return food.userId ||
-    (
-      food.dataType !== "Branded" &&
-      food.source !== "usda_branded" &&
-      (food.source !== "openfoodfacts" || (!food.barcode && !food.brand))
-    )
-    ? "generic"
-    : "market";
-}
-
-function foodMatchesSearchLocale(food: FoodItemRecord, input: FoodHybridSearchInput): boolean {
-  const locale = normalizeSearchLocale(input.locale);
-  if (!locale) return true;
-  if (input.scope === "market") return true;
-  const foodLocale =
-    food.foodKey === "es" || food.foodKey === "en"
-      ? food.foodKey
-      : food.externalSource === "usda_fdc"
-        ? "en"
-        : "any";
-  if (locale === "es") return foodLocale === "es" || foodLocale === "any";
-  if (locale === "en") return foodLocale === "en" || foodLocale === "any";
-  return true;
-}
-
-function normalizeSearchLocale(locale?: string): "es" | "en" | undefined {
-  const normalized = locale?.toLowerCase();
-  if (!normalized) return undefined;
-  if (normalized.startsWith("es")) return "es";
-  if (normalized.startsWith("en")) return "en";
-  return undefined;
 }
 
 function sanitizeLimit(limit?: number): number {

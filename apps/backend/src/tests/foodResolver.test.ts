@@ -302,7 +302,7 @@ describe("FoodResolver candidate groups", () => {
 });
 
 describe("FoodResolver", () => {
-  it("keeps Open Food Facts products out of generic search and available in market search", async () => {
+  it("searches Open Food Facts products and generic foods in one corpus", async () => {
     const repository = InMemoryRepository.seeded();
     await repository.upsertFoodItem({
       name: "Arroz",
@@ -357,14 +357,6 @@ describe("FoodResolver", () => {
       repository.searchFoodsHybrid("user-1", {
         query: "arroz",
         locale: "es-ES",
-        scope: "generic",
-      }),
-    ).resolves.toEqual([]);
-    await expect(
-      repository.searchFoodsHybrid("user-1", {
-        query: "arroz",
-        locale: "es-ES",
-        scope: "market",
       }),
     ).resolves.toEqual([
       expect.objectContaining({ externalId: "es-arroz", foodKey: "es" }),
@@ -373,11 +365,13 @@ describe("FoodResolver", () => {
       repository.searchFoodsHybrid("user-1", {
         query: "rice",
         locale: "en-US",
-        scope: "generic",
       }),
-    ).resolves.toEqual([
-      expect.objectContaining({ externalId: "usda-rice" }),
-    ]);
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ externalId: "usda-rice" }),
+        expect.objectContaining({ externalId: "en-rice-product" }),
+      ]),
+    );
   });
 
   it("ranks first-token food matches above later-token matches", async () => {
@@ -428,7 +422,6 @@ describe("FoodResolver", () => {
     const riceResults = await repository.searchFoodsHybrid("user-1", {
       query: "rice",
       locale: "en-US",
-      scope: "generic",
     });
     expect(riceResults.map((food) => food.externalId)).toEqual([
       "usda-rice-grain",
@@ -439,7 +432,6 @@ describe("FoodResolver", () => {
     const noodleResults = await repository.searchFoodsHybrid("user-1", {
       query: "rice noodles",
       locale: "en-US",
-      scope: "generic",
     });
     expect(noodleResults[0]).toEqual(
       expect.objectContaining({ externalId: "usda-rice-noodles" }),
@@ -483,7 +475,6 @@ describe("FoodResolver", () => {
       repository.searchFoodsHybrid("user-1", {
         query: "pechga pollo",
         locale: "es-ES",
-        scope: "generic",
       }),
     ).resolves.toEqual([
       expect.objectContaining({ externalId: "es-pechuga-pollo" }),
@@ -492,7 +483,6 @@ describe("FoodResolver", () => {
       repository.searchFoodsHybrid("user-1", {
         query: "iogur",
         locale: "es-ES",
-        scope: "generic",
       }),
     ).resolves.toEqual([
       expect.objectContaining({ externalId: "es-yogur-natural" }),
@@ -501,7 +491,6 @@ describe("FoodResolver", () => {
       repository.searchFoodsHybrid("user-1", {
         query: "yog",
         locale: "es-ES",
-        scope: "generic",
       }),
     ).resolves.toEqual([
       expect.objectContaining({ externalId: "es-yogur-natural" }),
@@ -835,7 +824,7 @@ describe("FoodResolver", () => {
     );
   });
 
-  it("does not use branded USDA rows for generic searches but allows barcode intent", async () => {
+  it("can resolve branded USDA rows through unified search and barcode intent", async () => {
     const repository = InMemoryRepository.seeded();
     await repository.upsertFoodItem({
       name: "Cheese Crackers",
@@ -858,11 +847,16 @@ describe("FoodResolver", () => {
       0.75,
     );
 
-    const generic = await resolver.resolveMealMentions("user-1", [
-      mention("cheese", "100 grams cheese"),
+    const unifiedSearch = await resolver.resolveMealMentions("user-1", [
+      mention("cheese crackers", "100 grams cheese crackers"),
     ]);
-    expect(generic.clarificationRequired).toBe(true);
-    expect(generic.items).toHaveLength(0);
+    expect(unifiedSearch.clarificationRequired).toBe(false);
+    expect(unifiedSearch.items[0]).toEqual(
+      expect.objectContaining({
+        name: "Cheese Crackers",
+        externalId: "4001",
+      }),
+    );
 
     const barcode = await resolver.search("user-1", "cheese", "000111222333");
     expect(barcode.items[0]).toEqual(

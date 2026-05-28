@@ -278,6 +278,60 @@ abstract class AppLocalizations {
   /// **'Add at least one ingredient.'**
   String get commonAddAtLeastOneIngredient;
 
+  /// No description provided for @mealEditorMealTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Meal total'**
+  String get mealEditorMealTotal;
+
+  /// No description provided for @mealEditorIngredientsSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Ingredients'**
+  String get mealEditorIngredientsSection;
+
+  /// No description provided for @mealEditorEditDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit details'**
+  String get mealEditorEditDetails;
+
+  /// No description provided for @mealEditorNutritionDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Nutrition details'**
+  String get mealEditorNutritionDetails;
+
+  /// No description provided for @mealEditorApplySuggestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply suggestion'**
+  String get mealEditorApplySuggestion;
+
+  /// No description provided for @mealEditorCalculatedFromMacros.
+  ///
+  /// In en, this message translates to:
+  /// **'Calculated from macros: {calories} kcal'**
+  String mealEditorCalculatedFromMacros(int calories);
+
+  /// No description provided for @mealEditorMacroCaloriesShort.
+  ///
+  /// In en, this message translates to:
+  /// **'{calories} kcal from macros'**
+  String mealEditorMacroCaloriesShort(int calories);
+
+  /// No description provided for @mealEditorCaloriesMismatchTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Calories differ from macros'**
+  String get mealEditorCaloriesMismatchTitle;
+
+  /// No description provided for @mealEditorCaloriesMismatchMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Calculated from macros: {calories} kcal'**
+  String mealEditorCaloriesMismatchMessage(int calories);
+
   /// No description provided for @mealTitleListSeparator.
   ///
   /// In en, this message translates to:

@@ -1,5 +1,8 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
+import '../../domain/models/macro_distribution.dart';
 import '../../domain/models/nutrition_models.dart';
 import '../../l10n/app_localizations_context.dart';
 import '../core/design_system.dart';
@@ -25,9 +28,7 @@ class _MealItemEditorSheetState extends State<MealItemEditorSheet> {
   @override
   void initState() {
     super.initState();
-    _items = [
-      for (final item in widget.meal.items) _EditableMealItem(item),
-    ];
+    _items = [for (final item in widget.meal.items) _EditableMealItem(item)];
     if (_items.isEmpty) {
       _items.add(_EditableMealItem.empty());
     }
@@ -46,77 +47,95 @@ class _MealItemEditorSheetState extends State<MealItemEditorSheet> {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     final textTheme = Theme.of(context).textTheme;
     final l10n = context.l10n;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(18, 12, 18, bottomInset + 18),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(
-              child: Container(
-                width: 44,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: context.freshPalette.rule,
-                  borderRadius: BorderRadius.circular(999),
+    final palette = context.freshPalette;
+    return DecoratedBox(
+      decoration: BoxDecoration(color: palette.surfaceSoft),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(18, 12, 18, bottomInset + 18),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: context.freshPalette.rule,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: FreshSpacing.lg),
-            Text(l10n.commonEditIngredients, style: textTheme.titleLarge),
-            const SizedBox(height: FreshSpacing.xs),
-            Text(
-              widget.meal.title,
-              style: textTheme.bodyMedium?.copyWith(
-                color: context.freshPalette.inkMuted,
-              ),
-            ),
-            const SizedBox(height: FreshSpacing.md),
-            if (_error != null) ...[
-              FreshStatusBanner(
-                icon: Icons.error_outline_rounded,
-                title: l10n.commonCheckIngredientDetails,
-                message: _error!,
-                color: FreshColors.coral,
+              const SizedBox(height: FreshSpacing.lg),
+              Text(l10n.commonEditIngredients, style: textTheme.titleLarge),
+              const SizedBox(height: FreshSpacing.xs),
+              Text(
+                widget.meal.title,
+                style: textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
               ),
               const SizedBox(height: FreshSpacing.md),
-            ],
-            for (var index = 0; index < _items.length; index++) ...[
-              _IngredientEditorRow(
-                key: ValueKey('${widget.keyPrefix}_item_editor_$index'),
-                item: _items[index],
-                index: index,
-                keyPrefix: widget.keyPrefix,
-                onDelete: _items.length == 1
-                    ? null
-                    : () {
-                        setState(() {
-                          _items.removeAt(index).dispose();
-                        });
-                      },
+              _MealTotalSummary(items: _items),
+              const SizedBox(height: FreshSpacing.md),
+              if (_error != null) ...[
+                FreshStatusBanner(
+                  icon: Icons.error_outline_rounded,
+                  title: l10n.commonCheckIngredientDetails,
+                  message: _error!,
+                  color: FreshColors.coral,
+                ),
+                const SizedBox(height: FreshSpacing.md),
+              ],
+              Text(
+                l10n.mealEditorIngredientsSection,
+                style: textTheme.labelLarge?.copyWith(
+                  color: palette.inkMuted,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: FreshSpacing.sm),
+              for (var index = 0; index < _items.length; index++) ...[
+                _IngredientEditorCard(
+                  key: ValueKey('${widget.keyPrefix}_item_card_$index'),
+                  item: _items[index],
+                  index: index,
+                  keyPrefix: widget.keyPrefix,
+                  onChanged: () {
+                    if (_error != null) {
+                      _error = null;
+                    }
+                    setState(() {});
+                  },
+                  onDelete: _items.length == 1
+                      ? null
+                      : () {
+                          setState(() {
+                            _items.removeAt(index).dispose();
+                          });
+                        },
+                ),
+                const SizedBox(height: FreshSpacing.lg),
+              ],
+              OutlinedButton.icon(
+                key: ValueKey('add_${widget.keyPrefix}_item_button'),
+                onPressed: () {
+                  setState(() {
+                    _items.add(_EditableMealItem.empty());
+                    _error = null;
+                  });
+                },
+                icon: const Icon(Icons.add_rounded),
+                label: Text(l10n.commonAddIngredient),
               ),
               const SizedBox(height: FreshSpacing.md),
+              FilledButton.icon(
+                key: ValueKey('save_${widget.keyPrefix}_item_edits_button'),
+                onPressed: _save,
+                icon: const Icon(Icons.check_rounded),
+                label: Text(l10n.commonSaveEdits),
+              ),
             ],
-            OutlinedButton.icon(
-              key: ValueKey('add_${widget.keyPrefix}_item_button'),
-              onPressed: () {
-                setState(() {
-                  _items.add(_EditableMealItem.empty());
-                  _error = null;
-                });
-              },
-              icon: const Icon(Icons.add_rounded),
-              label: Text(l10n.commonAddIngredient),
-            ),
-            const SizedBox(height: FreshSpacing.md),
-            FilledButton.icon(
-              key: ValueKey('save_${widget.keyPrefix}_item_edits_button'),
-              onPressed: _save,
-              icon: const Icon(Icons.check_rounded),
-              label: Text(l10n.commonSaveEdits),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -144,107 +163,53 @@ class _MealItemEditorSheetState extends State<MealItemEditorSheet> {
   }
 }
 
-class _IngredientEditorRow extends StatelessWidget {
-  const _IngredientEditorRow({
-    super.key,
-    required this.item,
-    required this.index,
-    required this.keyPrefix,
-    required this.onDelete,
-  });
+class _MealTotalSummary extends StatelessWidget {
+  const _MealTotalSummary({required this.items});
 
-  final _EditableMealItem item;
-  final int index;
-  final String keyPrefix;
-  final VoidCallback? onDelete;
+  final List<_EditableMealItem> items;
 
   @override
   Widget build(BuildContext context) {
-    final l10n = context.l10n;
+    final total = _NutritionEdit.sum([
+      for (final item in items) item.currentNutrition(),
+    ]);
+    final palette = context.freshPalette;
+    final textTheme = Theme.of(context).textTheme;
     return FreshCard(
-      padding: const EdgeInsets.all(12),
+      key: const ValueKey('meal_editor_total_card'),
+      padding: const EdgeInsets.all(16),
       shadow: false,
+      color: palette.limeWash,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          TextField(
-            key: ValueKey('${keyPrefix}_item_name_$index'),
-            controller: item.nameController,
-            decoration: InputDecoration(labelText: l10n.commonIngredient),
+          Text(
+            context.l10n.mealEditorMealTotal,
+            style: textTheme.labelLarge?.copyWith(
+              color: palette.limeDeep,
+              fontWeight: FontWeight.w800,
+            ),
           ),
-          const SizedBox(height: FreshSpacing.sm),
+          const SizedBox(height: FreshSpacing.xs),
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Expanded(
-                child: TextField(
-                  key: ValueKey('${keyPrefix}_item_quantity_$index'),
-                  controller: item.quantityController,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: InputDecoration(labelText: l10n.commonAmount),
+              Text(
+                context.l10n.caloriesValue(total.calories),
+                style: textTheme.headlineMedium?.copyWith(
+                  color: palette.ink,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(width: FreshSpacing.sm),
-              SizedBox(
-                width: 82,
-                child: TextField(
-                  key: ValueKey('${keyPrefix}_item_unit_$index'),
-                  controller: item.unitController,
-                  decoration: InputDecoration(labelText: l10n.commonUnit),
-                ),
-              ),
-              const SizedBox(width: FreshSpacing.sm),
-              IconButton(
-                key: ValueKey('delete_${keyPrefix}_item_$index'),
-                onPressed: onDelete,
-                icon: const Icon(Icons.delete_outline_rounded),
-                tooltip: l10n.commonDeleteIngredient,
-              ),
-            ],
-          ),
-          const SizedBox(height: FreshSpacing.sm),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  key: ValueKey('${keyPrefix}_item_calories_$index'),
-                  controller: item.caloriesController,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(labelText: l10n.commonCalories),
-                ),
-              ),
-              const SizedBox(width: FreshSpacing.sm),
-              Expanded(
-                child: TextField(
-                  key: ValueKey('${keyPrefix}_item_protein_$index'),
-                  controller: item.proteinController,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: InputDecoration(labelText: l10n.commonProtein),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: FreshSpacing.sm),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  key: ValueKey('${keyPrefix}_item_carbs_$index'),
-                  controller: item.carbsController,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: InputDecoration(labelText: l10n.commonCarbs),
-                ),
-              ),
-              const SizedBox(width: FreshSpacing.sm),
-              Expanded(
-                child: TextField(
-                  key: ValueKey('${keyPrefix}_item_fat_$index'),
-                  controller: item.fatController,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: InputDecoration(labelText: l10n.commonFat),
+              const Spacer(),
+              Flexible(
+                child: Text(
+                  _macroSummary(context, total),
+                  textAlign: TextAlign.end,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: palette.inkSoft,
+                    height: 1.25,
+                  ),
                 ),
               ),
             ],
@@ -255,20 +220,652 @@ class _IngredientEditorRow extends StatelessWidget {
   }
 }
 
+class _IngredientEditorCard extends StatelessWidget {
+  const _IngredientEditorCard({
+    super.key,
+    required this.item,
+    required this.index,
+    required this.keyPrefix,
+    required this.onChanged,
+    required this.onDelete,
+  });
+
+  final _EditableMealItem item;
+  final int index;
+  final String keyPrefix;
+  final VoidCallback onChanged;
+  final VoidCallback? onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final palette = context.freshPalette;
+    final textTheme = Theme.of(context).textTheme;
+    final nutrition = item.currentNutrition();
+    final macroCalories = nutrition.macroCalories;
+    final hasWarning = nutrition.hasCalorieMismatch;
+    return FreshCard(
+      padding: const EdgeInsets.all(16),
+      shadow: true,
+      color: palette.surface,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: TextField(
+                  key: ValueKey('${keyPrefix}_item_name_$index'),
+                  controller: item.nameController,
+                  onChanged: (_) => onChanged(),
+                  decoration: InputDecoration(
+                    labelText: l10n.commonIngredient,
+                    isDense: true,
+                  ),
+                ),
+              ),
+              const SizedBox(width: FreshSpacing.sm),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: hasWarning
+                      ? palette.coral.withValues(alpha: 0.08)
+                      : palette.limeWash,
+                  borderRadius: BorderRadius.circular(FreshRadii.md),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        context.l10n.caloriesValue(nutrition.calories),
+                        style: textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      if (hasWarning)
+                        Text(
+                          l10n.mealEditorMacroCaloriesShort(macroCalories),
+                          style: textTheme.labelSmall?.copyWith(
+                            color: FreshColors.coral,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: FreshSpacing.md),
+          Text(
+            l10n.commonAmount,
+            style: textTheme.labelMedium?.copyWith(
+              color: palette.inkMuted,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: FreshSpacing.xs),
+          Row(
+            children: [
+              _QuantityStepButton(
+                key: ValueKey('${keyPrefix}_item_decrease_10_$index'),
+                label: item.isGramUnit ? '-10g' : '-1',
+                onPressed: () {
+                  item.adjustQuantity(item.isGramUnit ? -10 : -1);
+                  onChanged();
+                },
+              ),
+              const SizedBox(width: FreshSpacing.sm),
+              Expanded(
+                child: TextField(
+                  key: ValueKey('${keyPrefix}_item_quantity_field_$index'),
+                  controller: item.quantityController,
+                  onChanged: (_) => onChanged(),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  textAlign: TextAlign.center,
+                  style: textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                  decoration: const InputDecoration(isDense: true),
+                ),
+              ),
+              const SizedBox(width: FreshSpacing.sm),
+              SizedBox(
+                width: 70,
+                child: TextField(
+                  key: ValueKey('${keyPrefix}_item_unit_$index'),
+                  controller: item.unitController,
+                  onChanged: (_) => onChanged(),
+                  textAlign: TextAlign.center,
+                  decoration: const InputDecoration(isDense: true),
+                ),
+              ),
+              const SizedBox(width: FreshSpacing.sm),
+              _QuantityStepButton(
+                key: ValueKey('${keyPrefix}_item_increase_10_$index'),
+                label: item.isGramUnit ? '+10g' : '+1',
+                onPressed: () {
+                  item.adjustQuantity(item.isGramUnit ? 10 : 1);
+                  onChanged();
+                },
+              ),
+            ],
+          ),
+          if (item.isGramUnit) ...[
+            const SizedBox(height: FreshSpacing.sm),
+            Wrap(
+              spacing: FreshSpacing.xs,
+              runSpacing: FreshSpacing.xs,
+              children: [
+                for (final preset in const [50.0, 100.0, 150.0, 200.0])
+                  ActionChip(
+                    key: ValueKey(
+                      '${keyPrefix}_item_quantity_preset_${preset.toInt()}_$index',
+                    ),
+                    label: Text('${preset.toInt()}g'),
+                    onPressed: () {
+                      item.setQuantity(preset);
+                      onChanged();
+                    },
+                  ),
+              ],
+            ),
+          ],
+          const SizedBox(height: FreshSpacing.md),
+          _MacroSummaryText(nutrition: nutrition),
+          if (hasWarning) ...[
+            const SizedBox(height: FreshSpacing.sm),
+            _MacroWarningBanner(
+              key: ValueKey('${keyPrefix}_item_macro_warning_$index'),
+              title: l10n.mealEditorCaloriesMismatchTitle,
+              message: l10n.mealEditorCaloriesMismatchMessage(macroCalories),
+            ),
+          ],
+          const SizedBox(height: FreshSpacing.sm),
+          Row(
+            children: [
+              TextButton.icon(
+                key: ValueKey('${keyPrefix}_item_edit_details_$index'),
+                onPressed: () async {
+                  final edited = await showModalBottomSheet<_NutritionEdit>(
+                    context: context,
+                    isScrollControlled: true,
+                    useSafeArea: true,
+                    builder: (context) => _NutritionDetailsSheet(
+                      item: item,
+                      keyPrefix: keyPrefix,
+                      index: index,
+                    ),
+                  );
+                  if (edited == null) return;
+                  item.setNutritionOverride(edited);
+                  onChanged();
+                },
+                icon: const Icon(Icons.tune_rounded, size: 18),
+                label: Text(l10n.mealEditorEditDetails),
+              ),
+              const Spacer(),
+              IconButton(
+                key: ValueKey('delete_${keyPrefix}_item_$index'),
+                onPressed: onDelete,
+                icon: const Icon(Icons.delete_outline_rounded),
+                tooltip: l10n.commonDeleteIngredient,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuantityStepButton extends StatelessWidget {
+  const _QuantityStepButton({
+    super.key,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 58,
+      height: 44,
+      child: OutlinedButton(
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          padding: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(FreshRadii.md),
+          ),
+        ),
+        child: Text(label),
+      ),
+    );
+  }
+}
+
+enum _MacroKind { protein, carbs, fat }
+
+class _MacroSummaryText extends StatelessWidget {
+  const _MacroSummaryText({required this.nutrition});
+
+  final _NutritionEdit? nutrition;
+
+  @override
+  Widget build(BuildContext context) {
+    final value = nutrition;
+    if (value == null) {
+      return const SizedBox.shrink();
+    }
+    final l10n = context.l10n;
+    final textTheme = Theme.of(context).textTheme;
+    final baseStyle = textTheme.bodyMedium?.copyWith(
+      color: context.freshPalette.inkMuted,
+      fontWeight: FontWeight.w600,
+      letterSpacing: 0,
+    );
+    return RichText(
+      text: TextSpan(
+        style: baseStyle,
+        children: [
+          _macroSpan(
+            context,
+            kind: _MacroKind.protein,
+            text: '${l10n.commonProtein} ${_formatMacro(value.proteinGrams)}g',
+          ),
+          const TextSpan(text: ' · '),
+          _macroSpan(
+            context,
+            kind: _MacroKind.carbs,
+            text: '${l10n.commonCarbs} ${_formatMacro(value.carbsGrams)}g',
+          ),
+          const TextSpan(text: ' · '),
+          _macroSpan(
+            context,
+            kind: _MacroKind.fat,
+            text: '${l10n.commonFat} ${_formatMacro(value.fatGrams)}g',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MacroWarningBanner extends StatelessWidget {
+  const _MacroWarningBanner({
+    super.key,
+    required this.title,
+    required this.message,
+  });
+
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final palette = context.freshPalette;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: palette.coral.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(FreshRadii.lg),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: [
+            FreshIconChip(
+              icon: Icons.info_outline_rounded,
+              color: palette.coral,
+              backgroundColor: palette.coral.withValues(alpha: 0.14),
+            ),
+            const SizedBox(width: FreshSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: FreshSpacing.xs),
+                  Text(
+                    message,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: palette.inkSoft,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CalorieSuggestionSuffix extends StatelessWidget {
+  const _CalorieSuggestionSuffix({
+    super.key,
+    required this.calories,
+    required this.onApply,
+  });
+
+  final int calories;
+  final VoidCallback onApply;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.freshPalette;
+    final textTheme = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            context.l10n.caloriesValue(calories),
+            style: textTheme.labelMedium?.copyWith(
+              color: palette.inkMuted,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(width: FreshSpacing.xs),
+          TextButton(
+            onPressed: onApply,
+            style: TextButton.styleFrom(
+              minimumSize: const Size(0, 30),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              foregroundColor: palette.ink,
+              backgroundColor: palette.lime,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            child: Text(context.l10n.mealEditorApplySuggestion),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NutritionDetailsSheet extends StatefulWidget {
+  const _NutritionDetailsSheet({
+    required this.item,
+    required this.keyPrefix,
+    required this.index,
+  });
+
+  final _EditableMealItem item;
+  final String keyPrefix;
+  final int index;
+
+  @override
+  State<_NutritionDetailsSheet> createState() => _NutritionDetailsSheetState();
+}
+
+class _NutritionDetailsSheetState extends State<_NutritionDetailsSheet> {
+  late final TextEditingController _caloriesController;
+  late final TextEditingController _proteinController;
+  late final TextEditingController _carbsController;
+  late final TextEditingController _fatController;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final nutrition = widget.item.currentNutrition();
+    _caloriesController = TextEditingController(
+      text: nutrition.calories.toString(),
+    );
+    _proteinController = TextEditingController(
+      text: _formatMacro(nutrition.proteinGrams),
+    );
+    _carbsController = TextEditingController(
+      text: _formatMacro(nutrition.carbsGrams),
+    );
+    _fatController = TextEditingController(
+      text: _formatMacro(nutrition.fatGrams),
+    );
+  }
+
+  @override
+  void dispose() {
+    _caloriesController.dispose();
+    _proteinController.dispose();
+    _carbsController.dispose();
+    _fatController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    final textTheme = Theme.of(context).textTheme;
+    final l10n = context.l10n;
+    final palette = context.freshPalette;
+    final preview = _previewNutrition();
+    final macroCalories = preview?.macroCalories ?? 0;
+    final showSuggestion = preview?.hasCalorieMismatch ?? false;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(18, 12, 18, bottomInset + 18),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: context.freshPalette.rule,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+            const SizedBox(height: FreshSpacing.lg),
+            Text(l10n.mealEditorNutritionDetails, style: textTheme.titleLarge),
+            const SizedBox(height: FreshSpacing.xs),
+            Text(
+              widget.item.nameController.text.trim().isEmpty
+                  ? l10n.commonIngredient
+                  : widget.item.nameController.text.trim(),
+              style: textTheme.bodyMedium?.copyWith(
+                color: palette.inkMuted,
+              ),
+            ),
+            const SizedBox(height: FreshSpacing.md),
+            if (_error != null) ...[
+              FreshStatusBanner(
+                icon: Icons.error_outline_rounded,
+                title: l10n.commonCheckIngredientDetails,
+                message: _error!,
+                color: FreshColors.coral,
+              ),
+              const SizedBox(height: FreshSpacing.md),
+            ],
+            TextField(
+              key: ValueKey(
+                '${widget.keyPrefix}_item_calories_${widget.index}',
+              ),
+              controller: _caloriesController,
+              keyboardType: TextInputType.number,
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                labelText: l10n.commonCalories,
+                suffixIcon: showSuggestion
+                    ? _CalorieSuggestionSuffix(
+                        key: ValueKey(
+                          '${widget.keyPrefix}_item_apply_suggestion_${widget.index}',
+                        ),
+                        calories: macroCalories,
+                        onApply: () => _applyMacroCalories(macroCalories),
+                      )
+                    : null,
+                suffixIconConstraints: const BoxConstraints(
+                  minWidth: 0,
+                  minHeight: 0,
+                ),
+              ),
+            ),
+            const SizedBox(height: FreshSpacing.sm),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    key: ValueKey(
+                      '${widget.keyPrefix}_item_protein_${widget.index}',
+                    ),
+                    controller: _proteinController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    onChanged: (_) => setState(() {}),
+                    decoration: _macroInputDecoration(
+                      context,
+                      label: l10n.commonProtein,
+                      color: _macroColor(context, _MacroKind.protein),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: FreshSpacing.sm),
+                Expanded(
+                  child: TextField(
+                    key: ValueKey(
+                      '${widget.keyPrefix}_item_carbs_${widget.index}',
+                    ),
+                    controller: _carbsController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    onChanged: (_) => setState(() {}),
+                    decoration: _macroInputDecoration(
+                      context,
+                      label: l10n.commonCarbs,
+                      color: _macroColor(context, _MacroKind.carbs),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: FreshSpacing.sm),
+                Expanded(
+                  child: TextField(
+                    key: ValueKey(
+                      '${widget.keyPrefix}_item_fat_${widget.index}',
+                    ),
+                    controller: _fatController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    onChanged: (_) => setState(() {}),
+                    decoration: _macroInputDecoration(
+                      context,
+                      label: l10n.commonFat,
+                      color: _macroColor(context, _MacroKind.fat),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: FreshSpacing.sm),
+            if (!showSuggestion) ...[
+              const SizedBox(height: FreshSpacing.md),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: palette.surfaceSoft,
+                  borderRadius: BorderRadius.circular(FreshRadii.md),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(
+                    l10n.mealEditorCalculatedFromMacros(macroCalories),
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: palette.inkMuted,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: FreshSpacing.md),
+            FilledButton.icon(
+              key: ValueKey(
+                '${widget.keyPrefix}_item_save_details_${widget.index}',
+              ),
+              onPressed: _save,
+              icon: const Icon(Icons.check_rounded),
+              label: Text(l10n.commonSave),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  _NutritionEdit? _previewNutrition() {
+    final calories = int.tryParse(_caloriesController.text.trim());
+    final protein = double.tryParse(_proteinController.text.trim());
+    final carbs = double.tryParse(_carbsController.text.trim());
+    final fat = double.tryParse(_fatController.text.trim());
+    if (calories == null || protein == null || carbs == null || fat == null) {
+      return null;
+    }
+    return _NutritionEdit(
+      calories: calories,
+      proteinGrams: _roundMacro(protein),
+      carbsGrams: _roundMacro(carbs),
+      fatGrams: _roundMacro(fat),
+    );
+  }
+
+  void _applyMacroCalories(int calories) {
+    _caloriesController.text = calories.toString();
+    _caloriesController.selection = TextSelection.collapsed(
+      offset: _caloriesController.text.length,
+    );
+    setState(() {});
+  }
+
+  void _save() {
+    final nutrition = _previewNutrition();
+    if (nutrition == null ||
+        nutrition.calories < 0 ||
+        nutrition.proteinGrams < 0 ||
+        nutrition.carbsGrams < 0 ||
+        nutrition.fatGrams < 0) {
+      setState(() {
+        _error = context.l10n.commonIngredientDetailsError;
+      });
+      return;
+    }
+    Navigator.of(context).pop(nutrition);
+  }
+}
+
 class _EditableMealItem {
   _EditableMealItem(MealItem item)
       : original = item,
         isNew = false {
     nameController = TextEditingController(text: item.name);
-    quantityController =
-        TextEditingController(text: _formatQuantity(item.quantity));
+    quantityController = TextEditingController(
+      text: _formatQuantity(item.quantity),
+    );
     unitController = TextEditingController(text: item.unit);
-    caloriesController = TextEditingController(text: '${item.calories}');
-    proteinController =
-        TextEditingController(text: _formatMacro(item.proteinGrams));
-    carbsController =
-        TextEditingController(text: _formatMacro(item.carbsGrams));
-    fatController = TextEditingController(text: _formatMacro(item.fatGrams));
   }
 
   _EditableMealItem.empty()
@@ -286,46 +883,73 @@ class _EditableMealItem {
     nameController = TextEditingController();
     quantityController = TextEditingController(text: '100');
     unitController = TextEditingController(text: 'g');
-    caloriesController = TextEditingController();
-    proteinController = TextEditingController(text: '0');
-    carbsController = TextEditingController(text: '0');
-    fatController = TextEditingController(text: '0');
   }
 
   final MealItem original;
   final bool isNew;
+  _NutritionEdit? _nutritionOverride;
+  double? _nutritionOverrideQuantity;
   late final TextEditingController nameController;
   late final TextEditingController quantityController;
   late final TextEditingController unitController;
-  late final TextEditingController caloriesController;
-  late final TextEditingController proteinController;
-  late final TextEditingController carbsController;
-  late final TextEditingController fatController;
+
+  bool get isGramUnit => _normalizedText(unitController.text) == 'g';
+
+  void adjustQuantity(double delta) {
+    final current = double.tryParse(quantityController.text.trim());
+    final next = math.max(0.1, (current ?? original.quantity) + delta);
+    setQuantity(next);
+  }
+
+  void setQuantity(double value) {
+    quantityController.text = _formatQuantity(value);
+  }
+
+  void setNutritionOverride(_NutritionEdit value) {
+    _nutritionOverride = value;
+    _nutritionOverrideQuantity = double.tryParse(
+      quantityController.text.trim(),
+    );
+  }
+
+  _NutritionEdit currentNutrition() {
+    final quantity = double.tryParse(quantityController.text.trim());
+    final override = _nutritionOverride;
+    if (override != null) {
+      final baseQuantity = _nutritionOverrideQuantity;
+      final factor = baseQuantity != null &&
+              baseQuantity > 0 &&
+              quantity != null &&
+              quantity > 0
+          ? quantity / baseQuantity
+          : 1.0;
+      return override.scaled(factor);
+    }
+    final factor = original.quantity > 0 && quantity != null && quantity > 0
+        ? quantity / original.quantity
+        : 1.0;
+    return _NutritionEdit(
+      calories: (original.calories * factor).round(),
+      proteinGrams: _roundMacro(original.proteinGrams * factor),
+      carbsGrams: _roundMacro(original.carbsGrams * factor),
+      fatGrams: _roundMacro(original.fatGrams * factor),
+    );
+  }
 
   MealItem? toMealItem() {
     final name = nameController.text.trim();
     final quantity = double.tryParse(quantityController.text.trim());
     final unit = unitController.text.trim();
-    final calories = int.tryParse(caloriesController.text.trim());
-    final protein = double.tryParse(proteinController.text.trim());
-    final carbs = double.tryParse(carbsController.text.trim());
-    final fat = double.tryParse(fatController.text.trim());
-    if (name.isEmpty ||
-        quantity == null ||
-        quantity <= 0 ||
-        unit.isEmpty ||
-        calories == null ||
-        calories < 0 ||
-        protein == null ||
-        protein < 0 ||
-        carbs == null ||
-        carbs < 0 ||
-        fat == null ||
-        fat < 0) {
+    if (name.isEmpty || quantity == null || quantity <= 0 || unit.isEmpty) {
       return null;
     }
-
-    final factor = original.quantity > 0 ? quantity / original.quantity : 1.0;
+    final nutrition = currentNutrition();
+    if (nutrition.calories < 0 ||
+        nutrition.proteinGrams < 0 ||
+        nutrition.carbsGrams < 0 ||
+        nutrition.fatGrams < 0) {
+      return null;
+    }
     final source = original.source.contains('manual_edit')
         ? original.source
         : '${original.source}:manual_edit';
@@ -333,21 +957,10 @@ class _EditableMealItem {
       name: name,
       quantity: quantity,
       unit: unit,
-      calories: _wasUnedited(caloriesController.text, '${original.calories}')
-          ? (original.calories * factor).round()
-          : calories,
-      proteinGrams: _wasUnedited(
-              proteinController.text, _formatMacro(original.proteinGrams))
-          ? _roundMacro(original.proteinGrams * factor)
-          : _roundMacro(protein),
-      carbsGrams:
-          _wasUnedited(carbsController.text, _formatMacro(original.carbsGrams))
-              ? _roundMacro(original.carbsGrams * factor)
-              : _roundMacro(carbs),
-      fatGrams:
-          _wasUnedited(fatController.text, _formatMacro(original.fatGrams))
-              ? _roundMacro(original.fatGrams * factor)
-              : _roundMacro(fat),
+      calories: nutrition.calories,
+      proteinGrams: nutrition.proteinGrams,
+      carbsGrams: nutrition.carbsGrams,
+      fatGrams: nutrition.fatGrams,
       source: isNew ? 'manual_edit' : source,
     );
   }
@@ -356,11 +969,101 @@ class _EditableMealItem {
     nameController.dispose();
     quantityController.dispose();
     unitController.dispose();
-    caloriesController.dispose();
-    proteinController.dispose();
-    carbsController.dispose();
-    fatController.dispose();
   }
+}
+
+class _NutritionEdit {
+  const _NutritionEdit({
+    required this.calories,
+    required this.proteinGrams,
+    required this.carbsGrams,
+    required this.fatGrams,
+  });
+
+  final int calories;
+  final double proteinGrams;
+  final double carbsGrams;
+  final double fatGrams;
+
+  int get macroCalories => macroCaloriesFromGrams(
+        MacroGrams(
+          proteinGrams: proteinGrams,
+          carbsGrams: carbsGrams,
+          fatGrams: fatGrams,
+        ),
+      );
+
+  bool get hasCalorieMismatch => (calories - macroCalories).abs() >= 5;
+
+  _NutritionEdit scaled(double factor) {
+    return _NutritionEdit(
+      calories: (calories * factor).round(),
+      proteinGrams: _roundMacro(proteinGrams * factor),
+      carbsGrams: _roundMacro(carbsGrams * factor),
+      fatGrams: _roundMacro(fatGrams * factor),
+    );
+  }
+
+  static _NutritionEdit sum(Iterable<_NutritionEdit> values) {
+    var calories = 0;
+    var protein = 0.0;
+    var carbs = 0.0;
+    var fat = 0.0;
+    for (final value in values) {
+      calories += value.calories;
+      protein += value.proteinGrams;
+      carbs += value.carbsGrams;
+      fat += value.fatGrams;
+    }
+    return _NutritionEdit(
+      calories: calories,
+      proteinGrams: _roundMacro(protein),
+      carbsGrams: _roundMacro(carbs),
+      fatGrams: _roundMacro(fat),
+    );
+  }
+}
+
+String _macroSummary(BuildContext context, _NutritionEdit nutrition) {
+  final l10n = context.l10n;
+  return '${l10n.commonProtein} ${_formatMacro(nutrition.proteinGrams)}g · '
+      '${l10n.commonCarbs} ${_formatMacro(nutrition.carbsGrams)}g · '
+      '${l10n.commonFat} ${_formatMacro(nutrition.fatGrams)}g';
+}
+
+InputDecoration _macroInputDecoration(
+  BuildContext context, {
+  required String label,
+  required Color color,
+}) {
+  return InputDecoration(
+    labelText: label,
+    labelStyle: TextStyle(color: color, fontWeight: FontWeight.w700),
+    floatingLabelStyle: TextStyle(color: color, fontWeight: FontWeight.w800),
+  );
+}
+
+Color _macroColor(BuildContext context, _MacroKind kind) {
+  final palette = context.freshPalette;
+  return switch (kind) {
+    _MacroKind.protein => palette.coral,
+    _MacroKind.carbs => const Color(0xffc9941a),
+    _MacroKind.fat => palette.leaf,
+  };
+}
+
+TextSpan _macroSpan(
+  BuildContext context, {
+  required _MacroKind kind,
+  required String text,
+}) {
+  return TextSpan(
+    text: text,
+    style: TextStyle(
+      color: _macroColor(context, kind),
+      fontWeight: FontWeight.w700,
+    ),
+  );
 }
 
 String _formatQuantity(double value) {
@@ -373,8 +1076,6 @@ String _formatMacro(double value) {
   return value.toStringAsFixed(1);
 }
 
-double _roundMacro(double value) => (value * 10).round() / 10;
+String _normalizedText(String value) => value.trim().toLowerCase();
 
-bool _wasUnedited(String current, String original) {
-  return current.trim() == original.trim();
-}
+double _roundMacro(double value) => (value * 10).round() / 10;

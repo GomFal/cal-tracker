@@ -59,159 +59,130 @@ class SlidingBranchContainer extends StatefulWidget {
     required this.currentIndex,
     required this.children,
     this.duration = const Duration(milliseconds: 260),
+    this.onPageChanged,
   });
 
   final int currentIndex;
   final List<Widget> children;
   final Duration duration;
+  final ValueChanged<int>? onPageChanged;
 
   @override
   State<SlidingBranchContainer> createState() => _SlidingBranchContainerState();
 }
 
-class _SlidingBranchContainerState extends State<SlidingBranchContainer>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late int _currentIndex;
-  int? _previousIndex;
-  int _direction = 0;
+class _SlidingBranchContainerState extends State<SlidingBranchContainer> {
+  late final PageController _controller;
+  late int _pageIndex;
+  int? _programmaticTargetIndex;
 
   @override
   void initState() {
     super.initState();
-    _currentIndex = widget.currentIndex;
-    _controller = AnimationController(
-      vsync: this,
-      duration: widget.duration,
-      value: 1,
-    )..addStatusListener(_handleAnimationStatus);
+    _pageIndex = _clampedIndex(widget.currentIndex);
+    _controller = PageController(initialPage: _pageIndex, keepPage: false);
   }
 
   @override
   void didUpdateWidget(covariant SlidingBranchContainer oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.duration != oldWidget.duration) {
-      _controller.duration = widget.duration;
-    }
-    if (widget.currentIndex == _currentIndex) {
+    final targetIndex = _clampedIndex(widget.currentIndex);
+    if (widget.children.isEmpty ||
+        targetIndex == _pageIndex ||
+        targetIndex == _programmaticTargetIndex) {
       return;
     }
 
-    _previousIndex = _currentIndex;
-    _direction = widget.currentIndex > _currentIndex ? 1 : -1;
-    _currentIndex = widget.currentIndex;
-    _controller.forward(from: 0);
+    _animateToPage(targetIndex);
   }
 
   @override
   void dispose() {
-    _controller.removeStatusListener(_handleAnimationStatus);
     _controller.dispose();
     super.dispose();
   }
 
-  void _handleAnimationStatus(AnimationStatus status) {
-    if (status != AnimationStatus.completed || _previousIndex == null) {
+  int _clampedIndex(int index) {
+    final maxIndex = widget.children.length - 1;
+    if (maxIndex < 0) return 0;
+    return index.clamp(0, maxIndex).toInt();
+  }
+
+  void _animateToPage(int index) {
+    _programmaticTargetIndex = index;
+    _pageIndex = index;
+    if (!_controller.hasClients) {
       return;
     }
-    setState(() => _previousIndex = null);
+
+    unawaited(
+      _controller
+          .animateToPage(
+            index,
+            duration: widget.duration,
+            curve: Curves.easeOutQuart,
+          )
+          .whenComplete(() {
+            if (!mounted || _programmaticTargetIndex != index) {
+              return;
+            }
+            _programmaticTargetIndex = null;
+          }),
+    );
+  }
+
+  void _handlePageChanged(int index) {
+    _pageIndex = index;
+    if (_programmaticTargetIndex != null) {
+      if (_programmaticTargetIndex == index) {
+        _programmaticTargetIndex = null;
+      }
+      return;
+    }
+    if (index == widget.currentIndex) return;
+    widget.onPageChanged?.call(index);
   }
 
   @override
   Widget build(BuildContext context) {
-    return ClipRect(
-      child: AnimatedBuilder(
-        animation: _controller,
-        builder: (context, child) {
-          final progress = Curves.easeOutQuart.transform(_controller.value);
-          final isAnimating = _previousIndex != null && _controller.value < 1;
-
-          return Stack(
-            fit: StackFit.expand,
-            children: [
-              for (final index in _paintOrder())
-                _BranchSlot(
-                  active: index == _currentIndex,
-                  visible: index == _currentIndex ||
-                      (isAnimating && index == _previousIndex),
-                  ignoring: isAnimating || index != _currentIndex,
-                  translation: _translationFor(index, progress),
-                  child: widget.children[index],
-                ),
-            ],
-          );
-        },
-      ),
+    if (widget.children.isEmpty) return const SizedBox.shrink();
+    return PageView(
+      controller: _controller,
+      onPageChanged: _handlePageChanged,
+      children: [
+        for (var index = 0; index < widget.children.length; index++)
+          _BranchSlot(
+            active: index == widget.currentIndex,
+            child: widget.children[index],
+          ),
+      ],
     );
-  }
-
-  Iterable<int> _paintOrder() sync* {
-    for (var index = 0; index < widget.children.length; index++) {
-      if (index != _previousIndex && index != _currentIndex) {
-        yield index;
-      }
-    }
-    if (_previousIndex != null &&
-        _previousIndex! >= 0 &&
-        _previousIndex! < widget.children.length) {
-      yield _previousIndex!;
-    }
-    if (_currentIndex >= 0 && _currentIndex < widget.children.length) {
-      yield _currentIndex;
-    }
-  }
-
-  Offset _translationFor(int index, double progress) {
-    if (index == _currentIndex) {
-      return Offset.lerp(
-        Offset(_direction.toDouble(), 0),
-        Offset.zero,
-        progress,
-      )!;
-    }
-    if (index == _previousIndex) {
-      return Offset.lerp(
-        Offset.zero,
-        Offset(-_direction.toDouble(), 0),
-        progress,
-      )!;
-    }
-    return Offset.zero;
   }
 }
 
-class _BranchSlot extends StatelessWidget {
-  const _BranchSlot({
-    required this.active,
-    required this.visible,
-    required this.ignoring,
-    required this.translation,
-    required this.child,
-  });
+class _BranchSlot extends StatefulWidget {
+  const _BranchSlot({required this.active, required this.child});
 
   final bool active;
-  final bool visible;
-  final bool ignoring;
-  final Offset translation;
   final Widget child;
 
   @override
+  State<_BranchSlot> createState() => _BranchSlotState();
+}
+
+class _BranchSlotState extends State<_BranchSlot>
+    with AutomaticKeepAliveClientMixin {
+  @override
   Widget build(BuildContext context) {
-    return Offstage(
-      offstage: !visible,
-      child: TickerMode(
-        enabled: active,
-        child: IgnorePointer(
-          ignoring: ignoring,
-          child: FractionalTranslation(
-            translation: translation,
-            transformHitTests: false,
-            child: RepaintBoundary(child: child),
-          ),
-        ),
-      ),
+    super.build(context);
+    return TickerMode(
+      enabled: widget.active,
+      child: RepaintBoundary(child: widget.child),
     );
   }
+
+  @override
+  bool get wantKeepAlive => true;
 }
 
 class _FreshBottomNav extends StatelessWidget {

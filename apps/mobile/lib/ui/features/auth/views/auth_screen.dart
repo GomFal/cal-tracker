@@ -7,6 +7,8 @@ import '../../../core/design_system.dart';
 import '../view_models/auth_view_model.dart';
 
 const _brandIconAsset = 'assets/images/brand_icon.png';
+const _googleContinueButtonAsset =
+    'assets/google_brand/android_neutral_rd_ctn@4x.png';
 const _heroAssets = [
   'assets/images/login/cropped/auth_hero_01.webp',
   'assets/images/login/cropped/auth_hero_02.webp',
@@ -38,6 +40,7 @@ class _AuthScreenState extends State<AuthScreen> {
     if (_preloadedAuthAssets) return;
     _preloadedAuthAssets = true;
     precacheImage(const AssetImage(_brandIconAsset), context);
+    precacheImage(const AssetImage(_googleContinueButtonAsset), context);
     for (final asset in _heroAssets) {
       precacheImage(AssetImage(asset), context);
     }
@@ -139,13 +142,10 @@ class _AuthScreenState extends State<AuthScreen> {
                           ),
                         ),
                         const SizedBox(height: FreshSpacing.sm),
-                        OutlinedButton.icon(
-                          key: const ValueKey('google_sign_in_button'),
-                          onPressed: viewModel.isLoading
-                              ? null
-                              : () => viewModel.loginWithGoogle(),
-                          icon: const Icon(Icons.g_mobiledata_rounded),
-                          label: Text(l10n.authContinueWithGoogleButton),
+                        _GoogleSignInButton(
+                          isEnabled: !viewModel.isLoading,
+                          label: l10n.authContinueWithGoogleButton,
+                          onPressed: () => viewModel.loginWithGoogle(),
                         ),
                         TextButton(
                           key: const ValueKey('auth_toggle_mode_button'),
@@ -187,14 +187,13 @@ class _AuthScreenState extends State<AuthScreen> {
     final nextNameError = _registerMode && displayName.isEmpty
         ? l10n.authNameRequiredError
         : null;
-    final nextEmailError = _isValidEmail(email)
-        ? null
-        : l10n.authEmailInvalidError;
+    final nextEmailError =
+        _isValidEmail(email) ? null : l10n.authEmailInvalidError;
     final nextPasswordError = password.isEmpty
         ? l10n.authPasswordRequiredError
         : _registerMode && password.length < 8
-        ? l10n.authPasswordTooShortError
-        : null;
+            ? l10n.authPasswordTooShortError
+            : null;
 
     setState(() {
       _nameError = nextNameError;
@@ -262,6 +261,10 @@ class _AuthTopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.freshPalette;
+    final titleStyle = Theme.of(
+      context,
+    ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700);
     return Row(
       children: [
         ClipRRect(
@@ -276,13 +279,73 @@ class _AuthTopBar extends StatelessWidget {
           ),
         ),
         const SizedBox(width: FreshSpacing.sm),
-        Text(
-          context.l10n.appTitle,
-          style: Theme.of(
-            context,
-          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+        Semantics(
+          label: context.l10n.appTitle,
+          child: ExcludeSemantics(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Better',
+                  key: const ValueKey('auth_brand_better_word'),
+                  style: titleStyle?.copyWith(color: palette.limeDeep),
+                ),
+                Text(
+                  'Calories',
+                  key: const ValueKey('auth_brand_calories_word'),
+                  style: titleStyle,
+                ),
+              ],
+            ),
+          ),
         ),
       ],
+    );
+  }
+}
+
+class _GoogleSignInButton extends StatelessWidget {
+  const _GoogleSignInButton({
+    required this.isEnabled,
+    required this.label,
+    required this.onPressed,
+  });
+
+  final bool isEnabled;
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      enabled: isEnabled,
+      label: label,
+      child: ExcludeSemantics(
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            key: const ValueKey('google_sign_in_button'),
+            onTap: isEnabled ? onPressed : null,
+            borderRadius: BorderRadius.circular(999),
+            child: SizedBox(
+              height: 52,
+              width: double.infinity,
+              child: Center(
+                child: Opacity(
+                  opacity: isEnabled ? 1 : 0.52,
+                  child: Image.asset(
+                    _googleContinueButtonAsset,
+                    height: 44,
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.high,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -437,15 +500,10 @@ class _LoginHeroCarouselState extends State<_LoginHeroCarousel>
                     left: 24,
                     right: 24,
                     top: height < 340 ? 22 : 28,
-                    child: Text(
-                      context.l10n.authHeroHeadline,
-                      maxLines: 3,
-                      overflow: TextOverflow.visible,
-                      style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                        color: palette.ink,
-                        fontSize: 38,
-                        fontWeight: FontWeight.w800,
-                        height: 1.08,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: _HeroHeadline(
+                        text: context.l10n.authHeroHeadline,
                       ),
                     ),
                   ),
@@ -457,6 +515,61 @@ class _LoginHeroCarouselState extends State<_LoginHeroCarousel>
       ),
     );
   }
+}
+
+class _HeroHeadline extends StatelessWidget {
+  const _HeroHeadline({required this.text});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.freshPalette;
+    final baseStyle = Theme.of(context).textTheme.displayLarge?.copyWith(
+          color: palette.ink,
+          fontSize: 38,
+          fontWeight: FontWeight.w800,
+          height: 1.08,
+        );
+    final split = _splitHighlight(text);
+    return Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(text: split.prefix),
+          TextSpan(
+            text: split.highlight,
+            style: TextStyle(
+              color: palette.limeDeep,
+              background: Paint()
+                ..color = palette.surface.withValues(alpha: 0.94),
+            ),
+          ),
+        ],
+      ),
+      key: const ValueKey('auth_hero_headline'),
+      maxLines: 3,
+      overflow: TextOverflow.visible,
+      style: baseStyle,
+    );
+  }
+
+  _HighlightSplit _splitHighlight(String value) {
+    final match = RegExp(r'\S+\s*$').firstMatch(value);
+    if (match == null) {
+      return _HighlightSplit('', value);
+    }
+    return _HighlightSplit(
+      value.substring(0, match.start),
+      value.substring(match.start, match.end),
+    );
+  }
+}
+
+class _HighlightSplit {
+  const _HighlightSplit(this.prefix, this.highlight);
+
+  final String prefix;
+  final String highlight;
 }
 
 class _LoginHeroImage extends StatelessWidget {

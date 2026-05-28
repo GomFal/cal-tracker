@@ -14,9 +14,16 @@ void main() {
       (tester) async {
     await _pumpAuthApp(tester, _FakePreferencesRepository());
 
-    expect(find.text('Better Calories'), findsOneWidget);
-    expect(find.textContaining('Track your'), findsOneWidget);
-    expect(find.textContaining('calories better'), findsOneWidget);
+    expect(
+        find.byKey(const ValueKey('auth_brand_better_word')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('auth_brand_calories_word')),
+      findsOneWidget,
+    );
+    final headline = tester.widget<Text>(
+      find.byKey(const ValueKey('auth_hero_headline')),
+    );
+    expect(headline.textSpan?.toPlainText(), 'Track your\ncalories better.');
     expect(find.byKey(const ValueKey('auth_brand_icon')), findsOneWidget);
     expect(find.byKey(const ValueKey('login_hero_carousel')), findsOneWidget);
     expect(find.byKey(const ValueKey('login_hero_image_0')), findsOneWidget);
@@ -53,11 +60,11 @@ void main() {
     );
 
     expect(find.text('Correo'), findsOneWidget);
-    final headlineFinder = find.textContaining('Controla mejor');
-    expect(headlineFinder, findsOneWidget);
-    final headline = tester.widget<Text>(headlineFinder);
+    final headline = tester.widget<Text>(
+      find.byKey(const ValueKey('auth_hero_headline')),
+    );
     expect(
-      headline.data?.replaceAll('\n', ' '),
+      headline.textSpan?.toPlainText().replaceAll('\n', ' '),
       'Controla mejor tus calorías.',
     );
   });

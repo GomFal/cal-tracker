@@ -59,12 +59,14 @@ class SlidingBranchContainer extends StatefulWidget {
     required this.currentIndex,
     required this.children,
     this.duration = const Duration(milliseconds: 260),
+    this.userScrollEnabled = true,
     this.onPageChanged,
   });
 
   final int currentIndex;
   final List<Widget> children;
   final Duration duration;
+  final bool userScrollEnabled;
   final ValueChanged<int>? onPageChanged;
 
   @override
@@ -118,16 +120,16 @@ class _SlidingBranchContainerState extends State<SlidingBranchContainer> {
     unawaited(
       _controller
           .animateToPage(
-            index,
-            duration: widget.duration,
-            curve: Curves.easeOutQuart,
-          )
+        index,
+        duration: widget.duration,
+        curve: Curves.easeOutQuart,
+      )
           .whenComplete(() {
-            if (!mounted || _programmaticTargetIndex != index) {
-              return;
-            }
-            _programmaticTargetIndex = null;
-          }),
+        if (!mounted || _programmaticTargetIndex != index) {
+          return;
+        }
+        _programmaticTargetIndex = null;
+      }),
     );
   }
 
@@ -148,6 +150,9 @@ class _SlidingBranchContainerState extends State<SlidingBranchContainer> {
     if (widget.children.isEmpty) return const SizedBox.shrink();
     return PageView(
       controller: _controller,
+      physics: widget.userScrollEnabled
+          ? null
+          : const NeverScrollableScrollPhysics(),
       onPageChanged: _handlePageChanged,
       children: [
         for (var index = 0; index < widget.children.length; index++)

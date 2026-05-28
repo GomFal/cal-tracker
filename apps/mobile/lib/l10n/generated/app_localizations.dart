@@ -278,6 +278,60 @@ abstract class AppLocalizations {
   /// **'Add at least one ingredient.'**
   String get commonAddAtLeastOneIngredient;
 
+  /// No description provided for @mealEditorMealTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Meal total'**
+  String get mealEditorMealTotal;
+
+  /// No description provided for @mealEditorIngredientsSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Ingredients'**
+  String get mealEditorIngredientsSection;
+
+  /// No description provided for @mealEditorEditDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit details'**
+  String get mealEditorEditDetails;
+
+  /// No description provided for @mealEditorNutritionDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Nutrition details'**
+  String get mealEditorNutritionDetails;
+
+  /// No description provided for @mealEditorApplySuggestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply suggestion'**
+  String get mealEditorApplySuggestion;
+
+  /// No description provided for @mealEditorCalculatedFromMacros.
+  ///
+  /// In en, this message translates to:
+  /// **'Calculated from macros: {calories} kcal'**
+  String mealEditorCalculatedFromMacros(int calories);
+
+  /// No description provided for @mealEditorMacroCaloriesShort.
+  ///
+  /// In en, this message translates to:
+  /// **'{calories} kcal from macros'**
+  String mealEditorMacroCaloriesShort(int calories);
+
+  /// No description provided for @mealEditorCaloriesMismatchTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Calories differ from macros'**
+  String get mealEditorCaloriesMismatchTitle;
+
+  /// No description provided for @mealEditorCaloriesMismatchMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Calculated from macros: {calories} kcal'**
+  String mealEditorCaloriesMismatchMessage(int calories);
+
   /// No description provided for @mealTitleListSeparator.
   ///
   /// In en, this message translates to:
@@ -425,7 +479,7 @@ abstract class AppLocalizations {
   /// No description provided for @authHeroHeadline.
   ///
   /// In en, this message translates to:
-  /// **'Track your\ncalories better.'**
+  /// **'Track your\ncalories, better.'**
   String get authHeroHeadline;
 
   /// No description provided for @darkModeSwitchToLight.
@@ -2239,6 +2293,186 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Meal confirmation is embedded in the logging flow.'**
   String get mealConfirmationEmbedded;
+
+  /// No description provided for @localToolkitToolButtonTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Open local toolkit'**
+  String get localToolkitToolButtonTooltip;
+
+  /// No description provided for @localToolkitPanelTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Local toolkit'**
+  String get localToolkitPanelTitle;
+
+  /// No description provided for @localToolkitPanelSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Jump routes, apply scenarios, and mutate local state.'**
+  String get localToolkitPanelSubtitle;
+
+  /// No description provided for @localToolkitRouteSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Routes'**
+  String get localToolkitRouteSectionTitle;
+
+  /// No description provided for @localToolkitScenarioSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Scenarios'**
+  String get localToolkitScenarioSectionTitle;
+
+  /// No description provided for @localToolkitQuickMutatorsSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick mutators'**
+  String get localToolkitQuickMutatorsSectionTitle;
+
+  /// No description provided for @localToolkitRouteAuth.
+  ///
+  /// In en, this message translates to:
+  /// **'Auth'**
+  String get localToolkitRouteAuth;
+
+  /// No description provided for @localToolkitRouteDashboard.
+  ///
+  /// In en, this message translates to:
+  /// **'Dashboard'**
+  String get localToolkitRouteDashboard;
+
+  /// No description provided for @localToolkitRouteLogMeal.
+  ///
+  /// In en, this message translates to:
+  /// **'Log Meal'**
+  String get localToolkitRouteLogMeal;
+
+  /// No description provided for @localToolkitRouteHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'History'**
+  String get localToolkitRouteHistory;
+
+  /// No description provided for @localToolkitRouteTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'Templates'**
+  String get localToolkitRouteTemplates;
+
+  /// No description provided for @localToolkitRouteSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get localToolkitRouteSettings;
+
+  /// No description provided for @localToolkitScenarioUnauthenticated.
+  ///
+  /// In en, this message translates to:
+  /// **'Unauthenticated'**
+  String get localToolkitScenarioUnauthenticated;
+
+  /// No description provided for @localToolkitScenarioEmptyDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Empty day'**
+  String get localToolkitScenarioEmptyDay;
+
+  /// No description provided for @localToolkitScenarioNormalDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Normal day'**
+  String get localToolkitScenarioNormalDay;
+
+  /// No description provided for @localToolkitScenarioOverTarget.
+  ///
+  /// In en, this message translates to:
+  /// **'Over target'**
+  String get localToolkitScenarioOverTarget;
+
+  /// No description provided for @localToolkitScenarioGoalsNotConfigured.
+  ///
+  /// In en, this message translates to:
+  /// **'Goals not configured'**
+  String get localToolkitScenarioGoalsNotConfigured;
+
+  /// No description provided for @localToolkitScenarioProposalReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Proposal ready'**
+  String get localToolkitScenarioProposalReady;
+
+  /// No description provided for @localToolkitScenarioClarificationRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Clarification required'**
+  String get localToolkitScenarioClarificationRequired;
+
+  /// No description provided for @localToolkitScenarioAutoCommittedMeal.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-committed meal'**
+  String get localToolkitScenarioAutoCommittedMeal;
+
+  /// No description provided for @localToolkitScenarioTemplateHeavyAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Template-heavy account'**
+  String get localToolkitScenarioTemplateHeavyAccount;
+
+  /// No description provided for @localToolkitQuickResetScenario.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset scenario'**
+  String get localToolkitQuickResetScenario;
+
+  /// No description provided for @localToolkitQuickAddSampleMeal.
+  ///
+  /// In en, this message translates to:
+  /// **'Add sample meal'**
+  String get localToolkitQuickAddSampleMeal;
+
+  /// No description provided for @localToolkitQuickClearMeals.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear meals'**
+  String get localToolkitQuickClearMeals;
+
+  /// No description provided for @localToolkitQuickToggleTrustedMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle trusted mode'**
+  String get localToolkitQuickToggleTrustedMode;
+
+  /// No description provided for @localToolkitQuickSwitchLocale.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch locale'**
+  String get localToolkitQuickSwitchLocale;
+
+  /// No description provided for @localToolkitQuickSwitchTheme.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch light/dark theme'**
+  String get localToolkitQuickSwitchTheme;
+
+  /// No description provided for @localToolkitTrustedModeOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Trusted on'**
+  String get localToolkitTrustedModeOn;
+
+  /// No description provided for @localToolkitTrustedModeOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Trusted off'**
+  String get localToolkitTrustedModeOff;
+
+  /// No description provided for @localToolkitCloseTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Close toolkit'**
+  String get localToolkitCloseTooltip;
 }
 
 class _AppLocalizationsDelegate

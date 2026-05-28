@@ -114,6 +114,13 @@ Required local assumptions:
 - Device ID after boot: `emulator-5554`
 - KVM must be available at `/dev/kvm`
 
+Antonio workstation overrides verified on 2026-05-28:
+
+- Android SDK: `/home/antonio/Android/Sdk`
+- AVDs: `Medium_Phone_API_36.1`, `Pixel_9_Pro`
+- Display environment: `DISPLAY=:0`, `XAUTHORITY=/tmp/xauth_aWXqXR`
+- Use `-memory 8192` when a roomy local emulator is requested.
+
 Use this exact startup sequence for local development and voice-capable testing. Start the emulator as a transient user systemd service so it is not tied to the coding agent command process, but do not give the service an automatic restart policy. If the emulator crashes, inspect the crash instead of masking it with a restart loop.
 
 ```bash
@@ -145,6 +152,33 @@ adb -s emulator-5554 shell 'pm list packages -f | grep android | wc -l'
 adb -s emulator-5554 shell echo alive
 ```
 
+Equivalent Antonio 8 GB local emulator command:
+
+```bash
+export PATH="/home/antonio/Android/Sdk/emulator:/home/antonio/Android/Sdk/platform-tools:$PATH"
+
+systemctl --user stop cal-tracker-app-watch.service 2>/dev/null || true
+systemctl --user stop cal-tracker-emulator.service 2>/dev/null || true
+systemctl --user stop cal-tracker-emulator-test.service 2>/dev/null || true
+ps aux | awk '/qemu-system/ && !/awk/ {print $2}' | xargs -r kill -9
+sleep 2
+
+systemd-run --user --unit=cal-tracker-emulator --collect \
+  --working-directory=/home/antonio/code/cal-tracker \
+  -E PATH=/home/antonio/Android/Sdk/emulator:/home/antonio/Android/Sdk/platform-tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+  -E DISPLAY=:0 \
+  -E XAUTHORITY=/tmp/xauth_aWXqXR \
+  -E XDG_RUNTIME_DIR=/run/user/1000 \
+  -E DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus \
+  -p StandardOutput=append:/tmp/emulator-systemd.log \
+  -p StandardError=append:/tmp/emulator-systemd.log \
+  /home/antonio/Android/Sdk/emulator/emulator -avd Medium_Phone_API_36.1 -memory 8192 -no-snapshot -no-snapshot-save -allow-host-audio -no-boot-anim -gpu off -accel on
+
+adb wait-for-device
+adb -s emulator-5554 shell 'while [[ $(getprop sys.boot_completed) != 1 ]]; do sleep 1; done; echo Boot completed'
+adb -s emulator-5554 shell echo alive
+```
+
 Important constraints:
 
 - Always cold boot with `-no-snapshot -no-snapshot-save`; corrupted snapshots have caused missing Android services.
@@ -156,6 +190,7 @@ Important constraints:
 - Keep emulator logs in `/tmp/emulator-systemd.log` and inspect the service with `systemctl --user status cal-tracker-emulator.service`.
 - Wait for `sys.boot_completed == 1` before `adb install`, `flutter run`, or package-manager checks.
 - Do not use broad kill patterns such as `pkill -f bun`; they may kill the backend.
+- On the Antonio `Medium_Phone_API_36.1` AVD, `INSTALL_FAILED_INSUFFICIENT_STORAGE` was resolved by restarting once with the same command plus `-wipe-data`; after wipe, `/data` had about 4.8 GB free.
 
 ### Emulator Microphone Setup
 
@@ -197,6 +232,13 @@ For normal development and any "start the whole system" request, start the emula
 ```bash
 cd /home/javier/dev/cal-tracker/apps/mobile
 flutter run --flavor dev --debug --dart-define=API_BASE_URL=http://10.0.2.2:3000 -d emulator-5554
+```
+
+For the tracked local UI toolkit flavor, use the dedicated local entrypoint. This flavor installs as `app.bettercalories.dev.local`, uses in-app fake repositories/fixtures, and does not require the backend for toolkit flows:
+
+```bash
+cd /home/antonio/code/cal-tracker/apps/mobile
+flutter run --flavor local --debug --target lib/main_local.dart --dart-define=API_BASE_URL=http://10.0.2.2:3000 -d emulator-5554
 ```
 
 Keep the `flutter run` process attached. Use these Flutter run keys from that terminal:

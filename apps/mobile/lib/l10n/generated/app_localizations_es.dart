@@ -100,6 +100,40 @@ class AppLocalizationsEs extends AppLocalizations {
   String get commonAddAtLeastOneIngredient => 'Añade al menos un ingrediente.';
 
   @override
+  String get mealEditorMealTotal => 'Total de la comida';
+
+  @override
+  String get mealEditorIngredientsSection => 'Ingredientes';
+
+  @override
+  String get mealEditorEditDetails => 'Editar detalles';
+
+  @override
+  String get mealEditorNutritionDetails => 'Detalles nutricionales';
+
+  @override
+  String get mealEditorApplySuggestion => 'Aplicar sugerencia';
+
+  @override
+  String mealEditorCalculatedFromMacros(int calories) {
+    return 'Calculado desde macros: $calories kcal';
+  }
+
+  @override
+  String mealEditorMacroCaloriesShort(int calories) {
+    return '$calories kcal desde macros';
+  }
+
+  @override
+  String get mealEditorCaloriesMismatchTitle =>
+      'Las calorías no cuadran con los macros';
+
+  @override
+  String mealEditorCaloriesMismatchMessage(int calories) {
+    return 'Calculado desde macros: $calories kcal';
+  }
+
+  @override
   String get mealTitleListSeparator => ', ';
 
   @override
@@ -1205,4 +1239,98 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get mealConfirmationEmbedded =>
       'La confirmación de comida está integrada en el flujo de registro.';
+
+  @override
+  String get localToolkitToolButtonTooltip => 'Abrir kit local';
+
+  @override
+  String get localToolkitPanelTitle => 'Kit local';
+
+  @override
+  String get localToolkitPanelSubtitle =>
+      'Salta entre rutas, aplica escenarios y cambia el estado local.';
+
+  @override
+  String get localToolkitRouteSectionTitle => 'Rutas';
+
+  @override
+  String get localToolkitScenarioSectionTitle => 'Escenarios';
+
+  @override
+  String get localToolkitQuickMutatorsSectionTitle => 'Mutadores rápidos';
+
+  @override
+  String get localToolkitRouteAuth => 'Auth';
+
+  @override
+  String get localToolkitRouteDashboard => 'Panel';
+
+  @override
+  String get localToolkitRouteLogMeal => 'Registrar comida';
+
+  @override
+  String get localToolkitRouteHistory => 'Historial';
+
+  @override
+  String get localToolkitRouteTemplates => 'Plantillas';
+
+  @override
+  String get localToolkitRouteSettings => 'Ajustes';
+
+  @override
+  String get localToolkitScenarioUnauthenticated => 'Sin autenticar';
+
+  @override
+  String get localToolkitScenarioEmptyDay => 'Día vacío';
+
+  @override
+  String get localToolkitScenarioNormalDay => 'Día normal';
+
+  @override
+  String get localToolkitScenarioOverTarget => 'Por encima del objetivo';
+
+  @override
+  String get localToolkitScenarioGoalsNotConfigured =>
+      'Objetivos sin configurar';
+
+  @override
+  String get localToolkitScenarioProposalReady => 'Propuesta lista';
+
+  @override
+  String get localToolkitScenarioClarificationRequired =>
+      'Aclaración requerida';
+
+  @override
+  String get localToolkitScenarioAutoCommittedMeal => 'Comida autoguardada';
+
+  @override
+  String get localToolkitScenarioTemplateHeavyAccount =>
+      'Cuenta con muchas plantillas';
+
+  @override
+  String get localToolkitQuickResetScenario => 'Restablecer escenario';
+
+  @override
+  String get localToolkitQuickAddSampleMeal => 'Añadir comida de muestra';
+
+  @override
+  String get localToolkitQuickClearMeals => 'Borrar comidas';
+
+  @override
+  String get localToolkitQuickToggleTrustedMode => 'Alternar modo de confianza';
+
+  @override
+  String get localToolkitQuickSwitchLocale => 'Cambiar idioma';
+
+  @override
+  String get localToolkitQuickSwitchTheme => 'Cambiar tema claro/oscuro';
+
+  @override
+  String get localToolkitTrustedModeOn => 'Confianza activa';
+
+  @override
+  String get localToolkitTrustedModeOff => 'Confianza inactiva';
+
+  @override
+  String get localToolkitCloseTooltip => 'Cerrar kit';
 }

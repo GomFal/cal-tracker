@@ -25,72 +25,76 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 void main() {
-  testWidgets('dashboard exposes dark mode toggle and cleaned up Home surface',
-      (tester) async {
-    final preferencesRepository = _FakePreferencesRepository();
-    final themeModeViewModel = ThemeModeViewModel(
-      preferencesRepository: preferencesRepository,
-    );
-    final authViewModel = AuthViewModel(authRepository: _FakeAuthRepository())
-      ..setUser(_testUser);
-    final nutritionRepository = _FakeNutritionRepository(
-      dailySummary: _summaryWithNoMeals,
-    );
+  testWidgets(
+    'dashboard exposes dark mode toggle and cleaned up Home surface',
+    (tester) async {
+      final preferencesRepository = _FakePreferencesRepository();
+      final themeModeViewModel = ThemeModeViewModel(
+        preferencesRepository: preferencesRepository,
+      );
+      final authViewModel = AuthViewModel(authRepository: _FakeAuthRepository())
+        ..setUser(_testUser);
+      final nutritionRepository = _FakeNutritionRepository(
+        dailySummary: _summaryWithNoMeals,
+      );
 
-    await tester.pumpWidget(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider<AuthViewModel>.value(value: authViewModel),
-          ChangeNotifierProvider<ThemeModeViewModel>.value(
-            value: themeModeViewModel,
-          ),
-          ChangeNotifierProvider(
-            create: (_) => DashboardViewModel(
-              nutritionRepository: nutritionRepository,
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<AuthViewModel>.value(value: authViewModel),
+            ChangeNotifierProvider<ThemeModeViewModel>.value(
+              value: themeModeViewModel,
             ),
-          ),
-        ],
-        child: _testApp(const DashboardScreen()),
-      ),
-    );
-    await tester.pumpAndSettle();
+            ChangeNotifierProvider(
+              create: (_) =>
+                  DashboardViewModel(nutritionRepository: nutritionRepository),
+            ),
+          ],
+          child: _testApp(const DashboardScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.byKey(DarkModeToggle.toggleKey), findsOneWidget);
-    expect(
-        find.byKey(const ValueKey('dashboard_progress_card')), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('dashboard_macro_carbs_icon')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey('dashboard_macro_protein_icon')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey('dashboard_macro_fats_icon')),
-      findsOneWidget,
-    );
-    expect(
-      find.byKey(const ValueKey('dashboard_water_intake_card')),
-      findsOneWidget,
-    );
-    expect(find.text('0 / 0 L'), findsOneWidget);
-    expect(find.byKey(const ValueKey('dashboard_goal_line')), findsNothing);
-    expect(find.text('Calendar'), findsNothing);
-    expect(find.text('Notifications'), findsNothing);
-    expect(find.byIcon(Icons.calendar_today_rounded), findsNothing);
-    expect(find.byIcon(Icons.notifications_none_rounded), findsNothing);
-    expect(find.byIcon(Icons.bolt_rounded), findsNothing);
+      expect(find.byKey(DarkModeToggle.toggleKey), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('dashboard_progress_card')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('dashboard_macro_carbs_icon')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('dashboard_macro_protein_icon')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('dashboard_macro_fats_icon')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('dashboard_water_intake_card')),
+        findsOneWidget,
+      );
+      expect(find.text('0 / 0 L'), findsOneWidget);
+      expect(find.byKey(const ValueKey('dashboard_goal_line')), findsNothing);
+      expect(find.text('Calendar'), findsNothing);
+      expect(find.text('Notifications'), findsNothing);
+      expect(find.byIcon(Icons.calendar_today_rounded), findsNothing);
+      expect(find.byIcon(Icons.notifications_none_rounded), findsNothing);
+      expect(find.byIcon(Icons.bolt_rounded), findsNothing);
 
-    await tester.tap(find.byKey(DarkModeToggle.toggleKey));
-    await tester.pumpAndSettle();
+      await tester.tap(find.byKey(DarkModeToggle.toggleKey));
+      await tester.pumpAndSettle();
 
-    expect(themeModeViewModel.themeMode, ThemeMode.dark);
-    expect(preferencesRepository.savedModes, [ThemeMode.dark]);
-  });
+      expect(themeModeViewModel.themeMode, ThemeMode.dark);
+      expect(preferencesRepository.savedModes, [ThemeMode.dark]);
+    },
+  );
 
-  testWidgets('dashboard water widget steps between zero and the goal',
-      (tester) async {
+  testWidgets('dashboard water widget steps between zero and the goal', (
+    tester,
+  ) async {
     final nutritionRepository = _FakeNutritionRepository(
       dailySummary: _summaryWithWaterGoal,
     );
@@ -107,9 +111,8 @@ void main() {
             ),
           ),
           ChangeNotifierProvider(
-            create: (_) => DashboardViewModel(
-              nutritionRepository: nutritionRepository,
-            ),
+            create: (_) =>
+                DashboardViewModel(nutritionRepository: nutritionRepository),
           ),
         ],
         child: _testApp(const DashboardScreen()),
@@ -134,70 +137,70 @@ void main() {
   });
 
   testWidgets(
-      'dashboard water widget updates optimistically without page refresh',
-      (tester) async {
-    final firstSave = Completer<DailySummary>();
-    final secondSave = Completer<DailySummary>();
-    final nutritionRepository = _FakeNutritionRepository(
-      dailySummary: _summaryWithWaterGoal,
-      hydrationUpdateCompleters: [firstSave, secondSave],
-    );
-    final authViewModel = AuthViewModel(authRepository: _FakeAuthRepository())
-      ..setUser(_testUser);
+    'dashboard water widget updates optimistically without page refresh',
+    (tester) async {
+      final firstSave = Completer<DailySummary>();
+      final secondSave = Completer<DailySummary>();
+      final nutritionRepository = _FakeNutritionRepository(
+        dailySummary: _summaryWithWaterGoal,
+        hydrationUpdateCompleters: [firstSave, secondSave],
+      );
+      final authViewModel = AuthViewModel(authRepository: _FakeAuthRepository())
+        ..setUser(_testUser);
 
-    await tester.pumpWidget(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider<AuthViewModel>.value(value: authViewModel),
-          ChangeNotifierProvider(
-            create: (_) => ThemeModeViewModel(
-              preferencesRepository: _FakePreferencesRepository(),
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<AuthViewModel>.value(value: authViewModel),
+            ChangeNotifierProvider(
+              create: (_) => ThemeModeViewModel(
+                preferencesRepository: _FakePreferencesRepository(),
+              ),
             ),
-          ),
-          ChangeNotifierProvider(
-            create: (_) => DashboardViewModel(
-              nutritionRepository: nutritionRepository,
+            ChangeNotifierProvider(
+              create: (_) =>
+                  DashboardViewModel(nutritionRepository: nutritionRepository),
             ),
-          ),
-        ],
-        child: _testApp(const DashboardScreen()),
-      ),
-    );
-    await tester.pumpAndSettle();
+          ],
+          child: _testApp(const DashboardScreen()),
+        ),
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.text('0 / 2.5 L'), findsOneWidget);
-    expect(find.byType(LinearProgressIndicator), findsNothing);
+      expect(find.text('0 / 2.5 L'), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsNothing);
 
-    await tester.tap(
-      find.byKey(const ValueKey('dashboard_water_increase_button')),
-    );
-    await tester.pump();
+      await tester.tap(
+        find.byKey(const ValueKey('dashboard_water_increase_button')),
+      );
+      await tester.pump();
 
-    expect(find.text('0.25 / 2.5 L'), findsOneWidget);
-    expect(find.byType(LinearProgressIndicator), findsNothing);
+      expect(find.text('0.25 / 2.5 L'), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsNothing);
 
-    await tester.tap(
-      find.byKey(const ValueKey('dashboard_water_increase_button')),
-    );
-    await tester.pump();
+      await tester.tap(
+        find.byKey(const ValueKey('dashboard_water_increase_button')),
+      );
+      await tester.pump();
 
-    expect(find.text('0.5 / 2.5 L'), findsOneWidget);
-    expect(find.byType(LinearProgressIndicator), findsNothing);
-    expect(nutritionRepository.hydrationUpdateRequests, [0.25]);
+      expect(find.text('0.5 / 2.5 L'), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+      expect(nutritionRepository.hydrationUpdateRequests, [0.25]);
 
-    firstSave.complete(_summaryWithWater(_summaryWithWaterGoal, 0.25));
-    await tester.pump();
+      firstSave.complete(_summaryWithWater(_summaryWithWaterGoal, 0.25));
+      await tester.pump();
 
-    expect(nutritionRepository.hydrationUpdateRequests, [0.25, 0.5]);
-    expect(find.text('0.5 / 2.5 L'), findsOneWidget);
-    expect(find.byType(LinearProgressIndicator), findsNothing);
+      expect(nutritionRepository.hydrationUpdateRequests, [0.25, 0.5]);
+      expect(find.text('0.5 / 2.5 L'), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsNothing);
 
-    secondSave.complete(_summaryWithWater(_summaryWithWaterGoal, 0.5));
-    await tester.pumpAndSettle();
+      secondSave.complete(_summaryWithWater(_summaryWithWaterGoal, 0.5));
+      await tester.pumpAndSettle();
 
-    expect(find.text('0.5 / 2.5 L'), findsOneWidget);
-    expect(find.byType(LinearProgressIndicator), findsNothing);
-  });
+      expect(find.text('0.5 / 2.5 L'), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+    },
+  );
 
   testWidgets('dashboard meal cards edit explicit ingredients', (tester) async {
     final nutritionRepository = _FakeNutritionRepository(
@@ -216,9 +219,8 @@ void main() {
             ),
           ),
           ChangeNotifierProvider(
-            create: (_) => DashboardViewModel(
-              nutritionRepository: nutritionRepository,
-            ),
+            create: (_) =>
+                DashboardViewModel(nutritionRepository: nutritionRepository),
           ),
         ],
         child: _testApp(const DashboardScreen()),
@@ -238,10 +240,30 @@ void main() {
     expect(find.text('Edit ingredients'), findsOneWidget);
     expect(find.byKey(const ValueKey('dashboard_item_name_0')), findsOneWidget);
 
-    await tester.enterText(
-      find.byKey(const ValueKey('dashboard_item_calories_0')),
-      '500',
+    final detailsFinder = find.byKey(
+      const ValueKey('dashboard_item_edit_details_0'),
     );
+    await tester.ensureVisible(detailsFinder);
+    await tester.pumpAndSettle();
+    await tester.tap(detailsFinder.hitTestable());
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('dashboard_item_protein_0')),
+      '50',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('dashboard_item_apply_suggestion_0')),
+    );
+    await tester.pumpAndSettle();
+    final caloriesField = tester.widget<TextField>(
+      find.byKey(const ValueKey('dashboard_item_calories_0')),
+    );
+    expect(caloriesField.controller!.text, '488');
+    await tester.tap(
+      find.byKey(const ValueKey('dashboard_item_save_details_0')),
+    );
+    await tester.pumpAndSettle();
     await tester.ensureVisible(
       find.byKey(const ValueKey('save_dashboard_item_edits_button')),
     );
@@ -252,8 +274,8 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(nutritionRepository.lastCorrectedItems, isNotNull);
-    expect(nutritionRepository.lastCorrectedItems!.single.calories, 500);
-    expect(find.text('500 Kcal'), findsOneWidget);
+    expect(nutritionRepository.lastCorrectedItems!.single.calories, 488);
+    expect(find.text('488 Kcal'), findsOneWidget);
     expect(find.text('Breakfast'), findsOneWidget);
   });
 
@@ -274,14 +296,12 @@ void main() {
             ),
           ),
           ChangeNotifierProvider(
-            create: (_) => DashboardViewModel(
-              nutritionRepository: nutritionRepository,
-            ),
+            create: (_) =>
+                DashboardViewModel(nutritionRepository: nutritionRepository),
           ),
           ChangeNotifierProvider(
-            create: (_) => MealHistoryViewModel(
-              nutritionRepository: nutritionRepository,
-            ),
+            create: (_) =>
+                MealHistoryViewModel(nutritionRepository: nutritionRepository),
           ),
         ],
         child: _testApp(const DashboardScreen()),
@@ -321,8 +341,9 @@ void main() {
     expect(find.text('No meals logged today'), findsOneWidget);
   });
 
-  testWidgets('dashboard first-run calorie setup saves and refreshes Home',
-      (tester) async {
+  testWidgets('dashboard first-run calorie setup saves and refreshes Home', (
+    tester,
+  ) async {
     final authRepository = _FakeAuthRepository();
     final nutritionRepository = _FakeNutritionRepository(
       dailySummary: _summaryWithoutConfiguredCalories,
@@ -340,14 +361,12 @@ void main() {
             ),
           ),
           ChangeNotifierProvider(
-            create: (_) => DashboardViewModel(
-              nutritionRepository: nutritionRepository,
-            ),
+            create: (_) =>
+                DashboardViewModel(nutritionRepository: nutritionRepository),
           ),
           ChangeNotifierProvider(
-            create: (_) => MealHistoryViewModel(
-              nutritionRepository: nutritionRepository,
-            ),
+            create: (_) =>
+                MealHistoryViewModel(nutritionRepository: nutritionRepository),
           ),
           ChangeNotifierProvider(
             create: (_) => SettingsViewModel(
@@ -399,8 +418,9 @@ void main() {
     expect(find.byKey(const ValueKey('dashboard_goal_line')), findsNothing);
   });
 
-  testWidgets('history shows empty logged meals without fake metric cards',
-      (tester) async {
+  testWidgets('history shows empty logged meals without fake metric cards', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
@@ -426,8 +446,9 @@ void main() {
     expect(find.text('Water'), findsNothing);
   });
 
-  testWidgets('history shows logged meals without fake metric cards',
-      (tester) async {
+  testWidgets('history shows logged meals without fake metric cards', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
@@ -544,10 +565,7 @@ class _FakeNutritionRepository extends NutritionRepository {
   }) async {
     hydrationUpdateRequests.add(waterConsumedLiters);
     final clamped = waterConsumedLiters
-        .clamp(
-          0,
-          _dailySummary.hydrationGoalLiters,
-        )
+        .clamp(0, _dailySummary.hydrationGoalLiters)
         .toDouble();
     if (_hydrationUpdateCompleters.isNotEmpty) {
       _dailySummary = await _hydrationUpdateCompleters.removeAt(0).future;
@@ -844,10 +862,7 @@ NutritionSnapshot _sumNutrition(List<MealItem> items) {
 
 NutritionSnapshot _sumMealNutrition(List<Meal> meals) {
   return NutritionSnapshot(
-    calories: meals.fold<int>(
-      0,
-      (sum, meal) => sum + meal.nutrition.calories,
-    ),
+    calories: meals.fold<int>(0, (sum, meal) => sum + meal.nutrition.calories),
     proteinGrams: meals.fold<double>(
       0,
       (sum, meal) => sum + meal.nutrition.proteinGrams,

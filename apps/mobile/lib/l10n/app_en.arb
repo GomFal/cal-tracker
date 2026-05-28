@@ -30,6 +30,36 @@
   "commonCheckIngredientDetails": "Check ingredient details",
   "commonIngredientDetailsError": "Each ingredient needs a name, amount, unit, calories, and non-negative macros.",
   "commonAddAtLeastOneIngredient": "Add at least one ingredient.",
+  "mealEditorMealTotal": "Meal total",
+  "mealEditorIngredientsSection": "Ingredients",
+  "mealEditorEditDetails": "Edit details",
+  "mealEditorNutritionDetails": "Nutrition details",
+  "mealEditorApplySuggestion": "Apply suggestion",
+  "mealEditorCalculatedFromMacros": "Calculated from macros: {calories} kcal",
+  "@mealEditorCalculatedFromMacros": {
+    "placeholders": {
+      "calories": {
+        "type": "int"
+      }
+    }
+  },
+  "mealEditorMacroCaloriesShort": "{calories} kcal from macros",
+  "@mealEditorMacroCaloriesShort": {
+    "placeholders": {
+      "calories": {
+        "type": "int"
+      }
+    }
+  },
+  "mealEditorCaloriesMismatchTitle": "Calories differ from macros",
+  "mealEditorCaloriesMismatchMessage": "Calculated from macros: {calories} kcal",
+  "@mealEditorCaloriesMismatchMessage": {
+    "placeholders": {
+      "calories": {
+        "type": "int"
+      }
+    }
+  },
   "mealTitleListSeparator": ", ",
   "mealTitleListFinalSeparator": " and ",
   "caloriesValue": "{calories} Kcal",
@@ -78,7 +108,7 @@
   "authNameRequiredError": "Enter your name.",
   "authPasswordRequiredError": "Enter your password.",
   "authPasswordTooShortError": "Use at least 8 characters.",
-  "authHeroHeadline": "Track your\ncalories better.",
+  "authHeroHeadline": "Track your\ncalories, better.",
   "darkModeSwitchToLight": "Switch to light mode",
   "darkModeSwitchToDark": "Switch to dark mode",
   "settingsTitle": "Menu",
@@ -585,5 +615,35 @@
   "mealLabelSkip": "Skip",
   "mealProposalReadyToLog": "Ready to log",
   "mealProposalConfirm": "Confirm",
-  "mealConfirmationEmbedded": "Meal confirmation is embedded in the logging flow."
+  "mealConfirmationEmbedded": "Meal confirmation is embedded in the logging flow.",
+  "localToolkitToolButtonTooltip": "Open local toolkit",
+  "localToolkitPanelTitle": "Local toolkit",
+  "localToolkitPanelSubtitle": "Jump routes, apply scenarios, and mutate local state.",
+  "localToolkitRouteSectionTitle": "Routes",
+  "localToolkitScenarioSectionTitle": "Scenarios",
+  "localToolkitQuickMutatorsSectionTitle": "Quick mutators",
+  "localToolkitRouteAuth": "Auth",
+  "localToolkitRouteDashboard": "Dashboard",
+  "localToolkitRouteLogMeal": "Log Meal",
+  "localToolkitRouteHistory": "History",
+  "localToolkitRouteTemplates": "Templates",
+  "localToolkitRouteSettings": "Settings",
+  "localToolkitScenarioUnauthenticated": "Unauthenticated",
+  "localToolkitScenarioEmptyDay": "Empty day",
+  "localToolkitScenarioNormalDay": "Normal day",
+  "localToolkitScenarioOverTarget": "Over target",
+  "localToolkitScenarioGoalsNotConfigured": "Goals not configured",
+  "localToolkitScenarioProposalReady": "Proposal ready",
+  "localToolkitScenarioClarificationRequired": "Clarification required",
+  "localToolkitScenarioAutoCommittedMeal": "Auto-committed meal",
+  "localToolkitScenarioTemplateHeavyAccount": "Template-heavy account",
+  "localToolkitQuickResetScenario": "Reset scenario",
+  "localToolkitQuickAddSampleMeal": "Add sample meal",
+  "localToolkitQuickClearMeals": "Clear meals",
+  "localToolkitQuickToggleTrustedMode": "Toggle trusted mode",
+  "localToolkitQuickSwitchLocale": "Switch locale",
+  "localToolkitQuickSwitchTheme": "Switch light/dark theme",
+  "localToolkitTrustedModeOn": "Trusted on",
+  "localToolkitTrustedModeOff": "Trusted off",
+  "localToolkitCloseTooltip": "Close toolkit"
 }

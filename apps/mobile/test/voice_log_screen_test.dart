@@ -48,227 +48,64 @@ void main() {
     });
 
     testWidgets(
-        'starts voice-only and keeps voice action while reviewing a proposal',
-        (tester) async {
-      final proposal = MealProposal(
-        id: 'prop_chicken_rice',
-        title: 'Chicken and rice',
-        confidence: 0.85,
-        requiresConfirmation: true,
-        trustedAutoCommitEligible: false,
-        nutrition: const NutritionSnapshot(
-          calories: 295,
-          proteinGrams: 38,
-          carbsGrams: 29,
-          fatGrams: 4,
-        ),
-        items: [
-          _mealItem(
-            name: 'Chicken breast',
-            calories: 165,
-            externalId: 'chicken',
-          ),
-          _mealItem(
-            name: 'Cooked rice',
-            calories: 130,
-            externalId: 'rice',
-          ),
-        ],
-      );
-      when(() => audioRecorderService.start()).thenAnswer((_) async {});
-      when(() => audioRecorderService.stop()).thenAnswer(
-        (_) async => const RecordedAudio(
-          path: '/tmp/test.m4a',
-          mimeType: 'audio/m4a',
-          sizeBytes: 1024,
-        ),
-      );
-      when(() => nutritionRepository.logAudio(any())).thenAnswer(
-        (_) async => VoiceMealRunResult(
-          transcript: 'chicken and rice',
-          provider: 'test',
-          model: 'test-model',
-          traceId: 'trace-1',
-          result: AgentRunResult(
-            kind: 'proposal',
-            message: 'Meal proposal created.',
-            proposal: proposal,
-          ),
-        ),
-      );
-      final hapticCalls = <String>[];
-      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-        SystemChannels.platform,
-        (call) async {
-          if (call.method == 'HapticFeedback.vibrate') {
-            hapticCalls.add(call.arguments as String);
-          }
-          return null;
-        },
-      );
-      addTearDown(
-        () => tester.binding.defaultBinaryMessenger
-            .setMockMethodCallHandler(SystemChannels.platform, null),
-      );
-
-      await tester.pumpWidget(
-        ChangeNotifierProvider<VoiceLogViewModel>.value(
-          value: viewModel,
-          child: MaterialApp(
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: AppLocalizations.supportedLocales,
-            theme: buildTheme(),
-            home: const MealCreateScreen(),
-          ),
-        ),
-      );
-
-      expect(find.byKey(const ValueKey('meal_text_field')), findsNothing);
-      expect(find.byKey(const ValueKey('submit_meal_button')), findsNothing);
-      expect(
-        find.byKey(const ValueKey('meal_create_voice_action_button')),
-        findsOneWidget,
-      );
-      expect(find.byKey(const ValueKey('mic_button')), findsOneWidget);
-
-      await tester.tap(find.byKey(const ValueKey('mic_button')));
-      await tester.pump();
-
-      expect(viewModel.state, VoiceLogState.recording);
-      expect(hapticCalls, contains('HapticFeedbackType.lightImpact'));
-      expect(find.byKey(const ValueKey('voice_action_recording_pulse')),
-          findsOneWidget);
-
-      await tester.tap(find.byKey(const ValueKey('mic_button')));
-      await tester.pumpAndSettle();
-
-      expect(hapticCalls, contains('HapticFeedbackType.mediumImpact'));
-      expect(find.text('Chicken and rice'), findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('voice_transcript_card')),
-        findsOneWidget,
-      );
-      expect(find.text('I heard:'), findsOneWidget);
-      expect(find.text('chicken and rice'), findsOneWidget);
-      expect(find.byKey(const ValueKey('confirm_proposal_button')),
-          findsOneWidget);
-      expect(
-          find.byKey(const ValueKey('edit_proposal_button')), findsOneWidget);
-      expect(find.byKey(const ValueKey('meal_text_field')), findsNothing);
-      expect(find.byKey(const ValueKey('submit_meal_button')), findsNothing);
-      expect(
-        find.byKey(const ValueKey('meal_create_voice_action_button')),
-        findsOneWidget,
-      );
-      expect(find.byKey(const ValueKey('mic_button')), findsOneWidget);
-
-      await tester
-          .tap(find.byKey(const ValueKey('voice_log_start_over_button')));
-      await tester.pumpAndSettle();
-
-      expect(find.byKey(const ValueKey('meal_text_field')), findsNothing);
-      expect(find.byKey(const ValueKey('submit_meal_button')), findsNothing);
-      expect(
-        find.byKey(const ValueKey('voice_transcript_card')),
-        findsNothing,
-      );
-      expect(find.byKey(const ValueKey('mic_button')), findsOneWidget);
-    });
-
-    testWidgets('hides start over while voice recording is starting and active',
-        (tester) async {
-      final proposal = MealProposal(
-        id: 'prop_chicken_rice',
-        title: 'Chicken and rice',
-        confidence: 0.85,
-        requiresConfirmation: true,
-        trustedAutoCommitEligible: false,
-        nutrition: const NutritionSnapshot(
-          calories: 295,
-          proteinGrams: 38,
-          carbsGrams: 29,
-          fatGrams: 4,
-        ),
-        items: [
-          _mealItem(
-            name: 'Chicken breast',
-            calories: 165,
-            externalId: 'chicken',
-          ),
-          _mealItem(
-            name: 'Cooked rice',
-            calories: 130,
-            externalId: 'rice',
-          ),
-        ],
-      );
-      final startCompleter = Completer<void>();
-      when(() => nutritionRepository.logText('chicken and rice')).thenAnswer(
-        (_) async => AgentRunResult(
-          kind: 'proposal',
-          message: 'Meal proposal created.',
-          proposal: proposal,
-        ),
-      );
-      when(() => audioRecorderService.start()).thenAnswer(
-        (_) => startCompleter.future,
-      );
-
-      await tester.pumpWidget(
-        ChangeNotifierProvider<VoiceLogViewModel>.value(
-          value: viewModel,
-          child: MaterialApp(
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: AppLocalizations.supportedLocales,
-            theme: buildTheme(),
-            home: const MealCreateScreen(),
-          ),
-        ),
-      );
-
-      await viewModel.submitText('chicken and rice');
-      await tester.pumpAndSettle();
-      expect(
-        find.byKey(const ValueKey('voice_log_start_over_button')),
-        findsOneWidget,
-      );
-
-      await tester.tap(find.byKey(const ValueKey('mic_button')));
-      await tester.pump();
-
-      expect(viewModel.state, VoiceLogState.requestingPermission);
-      expect(
-        find.byKey(const ValueKey('voice_log_start_over_button')),
-        findsNothing,
-      );
-
-      startCompleter.complete();
-      await tester.pump();
-
-      expect(viewModel.state, VoiceLogState.recording);
-      expect(
-        find.byKey(const ValueKey('voice_log_start_over_button')),
-        findsNothing,
-      );
-
-      viewModel.clearResult();
-    });
-
-    testWidgets(
-      'does not show voice transcript during text clarification',
+      'starts voice-only and keeps voice action while reviewing a proposal',
       (tester) async {
-        const transcript =
-            'Añade 100 gramos de arroz, 100 gramos de pollo y 100 gramos de pan.';
-        final group = _candidateGroup(
-          canonicalEnglishName: 'arroz',
-          candidates: const [],
+        final proposal = MealProposal(
+          id: 'prop_chicken_rice',
+          title: 'Chicken and rice',
+          confidence: 0.85,
+          requiresConfirmation: true,
+          trustedAutoCommitEligible: false,
+          nutrition: const NutritionSnapshot(
+            calories: 295,
+            proteinGrams: 38,
+            carbsGrams: 29,
+            fatGrams: 4,
+          ),
+          items: [
+            _mealItem(
+              name: 'Chicken breast',
+              calories: 165,
+              externalId: 'chicken',
+            ),
+            _mealItem(name: 'Cooked rice', calories: 130, externalId: 'rice'),
+          ],
         );
-        when(() => nutritionRepository.logText(transcript)).thenAnswer(
-          (_) async => AgentRunResult(
-            kind: 'clarification_required',
-            message:
-                'I could not confidently match every ingredient. Please choose a food match or rephrase the meal.',
-            candidateGroups: [group],
+        when(() => audioRecorderService.start()).thenAnswer((_) async {});
+        when(() => audioRecorderService.stop()).thenAnswer(
+          (_) async => const RecordedAudio(
+            path: '/tmp/test.m4a',
+            mimeType: 'audio/m4a',
+            sizeBytes: 1024,
+          ),
+        );
+        when(() => nutritionRepository.logAudio(any())).thenAnswer(
+          (_) async => VoiceMealRunResult(
+            transcript: 'chicken and rice',
+            provider: 'test',
+            model: 'test-model',
+            traceId: 'trace-1',
+            result: AgentRunResult(
+              kind: 'proposal',
+              message: 'Meal proposal created.',
+              proposal: proposal,
+            ),
+          ),
+        );
+        final hapticCalls = <String>[];
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          SystemChannels.platform,
+          (call) async {
+            if (call.method == 'HapticFeedback.vibrate') {
+              hapticCalls.add(call.arguments as String);
+            }
+            return null;
+          },
+        );
+        addTearDown(
+          () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+            SystemChannels.platform,
+            null,
           ),
         );
 
@@ -284,7 +121,54 @@ void main() {
           ),
         );
 
-        await viewModel.submitText(transcript);
+        expect(find.byKey(const ValueKey('meal_text_field')), findsNothing);
+        expect(find.byKey(const ValueKey('submit_meal_button')), findsNothing);
+        expect(
+          find.byKey(const ValueKey('meal_create_voice_action_button')),
+          findsOneWidget,
+        );
+        expect(find.byKey(const ValueKey('mic_button')), findsOneWidget);
+
+        await tester.tap(find.byKey(const ValueKey('mic_button')));
+        await tester.pump();
+
+        expect(viewModel.state, VoiceLogState.recording);
+        expect(hapticCalls, contains('HapticFeedbackType.lightImpact'));
+        expect(
+          find.byKey(const ValueKey('voice_action_recording_pulse')),
+          findsOneWidget,
+        );
+
+        await tester.tap(find.byKey(const ValueKey('mic_button')));
+        await tester.pumpAndSettle();
+
+        expect(hapticCalls, contains('HapticFeedbackType.mediumImpact'));
+        expect(find.text('Chicken and rice'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('voice_transcript_card')),
+          findsOneWidget,
+        );
+        expect(find.text('I heard:'), findsOneWidget);
+        expect(find.text('chicken and rice'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('confirm_proposal_button')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('edit_proposal_button')),
+          findsOneWidget,
+        );
+        expect(find.byKey(const ValueKey('meal_text_field')), findsNothing);
+        expect(find.byKey(const ValueKey('submit_meal_button')), findsNothing);
+        expect(
+          find.byKey(const ValueKey('meal_create_voice_action_button')),
+          findsOneWidget,
+        );
+        expect(find.byKey(const ValueKey('mic_button')), findsOneWidget);
+
+        await tester.tap(
+          find.byKey(const ValueKey('voice_log_start_over_button')),
+        );
         await tester.pumpAndSettle();
 
         expect(find.byKey(const ValueKey('meal_text_field')), findsNothing);
@@ -293,12 +177,128 @@ void main() {
           find.byKey(const ValueKey('voice_transcript_card')),
           findsNothing,
         );
-        expect(
-          find.byKey(const ValueKey('resolver_clarification_card')),
-          findsOneWidget,
-        );
+        expect(find.byKey(const ValueKey('mic_button')), findsOneWidget);
       },
     );
+
+    testWidgets(
+      'hides start over while voice recording is starting and active',
+      (tester) async {
+        final proposal = MealProposal(
+          id: 'prop_chicken_rice',
+          title: 'Chicken and rice',
+          confidence: 0.85,
+          requiresConfirmation: true,
+          trustedAutoCommitEligible: false,
+          nutrition: const NutritionSnapshot(
+            calories: 295,
+            proteinGrams: 38,
+            carbsGrams: 29,
+            fatGrams: 4,
+          ),
+          items: [
+            _mealItem(
+              name: 'Chicken breast',
+              calories: 165,
+              externalId: 'chicken',
+            ),
+            _mealItem(name: 'Cooked rice', calories: 130, externalId: 'rice'),
+          ],
+        );
+        final startCompleter = Completer<void>();
+        when(() => nutritionRepository.logText('chicken and rice')).thenAnswer(
+          (_) async => AgentRunResult(
+            kind: 'proposal',
+            message: 'Meal proposal created.',
+            proposal: proposal,
+          ),
+        );
+        when(
+          () => audioRecorderService.start(),
+        ).thenAnswer((_) => startCompleter.future);
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider<VoiceLogViewModel>.value(
+            value: viewModel,
+            child: MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              theme: buildTheme(),
+              home: const MealCreateScreen(),
+            ),
+          ),
+        );
+
+        await viewModel.submitText('chicken and rice');
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('voice_log_start_over_button')),
+          findsOneWidget,
+        );
+
+        await tester.tap(find.byKey(const ValueKey('mic_button')));
+        await tester.pump();
+
+        expect(viewModel.state, VoiceLogState.requestingPermission);
+        expect(
+          find.byKey(const ValueKey('voice_log_start_over_button')),
+          findsNothing,
+        );
+
+        startCompleter.complete();
+        await tester.pump();
+
+        expect(viewModel.state, VoiceLogState.recording);
+        expect(
+          find.byKey(const ValueKey('voice_log_start_over_button')),
+          findsNothing,
+        );
+
+        viewModel.clearResult();
+      },
+    );
+
+    testWidgets('does not show voice transcript during text clarification', (
+      tester,
+    ) async {
+      const transcript =
+          'Añade 100 gramos de arroz, 100 gramos de pollo y 100 gramos de pan.';
+      final group = _candidateGroup(
+        canonicalEnglishName: 'arroz',
+        candidates: const [],
+      );
+      when(() => nutritionRepository.logText(transcript)).thenAnswer(
+        (_) async => AgentRunResult(
+          kind: 'clarification_required',
+          message:
+              'I could not confidently match every ingredient. Please choose a food match or rephrase the meal.',
+          candidateGroups: [group],
+        ),
+      );
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<VoiceLogViewModel>.value(
+          value: viewModel,
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            theme: buildTheme(),
+            home: const MealCreateScreen(),
+          ),
+        ),
+      );
+
+      await viewModel.submitText(transcript);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('meal_text_field')), findsNothing);
+      expect(find.byKey(const ValueKey('submit_meal_button')), findsNothing);
+      expect(find.byKey(const ValueKey('voice_transcript_card')), findsNothing);
+      expect(
+        find.byKey(const ValueKey('resolver_clarification_card')),
+        findsOneWidget,
+      );
+    });
 
     testWidgets('searches manual foods and creates a proposal', (tester) async {
       final bread = _mealItem(
@@ -320,10 +320,9 @@ void main() {
         ),
         items: [bread],
       );
-      when(() => nutritionRepository.searchFoods('bread', limit: 10))
-          .thenAnswer(
-        (_) async => FoodSearchResult(items: [bread]),
-      );
+      when(
+        () => nutritionRepository.searchFoods('bread', limit: 10),
+      ).thenAnswer((_) async => FoodSearchResult(items: [bread]));
       when(
         () => nutritionRepository.createProposalFromItems(
           phrase: any(named: 'phrase'),
@@ -343,8 +342,10 @@ void main() {
         ),
       );
 
-      expect(find.byKey(const ValueKey('manual_food_search_panel')),
-          findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('manual_food_search_panel')),
+        findsOneWidget,
+      );
 
       await tester.enterText(
         find.byKey(const ValueKey('manual_food_search_field')),
@@ -357,15 +358,24 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const ValueKey('manual_food_draft_item_0')),
-          findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('manual_food_draft_item_0')),
+        findsOneWidget,
+      );
 
       await tester.ensureVisible(
         find.byKey(const ValueKey('manual_food_review_meal_button')),
       );
-      final reviewButton =
-          find.byKey(const ValueKey('manual_food_review_meal_button'));
-      await tester.tapAt(tester.getCenter(reviewButton) - const Offset(180, 0));
+      final reviewButton = find.byKey(
+        const ValueKey('manual_food_review_meal_button'),
+      );
+      await tester.scrollUntilVisible(
+        reviewButton,
+        260,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(reviewButton);
       await tester.pumpAndSettle();
 
       final captured = verify(
@@ -376,8 +386,10 @@ void main() {
       ).captured.single as List<MealItem>;
       expect(captured.single.name, 'Bread');
       expect(find.text('Bread'), findsWidgets);
-      expect(find.byKey(const ValueKey('confirm_proposal_button')),
-          findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('confirm_proposal_button')),
+        findsOneWidget,
+      );
     });
 
     testWidgets(
@@ -413,10 +425,12 @@ void main() {
             candidateGroups: [group],
           ),
         );
-        when(() => nutritionRepository.searchFoods('red meat', limit: 10))
-            .thenAnswer((_) async => const FoodSearchResult(items: []));
-        when(() => nutritionRepository.searchFoods('bread', limit: 10))
-            .thenAnswer((_) async => FoodSearchResult(items: [bread]));
+        when(
+          () => nutritionRepository.searchFoods('red meat', limit: 10),
+        ).thenAnswer((_) async => const FoodSearchResult(items: []));
+        when(
+          () => nutritionRepository.searchFoods('bread', limit: 10),
+        ).thenAnswer((_) async => FoodSearchResult(items: [bread]));
         when(
           () => nutritionRepository.createProposalFromItems(
             phrase: any(named: 'phrase'),
@@ -468,8 +482,10 @@ void main() {
             items: any(named: 'items'),
           ),
         ).called(1);
-        expect(find.byKey(const ValueKey('confirm_proposal_button')),
-            findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('confirm_proposal_button')),
+          findsOneWidget,
+        );
       },
     );
 
@@ -568,20 +584,13 @@ void main() {
         ),
         items: [
           group.candidates.first,
-          _mealItem(
-            name: 'Bread, rye',
-            calories: 259,
-            externalId: 'bread_rye',
-          ),
-          _mealItem(
-            name: 'Butter',
-            calories: 717,
-            externalId: 'butter',
-          ),
+          _mealItem(name: 'Bread, rye', calories: 259, externalId: 'bread_rye'),
+          _mealItem(name: 'Butter', calories: 717, externalId: 'butter'),
         ],
       );
-      when(() => nutritionRepository.logText('chicken bread butter'))
-          .thenAnswer(
+      when(
+        () => nutritionRepository.logText('chicken bread butter'),
+      ).thenAnswer(
         (_) async => AgentRunResult(
           kind: 'proposal',
           message: 'Meal proposal created.',
@@ -735,19 +744,43 @@ void main() {
         findsNothing,
       );
 
-      await tester.tap(
-        find.byKey(const ValueKey('edit_proposal_item_nutrition_0')),
+      final nutritionButtonFinder = find.byKey(
+        const ValueKey('edit_proposal_item_nutrition_0'),
       );
+      await tester.ensureVisible(nutritionButtonFinder);
+      await tester.pumpAndSettle();
+      await tester.tap(nutritionButtonFinder.hitTestable());
       await tester.pumpAndSettle();
 
       expect(
-        find.byKey(const ValueKey('proposal_nutrition_calories')),
+        find.byKey(const ValueKey('proposal_nutrition_calories_0')),
         findsOneWidget,
       );
       expect(
-        find.byKey(const ValueKey('proposal_nutrition_protein')),
+        find.byKey(const ValueKey('proposal_nutrition_protein_0')),
         findsOneWidget,
       );
+      await tester.enterText(
+        find.byKey(const ValueKey('proposal_nutrition_protein_0')),
+        '70',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('proposal_nutrition_carbs_0')),
+        '0',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('proposal_nutrition_fat_0')),
+        '0',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('proposal_nutrition_apply_suggestion_0')),
+      );
+      await tester.pumpAndSettle();
+      final caloriesField = tester.widget<TextField>(
+        find.byKey(const ValueKey('proposal_nutrition_calories_0')),
+      );
+      expect(caloriesField.controller!.text, '280');
     });
 
     testWidgets('searches a replacement in the proposal editor', (
@@ -805,15 +838,14 @@ void main() {
           proposal: proposal,
         ),
       );
-      when(() => nutritionRepository.searchFoods('Chicken breast', limit: 10))
-          .thenAnswer((_) async => const FoodSearchResult(items: []));
-      when(() => nutritionRepository.searchFoods('bread', limit: 10))
-          .thenAnswer((_) async => FoodSearchResult(items: [bread]));
       when(
-        () => nutritionRepository.updateProposalItems(
-          'prop_chicken',
-          any(),
-        ),
+        () => nutritionRepository.searchFoods('Chicken breast', limit: 10),
+      ).thenAnswer((_) async => const FoodSearchResult(items: []));
+      when(
+        () => nutritionRepository.searchFoods('bread', limit: 10),
+      ).thenAnswer((_) async => FoodSearchResult(items: [bread]));
+      when(
+        () => nutritionRepository.updateProposalItems('prop_chicken', any()),
       ).thenAnswer((_) async => updatedProposal);
 
       await tester.pumpWidget(
@@ -849,8 +881,9 @@ void main() {
       await tester.ensureVisible(
         find.byKey(const ValueKey('save_proposal_edits_button')),
       );
-      await tester
-          .tap(find.byKey(const ValueKey('save_proposal_edits_button')));
+      await tester.tap(
+        find.byKey(const ValueKey('save_proposal_edits_button')),
+      );
       await tester.pumpAndSettle();
 
       final captured = verify(
@@ -967,8 +1000,12 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('edit_proposal_button')));
       await tester.pumpAndSettle();
-      await tester
-          .tap(find.byKey(const ValueKey('save_proposal_edits_button')));
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('save_proposal_edits_button')),
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('save_proposal_edits_button')),
+      );
       await tester.pumpAndSettle();
 
       expect(
@@ -978,142 +1015,127 @@ void main() {
       verifyNever(() => nutritionRepository.updateProposalItems(any(), any()));
     });
 
-    testWidgets(
-      'keeps voice correction action available for active proposal',
-      (tester) async {
-        const initialProposal = MealProposal(
-          id: 'prop_1',
-          title: 'Bread and butter',
-          confidence: 0.85,
-          requiresConfirmation: true,
-          trustedAutoCommitEligible: false,
-          nutrition: NutritionSnapshot(
-            calories: 408,
-            proteinGrams: 9.2,
-            carbsGrams: 49,
-            fatGrams: 19.4,
-          ),
-          items: [],
-        );
-        const updatedProposal = MealProposal(
-          id: 'prop_1',
-          title: 'Bread and butter',
-          confidence: 0.85,
-          requiresConfirmation: true,
-          trustedAutoCommitEligible: false,
-          nutrition: NutritionSnapshot(
-            calories: 552,
-            proteinGrams: 9.4,
-            carbsGrams: 49,
-            fatGrams: 35.6,
-          ),
-          items: [],
-        );
-        when(() => nutritionRepository.logText('bread and butter')).thenAnswer(
-          (_) async => const AgentRunResult(
+    testWidgets('keeps voice correction action available for active proposal', (
+      tester,
+    ) async {
+      const initialProposal = MealProposal(
+        id: 'prop_1',
+        title: 'Bread and butter',
+        confidence: 0.85,
+        requiresConfirmation: true,
+        trustedAutoCommitEligible: false,
+        nutrition: NutritionSnapshot(
+          calories: 408,
+          proteinGrams: 9.2,
+          carbsGrams: 49,
+          fatGrams: 19.4,
+        ),
+        items: [],
+      );
+      const updatedProposal = MealProposal(
+        id: 'prop_1',
+        title: 'Bread and butter',
+        confidence: 0.85,
+        requiresConfirmation: true,
+        trustedAutoCommitEligible: false,
+        nutrition: NutritionSnapshot(
+          calories: 552,
+          proteinGrams: 9.4,
+          carbsGrams: 49,
+          fatGrams: 35.6,
+        ),
+        items: [],
+      );
+      when(() => nutritionRepository.logText('bread and butter')).thenAnswer(
+        (_) async => const AgentRunResult(
+          kind: 'proposal',
+          message: 'Meal proposal created.',
+          proposal: initialProposal,
+        ),
+      );
+      when(() => audioRecorderService.start()).thenAnswer((_) async {});
+      when(() => audioRecorderService.stop()).thenAnswer(
+        (_) async => const RecordedAudio(
+          path: '/tmp/test.m4a',
+          mimeType: 'audio/m4a',
+          sizeBytes: 1024,
+        ),
+      );
+      when(
+        () => nutritionRepository.logAudio(any(), activeProposalId: 'prop_1'),
+      ).thenAnswer(
+        (_) async => const VoiceMealRunResult(
+          transcript: 'make the butter 40 grams',
+          provider: 'test',
+          model: 'test-model',
+          traceId: 'trace-1',
+          result: AgentRunResult(
             kind: 'proposal',
-            message: 'Meal proposal created.',
-            proposal: initialProposal,
+            message: 'Meal proposal updated.',
+            proposal: updatedProposal,
           ),
-        );
-        when(
-          () => audioRecorderService.start(),
-        ).thenAnswer((_) async {});
-        when(
-          () => audioRecorderService.stop(),
-        ).thenAnswer(
-          (_) async => const RecordedAudio(
-            path: '/tmp/test.m4a',
-            mimeType: 'audio/m4a',
-            sizeBytes: 1024,
+        ),
+      );
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<VoiceLogViewModel>.value(
+          value: viewModel,
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            theme: buildTheme(),
+            home: const MealCreateScreen(),
           ),
-        );
-        when(
-          () => nutritionRepository.logAudio(
-            any(),
-            activeProposalId: 'prop_1',
-          ),
-        ).thenAnswer(
-          (_) async => const VoiceMealRunResult(
-            transcript: 'make the butter 40 grams',
-            provider: 'test',
-            model: 'test-model',
-            traceId: 'trace-1',
-            result: AgentRunResult(
-              kind: 'proposal',
-              message: 'Meal proposal updated.',
-              proposal: updatedProposal,
-            ),
-          ),
-        );
+        ),
+      );
 
-        await tester.pumpWidget(
-          ChangeNotifierProvider<VoiceLogViewModel>.value(
-            value: viewModel,
-            child: MaterialApp(
-              localizationsDelegates: AppLocalizations.localizationsDelegates,
-              supportedLocales: AppLocalizations.supportedLocales,
-              theme: buildTheme(),
-              home: const MealCreateScreen(),
-            ),
-          ),
-        );
+      await viewModel.submitText('bread and butter');
+      await tester.pumpAndSettle();
 
-        await viewModel.submitText('bread and butter');
-        await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('meal_text_field')), findsNothing);
+      expect(find.byKey(const ValueKey('submit_meal_button')), findsNothing);
+      expect(
+        find.byKey(const ValueKey('meal_create_voice_action_button')),
+        findsOneWidget,
+      );
+      expect(viewModel.proposal, initialProposal);
 
-        expect(find.byKey(const ValueKey('meal_text_field')), findsNothing);
-        expect(
-          find.byKey(const ValueKey('submit_meal_button')),
-          findsNothing,
-        );
-        expect(
-          find.byKey(const ValueKey('meal_create_voice_action_button')),
-          findsOneWidget,
-        );
-        expect(viewModel.proposal, initialProposal);
+      await tester.tap(find.byKey(const ValueKey('mic_button')));
+      await tester.pump();
 
-        await tester.tap(find.byKey(const ValueKey('mic_button')));
-        await tester.pump();
+      expect(viewModel.state, VoiceLogState.recording);
+      expect(viewModel.proposal, initialProposal);
+      expect(find.byKey(const ValueKey('voice_transcript_card')), findsNothing);
 
-        expect(viewModel.state, VoiceLogState.recording);
-        expect(viewModel.proposal, initialProposal);
-        expect(
-            find.byKey(const ValueKey('voice_transcript_card')), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('mic_button')));
+      await tester.pumpAndSettle();
 
-        await tester.tap(find.byKey(const ValueKey('mic_button')));
-        await tester.pumpAndSettle();
+      expect(viewModel.proposal, updatedProposal);
+      expect(
+        find.byKey(const ValueKey('proposal_change_success_toast')),
+        findsOneWidget,
+      );
+      expect(find.text('Changes applied'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('voice_transcript_card')),
+        findsOneWidget,
+      );
+      expect(find.text('make the butter 40 grams'), findsOneWidget);
+      verify(
+        () => nutritionRepository.logAudio(any(), activeProposalId: 'prop_1'),
+      ).called(1);
 
-        expect(viewModel.proposal, updatedProposal);
-        expect(
-          find.byKey(const ValueKey('proposal_change_success_toast')),
-          findsOneWidget,
-        );
-        expect(find.text('Changes applied'), findsOneWidget);
-        expect(
-          find.byKey(const ValueKey('voice_transcript_card')),
-          findsOneWidget,
-        );
-        expect(find.text('make the butter 40 grams'), findsOneWidget);
-        verify(
-          () => nutritionRepository.logAudio(
-            any(),
-            activeProposalId: 'prop_1',
-          ),
-        ).called(1);
+      await tester.pump(
+        VoiceLogViewModel.proposalChangeSuccessDuration +
+            const Duration(milliseconds: 100),
+      );
+      await tester.pump();
 
-        await tester.pump(
-          VoiceLogViewModel.proposalChangeSuccessDuration +
-              const Duration(milliseconds: 100),
-        );
-        await tester.pump();
-
-        expect(
-          find.byKey(const ValueKey('proposal_change_success_toast')),
-          findsNothing,
-        );
-      },
-    );
+      expect(
+        find.byKey(const ValueKey('proposal_change_success_toast')),
+        findsNothing,
+      );
+    });
 
     testWidgets(
       'shows localized change success for Spanish active proposal correction',
@@ -1146,8 +1168,9 @@ void main() {
           ),
           items: [],
         );
-        when(() => nutritionRepository.logText('arroz con mantequilla'))
-            .thenAnswer(
+        when(
+          () => nutritionRepository.logText('arroz con mantequilla'),
+        ).thenAnswer(
           (_) async => const AgentRunResult(
             kind: 'proposal',
             message: 'Propuesta de comida creada.',
@@ -1280,10 +1303,7 @@ void main() {
         expect(find.text('Needs a little more detail'), findsOneWidget);
         expect(find.byKey(const ValueKey('mic_button')), findsOneWidget);
         expect(find.byKey(const ValueKey('meal_text_field')), findsNothing);
-        expect(
-          find.byKey(const ValueKey('submit_meal_button')),
-          findsNothing,
-        );
+        expect(find.byKey(const ValueKey('submit_meal_button')), findsNothing);
       },
     );
 
@@ -1377,10 +1397,7 @@ void main() {
         );
         expect(find.byKey(const ValueKey('mic_button')), findsOneWidget);
         expect(find.byKey(const ValueKey('meal_text_field')), findsNothing);
-        expect(
-          find.byKey(const ValueKey('submit_meal_button')),
-          findsNothing,
-        );
+        expect(find.byKey(const ValueKey('submit_meal_button')), findsNothing);
       },
     );
   });

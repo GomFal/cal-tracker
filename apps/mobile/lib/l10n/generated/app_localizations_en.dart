@@ -100,6 +100,39 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commonAddAtLeastOneIngredient => 'Add at least one ingredient.';
 
   @override
+  String get mealEditorMealTotal => 'Meal total';
+
+  @override
+  String get mealEditorIngredientsSection => 'Ingredients';
+
+  @override
+  String get mealEditorEditDetails => 'Edit details';
+
+  @override
+  String get mealEditorNutritionDetails => 'Nutrition details';
+
+  @override
+  String get mealEditorApplySuggestion => 'Apply suggestion';
+
+  @override
+  String mealEditorCalculatedFromMacros(int calories) {
+    return 'Calculated from macros: $calories kcal';
+  }
+
+  @override
+  String mealEditorMacroCaloriesShort(int calories) {
+    return '$calories kcal from macros';
+  }
+
+  @override
+  String get mealEditorCaloriesMismatchTitle => 'Calories differ from macros';
+
+  @override
+  String mealEditorCaloriesMismatchMessage(int calories) {
+    return 'Calculated from macros: $calories kcal';
+  }
+
+  @override
   String get mealTitleListSeparator => ', ';
 
   @override
@@ -179,7 +212,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authPasswordTooShortError => 'Use at least 8 characters.';
 
   @override
-  String get authHeroHeadline => 'Track your\ncalories better.';
+  String get authHeroHeadline => 'Track your\ncalories, better.';
 
   @override
   String get darkModeSwitchToLight => 'Switch to light mode';
@@ -1195,4 +1228,97 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get mealConfirmationEmbedded =>
       'Meal confirmation is embedded in the logging flow.';
+
+  @override
+  String get localToolkitToolButtonTooltip => 'Open local toolkit';
+
+  @override
+  String get localToolkitPanelTitle => 'Local toolkit';
+
+  @override
+  String get localToolkitPanelSubtitle =>
+      'Jump routes, apply scenarios, and mutate local state.';
+
+  @override
+  String get localToolkitRouteSectionTitle => 'Routes';
+
+  @override
+  String get localToolkitScenarioSectionTitle => 'Scenarios';
+
+  @override
+  String get localToolkitQuickMutatorsSectionTitle => 'Quick mutators';
+
+  @override
+  String get localToolkitRouteAuth => 'Auth';
+
+  @override
+  String get localToolkitRouteDashboard => 'Dashboard';
+
+  @override
+  String get localToolkitRouteLogMeal => 'Log Meal';
+
+  @override
+  String get localToolkitRouteHistory => 'History';
+
+  @override
+  String get localToolkitRouteTemplates => 'Templates';
+
+  @override
+  String get localToolkitRouteSettings => 'Settings';
+
+  @override
+  String get localToolkitScenarioUnauthenticated => 'Unauthenticated';
+
+  @override
+  String get localToolkitScenarioEmptyDay => 'Empty day';
+
+  @override
+  String get localToolkitScenarioNormalDay => 'Normal day';
+
+  @override
+  String get localToolkitScenarioOverTarget => 'Over target';
+
+  @override
+  String get localToolkitScenarioGoalsNotConfigured => 'Goals not configured';
+
+  @override
+  String get localToolkitScenarioProposalReady => 'Proposal ready';
+
+  @override
+  String get localToolkitScenarioClarificationRequired =>
+      'Clarification required';
+
+  @override
+  String get localToolkitScenarioAutoCommittedMeal => 'Auto-committed meal';
+
+  @override
+  String get localToolkitScenarioTemplateHeavyAccount =>
+      'Template-heavy account';
+
+  @override
+  String get localToolkitQuickResetScenario => 'Reset scenario';
+
+  @override
+  String get localToolkitQuickAddSampleMeal => 'Add sample meal';
+
+  @override
+  String get localToolkitQuickClearMeals => 'Clear meals';
+
+  @override
+  String get localToolkitQuickToggleTrustedMode => 'Toggle trusted mode';
+
+  @override
+  String get localToolkitQuickSwitchLocale => 'Switch locale';
+
+  @override
+  String get localToolkitQuickSwitchTheme => 'Switch light/dark theme';
+
+  @override
+  String get localToolkitTrustedModeOn => 'Trusted on';
+
+  @override
+  String get localToolkitTrustedModeOff => 'Trusted off';
+
+  @override
+  String get localToolkitCloseTooltip => 'Close toolkit';
 }

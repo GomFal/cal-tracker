@@ -60,6 +60,11 @@ android {
             applicationIdSuffix = ".dev"
             resValue("string", "app_name", "dev:BetterCalories")
         }
+        create("local") {
+            dimension = "env"
+            applicationIdSuffix = ".dev.local"
+            resValue("string", "app_name", "local:BetterCalories")
+        }
     }
 
     signingConfigs {
@@ -78,6 +83,12 @@ android {
             signingConfig = signingConfigs.findByName("release")
                 ?: signingConfigs.getByName("debug")
         }
+    }
+}
+
+androidComponents {
+    beforeVariants(selector().withBuildType("release").withFlavor("env" to "local")) { variant ->
+        variant.enable = false
     }
 }
 

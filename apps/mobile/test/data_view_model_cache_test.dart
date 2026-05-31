@@ -26,8 +26,9 @@ void main() {
     });
 
     test('loads once while cache is fresh', () async {
-      when(() => repository.getDailySummary())
-          .thenAnswer((_) async => _summary('2026-05-10'));
+      when(
+        () => repository.getDailySummary(),
+      ).thenAnswer((_) async => _summary('2026-05-10'));
 
       await viewModel.load();
       await viewModel.load();
@@ -38,14 +39,15 @@ void main() {
     });
 
     test('force refresh bypasses cache and shows loading', () async {
-      when(() => repository.getDailySummary())
-          .thenAnswer((_) async => _summary('2026-05-10'));
+      when(
+        () => repository.getDailySummary(),
+      ).thenAnswer((_) async => _summary('2026-05-10'));
       await viewModel.load();
 
       final completer = Completer<DailySummary>();
-      when(() => repository.getDailySummary()).thenAnswer(
-        (_) => completer.future,
-      );
+      when(
+        () => repository.getDailySummary(),
+      ).thenAnswer((_) => completer.future);
 
       final refresh = viewModel.load(forceRefresh: true);
       expect(viewModel.isLoading, isTrue);
@@ -59,15 +61,16 @@ void main() {
     });
 
     test('expired cache refreshes silently', () async {
-      when(() => repository.getDailySummary())
-          .thenAnswer((_) async => _summary('2026-05-10'));
+      when(
+        () => repository.getDailySummary(),
+      ).thenAnswer((_) async => _summary('2026-05-10'));
       await viewModel.load();
       now = now.add(const Duration(seconds: 61));
 
       final completer = Completer<DailySummary>();
-      when(() => repository.getDailySummary()).thenAnswer(
-        (_) => completer.future,
-      );
+      when(
+        () => repository.getDailySummary(),
+      ).thenAnswer((_) => completer.future);
 
       final refresh = viewModel.load();
       expect(viewModel.isLoading, isFalse);
@@ -96,10 +99,7 @@ void main() {
 
     test('updates daily water optimistically without loading state', () async {
       when(() => repository.getDailySummary()).thenAnswer(
-        (_) async => _summary(
-          '2026-05-10',
-          hydrationGoalLiters: 2.5,
-        ),
+        (_) async => _summary('2026-05-10', hydrationGoalLiters: 2.5),
       );
       await viewModel.load();
 
@@ -129,71 +129,67 @@ void main() {
       ).called(1);
     });
 
-    test('queues rapid daily water updates and saves the latest value',
-        () async {
-      when(() => repository.getDailySummary()).thenAnswer(
-        (_) async => _summary(
-          '2026-05-10',
-          hydrationGoalLiters: 2.5,
-        ),
-      );
-      await viewModel.load();
+    test(
+      'queues rapid daily water updates and saves the latest value',
+      () async {
+        when(() => repository.getDailySummary()).thenAnswer(
+          (_) async => _summary('2026-05-10', hydrationGoalLiters: 2.5),
+        );
+        await viewModel.load();
 
-      final firstSave = Completer<DailySummary>();
-      final secondSave = Completer<DailySummary>();
-      when(
-        () => repository.updateDailyHydration(waterConsumedLiters: 0.25),
-      ).thenAnswer((_) => firstSave.future);
-      when(
-        () => repository.updateDailyHydration(waterConsumedLiters: 0.5),
-      ).thenAnswer((_) => secondSave.future);
+        final firstSave = Completer<DailySummary>();
+        final secondSave = Completer<DailySummary>();
+        when(
+          () => repository.updateDailyHydration(waterConsumedLiters: 0.25),
+        ).thenAnswer((_) => firstSave.future);
+        when(
+          () => repository.updateDailyHydration(waterConsumedLiters: 0.5),
+        ).thenAnswer((_) => secondSave.future);
 
-      final firstUpdate = viewModel.updateDailyWater(0.25);
-      final secondUpdate = viewModel.updateDailyWater(0.5);
+        final firstUpdate = viewModel.updateDailyWater(0.25);
+        final secondUpdate = viewModel.updateDailyWater(0.5);
 
-      expect(viewModel.summary?.waterConsumedLiters, 0.5);
-      expect(viewModel.isLoading, isFalse);
-      verify(
-        () => repository.updateDailyHydration(waterConsumedLiters: 0.25),
-      ).called(1);
-      verifyNever(
-        () => repository.updateDailyHydration(waterConsumedLiters: 0.5),
-      );
+        expect(viewModel.summary?.waterConsumedLiters, 0.5);
+        expect(viewModel.isLoading, isFalse);
+        verify(
+          () => repository.updateDailyHydration(waterConsumedLiters: 0.25),
+        ).called(1);
+        verifyNever(
+          () => repository.updateDailyHydration(waterConsumedLiters: 0.5),
+        );
 
-      firstSave.complete(
-        _summary(
-          '2026-05-10',
-          hydrationGoalLiters: 2.5,
-          waterConsumedLiters: 0.25,
-        ),
-      );
-      await Future<void>.delayed(Duration.zero);
+        firstSave.complete(
+          _summary(
+            '2026-05-10',
+            hydrationGoalLiters: 2.5,
+            waterConsumedLiters: 0.25,
+          ),
+        );
+        await Future<void>.delayed(Duration.zero);
 
-      verify(
-        () => repository.updateDailyHydration(waterConsumedLiters: 0.5),
-      ).called(1);
-      expect(viewModel.summary?.waterConsumedLiters, 0.5);
+        verify(
+          () => repository.updateDailyHydration(waterConsumedLiters: 0.5),
+        ).called(1);
+        expect(viewModel.summary?.waterConsumedLiters, 0.5);
 
-      secondSave.complete(
-        _summary(
-          '2026-05-10',
-          hydrationGoalLiters: 2.5,
-          waterConsumedLiters: 0.5,
-        ),
-      );
+        secondSave.complete(
+          _summary(
+            '2026-05-10',
+            hydrationGoalLiters: 2.5,
+            waterConsumedLiters: 0.5,
+          ),
+        );
 
-      expect(await firstUpdate, isTrue);
-      expect(await secondUpdate, isTrue);
-      expect(viewModel.summary?.waterConsumedLiters, 0.5);
-      expect(viewModel.error, isNull);
-    });
+        expect(await firstUpdate, isTrue);
+        expect(await secondUpdate, isTrue);
+        expect(viewModel.summary?.waterConsumedLiters, 0.5);
+        expect(viewModel.error, isNull);
+      },
+    );
 
     test('rolls back optimistic water when save fails', () async {
       when(() => repository.getDailySummary()).thenAnswer(
-        (_) async => _summary(
-          '2026-05-10',
-          hydrationGoalLiters: 2.5,
-        ),
+        (_) async => _summary('2026-05-10', hydrationGoalLiters: 2.5),
       );
       await viewModel.load();
 
@@ -234,8 +230,9 @@ void main() {
       await viewModel.load();
       await viewModel.load();
 
-      verify(() => repository.getDailySummary(date: any(named: 'date')))
-          .called(7);
+      verify(
+        () => repository.getDailySummary(date: any(named: 'date')),
+      ).called(7);
       expect(viewModel.isLoading, isFalse);
       expect(viewModel.meals, hasLength(1));
     });
@@ -245,10 +242,9 @@ void main() {
       await viewModel.load();
 
       final completer = Completer<DailySummary>();
-      when(() => repository.getDailySummary(date: any(named: 'date')))
-          .thenAnswer(
-        (_) => completer.future,
-      );
+      when(
+        () => repository.getDailySummary(date: any(named: 'date')),
+      ).thenAnswer((_) => completer.future);
 
       final refresh = viewModel.load(forceRefresh: true);
       expect(viewModel.isLoading, isTrue);
@@ -256,8 +252,9 @@ void main() {
       completer.complete(_summary('2026-05-10', meals: [_meal('meal-2')]));
       await refresh;
 
-      verify(() => repository.getDailySummary(date: any(named: 'date')))
-          .called(14);
+      verify(
+        () => repository.getDailySummary(date: any(named: 'date')),
+      ).called(14);
       expect(viewModel.isLoading, isFalse);
       expect(viewModel.meals.single.id, 'meal-2');
     });
@@ -268,10 +265,9 @@ void main() {
       now = now.add(const Duration(seconds: 61));
 
       final completer = Completer<DailySummary>();
-      when(() => repository.getDailySummary(date: any(named: 'date')))
-          .thenAnswer(
-        (_) => completer.future,
-      );
+      when(
+        () => repository.getDailySummary(date: any(named: 'date')),
+      ).thenAnswer((_) => completer.future);
 
       final refresh = viewModel.load();
       expect(viewModel.isLoading, isFalse);
@@ -279,8 +275,9 @@ void main() {
       completer.complete(_summary('2026-05-10', meals: [_meal('meal-2')]));
       await refresh;
 
-      verify(() => repository.getDailySummary(date: any(named: 'date')))
-          .called(14);
+      verify(
+        () => repository.getDailySummary(date: any(named: 'date')),
+      ).called(14);
       expect(viewModel.meals.single.id, 'meal-2');
     });
   });
@@ -292,6 +289,7 @@ void main() {
 
     setUp(() {
       repository = MockNutritionRepository();
+      when(() => repository.getUsualFoods()).thenAnswer((_) async => const []);
       now = DateTime(2026, 5, 10, 10);
       viewModel = MealTemplatesViewModel(
         nutritionRepository: repository,
@@ -300,8 +298,9 @@ void main() {
     });
 
     test('loads once while cache is fresh', () async {
-      when(() => repository.getTemplates())
-          .thenAnswer((_) async => [_template('template-1')]);
+      when(
+        () => repository.getTemplates(),
+      ).thenAnswer((_) async => [_template('template-1')]);
 
       await viewModel.load();
       await viewModel.load();
@@ -312,14 +311,13 @@ void main() {
     });
 
     test('force refresh bypasses cache and shows loading', () async {
-      when(() => repository.getTemplates())
-          .thenAnswer((_) async => [_template('template-1')]);
+      when(
+        () => repository.getTemplates(),
+      ).thenAnswer((_) async => [_template('template-1')]);
       await viewModel.load();
 
       final completer = Completer<List<MealTemplate>>();
-      when(() => repository.getTemplates()).thenAnswer(
-        (_) => completer.future,
-      );
+      when(() => repository.getTemplates()).thenAnswer((_) => completer.future);
 
       final refresh = viewModel.load(forceRefresh: true);
       expect(viewModel.isLoading, isTrue);
@@ -333,15 +331,14 @@ void main() {
     });
 
     test('expired cache refreshes silently', () async {
-      when(() => repository.getTemplates())
-          .thenAnswer((_) async => [_template('template-1')]);
+      when(
+        () => repository.getTemplates(),
+      ).thenAnswer((_) async => [_template('template-1')]);
       await viewModel.load();
       now = now.add(const Duration(seconds: 61));
 
       final completer = Completer<List<MealTemplate>>();
-      when(() => repository.getTemplates()).thenAnswer(
-        (_) => completer.future,
-      );
+      when(() => repository.getTemplates()).thenAnswer((_) => completer.future);
 
       final refresh = viewModel.load();
       expect(viewModel.isLoading, isFalse);
@@ -366,15 +363,15 @@ void _stubWeekSummaries(
   MockNutritionRepository repository, {
   required String selectedMealId,
 }) {
-  when(() => repository.getDailySummary(date: any(named: 'date'))).thenAnswer(
-    (invocation) async {
-      final date = invocation.namedArguments[#date] as String;
-      return _summary(
-        date,
-        meals: date == '2026-05-10' ? [_meal(selectedMealId)] : const [],
-      );
-    },
-  );
+  when(() => repository.getDailySummary(date: any(named: 'date'))).thenAnswer((
+    invocation,
+  ) async {
+    final date = invocation.namedArguments[#date] as String;
+    return _summary(
+      date,
+      meals: date == '2026-05-10' ? [_meal(selectedMealId)] : const [],
+    );
+  });
 }
 
 DailySummary _summary(

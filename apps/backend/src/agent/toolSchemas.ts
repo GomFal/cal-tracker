@@ -39,6 +39,22 @@ function toolDescription(action: (typeof actionDefinitions)[number]): string {
         "Use only to retrieve stored usual-meal aliases or memories, not as the final action for logging food.",
         action.description,
       ].join(" ");
+    case "draft_usual_food":
+      return [
+        `${action.title}.`,
+        "Use when the user explicitly asks to create or fill a usual ingredient draft from provided label text.",
+        "Return only values explicitly present in the user's text; do not guess nutrition from food names.",
+        "This action never saves a food.",
+        action.description,
+      ].join(" ");
+    case "draft_usual_meal":
+      return [
+        `${action.title}.`,
+        "Use when the user explicitly asks to create a usual meal, saved meal, or meal template from typed or transcribed text.",
+        "Return a review-only draft by extracting structured ingredient mentions, title, and aliases from the user's text.",
+        "Do not guess ingredients from meal names, and do not save a template.",
+        action.description,
+      ].join(" ");
     default:
       return `${action.title}. ${action.description}`;
   }

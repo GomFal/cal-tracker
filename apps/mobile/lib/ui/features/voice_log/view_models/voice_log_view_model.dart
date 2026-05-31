@@ -46,6 +46,8 @@ class VoiceLogUiState {
     this.confirmationInput,
     this.clarificationOptions,
     this.candidateGroups,
+    this.usualFoodDraft,
+    this.usualMealDraft,
     this.selectedCandidateItems = const {},
     this.showProposalChangeSuccess = false,
   });
@@ -70,6 +72,8 @@ class VoiceLogUiState {
   final Object? confirmationInput;
   final List<FoodCandidateGroup>? clarificationOptions;
   final List<FoodCandidateGroup>? candidateGroups;
+  final UsualFoodDraft? usualFoodDraft;
+  final UsualMealDraft? usualMealDraft;
   final Map<String, MealItem> selectedCandidateItems;
   final bool showProposalChangeSuccess;
 
@@ -99,6 +103,8 @@ class VoiceLogUiState {
     Object? confirmationInput = _unchanged,
     Object? clarificationOptions = _unchanged,
     Object? candidateGroups = _unchanged,
+    Object? usualFoodDraft = _unchanged,
+    Object? usualMealDraft = _unchanged,
     Map<String, MealItem>? selectedCandidateItems,
     bool? showProposalChangeSuccess,
   }) {
@@ -149,6 +155,12 @@ class VoiceLogUiState {
       candidateGroups: identical(candidateGroups, _unchanged)
           ? this.candidateGroups
           : candidateGroups as List<FoodCandidateGroup>?,
+      usualFoodDraft: identical(usualFoodDraft, _unchanged)
+          ? this.usualFoodDraft
+          : usualFoodDraft as UsualFoodDraft?,
+      usualMealDraft: identical(usualMealDraft, _unchanged)
+          ? this.usualMealDraft
+          : usualMealDraft as UsualMealDraft?,
       selectedCandidateItems:
           selectedCandidateItems ?? this.selectedCandidateItems,
       showProposalChangeSuccess:
@@ -217,6 +229,10 @@ class VoiceLogViewModel extends ChangeNotifier {
   List<FoodCandidateGroup>? get clarificationOptions =>
       _uiState.clarificationOptions;
 
+  UsualFoodDraft? get usualFoodDraft => _uiState.usualFoodDraft;
+
+  UsualMealDraft? get usualMealDraft => _uiState.usualMealDraft;
+
   bool get showProposalChangeSuccess => _uiState.showProposalChangeSuccess;
 
   MealItem? selectedCandidateFor(FoodCandidateGroup group) {
@@ -243,19 +259,20 @@ class VoiceLogViewModel extends ChangeNotifier {
 
   bool get canStopRecording => state == VoiceLogState.recording;
 
-  Future<FoodSearchResult> searchFoods(
-    String query, {
-    int limit = 10,
-  }) {
+  Future<FoodSearchResult> searchFoods(String query, {int limit = 10}) {
     return _nutritionRepository.searchFoods(query, limit: limit);
   }
 
-  Future<void> toggleRecording({bool submitAfterTranscription = false}) async {
+  Future<AgentRunResult?> toggleRecording({
+    bool submitAfterTranscription = false,
+  }) async {
     if (_canStartRecording) {
       await startRecording();
+      return null;
     } else if (state == VoiceLogState.recording) {
-      await stopRecording(submitAfterTranscription: submitAfterTranscription);
+      return stopRecording(submitAfterTranscription: submitAfterTranscription);
     }
+    return null;
   }
 
   Future<void> startRecording() {
@@ -263,12 +280,14 @@ class VoiceLogViewModel extends ChangeNotifier {
     return _startRecording();
   }
 
-  Future<void> stopRecording({bool submitAfterTranscription = false}) {
+  Future<AgentRunResult?> stopRecording({
+    bool submitAfterTranscription = false,
+  }) {
     if (state != VoiceLogState.recording) return Future.value();
     return _stopRecording(submitAfterTranscription: submitAfterTranscription);
   }
 
-  Future<void> toggleGlobalRecording() {
+  Future<AgentRunResult?> toggleGlobalRecording() {
     return toggleRecording(submitAfterTranscription: true);
   }
 
@@ -302,6 +321,8 @@ class VoiceLogViewModel extends ChangeNotifier {
         resolvedItems: null,
         templates: null,
         template: null,
+        usualFoodDraft: null,
+        usualMealDraft: null,
         deleted: null,
         confirmationActionId: null,
         confirmationInput: null,
@@ -347,13 +368,15 @@ class VoiceLogViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> _stopRecording({bool submitAfterTranscription = false}) async {
+  Future<AgentRunResult?> _stopRecording({
+    bool submitAfterTranscription = false,
+  }) async {
     _cancelRecordingTimer();
     _setState(VoiceLogState.stopping);
     try {
       final audio = await _audioRecorderService.stop();
       if (audio != null) {
-        await _transcribe(
+        return await _transcribe(
           audio.path,
           submitAfterTranscription: submitAfterTranscription,
         );
@@ -373,9 +396,10 @@ class VoiceLogViewModel extends ChangeNotifier {
         userVisibleErrorMessage(e, context: UserErrorContext.voiceRecording),
       );
     }
+    return null;
   }
 
-  Future<void> _transcribe(
+  Future<AgentRunResult?> _transcribe(
     String path, {
     bool submitAfterTranscription = false,
   }) async {
@@ -400,6 +424,7 @@ class VoiceLogViewModel extends ChangeNotifier {
           voiceResult.result,
           fallbackProposal: activeProposal,
         );
+        return voiceResult.result;
       } else {
         final transcript = await _nutritionRepository.transcribeAudio(
           File(path),
@@ -429,6 +454,7 @@ class VoiceLogViewModel extends ChangeNotifier {
         // ignore cleanup errors
       }
     }
+    return null;
   }
 
   void updateTranscript(String value) {
@@ -460,6 +486,8 @@ class VoiceLogViewModel extends ChangeNotifier {
         resolvedItems: null,
         templates: null,
         template: null,
+        usualFoodDraft: null,
+        usualMealDraft: null,
         deleted: null,
         confirmationActionId: null,
         confirmationInput: null,
@@ -513,6 +541,8 @@ class VoiceLogViewModel extends ChangeNotifier {
       case 'template_deleted':
       case 'meal_deleted':
       case 'meal_corrected':
+      case 'usual_food_draft':
+      case 'usual_meal_draft':
         nextState = VoiceLogState.resultReady;
         break;
       default:
@@ -528,7 +558,9 @@ class VoiceLogViewModel extends ChangeNotifier {
         result.proposal != null;
     final candidateGroups = shouldPreserveCandidateGroups
         ? _mergeCandidateGroups(
-            _uiState.candidateGroups, incomingCandidateGroups)
+            _uiState.candidateGroups,
+            incomingCandidateGroups,
+          )
         : incomingCandidateGroups;
     final resolvedItemsForSelection =
         result.resolvedItems ?? result.proposal?.items;
@@ -556,6 +588,8 @@ class VoiceLogViewModel extends ChangeNotifier {
         resolvedItems: result.resolvedItems,
         templates: result.templates,
         template: result.template,
+        usualFoodDraft: result.usualFoodDraft,
+        usualMealDraft: result.usualMealDraft,
         deleted: result.deleted,
         message: result.message,
         errorMessage: null,
@@ -654,6 +688,8 @@ class VoiceLogViewModel extends ChangeNotifier {
         resolvedItems: null,
         templates: null,
         template: null,
+        usualFoodDraft: null,
+        usualMealDraft: null,
         deleted: null,
         confirmationActionId: null,
         confirmationInput: null,
@@ -876,8 +912,9 @@ class VoiceLogViewModel extends ChangeNotifier {
     for (final group in groups) {
       final selected = selections[_candidateGroupKey(group)];
       if (selected == null) continue;
-      final index =
-          items.indexWhere((item) => _resolvedItemMatchesGroup(item, group));
+      final index = items.indexWhere(
+        (item) => _resolvedItemMatchesGroup(item, group),
+      );
       if (index >= 0) {
         items[index] = selected;
       } else if (!items.any((item) => _sameMealItem(item, selected))) {

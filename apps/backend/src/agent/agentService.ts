@@ -4,6 +4,8 @@ import {
   type Meal,
   type MealItem,
   type NutritionSnapshot,
+  type DraftUsualFoodOutput,
+  type DraftUsualMealOutput,
   type MealProposal,
   type MealTemplate,
   actionDefinitions,
@@ -78,6 +80,18 @@ export type AgentRunResult =
   | { kind: "templates"; templates: MealTemplate[]; message: string }
   | { kind: "template_saved"; template: MealTemplate; message: string }
   | { kind: "template_deleted"; deleted: boolean; message: string }
+  | {
+      kind: "usual_food_draft";
+      usualFoodDraft: DraftUsualFoodOutput;
+      message: string;
+    }
+  | {
+      kind: "usual_meal_draft";
+      usualMealDraft: DraftUsualMealOutput;
+      message: string;
+      options?: unknown[];
+      candidateGroups?: unknown[];
+    }
   | {
       kind: "confirmation_required";
       actionId: string;
@@ -506,6 +520,28 @@ export class AgentService {
           kind: "templates",
           templates: output.templates as MealTemplate[],
           message: "Here are your usual meals.",
+        };
+      case "draft_usual_food":
+        return {
+          kind: "usual_food_draft",
+          usualFoodDraft: output as DraftUsualFoodOutput,
+          message:
+            typeof output.message === "string"
+              ? output.message
+              : "Usual ingredient draft created for review.",
+        };
+      case "draft_usual_meal":
+        return {
+          kind: "usual_meal_draft",
+          usualMealDraft: output as DraftUsualMealOutput,
+          options: output.options as unknown[] | undefined,
+          candidateGroups: output.candidateGroups as unknown[] | undefined,
+          message:
+            typeof output.message === "string"
+              ? output.message
+              : output.clarificationRequired
+                ? "Usual meal draft needs ingredient matches before saving."
+                : "Usual meal draft created for review.",
         };
       case "create_meal_template":
         return {

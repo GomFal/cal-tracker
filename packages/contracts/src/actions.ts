@@ -1,6 +1,10 @@
 import { z } from "zod";
 import {
   dailySummarySchema,
+  draftUsualFoodInputSchema,
+  draftUsualFoodOutputSchema,
+  draftUsualMealInputSchema,
+  draftUsualMealOutputSchema,
   foodCandidateSchema,
   foodMentionSchema,
   mealLabelTypeSchema,
@@ -9,8 +13,13 @@ import {
   mealSchema,
   mealTemplateSchema,
   nutritionSnapshotSchema,
+  usualFoodSchema,
   uuidSchema,
 } from "./common.js";
+import {
+  createUsualFoodRequestSchema,
+  updateUsualFoodRequestSchema,
+} from "./api.js";
 import { PermissionScope } from "./permissions.js";
 
 export const actionSourceSchema = z.enum([
@@ -188,6 +197,27 @@ export const getMealHistoryOutputSchema = z.object({
 
 export const getUsualMealsOutputSchema = z.object({
   templates: z.array(mealTemplateSchema),
+});
+
+export const getUsualFoodsOutputSchema = z.object({
+  usualFoods: z.array(usualFoodSchema),
+});
+
+export const createUsualFoodInputSchema = createUsualFoodRequestSchema;
+export const createUsualFoodOutputSchema = z.object({
+  usualFood: usualFoodSchema,
+});
+
+export const updateUsualFoodInputSchema = updateUsualFoodRequestSchema.and(z.object({
+  usualFoodId: uuidSchema,
+}));
+export const updateUsualFoodOutputSchema = createUsualFoodOutputSchema;
+
+export const deleteUsualFoodInputSchema = z.object({
+  usualFoodId: uuidSchema,
+});
+export const deleteUsualFoodOutputSchema = z.object({
+  deleted: z.boolean(),
 });
 
 export const createMealTemplateInputSchema = z.object({
@@ -371,6 +401,54 @@ export const actionDefinitions = [
     executionMode: "deterministic",
   },
   {
+    id: "get_usual_foods",
+    version: "1.0.0",
+    title: "Get Usual Foods",
+    description: "List user-owned usual ingredients.",
+    inputSchema: emptyInputSchema,
+    outputSchema: getUsualFoodsOutputSchema,
+    permissionScope: PermissionScope.NutritionTemplatesRead,
+    sideEffect: "none",
+    confirmationPolicy: "never",
+    executionMode: "deterministic",
+  },
+  {
+    id: "create_usual_food",
+    version: "1.0.0",
+    title: "Create Usual Food",
+    description: "Create a user-owned usual ingredient from explicit structured nutrition input.",
+    inputSchema: createUsualFoodInputSchema,
+    outputSchema: createUsualFoodOutputSchema,
+    permissionScope: PermissionScope.NutritionTemplatesWrite,
+    sideEffect: "write",
+    confirmationPolicy: "required",
+    executionMode: "deterministic",
+  },
+  {
+    id: "update_usual_food",
+    version: "1.0.0",
+    title: "Update Usual Food",
+    description: "Update a current-user usual ingredient.",
+    inputSchema: updateUsualFoodInputSchema,
+    outputSchema: updateUsualFoodOutputSchema,
+    permissionScope: PermissionScope.NutritionTemplatesWrite,
+    sideEffect: "write",
+    confirmationPolicy: "required",
+    executionMode: "deterministic",
+  },
+  {
+    id: "delete_usual_food",
+    version: "1.0.0",
+    title: "Delete Usual Food",
+    description: "Archive a current-user usual ingredient.",
+    inputSchema: deleteUsualFoodInputSchema,
+    outputSchema: deleteUsualFoodOutputSchema,
+    permissionScope: PermissionScope.NutritionTemplatesWrite,
+    sideEffect: "destructive",
+    confirmationPolicy: "required",
+    executionMode: "deterministic",
+  },
+  {
     id: "get_usual_meals",
     version: "1.0.0",
     title: "Get Usual Meals",
@@ -381,6 +459,19 @@ export const actionDefinitions = [
     sideEffect: "none",
     confirmationPolicy: "never",
     executionMode: "deterministic",
+  },
+  {
+    id: "draft_usual_meal",
+    version: "1.0.0",
+    title: "Draft Usual Meal",
+    description:
+      "Create a review-only usual meal template draft from explicit user-provided text. Resolves structured ingredient mentions and never persists a template.",
+    inputSchema: draftUsualMealInputSchema,
+    outputSchema: draftUsualMealOutputSchema,
+    permissionScope: PermissionScope.NutritionTemplatesWrite,
+    sideEffect: "none",
+    confirmationPolicy: "never",
+    executionMode: "agent_assisted",
   },
   {
     id: "create_meal_template",
@@ -417,6 +508,19 @@ export const actionDefinitions = [
     sideEffect: "destructive",
     confirmationPolicy: "required",
     executionMode: "deterministic",
+  },
+  {
+    id: "draft_usual_food",
+    version: "1.0.0",
+    title: "Draft Usual Food",
+    description:
+      "Create a review-only usual ingredient draft from explicit user-provided nutrition text. Never persists a food.",
+    inputSchema: draftUsualFoodInputSchema,
+    outputSchema: draftUsualFoodOutputSchema,
+    permissionScope: PermissionScope.NutritionTemplatesWrite,
+    sideEffect: "none",
+    confirmationPolicy: "never",
+    executionMode: "agent_assisted",
   },
 ] satisfies ActionDefinition[];
 

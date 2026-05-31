@@ -140,6 +140,18 @@ abstract class AppLocalizations {
   /// **'Create'**
   String get commonCreate;
 
+  /// No description provided for @commonClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get commonClose;
+
+  /// No description provided for @commonBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get commonBack;
+
   /// No description provided for @commonRefresh.
   ///
   /// In en, this message translates to:
@@ -1757,13 +1769,13 @@ abstract class AppLocalizations {
   /// No description provided for @templatesTitle.
   ///
   /// In en, this message translates to:
-  /// **'Usual meals'**
+  /// **'Habituals'**
   String get templatesTitle;
 
   /// No description provided for @templatesSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Safe familiar templates'**
+  /// **'Usual meals and ingredients'**
   String get templatesSubtitle;
 
   /// No description provided for @templatesAddTooltip.
@@ -1777,12 +1789,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Usual meals are trusted meals you can log quickly.'**
   String get templatesExplainer;
-
-  /// No description provided for @templatesCouldNotLoad.
-  ///
-  /// In en, this message translates to:
-  /// **'Could not load usual meals'**
-  String get templatesCouldNotLoad;
 
   /// No description provided for @templatesNoUsualMealsYet.
   ///
@@ -1802,29 +1808,551 @@ abstract class AppLocalizations {
   /// **'Delete usual meal?'**
   String get templatesDeleteUsualMealTitle;
 
-  /// No description provided for @templatesNewUsualMealTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'New usual meal'**
-  String get templatesNewUsualMealTitle;
-
-  /// No description provided for @templatesTitleLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Title'**
-  String get templatesTitleLabel;
-
-  /// No description provided for @templatesAliasesLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Aliases, separated by commas'**
-  String get templatesAliasesLabel;
-
   /// No description provided for @templatesNoAliasesYet.
   ///
   /// In en, this message translates to:
   /// **'No aliases yet'**
   String get templatesNoAliasesYet;
+
+  /// No description provided for @templatesCreateUnavailableTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Meal templates need ingredients'**
+  String get templatesCreateUnavailableTitle;
+
+  /// No description provided for @templatesCreateUnavailableMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Create usual meals from selected ingredients or a reviewed draft. Placeholder meal templates are disabled.'**
+  String get templatesCreateUnavailableMessage;
+
+  /// No description provided for @mealTemplateEditorCreateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create usual meal'**
+  String get mealTemplateEditorCreateTitle;
+
+  /// No description provided for @mealTemplateEditorEditTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit usual meal'**
+  String get mealTemplateEditorEditTitle;
+
+  /// No description provided for @mealTemplateEditorSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Build a reviewed reusable meal. Nothing is logged to today.'**
+  String get mealTemplateEditorSubtitle;
+
+  /// No description provided for @mealTemplateEditorMissingTemplateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Usual meal not found'**
+  String get mealTemplateEditorMissingTemplateTitle;
+
+  /// No description provided for @mealTemplateEditorMissingTemplateMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh habituals and try opening this meal again.'**
+  String get mealTemplateEditorMissingTemplateMessage;
+
+  /// No description provided for @mealTemplateEditorDetailsSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Meal details'**
+  String get mealTemplateEditorDetailsSection;
+
+  /// No description provided for @mealTemplateEditorTitleLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Meal title'**
+  String get mealTemplateEditorTitleLabel;
+
+  /// No description provided for @mealTemplateEditorTitleHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Gym lunch'**
+  String get mealTemplateEditorTitleHint;
+
+  /// No description provided for @mealTemplateEditorAliasesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Aliases'**
+  String get mealTemplateEditorAliasesLabel;
+
+  /// No description provided for @mealTemplateEditorAliasesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Comma-separated phrases you use by voice'**
+  String get mealTemplateEditorAliasesHint;
+
+  /// No description provided for @mealTemplateEditorDraftSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill from voice'**
+  String get mealTemplateEditorDraftSection;
+
+  /// No description provided for @mealTemplateEditorDraftHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'Describe the usual meal by voice. Review ingredients, matches, and quantities before saving.'**
+  String get mealTemplateEditorDraftHelper;
+
+  /// No description provided for @mealTemplateEditorDraftLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcript'**
+  String get mealTemplateEditorDraftLabel;
+
+  /// No description provided for @mealTemplateEditorDraftHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Record the usual meal to fill this transcript.'**
+  String get mealTemplateEditorDraftHint;
+
+  /// No description provided for @mealTemplateEditorDraftButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Build draft'**
+  String get mealTemplateEditorDraftButton;
+
+  /// No description provided for @mealTemplateEditorVoiceTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Record usual meal'**
+  String get mealTemplateEditorVoiceTooltip;
+
+  /// No description provided for @mealTemplateEditorStopVoiceTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop and build draft'**
+  String get mealTemplateEditorStopVoiceTooltip;
+
+  /// No description provided for @mealTemplateEditorVoiceRecording.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording. Stop when you finish describing the meal.'**
+  String get mealTemplateEditorVoiceRecording;
+
+  /// No description provided for @mealTemplateEditorVoiceTranscribing.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcribing recording.'**
+  String get mealTemplateEditorVoiceTranscribing;
+
+  /// No description provided for @mealTemplateEditorDraftEmptyError.
+  ///
+  /// In en, this message translates to:
+  /// **'Record the meal before building a draft.'**
+  String get mealTemplateEditorDraftEmptyError;
+
+  /// No description provided for @mealTemplateEditorDraftApplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft applied. Review and edit before saving.'**
+  String get mealTemplateEditorDraftApplied;
+
+  /// No description provided for @mealTemplateEditorDraftNeedsItems.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft returned no ingredients yet. Add foods manually or clarify by voice.'**
+  String get mealTemplateEditorDraftNeedsItems;
+
+  /// No description provided for @mealTemplateEditorCandidatesSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Food matches'**
+  String get mealTemplateEditorCandidatesSection;
+
+  /// No description provided for @mealTemplateEditorCandidatesHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a candidate when the draft needs a database match.'**
+  String get mealTemplateEditorCandidatesHelper;
+
+  /// No description provided for @mealTemplateEditorNoCandidates.
+  ///
+  /// In en, this message translates to:
+  /// **'No candidates returned for this ingredient.'**
+  String get mealTemplateEditorNoCandidates;
+
+  /// No description provided for @mealTemplateEditorAddFromSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Add from food search'**
+  String get mealTemplateEditorAddFromSearch;
+
+  /// No description provided for @mealTemplateEditorSaveButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Save usual meal'**
+  String get mealTemplateEditorSaveButton;
+
+  /// No description provided for @mealTemplateEditorTitleRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a meal title before saving.'**
+  String get mealTemplateEditorTitleRequired;
+
+  /// No description provided for @usualsMealsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Meals'**
+  String get usualsMealsTab;
+
+  /// No description provided for @usualsIngredientsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Ingredients'**
+  String get usualsIngredientsTab;
+
+  /// No description provided for @usualsCouldNotLoad.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load habituals'**
+  String get usualsCouldNotLoad;
+
+  /// No description provided for @usualFoodsAddTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Add usual ingredient'**
+  String get usualFoodsAddTooltip;
+
+  /// No description provided for @usualFoodsExplainer.
+  ///
+  /// In en, this message translates to:
+  /// **'Usual ingredients are foods you enter manually so they appear first in search and meal logging.'**
+  String get usualFoodsExplainer;
+
+  /// No description provided for @usualFoodsEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No usual ingredients yet'**
+  String get usualFoodsEmptyTitle;
+
+  /// No description provided for @usualFoodsEmptyMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Add foods you use often so they appear first in search and meal logging.'**
+  String get usualFoodsEmptyMessage;
+
+  /// No description provided for @usualFoodsCreateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'New usual ingredient'**
+  String get usualFoodsCreateTitle;
+
+  /// No description provided for @usualFoodsEditTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit usual ingredient'**
+  String get usualFoodsEditTitle;
+
+  /// No description provided for @usualFoodsDraftLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill from text with AI (optional)'**
+  String get usualFoodsDraftLabel;
+
+  /// No description provided for @usualFoodsDraftHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Example: My rice per 100 g has 360 kcal, 79 g carbs, 7 g protein, 1 g fat and 0.01 g salt.'**
+  String get usualFoodsDraftHint;
+
+  /// No description provided for @usualFoodsDraftButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill fields'**
+  String get usualFoodsDraftButton;
+
+  /// No description provided for @usualFoodsDraftEmptyError.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter label text before filling fields.'**
+  String get usualFoodsDraftEmptyError;
+
+  /// No description provided for @usualFoodsDraftApplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft applied. Review the fields before saving.'**
+  String get usualFoodsDraftApplied;
+
+  /// No description provided for @usualFoodsDraftMissingFields.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft applied. Complete the empty required fields before saving.'**
+  String get usualFoodsDraftMissingFields;
+
+  /// No description provided for @usualFoodsDraftFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not fill the draft. Enter the values manually or try again.'**
+  String get usualFoodsDraftFailed;
+
+  /// No description provided for @usualFoodsEditorSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Review the label values before saving.'**
+  String get usualFoodsEditorSubtitle;
+
+  /// No description provided for @usualFoodsIdentitySectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Identity'**
+  String get usualFoodsIdentitySectionTitle;
+
+  /// No description provided for @usualFoodsServingSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Serving'**
+  String get usualFoodsServingSectionTitle;
+
+  /// No description provided for @usualFoodsMacrosSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Macros'**
+  String get usualFoodsMacrosSectionTitle;
+
+  /// No description provided for @usualFoodsOptionalSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional nutrients'**
+  String get usualFoodsOptionalSectionTitle;
+
+  /// No description provided for @usualFoodsOptionalSectionSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add label details only when you have them.'**
+  String get usualFoodsOptionalSectionSubtitle;
+
+  /// No description provided for @usualFoodsVoiceDraftTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill faster with voice'**
+  String get usualFoodsVoiceDraftTitle;
+
+  /// No description provided for @usualFoodsVoiceDraftMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Dictate the nutrition label. The transcript is read-only, fields stay editable, and nothing is saved until you confirm.'**
+  String get usualFoodsVoiceDraftMessage;
+
+  /// No description provided for @usualFoodsVoiceRecordButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Record label'**
+  String get usualFoodsVoiceRecordButton;
+
+  /// No description provided for @usualFoodsVoiceStopButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop and fill'**
+  String get usualFoodsVoiceStopButton;
+
+  /// No description provided for @usualFoodsVoicePermissionStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Requesting microphone permission...'**
+  String get usualFoodsVoicePermissionStatus;
+
+  /// No description provided for @usualFoodsVoiceRecordingStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Recording. Say the serving size, calories, protein, carbs, fat, and any optional label values.'**
+  String get usualFoodsVoiceRecordingStatus;
+
+  /// No description provided for @usualFoodsVoiceStoppingStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving audio...'**
+  String get usualFoodsVoiceStoppingStatus;
+
+  /// No description provided for @usualFoodsVoiceTranscribingStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcribing label...'**
+  String get usualFoodsVoiceTranscribingStatus;
+
+  /// No description provided for @usualFoodsVoiceDraftingStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Filling fields from transcript...'**
+  String get usualFoodsVoiceDraftingStatus;
+
+  /// No description provided for @usualFoodsVoicePermissionError.
+  ///
+  /// In en, this message translates to:
+  /// **'Microphone permission is required to fill from voice.'**
+  String get usualFoodsVoicePermissionError;
+
+  /// No description provided for @usualFoodsTranscriptLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Transcript'**
+  String get usualFoodsTranscriptLabel;
+
+  /// No description provided for @usualFoodsSaveFailedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save ingredient'**
+  String get usualFoodsSaveFailedTitle;
+
+  /// No description provided for @usualFoodsNotFoundTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Ingredient not found'**
+  String get usualFoodsNotFoundTitle;
+
+  /// No description provided for @usualFoodsNotFoundMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This usual ingredient is no longer available.'**
+  String get usualFoodsNotFoundMessage;
+
+  /// No description provided for @usualFoodsNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get usualFoodsNameLabel;
+
+  /// No description provided for @usualFoodsBrandLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Brand (optional)'**
+  String get usualFoodsBrandLabel;
+
+  /// No description provided for @usualFoodsCanonicalNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Canonical name (optional)'**
+  String get usualFoodsCanonicalNameLabel;
+
+  /// No description provided for @usualFoodsBarcodeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Barcode (optional)'**
+  String get usualFoodsBarcodeLabel;
+
+  /// No description provided for @usualFoodsAliasesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Aliases, separated by commas (optional)'**
+  String get usualFoodsAliasesLabel;
+
+  /// No description provided for @usualFoodsServingGramsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Serving grams'**
+  String get usualFoodsServingGramsLabel;
+
+  /// No description provided for @usualFoodsCaloriesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Calories'**
+  String get usualFoodsCaloriesLabel;
+
+  /// No description provided for @usualFoodsProteinLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Protein grams'**
+  String get usualFoodsProteinLabel;
+
+  /// No description provided for @usualFoodsCarbsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Carbs grams'**
+  String get usualFoodsCarbsLabel;
+
+  /// No description provided for @usualFoodsFatLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Fat grams'**
+  String get usualFoodsFatLabel;
+
+  /// No description provided for @usualFoodsSaltLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Salt grams (optional)'**
+  String get usualFoodsSaltLabel;
+
+  /// No description provided for @usualFoodsSodiumLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Sodium milligrams (optional)'**
+  String get usualFoodsSodiumLabel;
+
+  /// No description provided for @usualFoodsFiberLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Fiber grams (optional)'**
+  String get usualFoodsFiberLabel;
+
+  /// No description provided for @usualFoodsSugarsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Sugars grams (optional)'**
+  String get usualFoodsSugarsLabel;
+
+  /// No description provided for @usualFoodsServingDescriptionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Serving description (optional)'**
+  String get usualFoodsServingDescriptionLabel;
+
+  /// No description provided for @usualFoodsRequiredFieldError.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a value.'**
+  String get usualFoodsRequiredFieldError;
+
+  /// No description provided for @usualFoodsPositiveNumberError.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a number greater than 0.'**
+  String get usualFoodsPositiveNumberError;
+
+  /// No description provided for @usualFoodsNonNegativeNumberError.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter 0 or a greater number.'**
+  String get usualFoodsNonNegativeNumberError;
+
+  /// No description provided for @usualFoodsPerServing.
+  ///
+  /// In en, this message translates to:
+  /// **'per {grams} g'**
+  String usualFoodsPerServing(String grams);
+
+  /// No description provided for @usualFoodsManualSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual'**
+  String get usualFoodsManualSource;
+
+  /// No description provided for @usualFoodsEditTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit usual ingredient'**
+  String get usualFoodsEditTooltip;
+
+  /// No description provided for @usualFoodsDeleteTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete usual ingredient'**
+  String get usualFoodsDeleteTooltip;
+
+  /// No description provided for @usualFoodsDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete usual ingredient?'**
+  String get usualFoodsDeleteTitle;
+
+  /// No description provided for @usualFoodsDeleteMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {name} from your usual ingredients?'**
+  String usualFoodsDeleteMessage(String name);
 
   /// No description provided for @voiceTitle.
   ///

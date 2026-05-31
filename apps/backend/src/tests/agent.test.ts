@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
-import type { FoodMention, MealItem } from "@cal-tracker/contracts";
+import type {
+  DraftUsualMealProviderOutput,
+  FoodMention,
+  MealItem,
+} from "@cal-tracker/contracts";
 import type {
   AgentMessage,
   AgentToolDecision,
   ChatAgentProvider,
 } from "../agent/chatAgentProvider.js";
+import type { UsualMealDraftProvider } from "../agent/usualMealDraftProvider.js";
 import {
   buildTestApp,
   createTestUsualBreakfastTemplate,
@@ -43,6 +48,14 @@ class CapturingChatAgentProvider implements ChatAgentProvider {
 class ThrowingChatAgentProvider implements ChatAgentProvider {
   async runWithTools(): Promise<AgentToolDecision> {
     throw new Error("provider_unavailable");
+  }
+}
+
+class FakeUsualMealDraftProvider implements UsualMealDraftProvider {
+  constructor(private readonly output: DraftUsualMealProviderOutput) {}
+
+  async draft(): Promise<DraftUsualMealProviderOutput> {
+    return this.output;
   }
 }
 
@@ -163,7 +176,8 @@ describe("AgentService", () => {
         rawResponse: {},
       }),
     });
-    const { authHeader } = await registerAndAuth(request);
+    const auth = await registerAndAuth(request);
+    const { authHeader } = auth;
     await createTestUsualBreakfastTemplate(request, authHeader);
     const res = await request("http://localhost/v1/agent/runs", {
       method: "POST",
@@ -215,7 +229,8 @@ describe("AgentService", () => {
         rawResponse: {},
       }),
     });
-    const { authHeader } = await registerAndAuth(request);
+    const auth = await registerAndAuth(request);
+    const { authHeader } = auth;
     await createTestUsualBreakfastTemplate(request, authHeader);
     const res = await request("http://localhost/v1/agent/runs", {
       method: "POST",
@@ -276,7 +291,8 @@ describe("AgentService", () => {
       carbsGrams: 28,
       fatGrams: 0.3,
     });
-    const { authHeader } = await registerAndAuth(request);
+    const auth = await registerAndAuth(request);
+    const { authHeader } = auth;
     const res = await request("http://localhost/v1/agent/runs", {
       method: "POST",
       headers: { ...authHeader, "accept-language": "es-ES" },
@@ -650,7 +666,8 @@ describe("AgentService", () => {
         rawResponse: {},
       }),
     });
-    const { authHeader } = await registerAndAuth(request);
+    const auth = await registerAndAuth(request);
+    const { authHeader } = auth;
     await createTestUsualBreakfastTemplate(request, authHeader);
     const res = await request("http://localhost/v1/agent/runs", {
       method: "POST",
@@ -668,10 +685,20 @@ describe("AgentService", () => {
     ).toBe(true);
   });
 
-  it("maps memory lookup, history, and template mutations to explicit result kinds", async () => {
+  it("maps memory lookup, history, and usual meal creation requests to review-only drafts", async () => {
     const agentProvider = new QueueChatAgentProvider();
-    const { request } = buildTestApp({ agentProvider });
-    const { authHeader } = await registerAndAuth(request);
+    const { request, repository } = buildTestApp({
+      agentProvider,
+      usualMealDraftProvider: new FakeUsualMealDraftProvider({
+        title: "Toast",
+        aliases: ["toast"],
+        mentions: [
+          mention("bread", 100, { originalText: "100 grams of bread" }),
+        ],
+      }),
+    });
+    const auth = await registerAndAuth(request);
+    const { authHeader } = auth;
     await createTestUsualBreakfastTemplate(request, authHeader);
 
     agentProvider.push({
@@ -731,6 +758,50 @@ describe("AgentService", () => {
           id: "call_3",
           type: "function",
           function: {
+            name: "draft_usual_meal",
+            arguments: JSON.stringify({
+              text: "Create my usual Toast with 100 grams of bread.",
+            }),
+          },
+        },
+      ],
+      rawResponse: {},
+    });
+    const drafted = await request("http://localhost/v1/agent/runs", {
+      method: "POST",
+      headers: authHeader,
+      body: JSON.stringify({ text: "create usual toast", source: "flutter" }),
+    }).then(
+      (response) =>
+        response.json() as Promise<{
+          kind: string;
+          usualMealDraft: {
+            draft: {
+              title?: string;
+              aliases: string[];
+              items: Array<{ name: string }>;
+            };
+            requiresReview: boolean;
+          };
+        }>,
+    );
+    expect(drafted.kind).toBe("usual_meal_draft");
+    expect(drafted.usualMealDraft.requiresReview).toBe(true);
+    expect(drafted.usualMealDraft.draft.title).toBe("Toast");
+    expect(drafted.usualMealDraft.draft.aliases).toEqual(["toast"]);
+    expect(drafted.usualMealDraft.draft.items).toEqual([
+      expect.objectContaining({ name: "Bread" }),
+    ]);
+    await expect(repository.listTemplates(auth.user.id)).resolves.not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ title: "Toast" })]),
+    );
+
+    agentProvider.push({
+      toolCalls: [
+        {
+          id: "call_4",
+          type: "function",
+          function: {
             name: "create_meal_template",
             arguments: JSON.stringify({
               title: "Toast",
@@ -743,78 +814,19 @@ describe("AgentService", () => {
       ],
       rawResponse: {},
     });
-    const created = await request("http://localhost/v1/agent/runs", {
-      method: "POST",
-      headers: authHeader,
-      body: JSON.stringify({ text: "create usual toast", source: "flutter" }),
-    }).then(
-      (response) =>
-        response.json() as Promise<{
-          kind: string;
-          template: { id: string; title: string };
-        }>,
-    );
-    expect(created.kind).toBe("template_saved");
-    expect(created.template.title).toBe("Toast");
-
-    agentProvider.push({
-      toolCalls: [
-        {
-          id: "call_4",
-          type: "function",
-          function: {
-            name: "update_meal_template",
-            arguments: JSON.stringify({
-              templateId: created.template.id,
-              title: "Toast updated",
-              items: [testBreadItem],
-              aliases: ["toast"],
-            }),
-          },
-        },
-      ],
-      rawResponse: {},
-    });
     const updated = await request("http://localhost/v1/agent/runs", {
       method: "POST",
       headers: authHeader,
-      body: JSON.stringify({ text: "rename toast", source: "flutter" }),
+      body: JSON.stringify({ text: "save toast directly", source: "flutter" }),
     }).then(
       (response) =>
         response.json() as Promise<{
           kind: string;
-          template: { title: string };
+          message: string;
         }>,
     );
-    expect(updated.kind).toBe("template_saved");
-    expect(updated.template.title).toBe("Toast updated");
-
-    agentProvider.push({
-      toolCalls: [
-        {
-          id: "call_5",
-          type: "function",
-          function: {
-            name: "delete_meal_template",
-            arguments: JSON.stringify({ templateId: created.template.id }),
-          },
-        },
-      ],
-      rawResponse: {},
-    });
-    const deleted = await request("http://localhost/v1/agent/runs", {
-      method: "POST",
-      headers: authHeader,
-      body: JSON.stringify({
-        text: "delete toast usual meal",
-        source: "flutter",
-      }),
-    }).then(
-      (response) =>
-        response.json() as Promise<{ kind: string; deleted: boolean }>,
-    );
-    expect(deleted.kind).toBe("template_deleted");
-    expect(deleted.deleted).toBe(true);
+    expect(updated.kind).toBe("clarification_required");
+    expect(updated.message).toContain("not able");
   });
 
   it("maps direct commit and correction action results", async () => {

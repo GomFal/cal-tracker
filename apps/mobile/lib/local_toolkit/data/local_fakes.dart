@@ -69,10 +69,7 @@ class LocalAuthRepository extends AuthRepository {
   }
 
   @override
-  Future<AuthSession> login({
-    required String email,
-    required String password,
-  }) {
+  Future<AuthSession> login({required String email, required String password}) {
     return _authenticate(email: email, displayName: store.user.displayName);
   }
 
@@ -173,10 +170,7 @@ class LocalNutritionRepository extends NutritionRepository {
   }
 
   @override
-  Future<Meal> commitProposal(
-    String proposalId, {
-    MealLabel? mealLabel,
-  }) async {
+  Future<Meal> commitProposal(String proposalId, {MealLabel? mealLabel}) async {
     return store.commitProposal(proposalId, mealLabel: mealLabel);
   }
 
@@ -304,6 +298,11 @@ class LocalNutritionRepository extends NutritionRepository {
   }
 
   @override
+  Future<List<UsualFood>> getUsualFoods() async {
+    return store.usualFoods;
+  }
+
+  @override
   Future<MealTemplate> setTemplateTrustedMode(
     MealTemplate template,
     bool enabled,
@@ -316,13 +315,43 @@ class LocalNutritionRepository extends NutritionRepository {
     required String title,
     required List<MealItem> items,
     required List<String> aliases,
+    bool trustedAutoCommitEnabled = false,
   }) async {
     return store.createTemplate(title: title, items: items, aliases: aliases);
   }
 
   @override
+  Future<UsualFood> createUsualFood(UsualFoodInput input) async {
+    return store.createUsualFood(input);
+  }
+
+  @override
+  Future<UsualFood> updateUsualFood(String foodId, UsualFoodInput input) async {
+    return store.updateUsualFood(foodId, input);
+  }
+
+  @override
   Future<bool> deleteTemplate(String templateId) async {
     return store.deleteTemplate(templateId);
+  }
+
+  @override
+  Future<bool> deleteUsualFood(String foodId) async {
+    return store.deleteUsualFood(foodId);
+  }
+
+  @override
+  Future<UsualFoodDraft> draftUsualFood(String text) async {
+    return const UsualFoodDraft(
+      missingRequiredFields: [
+        'name',
+        'servingGrams',
+        'calories',
+        'proteinGrams',
+        'carbsGrams',
+        'fatGrams',
+      ],
+    );
   }
 
   @override
@@ -421,11 +450,7 @@ class LocalAudioRecorderService extends AudioRecorderService {
     _currentPath = null;
     _stateController.add(RecorderState.stopping);
     if (path == null) return null;
-    return RecordedAudio(
-      path: path,
-      mimeType: 'audio/wav',
-      sizeBytes: 1024,
-    );
+    return RecordedAudio(path: path, mimeType: 'audio/wav', sizeBytes: 1024);
   }
 
   @override

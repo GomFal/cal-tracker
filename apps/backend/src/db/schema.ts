@@ -147,7 +147,9 @@ export const foodItems = pgTable("food_items", {
   proteinGrams: numeric("protein_grams", { precision: 10, scale: 2 }).notNull(),
   carbsGrams: numeric("carbs_grams", { precision: 10, scale: 2 }).notNull(),
   fatGrams: numeric("fat_grams", { precision: 10, scale: 2 }).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true })
 }, (table) => [
   index("food_items_external_source_id_idx").on(table.externalSource, table.externalId).where(sql`${table.externalSource} IS NOT NULL AND ${table.externalId} IS NOT NULL`),
   index("food_items_external_source_id_lookup_idx").on(table.externalSource, table.externalId).where(sql`${table.externalSource} IS NOT NULL AND ${table.externalId} IS NOT NULL`),

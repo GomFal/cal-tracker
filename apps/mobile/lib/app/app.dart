@@ -80,6 +80,7 @@ class CalTrackerBootstrap extends StatelessWidget {
       providers: [
         Provider<AuthRepository>.value(value: authRepository),
         Provider<NutritionRepository>.value(value: nutritionRepository),
+        Provider<AudioRecorderService>.value(value: audioRecorderService),
         Provider<AppPreferencesRepository>.value(
           value: preferencesRepository,
         ),

@@ -13,13 +13,30 @@ import '../../../core/voice_action_button.dart';
 import '../view_models/voice_log_view_model.dart';
 
 class MealCreateScreen extends StatefulWidget {
-  const MealCreateScreen({super.key});
+  const MealCreateScreen({super.key, this.initialItems = const []});
+
+  final List<MealItem> initialItems;
 
   @override
   State<MealCreateScreen> createState() => _MealCreateScreenState();
 }
 
 class _MealCreateScreenState extends State<MealCreateScreen> {
+  bool _initialItemsRequested = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialItems.isEmpty) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _initialItemsRequested) return;
+      _initialItemsRequested = true;
+      context.read<VoiceLogViewModel>().createProposalFromManualItems(
+            widget.initialItems,
+          );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final viewModel = context.watch<VoiceLogViewModel>();
@@ -188,6 +205,12 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
     if (!context.mounted || selection == null) return;
     await viewModel.commitProposal(mealLabel: selection.label);
   }
+}
+
+class MealCreateInitialItems {
+  const MealCreateInitialItems(this.items);
+
+  final List<MealItem> items;
 }
 
 const _candidatePreviewCount = 3;

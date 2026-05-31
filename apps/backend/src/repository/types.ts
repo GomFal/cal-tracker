@@ -12,7 +12,10 @@ import type {
   MealProposal,
   MealTemplate,
   NutritionSnapshot,
-  PermissionScope
+  PermissionScope,
+  CreateUsualFoodRequest,
+  UpdateUsualFoodRequest,
+  UsualFood
 } from "@cal-tracker/contracts";
 
 export type StoredUser = AuthUser & {
@@ -89,6 +92,9 @@ export type FoodItemRecord = {
   proteinGrams: number;
   carbsGrams: number;
   fatGrams: number;
+  createdAt?: string;
+  updatedAt?: string;
+  deletedAt?: string;
 };
 
 export type FoodPortionRecord = {
@@ -215,6 +221,10 @@ export interface AppRepository {
   searchFoods(userId: string, query: string, barcode?: string): Promise<FoodItemRecord[]>;
   searchFoodsHybrid(userId: string, input: FoodHybridSearchInput): Promise<FoodSearchCandidate[]>;
   upsertFoodItem(input: Omit<FoodItemRecord, "id">): Promise<FoodItemRecord>;
+  listUsualFoods(userId: string): Promise<UsualFood[]>;
+  createUsualFood(userId: string, input: CreateUsualFoodRequest): Promise<UsualFood>;
+  updateUsualFood(userId: string, usualFoodId: string, input: UpdateUsualFoodRequest): Promise<UsualFood | undefined>;
+  deleteUsualFood(userId: string, usualFoodId: string): Promise<boolean>;
   recordFoodFeedback(input: FoodFeedbackRecord): Promise<UserFoodPreference | undefined>;
   getUserFoodPreferences(userId: string): Promise<UserFoodPreference[]>;
   upsertFoodItemEmbedding(input: UpsertFoodItemEmbeddingInput): Promise<FoodItemEmbeddingRecord>;

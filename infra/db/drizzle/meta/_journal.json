@@ -64,6 +64,13 @@
       "when": 1779898849230,
       "tag": "0008_meal_item_language",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1779898849231,
+      "tag": "0009_food_items_lifecycle",
+      "breakpoints": true
     }
   ]
 }

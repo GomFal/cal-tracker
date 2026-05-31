@@ -13,6 +13,7 @@ Current authoritative files:
 | `app-description.md` | Product vision, MVP scope, system architecture, action-layer rules, Flutter/backend boundaries, mobile OS adapter strategy, API surface, scoped decisions, testing/development order. | Detailed SQL schema, vector index design, backup mechanics. |
 | `db-vector-architecture.md` | PostgreSQL/pgvector architecture, tables, field requirements, vector retrieval, migrations, local/production DB deployment, backup/restore rules. | Product UX, action semantics beyond DB effects, Flutter UI architecture. |
 | `voice-agent-gap-analysis.md` | Current implementation gaps for voice input, STT, OpenRouter agent orchestration, and the technical slices needed to align the code with the MVP plan. | General product scope, database table ownership, production deployment. |
+| `spec-usual-foods-flow.md` | Task specification for usual ingredients inside the usual meals area, including manual CRUD, AI-assisted drafts, search priority, backend contracts, Flutter UI, and tests. | General nutrition source strategy outside usual foods, unrelated dashboard or onboarding UX. |
 
 This split is intentional:
 
@@ -42,6 +43,7 @@ Task-specific reading:
 | Backend action implementation | `app-description.md` -> Canonical Action Layer, Initial Canonical Actions, Confirmation Policy, Permissions |
 | Internal agent work | `app-description.md` -> Internal Agent Requirements, Safety Rules, Action Layer |
 | Voice input, STT, or OpenRouter agent work | `voice-agent-gap-analysis.md`; then `app-description.md` -> Internal Agent Requirements, Safety Rules, Action Layer |
+| Usual ingredients, usual meals tab, or user-owned food priority | `spec-usual-foods-flow.md`; then `app-description.md` -> Nutrition Source Priority and Canonical Action Layer |
 | Flutter UI work | `app-description.md` -> Flutter Architecture, API Requirements, Confirmation Policy |
 | Android AppFunctions or iOS App Intents | `app-description.md` -> Mobile OS Agent Integrations, Target Launch Platforms |
 | Database schema/migrations | `db-vector-architecture.md` -> Core Tables, Table Responsibilities, Required Constraints and Indexes |

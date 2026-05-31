@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:marionette_flutter/marionette_flutter.dart';
 import 'package:provider/provider.dart';
@@ -18,12 +19,13 @@ import 'ui/features/meal_history/view_models/meal_history_view_model.dart';
 import 'ui/features/meal_templates/view_models/meal_templates_view_model.dart';
 import 'ui/features/settings/view_models/settings_view_model.dart';
 
-void main() {
+Future<void> main() async {
   if (kDebugMode) {
     MarionetteBinding.ensureInitialized();
   } else {
     WidgetsFlutterBinding.ensureInitialized();
   }
+  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
   final dependencies = createLocalToolkitDependencies();
   runApp(_LocalToolkitApp(dependencies: dependencies));

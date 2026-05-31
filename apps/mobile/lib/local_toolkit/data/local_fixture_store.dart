@@ -7,9 +7,8 @@ import '../../domain/models/auth_models.dart';
 import '../../domain/models/macro_distribution.dart';
 import '../../domain/models/nutrition_models.dart';
 
-typedef LocalAgentScenarioResultBuilder = AgentRunResult Function(
-  LocalFixtureStore store,
-);
+typedef LocalAgentScenarioResultBuilder =
+    AgentRunResult Function(LocalFixtureStore store);
 
 class LocalAgentScenario {
   const LocalAgentScenario({
@@ -30,21 +29,23 @@ class LocalFixtureStore extends ChangeNotifier {
     required AuthUser user,
     required Map<String, DailySummary> dailySummaries,
     required List<MealTemplate> templates,
+    required List<UsualFood> usualFoods,
     required List<MealItem> foodCatalog,
     required Map<String, MealProposal> proposals,
     required List<FoodCandidateGroup> candidateGroups,
     required Map<String, LocalAgentScenario> agentScenarios,
     required String selectedScenarioKey,
     DateTime Function()? now,
-  })  : _user = user,
-        _dailySummaries = Map.of(dailySummaries),
-        _templates = List.of(templates),
-        _foodCatalog = List.of(foodCatalog),
-        _proposals = Map.of(proposals),
-        _candidateGroups = List.of(candidateGroups),
-        _agentScenarios = Map.of(agentScenarios),
-        _selectedScenarioKey = selectedScenarioKey,
-        _now = now ?? DateTime.now;
+  }) : _user = user,
+       _dailySummaries = Map.of(dailySummaries),
+       _templates = List.of(templates),
+       _usualFoods = List.of(usualFoods),
+       _foodCatalog = List.of(foodCatalog),
+       _proposals = Map.of(proposals),
+       _candidateGroups = List.of(candidateGroups),
+       _agentScenarios = Map.of(agentScenarios),
+       _selectedScenarioKey = selectedScenarioKey,
+       _now = now ?? DateTime.now;
 
   factory LocalFixtureStore.seeded({DateTime Function()? now}) {
     final clock = now ?? DateTime.now;
@@ -130,6 +131,7 @@ class LocalFixtureStore extends ChangeNotifier {
       ),
       dailySummaries: summaries,
       templates: _seedTemplates(catalog),
+      usualFoods: const [],
       foodCatalog: catalog,
       proposals: {proposal.id: proposal},
       candidateGroups: candidateGroups,
@@ -143,6 +145,7 @@ class LocalFixtureStore extends ChangeNotifier {
   AuthUser _user;
   final Map<String, DailySummary> _dailySummaries;
   List<MealTemplate> _templates;
+  List<UsualFood> _usualFoods;
   List<MealItem> _foodCatalog;
   final Map<String, MealProposal> _proposals;
   List<FoodCandidateGroup> _candidateGroups;
@@ -156,6 +159,7 @@ class LocalFixtureStore extends ChangeNotifier {
   String get today => _dateOnly(_now());
   String get selectedScenarioKey => _selectedScenarioKey;
   List<MealTemplate> get templates => List.unmodifiable(_templates);
+  List<UsualFood> get usualFoods => List.unmodifiable(_usualFoods);
   List<MealItem> get foodCatalog => List.unmodifiable(_foodCatalog);
   List<FoodCandidateGroup> get candidateGroups =>
       List.unmodifiable(_candidateGroups);
@@ -170,6 +174,7 @@ class LocalFixtureStore extends ChangeNotifier {
       ..clear()
       ..addAll(fresh._dailySummaries);
     _templates = List.of(fresh._templates);
+    _usualFoods = List.of(fresh._usualFoods);
     _foodCatalog = List.of(fresh._foodCatalog);
     _proposals
       ..clear()
@@ -665,12 +670,91 @@ class LocalFixtureStore extends ChangeNotifier {
     return true;
   }
 
+  UsualFood createUsualFood(UsualFoodInput input) {
+    final food = UsualFood(
+      id: 'local-usual-food-${_usualFoods.length + 1}',
+      name: input.name,
+      canonicalName: input.canonicalName,
+      brand: input.brand,
+      barcode: input.barcode,
+      servingGrams: input.servingGrams,
+      nutrition: input.nutrition,
+      aliases: List.of(input.aliases),
+      nutrients: Map.of(input.nutrients),
+      createdAt: _now(),
+      updatedAt: _now(),
+    );
+    _usualFoods = [..._usualFoods, food];
+    notifyListeners();
+    return food;
+  }
+
+  UsualFood updateUsualFood(String foodId, UsualFoodInput input) {
+    final updated = UsualFood(
+      id: foodId,
+      name: input.name,
+      canonicalName: input.canonicalName,
+      brand: input.brand,
+      barcode: input.barcode,
+      servingGrams: input.servingGrams,
+      nutrition: input.nutrition,
+      aliases: List.of(input.aliases),
+      nutrients: Map.of(input.nutrients),
+      updatedAt: _now(),
+    );
+    _usualFoods = _usualFoods
+        .map((food) => food.id == foodId ? updated : food)
+        .toList(growable: false);
+    notifyListeners();
+    return updated;
+  }
+
+  bool deleteUsualFood(String foodId) {
+    final next = _usualFoods
+        .where((food) => food.id != foodId)
+        .toList(growable: false);
+    if (next.length == _usualFoods.length) return false;
+    _usualFoods = next;
+    notifyListeners();
+    return true;
+  }
+
   List<MealItem> searchFoods({
     required String query,
     String? barcode,
     int limit = 10,
   }) {
     final normalizedQuery = query.trim().toLowerCase();
+    final usualMatches = _usualFoods
+        .where((food) {
+          if (barcode != null && barcode.isNotEmpty) {
+            return food.barcode == barcode;
+          }
+          if (normalizedQuery.isEmpty) return true;
+          return food.name.toLowerCase().contains(normalizedQuery) ||
+              (food.canonicalName ?? '').toLowerCase().contains(
+                normalizedQuery,
+              ) ||
+              (food.brand ?? '').toLowerCase().contains(normalizedQuery) ||
+              food.aliases.any(
+                (alias) => alias.toLowerCase().contains(normalizedQuery),
+              );
+        })
+        .map((food) {
+          return MealItem(
+            name: food.name,
+            quantity: food.servingGrams,
+            unit: 'g',
+            calories: food.nutrition.calories,
+            proteinGrams: food.nutrition.proteinGrams,
+            carbsGrams: food.nutrition.carbsGrams,
+            fatGrams: food.nutrition.fatGrams,
+            source: 'user_custom',
+            canonicalName: food.canonicalName,
+            externalSource: 'user_custom',
+            externalId: food.id,
+          );
+        });
     final matches = _foodCatalog.where((item) {
       if (barcode != null && barcode.isNotEmpty) {
         return item.externalId == barcode || item.originalText == barcode;
@@ -678,8 +762,8 @@ class LocalFixtureStore extends ChangeNotifier {
       if (normalizedQuery.isEmpty) return true;
       return item.name.toLowerCase().contains(normalizedQuery) ||
           (item.canonicalName ?? '').toLowerCase().contains(normalizedQuery);
-    }).take(limit);
-    return matches.toList(growable: false);
+    });
+    return [...usualMatches, ...matches].take(limit).toList(growable: false);
   }
 
   DailySummary _emptySummary(String date) {
@@ -1030,8 +1114,9 @@ Meal _meal({
   return Meal(
     id: id,
     title: title,
-    occurredAt:
-        DateTime.parse('${date}T${hour.toString().padLeft(2, '0')}:00:00'),
+    occurredAt: DateTime.parse(
+      '${date}T${hour.toString().padLeft(2, '0')}:00:00',
+    ),
     mealLabel: mealLabel,
     nutrition: _nutritionFor(items),
     items: items,
@@ -1094,10 +1179,7 @@ DailySummary _summaryFor({
   );
 }
 
-DailySummary _copySummary(
-  DailySummary summary, {
-  double? waterConsumedLiters,
-}) {
+DailySummary _copySummary(DailySummary summary, {double? waterConsumedLiters}) {
   return DailySummary(
     date: summary.date,
     consumed: summary.consumed,
@@ -1122,8 +1204,10 @@ DailySummary _copySummary(
 NutritionSnapshot _nutritionForMeals(List<Meal> meals) {
   return NutritionSnapshot(
     calories: meals.fold(0, (sum, meal) => sum + meal.nutrition.calories),
-    proteinGrams:
-        meals.fold(0, (sum, meal) => sum + meal.nutrition.proteinGrams),
+    proteinGrams: meals.fold(
+      0,
+      (sum, meal) => sum + meal.nutrition.proteinGrams,
+    ),
     carbsGrams: meals.fold(0, (sum, meal) => sum + meal.nutrition.carbsGrams),
     fatGrams: meals.fold(0, (sum, meal) => sum + meal.nutrition.fatGrams),
   );
@@ -1154,20 +1238,21 @@ NutritionSnapshot _targetFromConfig({
 }) {
   final grams = switch (macroConfig?.mode) {
     MacroMode.percentage => gramsFromPercentages(
-        calories,
-        macroConfig!.percentages ?? MacroPreset.balanced.percentages,
-      ),
-    MacroMode.grams => macroConfig!.grams ??
-        MacroGrams(
-          proteinGrams: fallback.proteinGrams,
-          carbsGrams: fallback.carbsGrams,
-          fatGrams: fallback.fatGrams,
-        ),
+      calories,
+      macroConfig!.percentages ?? MacroPreset.balanced.percentages,
+    ),
+    MacroMode.grams =>
+      macroConfig!.grams ??
+          MacroGrams(
+            proteinGrams: fallback.proteinGrams,
+            carbsGrams: fallback.carbsGrams,
+            fatGrams: fallback.fatGrams,
+          ),
     null => MacroGrams(
-        proteinGrams: fallback.proteinGrams,
-        carbsGrams: fallback.carbsGrams,
-        fatGrams: fallback.fatGrams,
-      ),
+      proteinGrams: fallback.proteinGrams,
+      carbsGrams: fallback.carbsGrams,
+      fatGrams: fallback.fatGrams,
+    ),
   };
   return NutritionSnapshot(
     calories: calories,
@@ -1195,7 +1280,8 @@ _MacroFields _macroFields({
     );
   }
   final percentages = macroConfig.percentages;
-  final grams = macroConfig.grams ??
+  final grams =
+      macroConfig.grams ??
       (percentages == null
           ? null
           : gramsFromPercentages(calories, percentages));
@@ -1207,8 +1293,9 @@ _MacroFields _macroFields({
     carbsPct: percentages?.carbsPct,
     fatPct: percentages?.fatPct,
     macroCalories: grams == null ? calories : macroCaloriesFromGrams(grams),
-    calorieDeltaKcal:
-        grams == null ? 0 : macroCaloriesFromGrams(grams) - calories,
+    calorieDeltaKcal: grams == null
+        ? 0
+        : macroCaloriesFromGrams(grams) - calories,
   );
 }
 

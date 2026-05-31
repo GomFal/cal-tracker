@@ -21,10 +21,16 @@ describe("contracts", () => {
       "get_daily_summary",
       "get_remaining_targets",
       "get_meal_history",
+      "get_usual_foods",
+      "create_usual_food",
+      "update_usual_food",
+      "delete_usual_food",
       "get_usual_meals",
+      "draft_usual_meal",
       "create_meal_template",
       "update_meal_template",
       "delete_meal_template",
+      "draft_usual_food",
     ];
     expect(actionDefinitions.map((action) => action.id)).toEqual(expected);
     for (const id of expected) {

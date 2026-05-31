@@ -4,10 +4,37 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../data/repositories/nutrition_repository.dart';
 import '../../l10n/app_localizations_context.dart';
 import '../features/voice_log/view_models/voice_log_view_model.dart';
 import 'design_system.dart';
 import 'voice_action_button.dart';
+
+class GlobalVoiceRoutingDestination {
+  const GlobalVoiceRoutingDestination(this.location, {this.extra});
+
+  final String location;
+  final Object? extra;
+}
+
+GlobalVoiceRoutingDestination? globalVoiceRoutingDestinationFor(
+  AgentRunResult? result,
+) {
+  if (result == null) return null;
+  if (result.kind == 'usual_food_draft' && result.usualFoodDraft != null) {
+    return GlobalVoiceRoutingDestination(
+      '/templates/ingredients/new',
+      extra: result.usualFoodDraft,
+    );
+  }
+  if (result.kind == 'usual_meal_draft' && result.usualMealDraft != null) {
+    return GlobalVoiceRoutingDestination(
+      '/templates/meals/new',
+      extra: result.usualMealDraft,
+    );
+  }
+  return const GlobalVoiceRoutingDestination('/meal/create');
+}
 
 class AppShell extends StatelessWidget {
   const AppShell({super.key, required this.navigationShell});
@@ -244,10 +271,7 @@ class _FreshBottomNav extends StatelessWidget {
 }
 
 class _FreshSideNav extends StatelessWidget {
-  const _FreshSideNav({
-    required this.selectedIndex,
-    required this.onSelected,
-  });
+  const _FreshSideNav({required this.selectedIndex, required this.onSelected});
 
   final int selectedIndex;
   final ValueChanged<int> onSelected;
@@ -331,8 +355,11 @@ class _NavButton extends StatelessWidget {
           children: [
             icon,
             const SizedBox(height: 4),
-            Text(item.label,
-                style: labelStyle, overflow: TextOverflow.ellipsis),
+            Text(
+              item.label,
+              style: labelStyle,
+              overflow: TextOverflow.ellipsis,
+            ),
           ],
         ),
       ),
@@ -452,11 +479,14 @@ class _CenterVoiceButtonState extends State<_CenterVoiceButton> {
   }
 
   Future<void> _stopAndOpen(VoiceLogViewModel viewModel) async {
-    final stopFuture = viewModel.stopRecording(submitAfterTranscription: true);
-    if (mounted) {
-      context.go('/meal/create');
+    final result = await viewModel.stopRecording(
+      submitAfterTranscription: true,
+    );
+    if (!mounted) return;
+    final destination = globalVoiceRoutingDestinationFor(result);
+    if (destination != null) {
+      context.go(destination.location, extra: destination.extra);
     }
-    await stopFuture;
   }
 }
 

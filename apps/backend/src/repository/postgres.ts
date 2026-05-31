@@ -1,4 +1,19 @@
-import { defaultUserScopes, type CalorieTargetSource, type DailyGoals, type MacroGoalMetadata, type Meal, type MealItem, type MealLabel, type MealProposal, type MealTemplate, type NutritionSnapshot, type PermissionScope } from "@cal-tracker/contracts";
+import {
+  defaultUserScopes,
+  type CalorieTargetSource,
+  type CreateUsualFoodRequest,
+  type DailyGoals,
+  type MacroGoalMetadata,
+  type Meal,
+  type MealItem,
+  type MealLabel,
+  type MealProposal,
+  type MealTemplate,
+  type NutritionSnapshot,
+  type PermissionScope,
+  type UpdateUsualFoodRequest,
+  type UsualFood,
+} from "@cal-tracker/contracts";
 import { sql as dbSql, type SQL } from "drizzle-orm";
 import { createDbClient, type AppDb, type AppDbClient } from "../db/client.js";
 import { newId } from "../utils/ids.js";
@@ -24,7 +39,7 @@ import type {
   StoredUser,
   UpsertFoodItemEmbeddingInput,
   UpdateDailyGoalsInput,
-  UserFoodPreference
+  UserFoodPreference,
 } from "./types.js";
 
 const ACTIVE_EMBEDDING_DIMENSIONS = 1024;
@@ -35,8 +50,11 @@ const VECTOR_SCORE_WEIGHT = 0.25;
 const LEXICAL_ONLY_SCORE_WEIGHT = 0.95;
 const PREFERENCE_SCORE_WEIGHT = 0.05;
 const PREFERENCE_SCORE_NORMALIZER = 10;
+const USER_FOOD_SCORE_BOOST = 0.15;
 const FOOD_SEARCH_CACHE_TTL_MS = 5 * 60 * 1000;
 const FOOD_SEARCH_CACHE_MAX_ENTRIES = 500;
+const USUAL_FOOD_SOURCE = "user_custom";
+const USUAL_FOOD_ALIASES_KEY = "usualFoodAliases";
 
 type FoodSearchProfile = {
   scope: "generic" | "market";
@@ -51,7 +69,10 @@ type DbExecutor = {
 export class PostgresRepository implements AppRepository {
   private readonly client: AppDbClient;
   private readonly db: AppDb;
-  private readonly foodSearchCache = new Map<string, { expiresAt: number; value: FoodSearchCandidate[] }>();
+  private readonly foodSearchCache = new Map<
+    string,
+    { expiresAt: number; value: FoodSearchCandidate[] }
+  >();
 
   constructor(databaseUrl: string) {
     this.client = createDbClient(databaseUrl);
@@ -62,27 +83,43 @@ export class PostgresRepository implements AppRepository {
     await this.client.close();
   }
 
-  private execute<T extends Record<string, unknown> = Record<string, unknown>>(query: SQL): Promise<T[]> {
+  private execute<T extends Record<string, unknown> = Record<string, unknown>>(
+    query: SQL,
+  ): Promise<T[]> {
     return executeRows(this.db, query);
   }
 
-  async createUser(input: { email: string; displayName: string; passwordHash?: string; scopes: PermissionScope[] }): Promise<StoredUser> {
+  async createUser(input: {
+    email: string;
+    displayName: string;
+    passwordHash?: string;
+    scopes: PermissionScope[];
+  }): Promise<StoredUser> {
     return this.db.transaction(async (tx) => {
-      const [row] = await executeRows(tx, dbSql`
+      const [row] = await executeRows(
+        tx,
+        dbSql`
         INSERT INTO users (email, display_name)
         VALUES (${input.email.toLowerCase()}, ${input.displayName})
         RETURNING id, email, display_name, trusted_mode_enabled, created_at
-      `);
+      `,
+      );
       if (input.passwordHash) {
-        await executeRows(tx, dbSql`INSERT INTO user_credentials (user_id, password_hash) VALUES (${row.id}, ${input.passwordHash})`);
+        await executeRows(
+          tx,
+          dbSql`INSERT INTO user_credentials (user_id, password_hash) VALUES (${row.id}, ${input.passwordHash})`,
+        );
       }
-      await executeRows(tx, dbSql`
+      await executeRows(
+        tx,
+        dbSql`
         INSERT INTO nutrition_targets (
           user_id, calories, protein_grams, carbs_grams, fat_grams, hydration_goal_glasses, hydration_goal_liters,
           calorie_target_configured, calorie_target_source
         )
         VALUES (${row.id}, 2200, 0, 0, 0, 0, 0, false, 'default')
-      `);
+      `,
+      );
       return this.mapUser(row, input.passwordHash, input.scopes);
     });
   }
@@ -94,7 +131,13 @@ export class PostgresRepository implements AppRepository {
       LEFT JOIN user_credentials c ON c.user_id = u.id
       WHERE lower(u.email) = lower(${email}) AND u.deleted_at IS NULL
     `);
-    return row ? this.mapUser(row, row.password_hash as string | undefined, defaultUserScopes) : undefined;
+    return row
+      ? this.mapUser(
+          row,
+          row.password_hash as string | undefined,
+          defaultUserScopes,
+        )
+      : undefined;
   }
 
   async findUserById(id: string): Promise<StoredUser | undefined> {
@@ -104,17 +147,31 @@ export class PostgresRepository implements AppRepository {
       LEFT JOIN user_credentials c ON c.user_id = u.id
       WHERE u.id = ${id} AND u.deleted_at IS NULL
     `);
-    return row ? this.mapUser(row, row.password_hash as string | undefined, defaultUserScopes) : undefined;
+    return row
+      ? this.mapUser(
+          row,
+          row.password_hash as string | undefined,
+          defaultUserScopes,
+        )
+      : undefined;
   }
 
-  async updateTrustedMode(userId: string, enabled: boolean): Promise<StoredUser> {
-    await this.execute(dbSql`UPDATE users SET trusted_mode_enabled = ${enabled} WHERE id = ${userId}`);
+  async updateTrustedMode(
+    userId: string,
+    enabled: boolean,
+  ): Promise<StoredUser> {
+    await this.execute(
+      dbSql`UPDATE users SET trusted_mode_enabled = ${enabled} WHERE id = ${userId}`,
+    );
     const user = await this.findUserById(userId);
     if (!user) throw new Error("user_not_found");
     return user;
   }
 
-  async findAuthIdentity(provider: AuthIdentityProvider, providerUserId: string): Promise<AuthIdentityRecord | undefined> {
+  async findAuthIdentity(
+    provider: AuthIdentityProvider,
+    providerUserId: string,
+  ): Promise<AuthIdentityRecord | undefined> {
     const [row] = await this.execute(dbSql`
       SELECT id, user_id, provider, provider_user_id, email, created_at, updated_at
       FROM auth_identities
@@ -124,7 +181,12 @@ export class PostgresRepository implements AppRepository {
     return row ? mapAuthIdentity(row) : undefined;
   }
 
-  async linkAuthIdentity(input: { userId: string; provider: AuthIdentityProvider; providerUserId: string; email: string }): Promise<AuthIdentityRecord> {
+  async linkAuthIdentity(input: {
+    userId: string;
+    provider: AuthIdentityProvider;
+    providerUserId: string;
+    email: string;
+  }): Promise<AuthIdentityRecord> {
     const [row] = await this.execute(dbSql`
       INSERT INTO auth_identities (user_id, provider, provider_user_id, email)
       VALUES (${input.userId}, ${input.provider}, ${input.providerUserId}, ${input.email.toLowerCase()})
@@ -135,7 +197,9 @@ export class PostgresRepository implements AppRepository {
     return mapAuthIdentity(row);
   }
 
-  async createSession(input: Omit<StoredSession, "createdAt">): Promise<StoredSession> {
+  async createSession(
+    input: Omit<StoredSession, "createdAt">,
+  ): Promise<StoredSession> {
     const [row] = await this.execute(dbSql`
       INSERT INTO auth_sessions (id, user_id, refresh_token_hash, expires_at, revoked_at, rotated_at)
       VALUES (${input.id}, ${input.userId}, ${input.refreshTokenHash}, ${input.expiresAt}, ${input.revokedAt ?? null}, ${input.rotatedAt ?? null})
@@ -144,7 +208,9 @@ export class PostgresRepository implements AppRepository {
     return mapSession(row);
   }
 
-  async findSessionByRefreshTokenHash(hash: string): Promise<StoredSession | undefined> {
+  async findSessionByRefreshTokenHash(
+    hash: string,
+  ): Promise<StoredSession | undefined> {
     const [row] = await this.execute(dbSql`
       SELECT * FROM auth_sessions
       WHERE refresh_token_hash = ${hash} AND revoked_at IS NULL AND expires_at > now()
@@ -154,14 +220,22 @@ export class PostgresRepository implements AppRepository {
   }
 
   async revokeSession(sessionId: string): Promise<void> {
-    await this.execute(dbSql`UPDATE auth_sessions SET revoked_at = now() WHERE id = ${sessionId}`);
+    await this.execute(
+      dbSql`UPDATE auth_sessions SET revoked_at = now() WHERE id = ${sessionId}`,
+    );
   }
 
   async revokeAllSessions(userId: string): Promise<void> {
-    await this.execute(dbSql`UPDATE auth_sessions SET revoked_at = now() WHERE user_id = ${userId} AND revoked_at IS NULL`);
+    await this.execute(
+      dbSql`UPDATE auth_sessions SET revoked_at = now() WHERE user_id = ${userId} AND revoked_at IS NULL`,
+    );
   }
 
-  async rotateSession(sessionId: string, nextHash: string, expiresAt: string): Promise<StoredSession> {
+  async rotateSession(
+    sessionId: string,
+    nextHash: string,
+    expiresAt: string,
+  ): Promise<StoredSession> {
     const [row] = await this.execute(dbSql`
       UPDATE auth_sessions
       SET refresh_token_hash = ${nextHash}, expires_at = ${expiresAt}, rotated_at = now()
@@ -171,38 +245,60 @@ export class PostgresRepository implements AppRepository {
     return mapSession(row);
   }
 
-  async createPasswordReset(input: { userId: string; tokenHash: string; expiresAt: string }): Promise<void> {
+  async createPasswordReset(input: {
+    userId: string;
+    tokenHash: string;
+    expiresAt: string;
+  }): Promise<void> {
     await this.execute(dbSql`
       INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
       VALUES (${input.userId}, ${input.tokenHash}, ${input.expiresAt})
     `);
   }
 
-  async consumePasswordReset(tokenHash: string, newPasswordHash: string): Promise<boolean> {
+  async consumePasswordReset(
+    tokenHash: string,
+    newPasswordHash: string,
+  ): Promise<boolean> {
     return this.db.transaction(async (tx) => {
-      const [reset] = await executeRows(tx, dbSql`
+      const [reset] = await executeRows(
+        tx,
+        dbSql`
         UPDATE password_reset_tokens
         SET used_at = now()
         WHERE token_hash = ${tokenHash} AND used_at IS NULL AND expires_at > now()
         RETURNING user_id
-      `);
+      `,
+      );
       if (!reset) return false;
-      await executeRows(tx, dbSql`UPDATE user_credentials SET password_hash = ${newPasswordHash}, updated_at = now() WHERE user_id = ${reset.user_id}`);
+      await executeRows(
+        tx,
+        dbSql`UPDATE user_credentials SET password_hash = ${newPasswordHash}, updated_at = now() WHERE user_id = ${reset.user_id}`,
+      );
       return true;
     });
   }
 
   async listFoods(userId: string): Promise<FoodItemRecord[]> {
-    const rows = await this.execute(dbSql`SELECT * FROM food_items WHERE user_id IS NULL OR user_id = ${userId}`);
+    const rows = await this.execute(
+      dbSql`SELECT * FROM food_items WHERE deleted_at IS NULL AND (user_id IS NULL OR user_id = ${userId})`,
+    );
     return this.mapFoodsWithPortions(rows);
   }
 
-  async searchFoods(userId: string, query: string, barcode?: string): Promise<FoodItemRecord[]> {
+  async searchFoods(
+    userId: string,
+    query: string,
+    barcode?: string,
+  ): Promise<FoodItemRecord[]> {
     const candidates = await this.searchFoodsHybrid(userId, { query, barcode });
     return candidates.map(stripFoodSearchCandidate);
   }
 
-  async searchFoodsHybrid(userId: string, input: FoodHybridSearchInput): Promise<FoodSearchCandidate[]> {
+  async searchFoodsHybrid(
+    userId: string,
+    input: FoodHybridSearchInput,
+  ): Promise<FoodSearchCandidate[]> {
     return withSpan(
       "PostgresRepository.searchFoodsHybrid",
       {
@@ -216,14 +312,24 @@ export class PostgresRepository implements AppRepository {
     );
   }
 
-  private async searchFoodsHybridInternal(userId: string, input: FoodHybridSearchInput): Promise<FoodSearchCandidate[]> {
+  private async searchFoodsHybridInternal(
+    userId: string,
+    input: FoodHybridSearchInput,
+  ): Promise<FoodSearchCandidate[]> {
     const limit = sanitizeLimit(input.limit);
     const normalized = normalizeText(input.query);
     const cacheKey = foodSearchCacheKey(userId, input, normalized, limit);
     const cached = this.getCachedFoodSearch(cacheKey);
     if (cached) return cached.map(cloneFoodSearchCandidate);
 
-    const candidateRows = new Map<string, { row: Record<string, unknown>; lexicalScore: number; vectorScore?: number }>();
+    const candidateRows = new Map<
+      string,
+      {
+        row: Record<string, unknown>;
+        lexicalScore: number;
+        vectorScore?: number;
+      }
+    >();
     const includeBranded = !input.excludeBranded;
 
     if (input.barcode) {
@@ -231,10 +337,11 @@ export class PostgresRepository implements AppRepository {
       const rows = await withSpan(
         "PostgresRepository.searchFoodsHybrid.barcodeQuery",
         { limit },
-        () => this.execute(dbSql`
+        () =>
+          this.execute(dbSql`
         SELECT *, 1::float AS search_score
         FROM food_items
-        WHERE (user_id IS NULL OR user_id = ${userId}) AND barcode = ${barcode}
+        WHERE deleted_at IS NULL AND (user_id IS NULL OR user_id = ${userId}) AND barcode = ${barcode}
         LIMIT ${limit}
       `),
       );
@@ -242,9 +349,18 @@ export class PostgresRepository implements AppRepository {
         candidateRows.set(row.id as string, { row, lexicalScore: 1 });
       }
     } else if (normalized.length > 0) {
-      const rows = await this.searchFoodDocuments(userId, input, normalized, limit, includeBranded);
+      const rows = await this.searchFoodDocuments(
+        userId,
+        input,
+        normalized,
+        limit,
+        includeBranded,
+      );
       for (const row of rows) {
-        candidateRows.set(row.id as string, { row, lexicalScore: clampScore(Number(row.search_score ?? 0)) });
+        candidateRows.set(row.id as string, {
+          row,
+          lexicalScore: clampScore(Number(row.search_score ?? 0)),
+        });
       }
     }
 
@@ -253,12 +369,14 @@ export class PostgresRepository implements AppRepository {
       const rows = await withSpan(
         "PostgresRepository.searchFoodsHybrid.vectorQuery",
         { limit: Math.max(limit, DEFAULT_FOOD_SEARCH_LIMIT), includeBranded },
-        () => this.execute(dbSql`
+        () =>
+          this.execute(dbSql`
         SELECT food_items.*,
                1 - (food_item_embeddings.embedding <=> ${vectorLiteral}::vector) AS vector_score
         FROM food_item_embeddings
         JOIN food_items ON food_items.id = food_item_embeddings.food_item_id
-        WHERE (food_items.user_id IS NULL OR food_items.user_id = ${userId})
+        WHERE food_items.deleted_at IS NULL
+          AND (food_items.user_id IS NULL OR food_items.user_id = ${userId})
           AND (${includeBranded} OR (
             food_items.data_type IS DISTINCT FROM 'Branded'
             AND food_items.source IS DISTINCT FROM 'usda_branded'
@@ -273,7 +391,10 @@ export class PostgresRepository implements AppRepository {
         const existing = candidateRows.get(foodId);
         const vectorScore = clampScore(Number(row.vector_score ?? 0));
         if (existing) {
-          existing.vectorScore = Math.max(existing.vectorScore ?? 0, vectorScore);
+          existing.vectorScore = Math.max(
+            existing.vectorScore ?? 0,
+            vectorScore,
+          );
         } else {
           candidateRows.set(foodId, { row, lexicalScore: 0, vectorScore });
         }
@@ -291,47 +412,75 @@ export class PostgresRepository implements AppRepository {
       { rowCount: merged.length },
       () => this.mapFoodsWithPortions(merged.map((candidate) => candidate.row)),
     );
-    const scoresByFoodId = new Map(merged.map((candidate) => [candidate.row.id as string, candidate]));
+    const scoresByFoodId = new Map(
+      merged.map((candidate) => [candidate.row.id as string, candidate]),
+    );
     const preferenceScores = await withSpan(
       "PostgresRepository.getPreferenceScoreMap",
       { foodCount: foods.length },
-      () => this.getPreferenceScoreMap(userId, foods.map((food) => food.id)),
+      () =>
+        this.getPreferenceScoreMap(
+          userId,
+          foods.map((food) => food.id),
+        ),
     );
 
     const ranked = withSyncSpan(
       "PostgresRepository.rankFoodCandidates",
       { foodCount: foods.length, limit },
-      () => foods.map((food) => {
-        const scores = scoresByFoodId.get(food.id);
-        const computedLexicalScore =
-          normalized.length > 0 && !input.barcode
-            ? lexicalFoodScore(food, normalized)
-            : 0;
-        const lexicalScore = clampScore(
-          computedLexicalScore > 0
-            ? computedLexicalScore
-            : scores?.lexicalScore ?? 0,
-        );
-        const vectorScore = scores?.vectorScore == null ? undefined : clampScore(scores.vectorScore);
-        const preferenceScore = clamp((preferenceScores.get(food.id) ?? 0) / PREFERENCE_SCORE_NORMALIZER, -1, 1);
-        const baseScore = vectorScore == null
-          ? lexicalScore * LEXICAL_ONLY_SCORE_WEIGHT
-          : lexicalScore * LEXICAL_SCORE_WEIGHT + vectorScore * VECTOR_SCORE_WEIGHT;
-        return {
-          ...food,
-          lexicalScore,
-          vectorScore,
-          preferenceScore,
-          finalScore: clampScore(baseScore + preferenceScore * PREFERENCE_SCORE_WEIGHT)
-        };
-      })
-      .sort((a, b) =>
-        b.finalScore - a.finalScore ||
-        b.lexicalScore - a.lexicalScore ||
-        (b.vectorScore ?? 0) - (a.vectorScore ?? 0) ||
-        a.name.localeCompare(b.name)
-      )
-      .slice(0, limit),
+      () =>
+        foods
+          .map((food) => {
+            const scores = scoresByFoodId.get(food.id);
+            const computedLexicalScore =
+              normalized.length > 0 && !input.barcode
+                ? lexicalFoodScore(food, normalized)
+                : 0;
+            const lexicalScore = clampScore(
+              computedLexicalScore > 0
+                ? computedLexicalScore
+                : (scores?.lexicalScore ?? 0),
+            );
+            const vectorScore =
+              scores?.vectorScore == null
+                ? undefined
+                : clampScore(scores.vectorScore);
+            const preferenceScore = clamp(
+              (preferenceScores.get(food.id) ?? 0) /
+                PREFERENCE_SCORE_NORMALIZER,
+              -1,
+              1,
+            );
+            const baseScore =
+              vectorScore == null
+                ? lexicalScore * LEXICAL_ONLY_SCORE_WEIGHT
+                : lexicalScore * LEXICAL_SCORE_WEIGHT +
+                  vectorScore * VECTOR_SCORE_WEIGHT;
+            const userFoodBoost =
+              food.userId === userId && lexicalScore >= 0.5
+                ? USER_FOOD_SCORE_BOOST
+                : 0;
+            return {
+              ...food,
+              lexicalScore,
+              vectorScore,
+              preferenceScore,
+              finalScore: clampScore(
+                baseScore +
+                  preferenceScore * PREFERENCE_SCORE_WEIGHT +
+                  userFoodBoost,
+              ),
+            };
+          })
+          .sort(
+            (a, b) =>
+              b.finalScore - a.finalScore ||
+              b.lexicalScore - a.lexicalScore ||
+              (b.vectorScore ?? 0) - (a.vectorScore ?? 0) ||
+              Number(Boolean(b.userId)) - Number(Boolean(a.userId)) ||
+              a.name.localeCompare(b.name),
+          )
+          .slice(0, limit),
     );
     this.setCachedFoodSearch(cacheKey, ranked);
     return ranked.map(cloneFoodSearchCandidate);
@@ -350,8 +499,19 @@ export class PostgresRepository implements AppRepository {
     for (const profile of profiles) {
       const profileRows = await withSpan(
         "PostgresRepository.searchFoodsHybrid.documentQuery",
-        { limit: Math.max(limit * 4, DEFAULT_FOOD_SEARCH_LIMIT), scope: profile.scope, locales: profile.locales },
-        () => this.queryFoodSearchDocuments(userId, normalized, profile, limit, includeBranded),
+        {
+          limit: Math.max(limit * 4, DEFAULT_FOOD_SEARCH_LIMIT),
+          scope: profile.scope,
+          locales: profile.locales,
+        },
+        () =>
+          this.queryFoodSearchDocuments(
+            userId,
+            normalized,
+            profile,
+            limit,
+            includeBranded,
+          ),
       );
       for (const row of profileRows) {
         const id = row.id as string;
@@ -371,10 +531,22 @@ export class PostgresRepository implements AppRepository {
     limit: number,
     includeBranded: boolean,
   ): Promise<Record<string, unknown>[]> {
-    const textRows = await this.queryFoodSearchDocumentsText(userId, normalized, profile, limit, includeBranded);
+    const textRows = await this.queryFoodSearchDocumentsText(
+      userId,
+      normalized,
+      profile,
+      limit,
+      includeBranded,
+    );
     if (textRows.length >= limit) return textRows;
     const seen = new Set(textRows.map((row) => row.id as string));
-    const fuzzyRows = await this.queryFoodSearchDocumentsFuzzy(userId, normalized, profile, limit, includeBranded);
+    const fuzzyRows = await this.queryFoodSearchDocumentsFuzzy(
+      userId,
+      normalized,
+      profile,
+      limit,
+      includeBranded,
+    );
     return [
       ...textRows,
       ...fuzzyRows.filter((row) => !seen.has(row.id as string)),
@@ -400,6 +572,7 @@ export class PostgresRepository implements AppRepository {
       FROM food_search_documents
       JOIN food_items ON food_items.id = food_search_documents.food_item_id
       WHERE (food_search_documents.user_id IS NULL OR food_search_documents.user_id = ${userId})
+        AND food_items.deleted_at IS NULL
         AND food_search_documents.scope = ${profile.scope}
         AND food_search_documents.locale IN ${sqlList(profile.locales)}
         AND (${includeBranded} OR (food_items.data_type IS DISTINCT FROM 'Branded' AND food_items.source IS DISTINCT FROM 'usda_branded'))
@@ -444,6 +617,7 @@ export class PostgresRepository implements AppRepository {
       FROM food_search_documents
       JOIN food_items ON food_items.id = food_search_documents.food_item_id
       WHERE (food_search_documents.user_id IS NULL OR food_search_documents.user_id = ${userId})
+        AND food_items.deleted_at IS NULL
         AND food_search_documents.scope = ${profile.scope}
         AND food_search_documents.locale IN ${sqlList(profile.locales)}
         AND (${includeBranded} OR (food_items.data_type IS DISTINCT FROM 'Branded' AND food_items.source IS DISTINCT FROM 'usda_branded'))
@@ -492,17 +666,20 @@ export class PostgresRepository implements AppRepository {
     });
   }
 
-  async upsertFoodItem(input: Omit<FoodItemRecord, "id">): Promise<FoodItemRecord> {
+  async upsertFoodItem(
+    input: Omit<FoodItemRecord, "id">,
+  ): Promise<FoodItemRecord> {
     const normalizedName = normalizeText(input.normalizedName || input.name);
-    const [existing] = input.externalSource && input.externalId
-      ? await this.execute(dbSql`
+    const [existing] =
+      input.externalSource && input.externalId
+        ? await this.execute(dbSql`
           SELECT * FROM food_items
           WHERE external_source = ${input.externalSource}
             AND external_id = ${input.externalId}
             AND (user_id IS NULL OR user_id = ${input.userId ?? null})
           LIMIT 1
         `)
-      : await this.execute(dbSql`
+        : await this.execute(dbSql`
           SELECT * FROM food_items
           WHERE normalized_name = ${normalizedName}
             AND source = ${input.source}
@@ -536,7 +713,9 @@ export class PostgresRepository implements AppRepository {
             calories = ${input.calories},
             protein_grams = ${input.proteinGrams},
             carbs_grams = ${input.carbsGrams},
-            fat_grams = ${input.fatGrams}
+            fat_grams = ${input.fatGrams},
+            updated_at = now(),
+            deleted_at = NULL
         WHERE id = ${existing.id as string}
         RETURNING *
       `);
@@ -570,9 +749,130 @@ export class PostgresRepository implements AppRepository {
     return mapFood(row);
   }
 
+  async listUsualFoods(userId: string): Promise<UsualFood[]> {
+    const rows = await this.execute(dbSql`
+      SELECT *
+      FROM food_items
+      WHERE user_id = ${userId}
+        AND source = ${USUAL_FOOD_SOURCE}
+        AND deleted_at IS NULL
+      ORDER BY updated_at DESC NULLS LAST, created_at DESC, name
+    `);
+    return rows.map((row) => foodRecordToUsualFood(mapFood(row)));
+  }
+
+  async createUsualFood(
+    userId: string,
+    input: CreateUsualFoodRequest,
+  ): Promise<UsualFood> {
+    const [row] = await this.execute(dbSql`
+      INSERT INTO food_items (
+        user_id, name, normalized_name, canonical_name, brand, barcode, source,
+        external_source, external_id, nutrients_json, serving_grams, calories,
+        protein_grams, carbs_grams, fat_grams, updated_at
+      )
+      VALUES (
+        ${userId}, ${input.name}, ${normalizeText(input.name)}, ${input.canonicalName ?? null},
+        ${input.brand ?? null}, ${input.barcode ?? null}, ${USUAL_FOOD_SOURCE},
+        NULL, NULL, ${jsonb(nutrientsWithAliases(input.nutrients, input.aliases))},
+        ${input.servingGrams}, ${input.nutrition.calories}, ${input.nutrition.proteinGrams},
+        ${input.nutrition.carbsGrams}, ${input.nutrition.fatGrams}, now()
+      )
+      RETURNING *
+    `);
+    this.foodSearchCache.clear();
+    await this.upsertFoodSearchDocument(mapFood(row));
+    return foodRecordToUsualFood(mapFood(row));
+  }
+
+  async updateUsualFood(
+    userId: string,
+    usualFoodId: string,
+    input: UpdateUsualFoodRequest,
+  ): Promise<UsualFood | undefined> {
+    const [existing] = await this.execute(dbSql`
+      SELECT *
+      FROM food_items
+      WHERE id = ${usualFoodId}
+        AND user_id = ${userId}
+        AND source = ${USUAL_FOOD_SOURCE}
+        AND deleted_at IS NULL
+      LIMIT 1
+    `);
+    if (!existing) return undefined;
+    const existingFood = mapFood(existing);
+    const nextName = input.name ?? existingFood.name;
+    const nextCanonicalName =
+      "canonicalName" in input
+        ? (input.canonicalName ?? null)
+        : (existingFood.canonicalName ?? null);
+    const nextBrand =
+      "brand" in input ? (input.brand ?? null) : (existingFood.brand ?? null);
+    const nextBarcode =
+      "barcode" in input
+        ? (input.barcode ?? null)
+        : (existingFood.barcode ?? null);
+    const nextAliases =
+      input.aliases ?? aliasesFromNutrients(existingFood.nutrients);
+    const nextNutrients =
+      input.nutrients === undefined && input.aliases === undefined
+        ? (existingFood.nutrients ?? {})
+        : nutrientsWithAliases(
+            input.nutrients ?? publicNutrients(existingFood.nutrients),
+            nextAliases,
+          );
+    const [row] = await this.execute(dbSql`
+      UPDATE food_items
+      SET name = ${nextName},
+          normalized_name = ${normalizeText(nextName)},
+          canonical_name = ${nextCanonicalName},
+          brand = ${nextBrand},
+          barcode = ${nextBarcode},
+          nutrients_json = ${jsonb(nextNutrients)},
+          serving_grams = ${input.servingGrams ?? existingFood.servingGrams},
+          calories = ${input.nutrition?.calories ?? existingFood.calories},
+          protein_grams = ${input.nutrition?.proteinGrams ?? existingFood.proteinGrams},
+          carbs_grams = ${input.nutrition?.carbsGrams ?? existingFood.carbsGrams},
+          fat_grams = ${input.nutrition?.fatGrams ?? existingFood.fatGrams},
+          updated_at = now()
+      WHERE id = ${usualFoodId}
+        AND user_id = ${userId}
+        AND source = ${USUAL_FOOD_SOURCE}
+        AND deleted_at IS NULL
+      RETURNING *
+    `);
+    if (!row) return undefined;
+    this.foodSearchCache.clear();
+    await this.upsertFoodSearchDocument(mapFood(row));
+    return foodRecordToUsualFood(mapFood(row));
+  }
+
+  async deleteUsualFood(userId: string, usualFoodId: string): Promise<boolean> {
+    const rows = await this.execute(dbSql`
+      UPDATE food_items
+      SET deleted_at = now(), updated_at = now()
+      WHERE id = ${usualFoodId}
+        AND user_id = ${userId}
+        AND source = ${USUAL_FOOD_SOURCE}
+        AND deleted_at IS NULL
+      RETURNING id
+    `);
+    if (rows.length === 0) return false;
+    await this.execute(
+      dbSql`DELETE FROM food_search_documents WHERE food_item_id = ${usualFoodId}`,
+    );
+    this.foodSearchCache.clear();
+    return true;
+  }
+
   private async upsertFoodSearchDocument(food: FoodItemRecord): Promise<void> {
     const document = foodSearchDocumentForFood(food);
-    if (!document) return;
+    if (!document) {
+      await this.execute(
+        dbSql`DELETE FROM food_search_documents WHERE food_item_id = ${food.id}`,
+      );
+      return;
+    }
     await this.execute(dbSql`
       INSERT INTO food_search_documents (
         food_item_id, user_id, locale, scope, search_text, search_vector, rank_bucket,
@@ -598,15 +898,22 @@ export class PostgresRepository implements AppRepository {
     `);
   }
 
-  async recordFoodFeedback(input: FoodFeedbackRecord): Promise<UserFoodPreference | undefined> {
+  async recordFoodFeedback(
+    input: FoodFeedbackRecord,
+  ): Promise<UserFoodPreference | undefined> {
     const normalizedQuery = normalizeText(input.query);
     const delta = foodFeedbackDelta(input.action);
     const positiveDelta = delta > 0 ? 1 : 0;
     const negativeDelta = delta < 0 ? 1 : 0;
 
     const [preference] = await this.db.transaction(async (tx) => {
-      const foodItemId = input.foodItemId ?? (input.externalSource && input.externalId
-        ? (await executeRows(tx, dbSql`
+      const foodItemId =
+        input.foodItemId ??
+        (input.externalSource && input.externalId
+          ? ((
+              await executeRows(
+                tx,
+                dbSql`
             SELECT id
             FROM food_items
             WHERE external_source = ${input.externalSource}
@@ -614,11 +921,15 @@ export class PostgresRepository implements AppRepository {
               AND (user_id IS NULL OR user_id = ${input.userId})
             ORDER BY CASE WHEN user_id = ${input.userId} THEN 0 ELSE 1 END
             LIMIT 1
-          `))[0]?.id as string | undefined
-        : undefined);
+          `,
+              )
+            )[0]?.id as string | undefined)
+          : undefined);
       if (!foodItemId) return [];
 
-      await executeRows(tx, dbSql`
+      await executeRows(
+        tx,
+        dbSql`
         INSERT INTO user_food_feedback_events (user_id, food_item_id, query_text, normalized_query, action, metadata_json)
         VALUES (
           ${input.userId},
@@ -628,8 +939,11 @@ export class PostgresRepository implements AppRepository {
           ${input.action},
           ${jsonb(input.metadata ?? {})}
         )
-      `);
-      return executeRows(tx, dbSql`
+      `,
+      );
+      return executeRows(
+        tx,
+        dbSql`
         INSERT INTO user_food_preferences (
           user_id, food_item_id, affinity_score, positive_feedback_count, negative_feedback_count, last_feedback_at, updated_at
         )
@@ -642,7 +956,8 @@ export class PostgresRepository implements AppRepository {
           last_feedback_at = now(),
           updated_at = now()
         RETURNING *
-      `);
+      `,
+      );
     });
     this.foodSearchCache.clear();
     return preference ? mapUserFoodPreference(preference) : undefined;
@@ -658,7 +973,9 @@ export class PostgresRepository implements AppRepository {
     return rows.map(mapUserFoodPreference);
   }
 
-  async upsertFoodItemEmbedding(input: UpsertFoodItemEmbeddingInput): Promise<FoodItemEmbeddingRecord> {
+  async upsertFoodItemEmbedding(
+    input: UpsertFoodItemEmbeddingInput,
+  ): Promise<FoodItemEmbeddingRecord> {
     const embedding = toVectorLiteral(input.embedding);
     const [row] = await this.execute(dbSql`
       INSERT INTO food_item_embeddings (
@@ -683,8 +1000,12 @@ export class PostgresRepository implements AppRepository {
   }
 
   async getNutritionTarget(userId: string): Promise<NutritionSnapshot> {
-    const [row] = await this.execute(dbSql`SELECT * FROM nutrition_targets WHERE user_id = ${userId}`);
-    return row ? mapNutrition(row) : { calories: 2200, proteinGrams: 0, carbsGrams: 0, fatGrams: 0 };
+    const [row] = await this.execute(
+      dbSql`SELECT * FROM nutrition_targets WHERE user_id = ${userId}`,
+    );
+    return row
+      ? mapNutrition(row)
+      : { calories: 2200, proteinGrams: 0, carbsGrams: 0, fatGrams: 0 };
   }
 
   async getDailyGoals(userId: string, date: string): Promise<DailyGoals> {
@@ -721,11 +1042,16 @@ export class PostgresRepository implements AppRepository {
     return mapDailyGoals(row);
   }
 
-  async updateDailyGoals(userId: string, input: UpdateDailyGoalsInput): Promise<DailyGoals> {
+  async updateDailyGoals(
+    userId: string,
+    input: UpdateDailyGoalsInput,
+  ): Promise<DailyGoals> {
     return this.db.transaction(async (tx) => {
       const current = await this.getCurrentGoals(userId, tx);
       for (const snapshotDate of previousDatesInWeek(input.date)) {
-        await executeRows(tx, dbSql`
+        await executeRows(
+          tx,
+          dbSql`
           INSERT INTO daily_goal_snapshots (
             user_id, target_date, calories, protein_grams, carbs_grams, fat_grams, hydration_goal_glasses, hydration_goal_liters, water_consumed_liters,
             calorie_target_configured, calorie_target_source, calorie_target_configured_at,
@@ -739,21 +1065,32 @@ export class PostgresRepository implements AppRepository {
             ${current.macroCalories ?? null}, ${current.calorieDeltaKcal ?? null}
           )
           ON CONFLICT (user_id, target_date) DO NOTHING
-        `);
+        `,
+        );
       }
 
-      const { target: nextTarget, metadata: nextMacroMetadata } = applyMacroGoalUpdate(
-        current.target,
-        current,
-        input,
-        input.calories ?? current.target.calories
-      );
-      const nextHydrationLiters = input.hydrationGoalLiters ?? current.hydrationGoalLiters;
+      const { target: nextTarget, metadata: nextMacroMetadata } =
+        applyMacroGoalUpdate(
+          current.target,
+          current,
+          input,
+          input.calories ?? current.target.calories,
+        );
+      const nextHydrationLiters =
+        input.hydrationGoalLiters ?? current.hydrationGoalLiters;
       const calorieTargetWasUpdated = input.calories !== undefined;
-      const nextConfigured = calorieTargetWasUpdated ? true : current.calorieTargetConfigured;
-      const nextSource = calorieTargetWasUpdated ? input.calorieTargetSource ?? "manual" : current.calorieTargetSource;
-      const nextConfiguredAt = calorieTargetWasUpdated ? new Date().toISOString() : current.calorieTargetConfiguredAt;
-      await executeRows(tx, dbSql`
+      const nextConfigured = calorieTargetWasUpdated
+        ? true
+        : current.calorieTargetConfigured;
+      const nextSource = calorieTargetWasUpdated
+        ? (input.calorieTargetSource ?? "manual")
+        : current.calorieTargetSource;
+      const nextConfiguredAt = calorieTargetWasUpdated
+        ? new Date().toISOString()
+        : current.calorieTargetConfiguredAt;
+      await executeRows(
+        tx,
+        dbSql`
         INSERT INTO nutrition_targets (
           user_id, calories, protein_grams, carbs_grams, fat_grams, hydration_goal_glasses, hydration_goal_liters,
           calorie_target_configured, calorie_target_source, calorie_target_configured_at,
@@ -787,8 +1124,11 @@ export class PostgresRepository implements AppRepository {
             macro_calories = EXCLUDED.macro_calories,
             calorie_delta_kcal = EXCLUDED.calorie_delta_kcal,
             updated_at = now()
-      `);
-      const [row] = await executeRows(tx, dbSql`
+      `,
+      );
+      const [row] = await executeRows(
+        tx,
+        dbSql`
         INSERT INTO daily_goal_snapshots (
           user_id, target_date, calories, protein_grams, carbs_grams, fat_grams, hydration_goal_glasses, hydration_goal_liters, water_consumed_liters,
           calorie_target_configured, calorie_target_source, calorie_target_configured_at,
@@ -824,14 +1164,22 @@ export class PostgresRepository implements AppRepository {
             calorie_delta_kcal = EXCLUDED.calorie_delta_kcal,
             updated_at = now()
         RETURNING *
-      `);
+      `,
+      );
       return mapDailyGoals(row);
     });
   }
 
-  async updateDailyHydration(userId: string, date: string, waterConsumedLiters: number) {
+  async updateDailyHydration(
+    userId: string,
+    date: string,
+    waterConsumedLiters: number,
+  ) {
     const goals = await this.getDailyGoals(userId, date);
-    const clampedWater = Math.min(Math.max(waterConsumedLiters, 0), goals.hydrationGoalLiters);
+    const clampedWater = Math.min(
+      Math.max(waterConsumedLiters, 0),
+      goals.hydrationGoalLiters,
+    );
     await this.execute(dbSql`
       UPDATE daily_goal_snapshots
       SET water_consumed_liters = ${clampedWater}, updated_at = now()
@@ -851,83 +1199,131 @@ export class PostgresRepository implements AppRepository {
   }
 
   async getMeal(userId: string, mealId: string): Promise<Meal | undefined> {
-    const [row] = await this.execute(dbSql`SELECT * FROM meals WHERE id = ${mealId} AND user_id = ${userId} AND deleted_at IS NULL`);
+    const [row] = await this.execute(
+      dbSql`SELECT * FROM meals WHERE id = ${mealId} AND user_id = ${userId} AND deleted_at IS NULL`,
+    );
     return row ? this.mapMeal(row) : undefined;
   }
 
-  async createProposal(userId: string, proposal: Omit<MealProposal, "id" | "createdAt">): Promise<MealProposal> {
+  async createProposal(
+    userId: string,
+    proposal: Omit<MealProposal, "id" | "createdAt">,
+  ): Promise<MealProposal> {
     return withSpan(
       "PostgresRepository.createProposal",
       { itemCount: proposal.items.length },
-      () => this.db.transaction(async (tx) => {
-        const id = newId();
-        const [row] = await withSpan(
-          "PostgresRepository.createProposal.insertProposal",
-          undefined,
-          () => executeRows(tx, dbSql`
+      () =>
+        this.db.transaction(async (tx) => {
+          const id = newId();
+          const [row] = await withSpan(
+            "PostgresRepository.createProposal.insertProposal",
+            undefined,
+            () =>
+              executeRows(
+                tx,
+                dbSql`
           INSERT INTO meal_proposals (id, user_id, phrase, title, status, confidence, requires_confirmation, trusted_auto_commit_eligible, source, calories, protein_grams, carbs_grams, fat_grams)
           VALUES (${id}, ${userId}, ${proposal.phrase}, ${proposal.title}, ${proposal.status}, ${proposal.confidence}, ${proposal.requiresConfirmation}, ${proposal.trustedAutoCommitEligible}, ${proposal.source}, ${proposal.nutrition.calories}, ${proposal.nutrition.proteinGrams}, ${proposal.nutrition.carbsGrams}, ${proposal.nutrition.fatGrams})
           RETURNING *
-        `),
-        );
-        await withSpan(
-          "PostgresRepository.createProposal.insertItems",
-          { itemCount: proposal.items.length },
-          () => Promise.all(proposal.items.map((item) => insertProposalItem(tx, id, item))),
-        );
-        return this.mapProposal(row, proposal.title, tx);
-      }),
+        `,
+              ),
+          );
+          await withSpan(
+            "PostgresRepository.createProposal.insertItems",
+            { itemCount: proposal.items.length },
+            () =>
+              Promise.all(
+                proposal.items.map((item) => insertProposalItem(tx, id, item)),
+              ),
+          );
+          return this.mapProposal(row, proposal.title, tx);
+        }),
     );
   }
 
-  async getProposal(userId: string, proposalId: string): Promise<MealProposal | undefined> {
-    const [row] = await this.execute(dbSql`SELECT * FROM meal_proposals WHERE id = ${proposalId} AND user_id = ${userId}`);
+  async getProposal(
+    userId: string,
+    proposalId: string,
+  ): Promise<MealProposal | undefined> {
+    const [row] = await this.execute(
+      dbSql`SELECT * FROM meal_proposals WHERE id = ${proposalId} AND user_id = ${userId}`,
+    );
     return row ? this.mapProposal(row) : undefined;
   }
 
-  async updateProposal(userId: string, proposal: MealProposal): Promise<MealProposal> {
+  async updateProposal(
+    userId: string,
+    proposal: MealProposal,
+  ): Promise<MealProposal> {
     await this.db.transaction(async (tx) => {
-      await executeRows(tx, dbSql`
+      await executeRows(
+        tx,
+        dbSql`
         UPDATE meal_proposals
         SET title = ${proposal.title}, status = ${proposal.status}, calories = ${proposal.nutrition.calories}, protein_grams = ${proposal.nutrition.proteinGrams}, carbs_grams = ${proposal.nutrition.carbsGrams}, fat_grams = ${proposal.nutrition.fatGrams}
         WHERE id = ${proposal.id} AND user_id = ${userId}
-      `);
-      await executeRows(tx, dbSql`DELETE FROM meal_proposal_items WHERE proposal_id = ${proposal.id}`);
-      for (const item of proposal.items) await insertProposalItem(tx, proposal.id, item);
+      `,
+      );
+      await executeRows(
+        tx,
+        dbSql`DELETE FROM meal_proposal_items WHERE proposal_id = ${proposal.id}`,
+      );
+      for (const item of proposal.items)
+        await insertProposalItem(tx, proposal.id, item);
     });
     return proposal;
   }
 
-  async createMealFromProposal(userId: string, proposal: MealProposal, occurredAt: string, items = proposal.items, mealLabel?: MealLabel | null): Promise<Meal> {
+  async createMealFromProposal(
+    userId: string,
+    proposal: MealProposal,
+    occurredAt: string,
+    items = proposal.items,
+    mealLabel?: MealLabel | null,
+  ): Promise<Meal> {
     return this.db.transaction(async (tx) => {
       const id = newId();
       const nutrition = sumNutrition(items);
-      const [row] = await executeRows(tx, dbSql`
+      const [row] = await executeRows(
+        tx,
+        dbSql`
         INSERT INTO meals (id, user_id, proposal_id, title, occurred_at, meal_type, meal_type_label, calories, protein_grams, carbs_grams, fat_grams)
         VALUES (${id}, ${userId}, ${proposal.id}, ${proposal.title}, ${occurredAt}, ${mealLabel?.type ?? null}, ${mealLabel?.label ?? null}, ${nutrition.calories}, ${nutrition.proteinGrams}, ${nutrition.carbsGrams}, ${nutrition.fatGrams})
         RETURNING *
-      `);
+      `,
+      );
       for (const item of items) await insertMealItem(tx, id, item);
-      await executeRows(tx, dbSql`UPDATE meal_proposals SET status = 'committed' WHERE id = ${proposal.id}`);
+      await executeRows(
+        tx,
+        dbSql`UPDATE meal_proposals SET status = 'committed' WHERE id = ${proposal.id}`,
+      );
       return this.mapMeal(row, tx);
     });
   }
 
   async updateMeal(userId: string, meal: Meal): Promise<Meal> {
     await this.db.transaction(async (tx) => {
-      await executeRows(tx, dbSql`
+      await executeRows(
+        tx,
+        dbSql`
         UPDATE meals
         SET calories = ${meal.nutrition.calories}, protein_grams = ${meal.nutrition.proteinGrams}, carbs_grams = ${meal.nutrition.carbsGrams}, fat_grams = ${meal.nutrition.fatGrams}
         WHERE id = ${meal.id} AND user_id = ${userId}
-      `);
-      await executeRows(tx, dbSql`DELETE FROM meal_items WHERE meal_id = ${meal.id}`);
+      `,
+      );
+      await executeRows(
+        tx,
+        dbSql`DELETE FROM meal_items WHERE meal_id = ${meal.id}`,
+      );
       for (const item of meal.items) await insertMealItem(tx, meal.id, item);
     });
     return meal;
   }
 
   async softDeleteMeal(userId: string, mealId: string): Promise<boolean> {
-    const rows = await this.execute(dbSql`UPDATE meals SET deleted_at = now() WHERE id = ${mealId} AND user_id = ${userId} AND deleted_at IS NULL RETURNING id`);
+    const rows = await this.execute(
+      dbSql`UPDATE meals SET deleted_at = now() WHERE id = ${mealId} AND user_id = ${userId} AND deleted_at IS NULL RETURNING id`,
+    );
     return rows.length > 0;
   }
 
@@ -944,12 +1340,15 @@ export class PostgresRepository implements AppRepository {
       ORDER BY occurred_at DESC
     `);
     const meals = await this.mapMeals(rows);
-    const consumed = meals.reduce((total, meal) => ({
-      calories: total.calories + meal.nutrition.calories,
-      proteinGrams: total.proteinGrams + meal.nutrition.proteinGrams,
-      carbsGrams: total.carbsGrams + meal.nutrition.carbsGrams,
-      fatGrams: total.fatGrams + meal.nutrition.fatGrams
-    }), { calories: 0, proteinGrams: 0, carbsGrams: 0, fatGrams: 0 });
+    const consumed = meals.reduce(
+      (total, meal) => ({
+        calories: total.calories + meal.nutrition.calories,
+        proteinGrams: total.proteinGrams + meal.nutrition.proteinGrams,
+        carbsGrams: total.carbsGrams + meal.nutrition.carbsGrams,
+        fatGrams: total.fatGrams + meal.nutrition.fatGrams,
+      }),
+      { calories: 0, proteinGrams: 0, carbsGrams: 0, fatGrams: 0 },
+    );
     const goals = await this.getDailyGoals(userId, date);
     const [hydrationRow] = await this.execute(dbSql`
       SELECT water_consumed_liters
@@ -973,54 +1372,97 @@ export class PostgresRepository implements AppRepository {
       fatPct: goals.fatPct,
       macroCalories: goals.macroCalories,
       calorieDeltaKcal: goals.calorieDeltaKcal,
-      meals
+      meals,
     };
   }
 
   async listTemplates(userId: string): Promise<MealTemplate[]> {
-    const rows = await this.execute(dbSql`SELECT * FROM meal_templates WHERE user_id = ${userId} AND deleted_at IS NULL`);
+    const rows = await this.execute(
+      dbSql`SELECT * FROM meal_templates WHERE user_id = ${userId} AND deleted_at IS NULL`,
+    );
     return this.mapTemplates(rows);
   }
 
-  async createTemplate(userId: string, input: Omit<MealTemplate, "id">): Promise<MealTemplate> {
+  async createTemplate(
+    userId: string,
+    input: Omit<MealTemplate, "id">,
+  ): Promise<MealTemplate> {
     return this.db.transaction(async (tx) => {
       const id = newId();
-      const [row] = await executeRows(tx, dbSql`
+      const [row] = await executeRows(
+        tx,
+        dbSql`
         INSERT INTO meal_templates (id, user_id, title, normalized_title, trusted_auto_commit_enabled, calories, protein_grams, carbs_grams, fat_grams)
         VALUES (${id}, ${userId}, ${input.title}, ${normalizeText(input.title)}, ${input.trustedAutoCommitEnabled}, ${input.nutrition.calories}, ${input.nutrition.proteinGrams}, ${input.nutrition.carbsGrams}, ${input.nutrition.fatGrams})
         RETURNING *
-      `);
+      `,
+      );
       for (const item of input.items) await insertTemplateItem(tx, id, item);
       for (const alias of input.aliases) {
-        await executeRows(tx, dbSql`
+        await executeRows(
+          tx,
+          dbSql`
           INSERT INTO food_memories (user_id, normalized_text, label, meal_template_id, confidence)
           VALUES (${userId}, ${normalizeText(alias)}, ${alias}, ${id}, 1)
           ON CONFLICT DO NOTHING
-        `);
+        `,
+        );
       }
       return this.mapTemplate(row, tx);
     });
   }
 
-  async updateTemplate(userId: string, template: MealTemplate): Promise<MealTemplate> {
+  async updateTemplate(
+    userId: string,
+    template: MealTemplate,
+  ): Promise<MealTemplate> {
     await this.db.transaction(async (tx) => {
-      await executeRows(tx, dbSql`
+      await executeRows(
+        tx,
+        dbSql`
         UPDATE meal_templates
         SET title = ${template.title}, normalized_title = ${normalizeText(template.title)}, trusted_auto_commit_enabled = ${template.trustedAutoCommitEnabled}, calories = ${template.nutrition.calories}, protein_grams = ${template.nutrition.proteinGrams}, carbs_grams = ${template.nutrition.carbsGrams}, fat_grams = ${template.nutrition.fatGrams}
         WHERE id = ${template.id} AND user_id = ${userId}
-      `);
-      await executeRows(tx, dbSql`DELETE FROM meal_template_items WHERE template_id = ${template.id}`);
-      for (const item of template.items) await insertTemplateItem(tx, template.id, item);
+      `,
+      );
+      await executeRows(
+        tx,
+        dbSql`DELETE FROM meal_template_items WHERE template_id = ${template.id}`,
+      );
+      for (const item of template.items)
+        await insertTemplateItem(tx, template.id, item);
+      await executeRows(
+        tx,
+        dbSql`
+        DELETE FROM food_memories
+        WHERE user_id = ${userId} AND meal_template_id = ${template.id}
+      `,
+      );
+      for (const alias of template.aliases) {
+        await executeRows(
+          tx,
+          dbSql`
+          INSERT INTO food_memories (user_id, normalized_text, label, meal_template_id, confidence)
+          VALUES (${userId}, ${normalizeText(alias)}, ${alias}, ${template.id}, 1)
+          ON CONFLICT DO NOTHING
+        `,
+        );
+      }
     });
     return template;
   }
 
   async deleteTemplate(userId: string, templateId: string): Promise<boolean> {
-    const rows = await this.execute(dbSql`UPDATE meal_templates SET deleted_at = now() WHERE id = ${templateId} AND user_id = ${userId} RETURNING id`);
+    const rows = await this.execute(
+      dbSql`UPDATE meal_templates SET deleted_at = now() WHERE id = ${templateId} AND user_id = ${userId} RETURNING id`,
+    );
     return rows.length > 0;
   }
 
-  async queryMemory(userId: string, normalizedText: string): Promise<MemoryMatch[]> {
+  async queryMemory(
+    userId: string,
+    normalizedText: string,
+  ): Promise<MemoryMatch[]> {
     const rows = await this.execute(dbSql`
       SELECT * FROM food_memories
       WHERE user_id = ${userId}
@@ -1028,17 +1470,31 @@ export class PostgresRepository implements AppRepository {
       ORDER BY CASE WHEN ${normalizedText} = normalized_text THEN 0 ELSE 1 END, usage_count DESC
       LIMIT 5
     `);
-    return Promise.all(rows.map(async (row) => ({
-      id: row.id as string,
-      userId,
-      label: row.label as string,
-      normalizedText: row.normalized_text as string,
-      confidence: normalizedText === row.normalized_text || normalizedText.includes(row.normalized_text as string) ? Number(row.confidence) : Math.min(Number(row.confidence), 0.82),
-      template: row.meal_template_id ? await this.getTemplateById(userId, row.meal_template_id as string) : null
-    })));
+    return Promise.all(
+      rows.map(async (row) => ({
+        id: row.id as string,
+        userId,
+        label: row.label as string,
+        normalizedText: row.normalized_text as string,
+        confidence:
+          normalizedText === row.normalized_text ||
+          normalizedText.includes(row.normalized_text as string)
+            ? Number(row.confidence)
+            : Math.min(Number(row.confidence), 0.82),
+        template: row.meal_template_id
+          ? await this.getTemplateById(userId, row.meal_template_id as string)
+          : null,
+      })),
+    );
   }
 
-  async createMemory(input: { userId: string; normalizedText: string; label: string; templateId?: string; confidence: number }): Promise<void> {
+  async createMemory(input: {
+    userId: string;
+    normalizedText: string;
+    label: string;
+    templateId?: string;
+    confidence: number;
+  }): Promise<void> {
     await this.execute(dbSql`
       INSERT INTO food_memories (user_id, normalized_text, label, meal_template_id, confidence)
       VALUES (${input.userId}, ${input.normalizedText}, ${input.label}, ${input.templateId ?? null}, ${input.confidence})
@@ -1046,11 +1502,14 @@ export class PostgresRepository implements AppRepository {
     `);
   }
 
-  async recordActionCall(input: Omit<ActionCallRecord, "id" | "createdAt">): Promise<ActionCallRecord> {
+  async recordActionCall(
+    input: Omit<ActionCallRecord, "id" | "createdAt">,
+  ): Promise<ActionCallRecord> {
     const [row] = await withSpan(
       "PostgresRepository.recordActionCall",
       { actionId: input.actionId, status: input.confirmationStatus },
-      () => this.execute(dbSql`
+      () =>
+        this.execute(dbSql`
       INSERT INTO action_calls (user_id, action_id, source, input_json, output_json, error_json, confirmation_status, trace_id, latency_ms)
       VALUES (${input.userId}, ${input.actionId}, ${input.source}, ${jsonb(input.input)}, ${jsonb(input.output ?? null)}, ${jsonb(input.error ?? null)}, ${input.confirmationStatus}, ${input.traceId}, ${input.latencyMs})
       RETURNING *
@@ -1059,11 +1518,14 @@ export class PostgresRepository implements AppRepository {
     return mapActionCall(row);
   }
 
-  async recordAuditEvent(input: Omit<AuditEventRecord, "id" | "createdAt">): Promise<AuditEventRecord> {
+  async recordAuditEvent(
+    input: Omit<AuditEventRecord, "id" | "createdAt">,
+  ): Promise<AuditEventRecord> {
     const [row] = await withSpan(
       "PostgresRepository.recordAuditEvent",
       { eventType: input.eventType },
-      () => this.execute(dbSql`
+      () =>
+        this.execute(dbSql`
       INSERT INTO audit_events (user_id, event_type, metadata_json, trace_id)
       VALUES (${input.userId ?? null}, ${input.eventType}, ${jsonb(input.metadata)}, ${input.traceId})
       RETURNING *
@@ -1073,33 +1535,51 @@ export class PostgresRepository implements AppRepository {
   }
 
   async listActionCalls(userId: string): Promise<ActionCallRecord[]> {
-    const rows = await this.execute(dbSql`SELECT * FROM action_calls WHERE user_id = ${userId} ORDER BY created_at`);
+    const rows = await this.execute(
+      dbSql`SELECT * FROM action_calls WHERE user_id = ${userId} ORDER BY created_at`,
+    );
     return rows.map(mapActionCall);
   }
 
   async listAuditEvents(userId: string): Promise<AuditEventRecord[]> {
-    const rows = await this.execute(dbSql`SELECT * FROM audit_events WHERE user_id = ${userId} ORDER BY created_at`);
+    const rows = await this.execute(
+      dbSql`SELECT * FROM audit_events WHERE user_id = ${userId} ORDER BY created_at`,
+    );
     return rows.map(mapAuditEvent);
   }
 
-  private async mapMeals(rows: Record<string, unknown>[], dbClient: DbExecutor = this.db): Promise<Meal[]> {
+  private async mapMeals(
+    rows: Record<string, unknown>[],
+    dbClient: DbExecutor = this.db,
+  ): Promise<Meal[]> {
     if (rows.length === 0) return [];
-    const items = await executeRows(dbClient, dbSql`
+    const items = await executeRows(
+      dbClient,
+      dbSql`
       SELECT *
       FROM meal_items
       WHERE meal_id IN ${sqlList(rows.map((row) => row.id as string))}
       ORDER BY meal_id, id
-    `);
+    `,
+    );
     const itemsByMealId = groupRowsByString(items, "meal_id");
-    return rows.map((row) => this.mapMealRow(row, itemsByMealId.get(row.id as string) ?? []));
+    return rows.map((row) =>
+      this.mapMealRow(row, itemsByMealId.get(row.id as string) ?? []),
+    );
   }
 
-  private async mapMeal(row: Record<string, unknown>, dbClient: DbExecutor = this.db): Promise<Meal> {
+  private async mapMeal(
+    row: Record<string, unknown>,
+    dbClient: DbExecutor = this.db,
+  ): Promise<Meal> {
     const [meal] = await this.mapMeals([row], dbClient);
     return meal;
   }
 
-  private mapMealRow(row: Record<string, unknown>, items: Record<string, unknown>[]): Meal {
+  private mapMealRow(
+    row: Record<string, unknown>,
+    items: Record<string, unknown>[],
+  ): Meal {
     return {
       id: row.id as string,
       title: row.title as string,
@@ -1108,16 +1588,23 @@ export class PostgresRepository implements AppRepository {
       nutrition: mapNutrition(row),
       items: items.map(mapItem),
       createdAt: toIso(row.created_at),
-      deletedAt: row.deleted_at ? toIso(row.deleted_at) : undefined
+      deletedAt: row.deleted_at ? toIso(row.deleted_at) : undefined,
     };
   }
 
-  private async mapProposal(row: Record<string, unknown>, fallbackTitle = "Meal", dbClient: DbExecutor = this.db): Promise<MealProposal> {
-    const items = await executeRows(dbClient, dbSql`SELECT * FROM meal_proposal_items WHERE proposal_id = ${row.id as string}`);
+  private async mapProposal(
+    row: Record<string, unknown>,
+    fallbackTitle = "Meal",
+    dbClient: DbExecutor = this.db,
+  ): Promise<MealProposal> {
+    const items = await executeRows(
+      dbClient,
+      dbSql`SELECT * FROM meal_proposal_items WHERE proposal_id = ${row.id as string}`,
+    );
     return {
       id: row.id as string,
       phrase: row.phrase as string,
-      title: row.title as string || fallbackTitle,
+      title: (row.title as string) || fallbackTitle,
       status: row.status as MealProposal["status"],
       confidence: Number(row.confidence),
       requiresConfirmation: Boolean(row.requires_confirmation),
@@ -1125,64 +1612,95 @@ export class PostgresRepository implements AppRepository {
       source: row.source as string,
       nutrition: mapNutrition(row),
       items: items.map(mapItem),
-      createdAt: toIso(row.created_at)
+      createdAt: toIso(row.created_at),
     };
   }
 
-  private async mapTemplates(rows: Record<string, unknown>[], dbClient: DbExecutor = this.db): Promise<MealTemplate[]> {
+  private async mapTemplates(
+    rows: Record<string, unknown>[],
+    dbClient: DbExecutor = this.db,
+  ): Promise<MealTemplate[]> {
     if (rows.length === 0) return [];
     const templateIds = rows.map((row) => row.id as string);
-    const items = await executeRows(dbClient, dbSql`
+    const items = await executeRows(
+      dbClient,
+      dbSql`
       SELECT *
       FROM meal_template_items
       WHERE template_id IN ${sqlList(templateIds)}
       ORDER BY template_id, id
-    `);
-    const aliases = await executeRows(dbClient, dbSql`
+    `,
+    );
+    const aliases = await executeRows(
+      dbClient,
+      dbSql`
       SELECT meal_template_id, label
       FROM food_memories
       WHERE meal_template_id IN ${sqlList(templateIds)}
       ORDER BY meal_template_id, label
-    `);
+    `,
+    );
     const itemsByTemplateId = groupRowsByString(items, "template_id");
     const aliasesByTemplateId = groupRowsByString(aliases, "meal_template_id");
-    return rows.map((row) => this.mapTemplateRow(
-      row,
-      itemsByTemplateId.get(row.id as string) ?? [],
-      aliasesByTemplateId.get(row.id as string) ?? [],
-    ));
+    return rows.map((row) =>
+      this.mapTemplateRow(
+        row,
+        itemsByTemplateId.get(row.id as string) ?? [],
+        aliasesByTemplateId.get(row.id as string) ?? [],
+      ),
+    );
   }
 
-  private async mapTemplate(row: Record<string, unknown>, dbClient: DbExecutor = this.db): Promise<MealTemplate> {
+  private async mapTemplate(
+    row: Record<string, unknown>,
+    dbClient: DbExecutor = this.db,
+  ): Promise<MealTemplate> {
     const [template] = await this.mapTemplates([row], dbClient);
     return template;
   }
 
-  private mapTemplateRow(row: Record<string, unknown>, items: Record<string, unknown>[], aliases: Record<string, unknown>[]): MealTemplate {
+  private mapTemplateRow(
+    row: Record<string, unknown>,
+    items: Record<string, unknown>[],
+    aliases: Record<string, unknown>[],
+  ): MealTemplate {
     return {
       id: row.id as string,
       title: row.title as string,
       trustedAutoCommitEnabled: Boolean(row.trusted_auto_commit_enabled),
       nutrition: mapNutrition(row),
       items: items.map(mapItem),
-      aliases: aliases.map((alias) => alias.label as string)
+      aliases: aliases.map((alias) => alias.label as string),
     };
   }
 
-  private async getTemplateById(userId: string, templateId: string): Promise<MealTemplate | null> {
-    const [row] = await this.execute(dbSql`SELECT * FROM meal_templates WHERE id = ${templateId} AND user_id = ${userId} AND deleted_at IS NULL`);
+  private async getTemplateById(
+    userId: string,
+    templateId: string,
+  ): Promise<MealTemplate | null> {
+    const [row] = await this.execute(
+      dbSql`SELECT * FROM meal_templates WHERE id = ${templateId} AND user_id = ${userId} AND deleted_at IS NULL`,
+    );
     return row ? this.mapTemplate(row) : null;
   }
 
-  private async getCurrentGoals(userId: string, dbClient: DbExecutor = this.db): Promise<Omit<DailyGoals, "date"> & { calorieTargetConfiguredAt?: string }> {
-    const [row] = await executeRows(dbClient, dbSql`SELECT * FROM nutrition_targets WHERE user_id = ${userId}`);
+  private async getCurrentGoals(
+    userId: string,
+    dbClient: DbExecutor = this.db,
+  ): Promise<
+    Omit<DailyGoals, "date"> & { calorieTargetConfiguredAt?: string }
+  > {
+    const [row] = await executeRows(
+      dbClient,
+      dbSql`SELECT * FROM nutrition_targets WHERE user_id = ${userId}`,
+    );
     if (!row) {
       return {
         target: { calories: 2200, proteinGrams: 0, carbsGrams: 0, fatGrams: 0 },
         hydrationGoalLiters: 0,
         calorieTargetConfigured: false,
         calorieTargetSource: "default",
-        calorieTargetConfiguredAt: undefined
+        calorieTargetConfiguredAt: undefined,
       };
     }
     return {
@@ -1190,12 +1708,16 @@ export class PostgresRepository implements AppRepository {
       hydrationGoalLiters: Number(row.hydration_goal_liters ?? 0),
       calorieTargetConfigured: Boolean(row.calorie_target_configured),
       calorieTargetSource: parseCalorieTargetSource(row.calorie_target_source),
-      calorieTargetConfiguredAt: row.calorie_target_configured_at ? toIso(row.calorie_target_configured_at) : undefined,
-      ...mapMacroMetadata(row)
+      calorieTargetConfiguredAt: row.calorie_target_configured_at
+        ? toIso(row.calorie_target_configured_at)
+        : undefined,
+      ...mapMacroMetadata(row),
     };
   }
 
-  private async mapFoodsWithPortions(rows: Record<string, unknown>[]): Promise<FoodItemRecord[]> {
+  private async mapFoodsWithPortions(
+    rows: Record<string, unknown>[],
+  ): Promise<FoodItemRecord[]> {
     if (rows.length === 0) return [];
     const foods = rows.map(mapFood);
     const portions = await this.execute(dbSql`
@@ -1211,10 +1733,16 @@ export class PostgresRepository implements AppRepository {
       list.push(portion);
       byFoodId.set(portion.foodItemId, list);
     }
-    return foods.map((food) => ({ ...food, portions: byFoodId.get(food.id) ?? [] }));
+    return foods.map((food) => ({
+      ...food,
+      portions: byFoodId.get(food.id) ?? [],
+    }));
   }
 
-  private async getPreferenceScoreMap(userId: string, foodIds: string[]): Promise<Map<string, number>> {
+  private async getPreferenceScoreMap(
+    userId: string,
+    foodIds: string[],
+  ): Promise<Map<string, number>> {
     if (foodIds.length === 0) return new Map();
     const rows = await this.execute(dbSql`
       SELECT food_item_id, affinity_score
@@ -1222,10 +1750,19 @@ export class PostgresRepository implements AppRepository {
       WHERE user_id = ${userId}
         AND food_item_id IN ${sqlList(foodIds)}
     `);
-    return new Map(rows.map((row) => [row.food_item_id as string, Number(row.affinity_score)]));
+    return new Map(
+      rows.map((row) => [
+        row.food_item_id as string,
+        Number(row.affinity_score),
+      ]),
+    );
   }
 
-  private mapUser(row: Record<string, unknown>, passwordHash: string | undefined, scopes: PermissionScope[]): StoredUser {
+  private mapUser(
+    row: Record<string, unknown>,
+    passwordHash: string | undefined,
+    scopes: PermissionScope[],
+  ): StoredUser {
     return {
       id: row.id as string,
       email: row.email as string,
@@ -1233,7 +1770,7 @@ export class PostgresRepository implements AppRepository {
       trustedModeEnabled: Boolean(row.trusted_mode_enabled),
       createdAt: toIso(row.created_at),
       ...(passwordHash ? { passwordHash } : {}),
-      scopes
+      scopes,
     };
   }
 }
@@ -1246,12 +1783,18 @@ function mapAuthIdentity(row: Record<string, unknown>): AuthIdentityRecord {
     providerUserId: row.provider_user_id as string,
     email: row.email as string,
     createdAt: toIso(row.created_at),
-    updatedAt: toIso(row.updated_at)
+    updatedAt: toIso(row.updated_at),
   };
 }
 
-async function insertProposalItem(dbClient: DbExecutor, proposalId: string, item: MealItem) {
-  await executeRows(dbClient, dbSql`
+async function insertProposalItem(
+  dbClient: DbExecutor,
+  proposalId: string,
+  item: MealItem,
+) {
+  await executeRows(
+    dbClient,
+    dbSql`
     INSERT INTO meal_proposal_items (
       proposal_id, name, quantity, unit, calories, protein_grams, carbs_grams, fat_grams,
       source, original_text, canonical_name, language, external_source, external_id, source_url, license, confidence, needs_review
@@ -1261,11 +1804,18 @@ async function insertProposalItem(dbClient: DbExecutor, proposalId: string, item
       ${item.source}, ${item.originalText ?? null}, ${item.canonicalName ?? null}, ${item.language ?? null}, ${item.externalSource ?? null}, ${item.externalId ?? null},
       ${item.sourceUrl ?? null}, ${item.license ?? null}, ${item.confidence ?? null}, ${item.needsReview ?? false}
     )
-  `);
+  `,
+  );
 }
 
-async function insertMealItem(dbClient: DbExecutor, mealId: string, item: MealItem) {
-  await executeRows(dbClient, dbSql`
+async function insertMealItem(
+  dbClient: DbExecutor,
+  mealId: string,
+  item: MealItem,
+) {
+  await executeRows(
+    dbClient,
+    dbSql`
     INSERT INTO meal_items (
       meal_id, name, quantity, unit, calories, protein_grams, carbs_grams, fat_grams,
       source, original_text, canonical_name, language, external_source, external_id, source_url, license, confidence, needs_review
@@ -1275,11 +1825,18 @@ async function insertMealItem(dbClient: DbExecutor, mealId: string, item: MealIt
       ${item.source}, ${item.originalText ?? null}, ${item.canonicalName ?? null}, ${item.language ?? null}, ${item.externalSource ?? null}, ${item.externalId ?? null},
       ${item.sourceUrl ?? null}, ${item.license ?? null}, ${item.confidence ?? null}, ${item.needsReview ?? false}
     )
-  `);
+  `,
+  );
 }
 
-async function insertTemplateItem(dbClient: DbExecutor, templateId: string, item: MealItem) {
-  await executeRows(dbClient, dbSql`
+async function insertTemplateItem(
+  dbClient: DbExecutor,
+  templateId: string,
+  item: MealItem,
+) {
+  await executeRows(
+    dbClient,
+    dbSql`
     INSERT INTO meal_template_items (
       template_id, name, quantity, unit, calories, protein_grams, carbs_grams, fat_grams,
       source, original_text, canonical_name, language, external_source, external_id, source_url, license, confidence, needs_review
@@ -1289,7 +1846,8 @@ async function insertTemplateItem(dbClient: DbExecutor, templateId: string, item
       ${item.source}, ${item.originalText ?? null}, ${item.canonicalName ?? null}, ${item.language ?? null}, ${item.externalSource ?? null}, ${item.externalId ?? null},
       ${item.sourceUrl ?? null}, ${item.license ?? null}, ${item.confidence ?? null}, ${item.needsReview ?? false}
     )
-  `);
+  `,
+  );
 }
 
 function mapFood(row: Record<string, unknown>): FoodItemRecord {
@@ -1309,7 +1867,9 @@ function mapFood(row: Record<string, unknown>): FoodItemRecord {
     fetchedAt: row.fetched_at ? toIso(row.fetched_at) : undefined,
     dataType: optionalString(row.data_type),
     foodCategory: optionalString(row.food_category),
-    publicationDate: row.publication_date ? toDateOnly(row.publication_date) : undefined,
+    publicationDate: row.publication_date
+      ? toDateOnly(row.publication_date)
+      : undefined,
     ndbNumber: optionalString(row.ndb_number),
     foodKey: optionalString(row.food_key),
     ingredients: optionalString(row.ingredients),
@@ -1321,7 +1881,10 @@ function mapFood(row: Record<string, unknown>): FoodItemRecord {
     calories: Number(row.calories),
     proteinGrams: Number(row.protein_grams),
     carbsGrams: Number(row.carbs_grams),
-    fatGrams: Number(row.fat_grams)
+    fatGrams: Number(row.fat_grams),
+    createdAt: row.created_at ? toIso(row.created_at) : undefined,
+    updatedAt: row.updated_at ? toIso(row.updated_at) : undefined,
+    deletedAt: row.deleted_at ? toIso(row.deleted_at) : undefined,
   };
 }
 
@@ -1335,24 +1898,30 @@ function mapFoodPortion(row: Record<string, unknown>): FoodPortionRecord {
     modifier: optionalString(row.modifier),
     description: optionalString(row.description),
     gramWeight: Number(row.gram_weight),
-    normalizedAliases: Array.isArray(row.normalized_aliases) ? row.normalized_aliases.map(String) : [],
+    normalizedAliases: Array.isArray(row.normalized_aliases)
+      ? row.normalized_aliases.map(String)
+      : [],
     kind: (row.kind as string | undefined) ?? "serving",
-    sourceDescription: row.source_description as string
+    sourceDescription: row.source_description as string,
   };
 }
 
-function mapFoodItemEmbedding(row: Record<string, unknown>): FoodItemEmbeddingRecord {
+function mapFoodItemEmbedding(
+  row: Record<string, unknown>,
+): FoodItemEmbeddingRecord {
   return {
     id: row.id as string,
     foodItemId: row.food_item_id as string,
     embeddedText: row.embedded_text as string,
     embeddedTextHash: row.embedded_text_hash as string,
     createdAt: toIso(row.created_at),
-    updatedAt: toIso(row.updated_at)
+    updatedAt: toIso(row.updated_at),
   };
 }
 
-function mapUserFoodPreference(row: Record<string, unknown>): UserFoodPreference {
+function mapUserFoodPreference(
+  row: Record<string, unknown>,
+): UserFoodPreference {
   return {
     userId: row.user_id as string,
     foodItemId: row.food_item_id as string,
@@ -1360,8 +1929,64 @@ function mapUserFoodPreference(row: Record<string, unknown>): UserFoodPreference
     positiveFeedbackCount: Number(row.positive_feedback_count),
     negativeFeedbackCount: Number(row.negative_feedback_count),
     lastFeedbackAt: toIso(row.last_feedback_at),
-    updatedAt: toIso(row.updated_at)
+    updatedAt: toIso(row.updated_at),
   };
+}
+
+function foodRecordToUsualFood(food: FoodItemRecord): UsualFood {
+  const nutrients = publicNutrients(food.nutrients);
+  return {
+    id: food.id,
+    name: food.name,
+    canonicalName: food.canonicalName,
+    brand: food.brand,
+    barcode: food.barcode,
+    servingGrams: food.servingGrams,
+    nutrition: {
+      calories: food.calories,
+      proteinGrams: food.proteinGrams,
+      carbsGrams: food.carbsGrams,
+      fatGrams: food.fatGrams,
+    },
+    ...(Object.keys(nutrients).length > 0 ? { nutrients } : {}),
+    aliases: aliasesFromNutrients(food.nutrients),
+    createdAt: food.createdAt,
+    updatedAt: food.updatedAt,
+  };
+}
+
+function nutrientsWithAliases(
+  nutrients: Record<string, unknown> | undefined,
+  aliases: string[] | undefined,
+): Record<string, unknown> {
+  const next = publicNutrients(nutrients);
+  const normalizedAliases = uniqueStrings(
+    (aliases ?? []).map((alias) => alias.trim()).filter(Boolean),
+  );
+  if (normalizedAliases.length > 0)
+    next[USUAL_FOOD_ALIASES_KEY] = normalizedAliases;
+  return next;
+}
+
+function publicNutrients(
+  nutrients: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  const next = { ...(nutrients ?? {}) };
+  delete next[USUAL_FOOD_ALIASES_KEY];
+  return next;
+}
+
+function aliasesFromNutrients(
+  nutrients: Record<string, unknown> | undefined,
+): string[] {
+  const aliases = nutrients?.[USUAL_FOOD_ALIASES_KEY];
+  if (!Array.isArray(aliases)) return [];
+  return uniqueStrings(
+    aliases
+      .map(String)
+      .map((alias) => alias.trim())
+      .filter(Boolean),
+  );
 }
 
 function mapNutrition(row: Record<string, unknown>): NutritionSnapshot {
@@ -1369,7 +1994,7 @@ function mapNutrition(row: Record<string, unknown>): NutritionSnapshot {
     calories: Number(row.calories),
     proteinGrams: Number(row.protein_grams),
     carbsGrams: Number(row.carbs_grams),
-    fatGrams: Number(row.fat_grams)
+    fatGrams: Number(row.fat_grams),
   };
 }
 
@@ -1380,12 +2005,14 @@ function mapDailyGoals(row: Record<string, unknown>): DailyGoals {
     hydrationGoalLiters: Number(row.hydration_goal_liters ?? 0),
     calorieTargetConfigured: Boolean(row.calorie_target_configured),
     calorieTargetSource: parseCalorieTargetSource(row.calorie_target_source),
-    ...mapMacroMetadata(row)
+    ...mapMacroMetadata(row),
   };
 }
 
 function parseCalorieTargetSource(value: unknown): CalorieTargetSource {
-  return value === "manual" || value === "calculator" || value === "default" ? value : "default";
+  return value === "manual" || value === "calculator" || value === "default"
+    ? value
+    : "default";
 }
 
 function mapMacroMetadata(row: Record<string, unknown>): MacroGoalMetadata {
@@ -1397,7 +2024,7 @@ function mapMacroMetadata(row: Record<string, unknown>): MacroGoalMetadata {
     carbsPct: optionalNumber(row.carbs_pct),
     fatPct: optionalNumber(row.fat_pct),
     macroCalories: optionalNumber(row.macro_calories),
-    calorieDeltaKcal: optionalNumber(row.calorie_delta_kcal)
+    calorieDeltaKcal: optionalNumber(row.calorie_delta_kcal),
   };
 }
 
@@ -1410,7 +2037,11 @@ function parseMacroSource(value: unknown): MacroGoalMetadata["macroSource"] {
 }
 
 function parseMacroPreset(value: unknown): MacroGoalMetadata["macroPreset"] {
-  return value === "balanced" || value === "high_protein" || value === "lower_carb" ? value : undefined;
+  return value === "balanced" ||
+    value === "high_protein" ||
+    value === "lower_carb"
+    ? value
+    : undefined;
 }
 
 function mapMealLabel(row: Record<string, unknown>): MealLabel | null {
@@ -1437,7 +2068,8 @@ function mapItem(row: Record<string, unknown>): MealItem {
     sourceUrl: row.source_url as string | undefined,
     license: row.license as string | undefined,
     confidence: row.confidence == null ? undefined : Number(row.confidence),
-    needsReview: row.needs_review == null ? undefined : Boolean(row.needs_review)
+    needsReview:
+      row.needs_review == null ? undefined : Boolean(row.needs_review),
   };
 }
 
@@ -1449,7 +2081,7 @@ function mapSession(row: Record<string, unknown>): StoredSession {
     expiresAt: toIso(row.expires_at),
     revokedAt: row.revoked_at ? toIso(row.revoked_at) : undefined,
     createdAt: toIso(row.created_at),
-    rotatedAt: row.rotated_at ? toIso(row.rotated_at) : undefined
+    rotatedAt: row.rotated_at ? toIso(row.rotated_at) : undefined,
   };
 }
 
@@ -1465,7 +2097,7 @@ function mapActionCall(row: Record<string, unknown>): ActionCallRecord {
     confirmationStatus: row.confirmation_status as string,
     traceId: row.trace_id as string,
     latencyMs: Number(row.latency_ms),
-    createdAt: toIso(row.created_at)
+    createdAt: toIso(row.created_at),
   };
 }
 
@@ -1476,16 +2108,20 @@ function mapAuditEvent(row: Record<string, unknown>): AuditEventRecord {
     eventType: row.event_type as string,
     metadata: row.metadata_json,
     traceId: row.trace_id as string,
-    createdAt: toIso(row.created_at)
+    createdAt: toIso(row.created_at),
   };
 }
 
 function toIso(value: unknown): string {
-  return value instanceof Date ? value.toISOString() : new Date(value as string).toISOString();
+  return value instanceof Date
+    ? value.toISOString()
+    : new Date(value as string).toISOString();
 }
 
 function toDateOnly(value: unknown): string {
-  return value instanceof Date ? value.toISOString().slice(0, 10) : String(value).slice(0, 10);
+  return value instanceof Date
+    ? value.toISOString().slice(0, 10)
+    : String(value).slice(0, 10);
 }
 
 function optionalString(value: unknown): string | undefined {
@@ -1512,7 +2148,9 @@ function previousDatesInWeek(date: string): string[] {
   return dates;
 }
 
-function stripFoodSearchCandidate(candidate: FoodSearchCandidate): FoodItemRecord {
+function stripFoodSearchCandidate(
+  candidate: FoodSearchCandidate,
+): FoodItemRecord {
   const {
     lexicalScore: _lexicalScore,
     vectorScore: _vectorScore,
@@ -1523,7 +2161,9 @@ function stripFoodSearchCandidate(candidate: FoodSearchCandidate): FoodItemRecor
   return food;
 }
 
-function cloneFoodSearchCandidate(candidate: FoodSearchCandidate): FoodSearchCandidate {
+function cloneFoodSearchCandidate(
+  candidate: FoodSearchCandidate,
+): FoodSearchCandidate {
   return {
     ...candidate,
     portions: candidate.portions?.map((portion) => ({ ...portion })),
@@ -1574,8 +2214,16 @@ function foodSearchScoreSql(normalized: string): SQL {
   const queryTokenCount = normalized.split(/\s+/).filter(Boolean).length;
   const normalizedName = dbSql`COALESCE(food_items.normalized_name, '')`;
   const canonicalName = dbSql`COALESCE(food_items.canonical_name, '')`;
-  const normalizedNamePenalty = compactnessPenaltySql(normalizedName, normalized, queryTokenCount);
-  const canonicalNamePenalty = compactnessPenaltySql(canonicalName, normalized, queryTokenCount);
+  const normalizedNamePenalty = compactnessPenaltySql(
+    normalizedName,
+    normalized,
+    queryTokenCount,
+  );
+  const canonicalNamePenalty = compactnessPenaltySql(
+    canonicalName,
+    normalized,
+    queryTokenCount,
+  );
 
   return dbSql`
     GREATEST(
@@ -1664,7 +2312,11 @@ function candidatePhraseInQuerySql(text: SQL, normalized: string): SQL {
   return dbSql`${text} <> '' AND POSITION(' ' || ${text} || ' ' IN ${paddedQuery}) > 0`;
 }
 
-function compactnessPenaltySql(text: SQL, normalized: string, queryTokenCount: number): SQL {
+function compactnessPenaltySql(
+  text: SQL,
+  normalized: string,
+  queryTokenCount: number,
+): SQL {
   return dbSql`
     LEAST(
       0.12::float,
@@ -1683,7 +2335,9 @@ function foodSearchProfiles(
 ): FoodSearchProfile[] {
   const locale = normalizeSearchLocale(input.locale);
   const scope = input.scope ?? (includeBranded ? "market" : "generic");
-  const marketLocales = uniqueStrings([locale, "en", "es", "any"].filter(Boolean) as string[]);
+  const marketLocales = uniqueStrings(
+    [locale, "en", "es", "any"].filter(Boolean) as string[],
+  );
   if (scope === "market") {
     return [
       {
@@ -1715,9 +2369,17 @@ function foodSearchProfiles(
   ];
 }
 
-function foodSearchDocumentForFood(food: FoodItemRecord):
-  | { locale: string; scope: "generic" | "market"; searchText: string; rankBucket: number }
+function foodSearchDocumentForFood(
+  food: FoodItemRecord,
+):
+  | {
+      locale: string;
+      scope: "generic" | "market";
+      searchText: string;
+      rankBucket: number;
+    }
   | undefined {
+  if (food.deletedAt) return undefined;
   const searchText = normalizeText(
     [
       food.normalizedName,
@@ -1725,6 +2387,7 @@ function foodSearchDocumentForFood(food: FoodItemRecord):
       food.name,
       food.brand,
       food.foodCategory,
+      ...aliasesFromNutrients(food.nutrients),
     ]
       .filter((value): value is string => Boolean(value))
       .join(" "),
@@ -1738,16 +2401,17 @@ function foodSearchDocumentForFood(food: FoodItemRecord):
         : "any";
   const scope =
     food.userId ||
-    (
-      food.dataType !== "Branded" &&
+    (food.dataType !== "Branded" &&
       food.source !== "usda_branded" &&
-      (food.source !== "openfoodfacts" || (!food.barcode && !food.brand))
-    )
+      (food.source !== "openfoodfacts" || (!food.barcode && !food.brand)))
       ? "generic"
       : "market";
   const rankBucket = food.userId
     ? 0
-    : food.source === "openfoodfacts" && food.foodKey === "es" && !food.barcode && !food.brand
+    : food.source === "openfoodfacts" &&
+        food.foodKey === "es" &&
+        !food.barcode &&
+        !food.brand
       ? 1
       : food.dataType === "SR Legacy"
         ? 2
@@ -1775,20 +2439,28 @@ function uniqueStrings(values: string[]): string[] {
   return [...new Set(values)];
 }
 
-async function executeRows<T extends Record<string, unknown> = Record<string, unknown>>(dbClient: DbExecutor, query: SQL): Promise<T[]> {
-  return await dbClient.execute(query) as T[];
+async function executeRows<
+  T extends Record<string, unknown> = Record<string, unknown>,
+>(dbClient: DbExecutor, query: SQL): Promise<T[]> {
+  return (await dbClient.execute(query)) as T[];
 }
 
 function sqlList(values: readonly string[]): SQL {
   if (values.length === 0) return dbSql`(NULL)`;
-  return dbSql`(${dbSql.join(values.map((value) => dbSql`${value}`), dbSql`, `)})`;
+  return dbSql`(${dbSql.join(
+    values.map((value) => dbSql`${value}`),
+    dbSql`, `,
+  )})`;
 }
 
 function jsonb(value: unknown): SQL {
   return dbSql`${JSON.stringify(value)}::jsonb`;
 }
 
-function groupRowsByString(rows: Record<string, unknown>[], key: string): Map<string, Record<string, unknown>[]> {
+function groupRowsByString(
+  rows: Record<string, unknown>[],
+  key: string,
+): Map<string, Record<string, unknown>[]> {
   const grouped = new Map<string, Record<string, unknown>[]>();
   for (const row of rows) {
     const value = row[key];
@@ -1802,7 +2474,10 @@ function groupRowsByString(rows: Record<string, unknown>[], key: string): Map<st
 
 function sanitizeLimit(limit?: number): number {
   if (!Number.isFinite(limit)) return DEFAULT_FOOD_SEARCH_LIMIT;
-  return Math.max(1, Math.min(MAX_FOOD_SEARCH_LIMIT, Math.floor(limit as number)));
+  return Math.max(
+    1,
+    Math.min(MAX_FOOD_SEARCH_LIMIT, Math.floor(limit as number)),
+  );
 }
 
 function clampScore(score: number): number {
@@ -1818,10 +2493,12 @@ function toVectorLiteral(embedding: number[]): string {
   if (embedding.length !== ACTIVE_EMBEDDING_DIMENSIONS) {
     throw new Error("invalid_embedding_dimensions");
   }
-  return `[${embedding.map((value) => {
-    if (!Number.isFinite(value)) throw new Error("invalid_embedding_value");
-    return String(value);
-  }).join(",")}]`;
+  return `[${embedding
+    .map((value) => {
+      if (!Number.isFinite(value)) throw new Error("invalid_embedding_value");
+      return String(value);
+    })
+    .join(",")}]`;
 }
 
 function foodFeedbackDelta(action: FoodFeedbackRecord["action"]): number {

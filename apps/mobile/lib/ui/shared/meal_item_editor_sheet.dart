@@ -738,6 +738,7 @@ class _NutritionDetailsSheetState extends State<_NutritionDetailsSheet> {
                       decimal: true,
                     ),
                     onChanged: (_) => setState(() {}),
+                    style: _macroFieldStyle(context, _MacroKind.protein),
                     decoration: _macroInputDecoration(
                       context,
                       label: l10n.commonProtein,
@@ -756,6 +757,7 @@ class _NutritionDetailsSheetState extends State<_NutritionDetailsSheet> {
                       decimal: true,
                     ),
                     onChanged: (_) => setState(() {}),
+                    style: _macroFieldStyle(context, _MacroKind.carbs),
                     decoration: _macroInputDecoration(
                       context,
                       label: l10n.commonCarbs,
@@ -774,6 +776,7 @@ class _NutritionDetailsSheetState extends State<_NutritionDetailsSheet> {
                       decimal: true,
                     ),
                     onChanged: (_) => setState(() {}),
+                    style: _macroFieldStyle(context, _MacroKind.fat),
                     decoration: _macroInputDecoration(
                       context,
                       label: l10n.commonFat,
@@ -1043,12 +1046,24 @@ InputDecoration _macroInputDecoration(
   );
 }
 
-Color _macroColor(BuildContext context, _MacroKind kind) {
-  final palette = context.freshPalette;
+TextStyle _macroFieldStyle(BuildContext context, _MacroKind kind) {
+  return Theme.of(context).textTheme.bodyLarge?.copyWith(
+        color: _macroColor(context, kind),
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0,
+      ) ??
+      TextStyle(
+        color: _macroColor(context, kind),
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0,
+      );
+}
+
+Color _macroColor(BuildContext _, _MacroKind kind) {
   return switch (kind) {
-    _MacroKind.protein => palette.coral,
-    _MacroKind.carbs => const Color(0xffc9941a),
-    _MacroKind.fat => palette.leaf,
+    _MacroKind.protein => const Color(0xffc95a5a),
+    _MacroKind.carbs => const Color(0xffb88758),
+    _MacroKind.fat => const Color(0xffe0b93b),
   };
 }
 

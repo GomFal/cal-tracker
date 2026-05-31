@@ -43,6 +43,23 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(detailsFinder.hitTestable());
     await tester.pumpAndSettle();
+
+    _expectMacroFieldColor(
+      tester,
+      key: const ValueKey('history_item_protein_0'),
+      color: const Color(0xffc95a5a),
+    );
+    _expectMacroFieldColor(
+      tester,
+      key: const ValueKey('history_item_carbs_0'),
+      color: const Color(0xffb88758),
+    );
+    _expectMacroFieldColor(
+      tester,
+      key: const ValueKey('history_item_fat_0'),
+      color: const Color(0xffe0b93b),
+    );
+
     await tester.enterText(
       find.byKey(const ValueKey('history_item_protein_0')),
       '90',
@@ -78,6 +95,17 @@ void main() {
     expect(chicken.calories, 360);
     expect(find.text('490 Kcal'), findsOneWidget);
   });
+}
+
+void _expectMacroFieldColor(
+  WidgetTester tester, {
+  required ValueKey<String> key,
+  required Color color,
+}) {
+  final field = tester.widget<TextField>(find.byKey(key));
+  expect(field.style?.color, color);
+  expect(field.decoration?.labelStyle?.color, color);
+  expect(field.decoration?.floatingLabelStyle?.color, color);
 }
 
 class _TestApp extends StatelessWidget {

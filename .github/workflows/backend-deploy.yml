@@ -111,6 +111,7 @@ jobs:
           write_remote_file pro.env "$PRO_ENV_FILE"
 
       - name: Login GHCR on VPS
+        id: ghcr_vps_login
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
@@ -131,7 +132,7 @@ jobs:
           ssh "$VPS_USER@$VPS_HOST" "bash /srv/cal-tracker/deploy/deploy.sh '$DEPLOY_ENVIRONMENT' '$IMAGE'"
 
       - name: Logout GHCR on VPS
-        if: always()
+        if: always() && steps.ghcr_vps_login.conclusion == 'success'
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}

@@ -54,25 +54,35 @@ set -a
 source "$SECRETS_FILE"
 set +a
 
+case "$ENVIRONMENT" in
+  dev) DATABASE_NAME="${DEV_DATABASE_NAME:-cal_tracker}" ;;
+  pro) DATABASE_NAME="${PRO_DATABASE_NAME:-cal_tracker}" ;;
+esac
+
+if [[ ! "$DATABASE_NAME" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
+  echo "Invalid database name for $ENVIRONMENT: $DATABASE_NAME" >&2
+  exit 2
+fi
+
 export BACKEND_IMAGE="$REQUESTED_BACKEND_IMAGE"
 
 docker compose --env-file "$SECRETS_FILE" -f "$COMPOSE_FILE" pull postgres "$NEXT_SERVICE"
 docker compose --env-file "$SECRETS_FILE" -f "$COMPOSE_FILE" up -d postgres
 
 for _ in {1..60}; do
-  if docker exec cal-tracker-postgres pg_isready -U cal_tracker -d cal_tracker >/dev/null 2>&1; then
+  if docker exec cal-tracker-postgres pg_isready -U cal_tracker -d "$DATABASE_NAME" >/dev/null 2>&1; then
     break
   fi
   sleep 2
 done
 
-docker exec cal-tracker-postgres pg_isready -U cal_tracker -d cal_tracker
+docker exec cal-tracker-postgres pg_isready -U cal_tracker -d "$DATABASE_NAME"
 
 docker run --rm \
   --network cal-tracker-internal \
   --env-file "$ENV_DIR/${ENVIRONMENT}.env" \
   -e "DATABASE_SCHEMA=$SCHEMA" \
-  -e "DATABASE_URL=postgres://cal_tracker:${POSTGRES_PASSWORD}@cal-tracker-postgres:5432/cal_tracker" \
+  -e "DATABASE_URL=postgres://cal_tracker:${POSTGRES_PASSWORD}@cal-tracker-postgres:5432/${DATABASE_NAME}" \
   "$BACKEND_IMAGE" \
   bun dist/scripts/migrate.js
 

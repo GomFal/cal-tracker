@@ -540,6 +540,48 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('shows normalized candidate details in food match metadata', (
+      tester,
+    ) async {
+      final group = _candidateGroup(
+        canonicalEnglishName: 'normalized_food',
+        candidates: [
+          _mealItem(
+            name: 'White Rice',
+            calories: 151,
+            externalId: 'normalized_rice',
+            displayDetails: const ['Steamed', 'Chinese Restaurant'],
+          ),
+        ],
+      );
+      when(() => nutritionRepository.logText('normalized food')).thenAnswer(
+        (_) async => AgentRunResult(
+          kind: 'clarification_required',
+          message: 'Choose a food match.',
+          candidateGroups: [group],
+        ),
+      );
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<VoiceLogViewModel>.value(
+          value: viewModel,
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            theme: buildTheme(),
+            home: const MealCreateScreen(),
+          ),
+        ),
+      );
+
+      await viewModel.submitText('normalized food');
+      await tester.pumpAndSettle();
+
+      expect(find.text('White Rice'), findsOneWidget);
+      expect(find.text('Steamed'), findsOneWidget);
+      expect(find.text('Chinese Restaurant'), findsOneWidget);
+    });
+
     testWidgets('does not show food matches after a proposal is created', (
       tester,
     ) async {
@@ -1408,6 +1450,7 @@ MealItem _mealItem({
   required int calories,
   required String externalId,
   String? canonicalName,
+  List<String> displayDetails = const [],
 }) {
   return MealItem(
     name: name,
@@ -1424,5 +1467,6 @@ MealItem _mealItem({
     license: 'CC BY-SA',
     confidence: 0.91,
     resolvedGrams: 100,
+    displayDetails: displayDetails,
   );
 }

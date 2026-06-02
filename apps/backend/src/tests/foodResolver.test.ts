@@ -7,6 +7,7 @@ import {
   type FoodDataProvider,
 } from "../nutrition/foodResolver.js";
 import { InMemoryRepository } from "../repository/inMemory.js";
+import type { AppRepository, FoodSearchCandidate } from "../repository/types.js";
 import { seedTestFoods } from "./foodFixtures.js";
 
 const originalFetch = globalThis.fetch;
@@ -47,6 +48,58 @@ function normalizeFixtureFoodName(value: string): string {
     .replace(/[^a-z0-9\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function resolverWithNormalizedCandidates(candidates: FoodSearchCandidate[]): FoodResolver {
+  const repository = {
+    searchFoodsHybrid: async () => candidates,
+  } as unknown as AppRepository;
+  return new FoodResolver(new LocalFoodDataProvider(repository), 0.75);
+}
+
+function normalizedCandidate(
+  input: {
+    name: string;
+    normalizedBaseName: string;
+    finalScore: number;
+    calories: number;
+    brand?: string;
+    barcode?: string;
+    source?: string;
+    externalSource?: string;
+    dataType?: string;
+    normalizedResultType?: string;
+    normalizedBrandDisplay?: string;
+    normalizedVariantName?: string;
+    displayDetails?: string[];
+  },
+): FoodSearchCandidate {
+  return {
+    id: input.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+    name: input.name,
+    normalizedName: normalizeFixtureFoodName(input.name),
+    canonicalName: normalizeFixtureFoodName(input.name),
+    brand: input.brand,
+    barcode: input.barcode,
+    source: input.source ?? "usda_fdc",
+    externalSource: input.externalSource ?? "usda_fdc",
+    externalId: input.name,
+    dataType: input.dataType ?? "SR Legacy",
+    normalizedDisplayName: input.name,
+    normalizedBaseName: input.normalizedBaseName,
+    normalizedVariantName: input.normalizedVariantName,
+    normalizedResultType: input.normalizedResultType ?? "generic_food",
+    normalizedBrandDisplay: input.normalizedBrandDisplay,
+    displayDetails: input.displayDetails,
+    servingGrams: 100,
+    calories: input.calories,
+    proteinGrams: 2,
+    carbsGrams: 25,
+    fatGrams: 1,
+    lexicalScore: input.finalScore,
+    preferenceScore: 0,
+    finalScore: input.finalScore,
+  };
 }
 
 describe("scoreUsdaCandidate", () => {
@@ -302,6 +355,134 @@ describe("FoodResolver candidate groups", () => {
 });
 
 describe("FoodResolver", () => {
+  it("keeps normalized repository ranking ahead of compactness confidence", async () => {
+    const resolver = resolverWithNormalizedCandidates([
+      normalizedCandidate({
+        name: "Cereals Cream Of Rice, Dry",
+        normalizedBaseName: "Cereals Cream Of Rice",
+        finalScore: 0.87,
+        calories: 370,
+      }),
+      normalizedCandidate({
+        name: "White Rice, Cooked",
+        normalizedBaseName: "White Rice",
+        finalScore: 0.93,
+        calories: 130,
+        displayDetails: ["Cooked"],
+      }),
+      normalizedCandidate({
+        name: "White Rice, Raw",
+        normalizedBaseName: "White Rice",
+        finalScore: 0.91,
+        calories: 360,
+        displayDetails: ["Raw"],
+      }),
+    ]);
+
+    const result = await resolver.search("user-1", "rice", undefined, "en-US");
+
+    expect(result.items.map((item) => item.name)).toEqual([
+      "White Rice, Cooked",
+      "White Rice, Raw",
+      "Cereals Cream Of Rice, Dry",
+    ]);
+    expect(result.items[0]?.displayDetails).toEqual(["Cooked"]);
+    expect(result.items[0]?.matchReason).toBe("normalized_search");
+  });
+
+  it("uses the same normalized ranking behavior outside rice examples", async () => {
+    const resolver = resolverWithNormalizedCandidates([
+      normalizedCandidate({
+        name: "Plain Yogurt",
+        normalizedBaseName: "Plain Yogurt",
+        finalScore: 0.94,
+        calories: 63,
+      }),
+      normalizedCandidate({
+        name: "Greek Style Plain Yogurt",
+        normalizedBaseName: "Greek Style Plain Yogurt",
+        finalScore: 0.9,
+        calories: 97,
+        displayDetails: ["Greek Style"],
+      }),
+      normalizedCandidate({
+        name: "Vanilla Yogurt",
+        normalizedBaseName: "Vanilla Yogurt",
+        finalScore: 0.89,
+        calories: 95,
+      }),
+    ]);
+
+    const result = await resolver.search("user-1", "plain yogurt", undefined, "en-US");
+
+    expect(result.items.map((item) => item.name)).toEqual([
+      "Plain Yogurt",
+      "Greek Style Plain Yogurt",
+    ]);
+  });
+
+  it("does not apply the legacy branded compatibility gate to normalized product candidates", async () => {
+    const resolver = resolverWithNormalizedCandidates([
+      normalizedCandidate({
+        name: "Oat Drink - Sample Brand",
+        normalizedBaseName: "Oat Drink",
+        normalizedBrandDisplay: "Sample Brand",
+        normalizedResultType: "product",
+        source: "openfoodfacts",
+        externalSource: "openfoodfacts",
+        dataType: "Branded",
+        brand: "Sample Brand",
+        barcode: "1234567890123",
+        finalScore: 0.96,
+        calories: 45,
+      }),
+    ]);
+
+    const result = await resolver.resolveMealMentions(
+      "user-1",
+      [
+        {
+          originalText: "oat drink",
+          canonicalName: "oat drink",
+          canonicalEnglishName: "oat drink",
+          quantity: 100,
+          unit: "g",
+          confidence: 0.95,
+          marketProduct: false,
+        },
+      ],
+      "en-US",
+    );
+
+    expect(result.candidateGroups[0]?.candidates[0]?.name).toBe("Oat Drink - Sample Brand");
+    expect(result.candidateGroups[0]?.candidates[0]?.matchReason).toBe("normalized_search");
+  });
+
+  it("allows longer normalized candidates when the query includes their extra tokens", async () => {
+    const resolver = resolverWithNormalizedCandidates([
+      normalizedCandidate({
+        name: "White Rice, Cooked",
+        normalizedBaseName: "White Rice",
+        finalScore: 0.93,
+        calories: 130,
+      }),
+      normalizedCandidate({
+        name: "Cereals Cream Of Rice, Dry",
+        normalizedBaseName: "Cereals Cream Of Rice",
+        finalScore: 0.87,
+        calories: 370,
+        displayDetails: ["Dry"],
+      }),
+    ]);
+
+    const result = await resolver.search("user-1", "cream of rice", undefined, "en-US");
+
+    expect(result.items.map((item) => item.name)).toEqual([
+      "Cereals Cream Of Rice, Dry",
+    ]);
+    expect(result.items[0]?.displayDetails).toEqual(["Dry"]);
+  });
+
   it("keeps Open Food Facts products out of generic search and available in market search", async () => {
     const repository = InMemoryRepository.seeded();
     await repository.upsertFoodItem({

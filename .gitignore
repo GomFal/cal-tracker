@@ -27,6 +27,13 @@ logs/
 data/usda/
 data/openfoodfacts/
 data/bedca/
+data/food-quality/
+data/food-normalization/
+data/food-search-benchmarks/
 __pycache__/
 *.pyc
 .pytest_cache/
+
+
+# Screenshots
+design-artifacts/screens/

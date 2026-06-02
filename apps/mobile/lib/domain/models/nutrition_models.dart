@@ -137,6 +137,7 @@ class MealItem {
     this.needsReview,
     this.resolvedGrams,
     this.portionDescription,
+    this.displayDetails = const [],
   });
 
   final String name;
@@ -158,6 +159,7 @@ class MealItem {
   final bool? needsReview;
   final double? resolvedGrams;
   final String? portionDescription;
+  final List<String> displayDetails;
 
   factory MealItem.fromJson(Map<String, Object?> json) {
     return MealItem(
@@ -180,6 +182,10 @@ class MealItem {
       needsReview: json['needsReview'] as bool?,
       resolvedGrams: (json['resolvedGrams'] as num?)?.toDouble(),
       portionDescription: json['portionDescription'] as String?,
+      displayDetails: (json['displayDetails'] as List?)
+              ?.whereType<String>()
+              .toList(growable: false) ??
+          const [],
     );
   }
 
@@ -204,6 +210,7 @@ class MealItem {
         if (resolvedGrams != null) 'resolvedGrams': resolvedGrams,
         if (portionDescription != null)
           'portionDescription': portionDescription,
+        if (displayDetails.isNotEmpty) 'displayDetails': displayDetails,
       };
 
   MealItem copyWith({
@@ -226,6 +233,7 @@ class MealItem {
     bool? needsReview,
     double? resolvedGrams,
     String? portionDescription,
+    List<String>? displayDetails,
   }) {
     return MealItem(
       name: name ?? this.name,
@@ -247,6 +255,7 @@ class MealItem {
       needsReview: needsReview ?? this.needsReview,
       resolvedGrams: resolvedGrams ?? this.resolvedGrams,
       portionDescription: portionDescription ?? this.portionDescription,
+      displayDetails: displayDetails ?? this.displayDetails,
     );
   }
 }

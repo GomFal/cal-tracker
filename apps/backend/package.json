@@ -18,6 +18,13 @@
     "db:seed": "tsx scripts/seed.ts",
     "db:seed:dist": "bun dist/scripts/seed.js",
     "embed:foods": "tsx scripts/embed-food-items.ts",
+    "food-quality": "tsx scripts/food-data-quality.ts",
+    "food-normalization:sample": "tsx scripts/food-normalization-sample.ts",
+    "food-normalization:backfill": "tsx scripts/food-normalized-search-backfill.ts",
+    "food-normalization:reset-artifacts": "tsx scripts/food-normalization-reset-artifacts.ts",
+    "food-normalization:long-name-review": "tsx scripts/food-normalization-long-name-review.ts",
+    "benchmark:food-search": "tsx scripts/benchmark-food-search.ts",
+    "validate:food-search-primary": "tsx scripts/validate-food-search-primary-position.ts",
     "benchmark:agent-foods": "tsx scripts/benchmark-agent-foods.ts",
     "generate:flutter-client": "tsx scripts/generate-flutter-client.ts"
   },

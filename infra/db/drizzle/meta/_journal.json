@@ -64,6 +64,55 @@
       "when": 1779898849230,
       "tag": "0008_meal_item_language",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1779988330736,
+      "tag": "0009_food_data_quality_normalized_search",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1780054195450,
+      "tag": "0010_food_normalized_primary_entity",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1780054813800,
+      "tag": "0011_food_normalized_representativeness",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1780068180000,
+      "tag": "0012_food_normalization_review",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1780070000000,
+      "tag": "0013_food_normalized_identity_trgm_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1780070100000,
+      "tag": "0014_food_normalized_identity_btree_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1780070200000,
+      "tag": "0015_food_normalized_identity_token_keys",
+      "breakpoints": true
     }
   ]
 }

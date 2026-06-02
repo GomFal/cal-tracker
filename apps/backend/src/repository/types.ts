@@ -81,6 +81,18 @@ export type FoodItemRecord = {
   foodKey?: string;
   ingredients?: string;
   marketCountry?: string;
+  normalizedDisplayName?: string;
+  normalizedBaseName?: string;
+  normalizedVariantName?: string;
+  normalizedResultType?: string;
+  normalizedBrandDisplay?: string;
+  primaryEntityName?: string;
+  primaryEntityAliases?: string[];
+  secondaryEntityAliases?: string[];
+  primaryEntityCategory?: string;
+  primaryEntityCategoryCoherence?: number;
+  primaryEntityRepresentativeness?: number;
+  displayDetails?: string[];
   householdServingFulltext?: string;
   nutrients?: Record<string, unknown>;
   portions?: FoodPortionRecord[];

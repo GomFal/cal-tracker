@@ -368,7 +368,11 @@ export class LocalFoodDataProvider implements FoodDataProvider {
         item.vectorScore = food.vectorScore ?? item.vectorScore;
         item.preferenceScore = food.preferenceScore ?? item.preferenceScore;
         item.matchScore = food.finalScore ?? item.matchScore;
-        item.matchReason = food.vectorScore ? "hybrid_search" : item.matchReason;
+        item.matchReason = isNormalizedSearchFood(food)
+          ? "normalized_search"
+          : food.vectorScore
+            ? "hybrid_search"
+            : item.matchReason;
         items.push(item);
         continue;
       }
@@ -457,6 +461,8 @@ function cachedFoodIsCompatible(
   food: FoodItemRecord,
   mention: FoodMention,
 ): boolean {
+  if (isNormalizedSearchFood(food))
+    return normalizedFoodFit(food, mention).compatible;
   if (isBrandedFood(food) && !hasMarketProductIntent(mention)) return false;
   if (food.externalSource !== "usda_fdc") return true;
   return Boolean(scoreUsdaCandidate(usdaFoodFromRecord(food), mention));
@@ -534,6 +540,7 @@ function itemFromFood(
     license: food.license,
     confidence: Math.min(mention.confidence, options.confidence),
     needsReview: Math.min(mention.confidence, options.confidence) < 0.9,
+    displayDetails: food.displayDetails,
   };
 }
 
@@ -570,6 +577,9 @@ function scaleMentionFood(
 }
 
 function localConfidence(food: FoodItemRecord, mention: FoodMention): number {
+  if (isNormalizedSearchFood(food)) {
+    return normalizedFoodFit(food, mention).confidence;
+  }
   if (food.externalSource === "usda_fdc") {
     const score = scoreUsdaCandidate(usdaFoodFromRecord(food), mention);
     if (!score) return 0.2;
@@ -585,6 +595,82 @@ function localConfidence(food: FoodItemRecord, mention: FoodMention): number {
   if (food.normalizedName === mentionCanonical)
     return 0.94;
   return 0.78;
+}
+
+type NormalizedFoodFit = {
+  compatible: boolean;
+  confidence: number;
+};
+
+function isNormalizedSearchFood(food: FoodItemRecord): boolean {
+  return Boolean(
+    food.normalizedBaseName ||
+      food.normalizedDisplayName ||
+      food.normalizedResultType,
+  );
+}
+
+function normalizedFoodFit(food: FoodItemRecord, mention: FoodMention): NormalizedFoodFit {
+  const queryTokens = uniqueTokens(meaningfulFoodTokens(canonicalNameForMention(mention)));
+  if (queryTokens.length === 0) return { compatible: false, confidence: 0.1 };
+
+  const candidateText = normalizeText([
+    food.normalizedBaseName,
+    food.normalizedDisplayName,
+    food.normalizedVariantName,
+    food.normalizedBrandDisplay ?? food.brand,
+  ].filter((value): value is string => Boolean(value)).join(" "));
+  const candidateTokens = uniqueTokens(meaningfulFoodTokens(candidateText));
+  if (candidateTokens.length === 0) return { compatible: false, confidence: 0.1 };
+
+  const candidateTokenSet = new Set(candidateTokens);
+  const missingTokens = queryTokens.filter((token) => !candidateTokenSet.has(token));
+  if (missingTokens.length > 0) return { compatible: false, confidence: 0.2 };
+
+  const queryTokenSet = new Set(queryTokens);
+  const extraTokenCount = candidateTokens.filter((token) => !queryTokenSet.has(token)).length;
+  const queryText = queryTokens.join(" ");
+  const compactCandidateText = candidateTokens.join(" ");
+  const exactBaseMatch =
+    normalizeText(food.normalizedBaseName ?? "") === queryText ||
+    normalizeText(food.normalizedDisplayName ?? "") === queryText;
+  const contiguousPhrase = tokenPhraseIndex(candidateTokens, queryTokens);
+  const phraseBonus =
+    exactBaseMatch ? 0.13 :
+      contiguousPhrase === 0 ? 0.06 :
+        contiguousPhrase > 0 ? 0.03 :
+          0;
+  const compactnessPenalty = Math.min(
+    0.34,
+    extraTokenCount * 0.04 +
+      Math.max(compactCandidateText.length - queryText.length, 0) * 0.002,
+  );
+  const confidence = Math.max(
+    0.1,
+    Math.min(0.98, roundTwo(0.84 + phraseBonus - compactnessPenalty)),
+  );
+  return { compatible: confidence >= 0.55, confidence };
+}
+
+function uniqueTokens(tokens: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const token of tokens) {
+    if (seen.has(token)) continue;
+    seen.add(token);
+    result.push(token);
+  }
+  return result;
+}
+
+function tokenPhraseIndex(tokens: string[], phraseTokens: string[]): number {
+  if (phraseTokens.length === 0 || phraseTokens.length > tokens.length) return -1;
+  for (let index = 0; index <= tokens.length - phraseTokens.length; index += 1) {
+    if (phraseTokens.every((token, phraseIndex) => tokens[index + phraseIndex] === token)) {
+      return index;
+    }
+  }
+  return -1;
 }
 
 function usdaFoodFromRecord(food: FoodItemRecord): UsdaFood {
@@ -888,6 +974,16 @@ function annotateCandidateMetadata(candidates: MealItem[]): MealItem[] {
 }
 
 function compareFoodCandidates(a: MealItem, b: MealItem): number {
+  if (a.matchReason === "normalized_search" && b.matchReason === "normalized_search") {
+    return (
+      (b.matchScore ?? 0) - (a.matchScore ?? 0) ||
+      (b.confidence ?? 0) - (a.confidence ?? 0) ||
+      (b.preferenceScore ?? 0) - (a.preferenceScore ?? 0) ||
+      (b.vectorScore ?? 0) - (a.vectorScore ?? 0) ||
+      (b.lexicalScore ?? 0) - (a.lexicalScore ?? 0) ||
+      a.name.localeCompare(b.name)
+    );
+  }
   return (
     recommendationScore(b) - recommendationScore(a) ||
     (b.confidence ?? 0) - (a.confidence ?? 0) ||

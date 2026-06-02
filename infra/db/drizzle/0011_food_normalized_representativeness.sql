@@ -1,0 +1,1 @@
+ALTER TABLE "food_normalized_search_documents" ADD COLUMN "primary_entity_representativeness" numeric(6, 4) DEFAULT '0' NOT NULL;

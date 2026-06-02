@@ -206,6 +206,123 @@ export const foodSearchDocuments = pgTable("food_search_documents", {
   index("food_search_documents_user_idx").on(table.userId).where(sql`${table.userId} IS NOT NULL`)
 ]);
 
+export const foodItemQuality = pgTable("food_item_quality", {
+  foodItemId: uuid("food_item_id").primaryKey().references(() => foodItems.id, { onDelete: "cascade" }),
+  qualityStatus: text("quality_status").notNull(),
+  isSearchEligible: boolean("is_search_eligible").notNull(),
+  canonicalFoodItemId: uuid("canonical_food_item_id").references(() => foodItems.id, { onDelete: "set null" }),
+  qualityScore: numeric("quality_score", { precision: 6, scale: 4 }).notNull(),
+  qualityFlags: text("quality_flags").array().notNull().default(sql`'{}'::text[]`),
+  qualityVersion: text("quality_version").notNull(),
+  metadata: jsonb("metadata").$type<JsonObject>().notNull().default(sql`'{}'::jsonb`),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
+}, (table) => [
+  check("food_item_quality_status_check", sql`${table.qualityStatus} IN ('valid', 'duplicate', 'suspicious', 'quarantined')`),
+  index("food_item_quality_eligible_status_idx").on(table.isSearchEligible, table.qualityStatus),
+  index("food_item_quality_flags_gin_idx").using("gin", table.qualityFlags),
+  index("food_item_quality_canonical_idx").on(table.canonicalFoodItemId).where(sql`${table.canonicalFoodItemId} IS NOT NULL`)
+]);
+
+export const foodNormalizationSampleSets = pgTable("food_normalization_sample_sets", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  seed: text("seed").notNull(),
+  qualityVersion: text("quality_version").notNull(),
+  normalizationVersion: text("normalization_version").notNull(),
+  criteriaJson: jsonb("criteria_json").$type<JsonObject>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+}, (table) => [
+  uniqueIndex("food_normalization_sample_sets_name_unique").on(table.name)
+]);
+
+export const foodNormalizationSampleItems = pgTable("food_normalization_sample_items", {
+  sampleSetId: uuid("sample_set_id").notNull().references(() => foodNormalizationSampleSets.id, { onDelete: "cascade" }),
+  foodItemId: uuid("food_item_id").notNull().references(() => foodItems.id, { onDelete: "cascade" }),
+  sampleReason: text("sample_reason").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+}, (table) => [
+  primaryKey({ columns: [table.sampleSetId, table.foodItemId] }),
+  index("food_normalization_sample_items_sample_food_idx").on(table.sampleSetId, table.foodItemId),
+  index("food_normalization_sample_items_reason_idx").on(table.sampleSetId, table.sampleReason)
+]);
+
+export const foodNormalizedSearchDocuments = pgTable("food_normalized_search_documents", {
+  foodItemId: uuid("food_item_id").primaryKey().references(() => foodItems.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+  locale: text("locale").notNull(),
+  resultType: text("result_type").notNull(),
+  displayName: text("display_name").notNull(),
+  baseName: text("base_name").notNull(),
+  variantName: text("variant_name"),
+  brandDisplay: text("brand_display"),
+  primaryEntityName: text("primary_entity_name").notNull().default(""),
+  primaryEntityAliases: text("primary_entity_aliases").array().notNull().default(sql`'{}'::text[]`),
+  secondaryEntityAliases: text("secondary_entity_aliases").array().notNull().default(sql`'{}'::text[]`),
+  identityTokenKeys: text("identity_token_keys").array().notNull().default(sql`'{}'::text[]`),
+  primaryEntityCategory: text("primary_entity_category"),
+  primaryEntityCategoryCoherence: numeric("primary_entity_category_coherence", { precision: 6, scale: 4 }).notNull().default("0"),
+  primaryEntityRepresentativeness: numeric("primary_entity_representativeness", { precision: 6, scale: 4 }).notNull().default("0"),
+  searchText: text("search_text").notNull(),
+  searchAliases: text("search_aliases").array().notNull().default(sql`'{}'::text[]`),
+  searchVector: tsvector("search_vector").notNull(),
+  rankBucket: integer("rank_bucket").notNull(),
+  normalizationVersion: text("normalization_version").notNull(),
+  normalizationSource: text("normalization_source").notNull(),
+  normalizationConfidence: numeric("normalization_confidence", { precision: 6, scale: 4 }).notNull(),
+  qualityFlags: text("quality_flags").array().notNull().default(sql`'{}'::text[]`),
+  metadata: jsonb("metadata").$type<JsonObject>().notNull().default(sql`'{}'::jsonb`),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
+}, (table) => [
+  check("food_normalized_search_documents_result_type_check", sql`${table.resultType} IN ('generic_food', 'product', 'custom_food')`),
+  index("food_normalized_search_documents_search_text_trgm_idx").using("gin", table.searchText.op("gin_trgm_ops")),
+  index("food_normalized_search_documents_base_name_trgm_idx").using("gin", sql`lower(${table.baseName}) gin_trgm_ops`),
+  index("food_normalized_search_documents_display_name_trgm_idx").using("gin", sql`lower(${table.displayName}) gin_trgm_ops`),
+  index("food_normalized_search_documents_brand_display_trgm_idx").using("gin", sql`lower(${table.brandDisplay}) gin_trgm_ops`),
+  index("food_normalized_search_documents_base_name_lower_idx").on(sql`lower(${table.baseName})`),
+  index("food_normalized_search_documents_display_name_lower_idx").on(sql`lower(${table.displayName})`),
+  index("food_normalized_search_documents_brand_display_lower_idx").on(sql`lower(${table.brandDisplay})`),
+  index("food_normalized_search_documents_primary_aliases_gin_idx").using("gin", table.primaryEntityAliases),
+  index("food_normalized_search_documents_secondary_aliases_gin_idx").using("gin", table.secondaryEntityAliases),
+  index("food_normalized_search_documents_identity_token_keys_gin_idx").using("gin", table.identityTokenKeys),
+  index("food_normalized_search_documents_search_vector_idx").using("gin", table.searchVector),
+  index("food_normalized_search_documents_locale_type_rank_idx").on(table.locale, table.resultType, table.rankBucket),
+  index("food_normalized_search_documents_user_idx").on(table.userId).where(sql`${table.userId} IS NOT NULL`)
+]);
+
+export const foodNormalizationReview = pgTable("food_normalization_review", {
+  foodItemId: uuid("food_item_id").primaryKey().references(() => foodItems.id, { onDelete: "cascade" }),
+  normalizationVersion: text("normalization_version").notNull(),
+  reviewStatus: text("review_status").notNull(),
+  severity: text("severity").notNull(),
+  issueCodes: text("issue_codes").array().notNull().default(sql`'{}'::text[]`),
+  rawName: text("raw_name").notNull(),
+  rawBrand: text("raw_brand"),
+  rawSource: text("raw_source"),
+  rawExternalSource: text("raw_external_source"),
+  rawDataType: text("raw_data_type"),
+  displayName: text("display_name"),
+  baseName: text("base_name"),
+  variantName: text("variant_name"),
+  brandDisplay: text("brand_display"),
+  primaryEntityName: text("primary_entity_name"),
+  locale: text("locale"),
+  resultType: text("result_type"),
+  normalizationConfidence: numeric("normalization_confidence", { precision: 6, scale: 4 }),
+  metrics: jsonb("metrics").$type<JsonObject>().notNull().default(sql`'{}'::jsonb`),
+  metadata: jsonb("metadata").$type<JsonObject>().notNull().default(sql`'{}'::jsonb`),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
+}, (table) => [
+  check("food_normalization_review_status_check", sql`${table.reviewStatus} IN ('valid', 'needs_review', 'failed')`),
+  check("food_normalization_review_severity_check", sql`${table.severity} IN ('info', 'warning', 'error')`),
+  index("food_normalization_review_status_severity_idx").on(table.reviewStatus, table.severity),
+  index("food_normalization_review_issue_codes_gin_idx").using("gin", table.issueCodes),
+  index("food_normalization_review_version_idx").on(table.normalizationVersion),
+  index("food_normalization_review_display_idx").on(table.locale, table.resultType, sql`lower(${table.displayName})`)
+]);
+
 export const referenceDataImports = pgTable("reference_data_imports", {
   id: uuid("id").primaryKey().defaultRandom(),
   source: text("source").notNull(),
@@ -466,6 +583,8 @@ export const foodItemsRelations = relations(foodItems, ({ one, many }) => ({
   user: one(users, { fields: [foodItems.userId], references: [users.id] }),
   portions: many(foodPortions),
   searchDocument: one(foodSearchDocuments),
+  quality: one(foodItemQuality),
+  normalizedSearchDocument: one(foodNormalizedSearchDocuments),
   embeddings: many(foodItemEmbeddings)
 }));
 

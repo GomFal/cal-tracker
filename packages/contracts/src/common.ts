@@ -87,6 +87,7 @@ export const mealItemSchema = z.object({
   needsReview: foodResolutionProvenanceSchema.shape.needsReview,
   resolvedGrams: z.number().positive().optional(),
   portionDescription: z.string().optional(),
+  displayDetails: z.array(z.string().min(1)).optional(),
   rank: z.number().int().positive().optional(),
   matchScore: z.number().min(0).max(1).optional(),
   lexicalScore: z.number().min(0).max(1).optional(),

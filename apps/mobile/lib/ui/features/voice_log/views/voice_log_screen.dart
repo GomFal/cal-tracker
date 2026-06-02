@@ -1228,6 +1228,7 @@ class _CandidateMealLine extends StatelessWidget {
 
   List<String> _candidateMetadata(MealItem candidate) {
     final parts = <String>[];
+    parts.addAll(candidate.displayDetails);
     final source = candidate.externalSource ?? candidate.source;
     if (source.isNotEmpty) parts.add(source);
     final portion = candidate.portionDescription;

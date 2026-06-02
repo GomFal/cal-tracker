@@ -5,6 +5,7 @@ import { newId } from "../utils/ids.js";
 import { applyMacroGoalUpdate } from "../utils/macroGoals.js";
 import { withSpan, withSyncSpan } from "../observability/profiler.js";
 import { normalizeText } from "../utils/normalize.js";
+import { normalizedIdentityTokenKeys } from "../foodData/normalization.js";
 import { subtractNutrition, sumNutrition } from "../utils/nutrition.js";
 import { lexicalFoodScore } from "./foodSearchScoring.js";
 import type {
@@ -44,18 +45,34 @@ type FoodSearchProfile = {
   continueAfterLimit?: boolean;
 };
 
+type NormalizedFoodSearchProfile = {
+  locales: string[];
+};
+
 type DbExecutor = {
   execute(query: SQL): Promise<unknown>;
+};
+
+type PostgresRepositoryOptions = {
+  normalizedSearchEnabled?: boolean;
+  normalizedSearchScope?: "sample" | "full";
+  normalizedSearchSampleSet?: string;
 };
 
 export class PostgresRepository implements AppRepository {
   private readonly client: AppDbClient;
   private readonly db: AppDb;
+  private readonly normalizedSearchEnabled: boolean;
+  private readonly normalizedSearchScope: "sample" | "full";
+  private readonly normalizedSearchSampleSet: string;
   private readonly foodSearchCache = new Map<string, { expiresAt: number; value: FoodSearchCandidate[] }>();
 
-  constructor(databaseUrl: string) {
+  constructor(databaseUrl: string, options: PostgresRepositoryOptions = {}) {
     this.client = createDbClient(databaseUrl);
     this.db = this.client.db;
+    this.normalizedSearchEnabled = Boolean(options.normalizedSearchEnabled);
+    this.normalizedSearchScope = options.normalizedSearchScope ?? "sample";
+    this.normalizedSearchSampleSet = options.normalizedSearchSampleSet ?? "normalized_search_v1";
   }
 
   async close(): Promise<void> {
@@ -224,6 +241,18 @@ export class PostgresRepository implements AppRepository {
     if (cached) return cached.map(cloneFoodSearchCandidate);
 
     const candidateRows = new Map<string, { row: Record<string, unknown>; lexicalScore: number; vectorScore?: number }>();
+    if (this.normalizedSearchEnabled) {
+      const rows = await this.searchNormalizedFoodDocuments(userId, input, normalized, limit);
+      for (const row of rows) {
+        candidateRows.set(row.id as string, { row, lexicalScore: clampScore(Number(row.search_score ?? 0)) });
+      }
+      if (candidateRows.size === 0) {
+        this.setCachedFoodSearch(cacheKey, []);
+        return [];
+      }
+      return this.rankFoodSearchRows(userId, input, normalized, limit, candidateRows, cacheKey, true);
+    }
+
     const includeBranded = !input.excludeBranded;
 
     if (input.barcode) {
@@ -280,12 +309,23 @@ export class PostgresRepository implements AppRepository {
       }
     }
 
-    const merged = [...candidateRows.values()];
-    if (merged.length === 0) {
+    if (candidateRows.size === 0) {
       this.setCachedFoodSearch(cacheKey, []);
       return [];
     }
+    return this.rankFoodSearchRows(userId, input, normalized, limit, candidateRows, cacheKey, false);
+  }
 
+  private async rankFoodSearchRows(
+    userId: string,
+    input: FoodHybridSearchInput,
+    normalized: string,
+    limit: number,
+    candidateRows: Map<string, { row: Record<string, unknown>; lexicalScore: number; vectorScore?: number }>,
+    cacheKey: string,
+    useStoredLexicalScore: boolean,
+  ): Promise<FoodSearchCandidate[]> {
+    const merged = [...candidateRows.values()];
     const foods = await withSpan(
       "PostgresRepository.mapFoodsWithPortions",
       { rowCount: merged.length },
@@ -307,11 +347,12 @@ export class PostgresRepository implements AppRepository {
           normalized.length > 0 && !input.barcode
             ? lexicalFoodScore(food, normalized)
             : 0;
-        const lexicalScore = clampScore(
-          computedLexicalScore > 0
+        const rawLexicalScore = useStoredLexicalScore
+          ? scores?.lexicalScore ?? computedLexicalScore
+          : computedLexicalScore > 0
             ? computedLexicalScore
-            : scores?.lexicalScore ?? 0,
-        );
+            : scores?.lexicalScore ?? 0;
+        const lexicalScore = clampScore(rawLexicalScore);
         const vectorScore = scores?.vectorScore == null ? undefined : clampScore(scores.vectorScore);
         const preferenceScore = clamp((preferenceScores.get(food.id) ?? 0) / PREFERENCE_SCORE_NORMALIZER, -1, 1);
         const baseScore = vectorScore == null
@@ -335,6 +376,429 @@ export class PostgresRepository implements AppRepository {
     );
     this.setCachedFoodSearch(cacheKey, ranked);
     return ranked.map(cloneFoodSearchCandidate);
+  }
+
+  private async searchNormalizedFoodDocuments(
+    userId: string,
+    input: FoodHybridSearchInput,
+    normalized: string,
+    limit: number,
+  ): Promise<Record<string, unknown>[]> {
+    if (input.barcode) {
+      const rows = await withSpan(
+        "PostgresRepository.searchFoodsHybrid.normalizedBarcodeQuery",
+        { limit, scope: this.normalizedSearchScope, sampleSet: this.normalizedSearchSampleSet },
+        () => this.execute(dbSql`
+          SELECT food_items.*,
+                 food_normalized_search_documents.display_name AS search_display_name,
+                 food_normalized_search_documents.display_name AS search_normalized_display_name,
+                 food_normalized_search_documents.base_name AS search_normalized_base_name,
+                 food_normalized_search_documents.variant_name AS search_normalized_variant_name,
+                 food_normalized_search_documents.result_type AS search_normalized_result_type,
+                 food_normalized_search_documents.brand_display AS search_normalized_brand_display,
+                 food_normalized_search_documents.primary_entity_name AS search_primary_entity_name,
+                 food_normalized_search_documents.primary_entity_aliases AS search_primary_entity_aliases,
+                 food_normalized_search_documents.secondary_entity_aliases AS search_secondary_entity_aliases,
+                 food_normalized_search_documents.primary_entity_category AS search_primary_entity_category,
+                 food_normalized_search_documents.primary_entity_category_coherence AS search_primary_entity_category_coherence,
+                 food_normalized_search_documents.primary_entity_representativeness AS search_primary_entity_representativeness,
+                 food_normalized_search_documents.metadata AS search_normalized_metadata,
+                 1::float AS search_score
+          FROM food_normalized_search_documents
+          JOIN food_items ON food_items.id = food_normalized_search_documents.food_item_id
+          JOIN food_item_quality ON food_item_quality.food_item_id = food_items.id
+          JOIN food_normalization_review ON food_normalization_review.food_item_id = food_items.id
+            AND food_normalization_review.normalization_version = food_normalized_search_documents.normalization_version
+          ${this.normalizedFoodSearchSampleJoinSql()}
+          WHERE (food_normalized_search_documents.user_id IS NULL OR food_normalized_search_documents.user_id = ${userId})
+            AND food_item_quality.is_search_eligible
+            AND food_normalization_review.review_status = 'valid'
+            ${this.normalizedFoodSearchSamplePredicateSql()}
+            AND food_items.barcode = ${input.barcode}
+          ORDER BY
+            CASE WHEN food_normalized_search_documents.user_id = ${userId} THEN 0 ELSE 1 END,
+            food_normalized_search_documents.rank_bucket,
+            food_normalized_search_documents.display_name
+          LIMIT ${limit}
+        `),
+      );
+      return rows;
+    }
+    if (normalized.length === 0) return [];
+
+    const profile = normalizedFoodSearchProfile(input);
+    return withSpan(
+      "PostgresRepository.searchFoodsHybrid.normalizedDocumentQuery",
+      { limit: normalizedFoodSearchLimit(limit), locales: profile.locales, scope: this.normalizedSearchScope, sampleSet: this.normalizedSearchSampleSet },
+      () => this.queryNormalizedFoodDocuments(userId, normalized, profile, limit),
+    );
+  }
+
+  private async queryNormalizedFoodDocuments(
+    userId: string,
+    normalized: string,
+    profile: NormalizedFoodSearchProfile,
+    limit: number,
+  ): Promise<Record<string, unknown>[]> {
+    const queryIdentityKey = normalizedIdentityTokenKeys([normalized])[0];
+    const strongRows = await this.queryNormalizedFoodDocumentsStrongIdentity(userId, normalized, queryIdentityKey, profile, limit);
+    if (normalizedStrongIdentityCanShortCircuit(strongRows, limit)) return strongRows;
+    const textRows = await this.queryNormalizedFoodDocumentsText(userId, normalized, queryIdentityKey, profile, limit);
+    const mergedRows = mergeNormalizedFoodDocumentRows(limit * 2, strongRows, textRows);
+    if (mergedRows.length > 0) return mergedRows;
+    const fuzzyRows = await this.queryNormalizedFoodDocumentsFuzzy(userId, normalized, queryIdentityKey, profile, limit);
+    return fuzzyRows;
+  }
+
+  private normalizedFoodSearchSampleJoinSql(): SQL {
+    if (this.normalizedSearchScope === "full") return dbSql``;
+    return dbSql`
+      JOIN food_normalization_sample_items ON food_normalization_sample_items.food_item_id = food_items.id
+      JOIN food_normalization_sample_sets ON food_normalization_sample_sets.id = food_normalization_sample_items.sample_set_id
+    `;
+  }
+
+  private normalizedFoodSearchSamplePredicateSql(): SQL {
+    if (this.normalizedSearchScope === "full") return dbSql``;
+    return dbSql`AND food_normalization_sample_sets.name = ${this.normalizedSearchSampleSet}`;
+  }
+
+  private async queryNormalizedFoodDocumentsStrongIdentity(
+    userId: string,
+    normalized: string,
+    queryIdentityKey: string | undefined,
+    profile: NormalizedFoodSearchProfile,
+    limit: number,
+  ): Promise<Record<string, unknown>[]> {
+    const tokenRows = queryIdentityKey
+      ? await this.queryNormalizedFoodDocumentsStrongIdentityRows(
+        userId,
+        normalized,
+        queryIdentityKey,
+        profile,
+        limit,
+        normalizedFoodIdentityTokenKeyPredicateSql(queryIdentityKey),
+      )
+      : [];
+    if (normalizedStrongIdentityCanShortCircuit(tokenRows, limit)) return tokenRows;
+    const broadRows = await this.queryNormalizedFoodDocumentsStrongIdentityRows(
+      userId,
+      normalized,
+      queryIdentityKey,
+      profile,
+      limit,
+      normalizedFoodStrongIdentityPredicateSql(normalized, undefined),
+    );
+    return mergeNormalizedFoodDocumentRows(limit * 2, tokenRows, broadRows);
+  }
+
+  private async queryNormalizedFoodDocumentsStrongIdentityRows(
+    userId: string,
+    normalized: string,
+    queryIdentityKey: string | undefined,
+    profile: NormalizedFoodSearchProfile,
+    limit: number,
+    predicate: SQL,
+  ): Promise<Record<string, unknown>[]> {
+    const searchLimit = normalizedFoodSearchLimit(limit);
+    const searchScore = normalizedFoodTextSearchScoreSql(normalized, queryIdentityKey);
+    const locale0 = profile.locales[0] ?? "any";
+    const locale1 = profile.locales[1] ?? locale0;
+    const locale2 = profile.locales[2] ?? locale1;
+    const locale3 = profile.locales[3] ?? locale2;
+    return this.execute(dbSql`
+      WITH base_rows AS (
+        SELECT food_items.*,
+               food_normalized_search_documents.display_name AS search_display_name,
+               food_normalized_search_documents.display_name AS search_normalized_display_name,
+               food_normalized_search_documents.base_name AS search_normalized_base_name,
+               food_normalized_search_documents.variant_name AS search_normalized_variant_name,
+               food_normalized_search_documents.result_type AS search_normalized_result_type,
+               food_normalized_search_documents.brand_display AS search_normalized_brand_display,
+               food_normalized_search_documents.primary_entity_name AS search_primary_entity_name,
+               food_normalized_search_documents.primary_entity_aliases AS search_primary_entity_aliases,
+               food_normalized_search_documents.secondary_entity_aliases AS search_secondary_entity_aliases,
+               food_normalized_search_documents.primary_entity_category AS search_primary_entity_category,
+               food_normalized_search_documents.primary_entity_category_coherence AS search_primary_entity_category_coherence,
+               food_normalized_search_documents.primary_entity_representativeness AS search_primary_entity_representativeness,
+               food_normalized_search_documents.metadata AS search_normalized_metadata,
+               ${searchScore} AS search_score_base,
+               LEAST(
+                 0.04::float,
+                 GREATEST(
+                   count(*) OVER (PARTITION BY lower(food_normalized_search_documents.display_name))::float - 1::float,
+                   0::float
+                 ) * 0.002::float
+               ) AS search_display_frequency_bonus,
+               CASE WHEN food_normalized_search_documents.user_id = ${userId} THEN 0 ELSE 1 END AS search_user_rank,
+               CASE
+                 WHEN food_normalized_search_documents.locale = ${locale0} THEN 0
+                 WHEN food_normalized_search_documents.locale = ${locale1} THEN 1
+                 WHEN food_normalized_search_documents.locale = ${locale2} THEN 2
+                 WHEN food_normalized_search_documents.locale = ${locale3} THEN 3
+                 ELSE 4
+               END AS search_locale_rank,
+               CASE food_normalized_search_documents.result_type
+                 WHEN 'generic_food' THEN 0
+                 WHEN 'product' THEN 1
+                 ELSE 2
+               END AS search_result_type_rank,
+               food_normalized_search_documents.rank_bucket AS search_rank_bucket,
+               food_normalized_search_documents.normalization_confidence AS search_normalization_confidence
+        FROM food_normalized_search_documents
+        JOIN food_items ON food_items.id = food_normalized_search_documents.food_item_id
+        JOIN food_item_quality ON food_item_quality.food_item_id = food_items.id
+        JOIN food_normalization_review ON food_normalization_review.food_item_id = food_items.id
+          AND food_normalization_review.normalization_version = food_normalized_search_documents.normalization_version
+        ${this.normalizedFoodSearchSampleJoinSql()}
+        WHERE (food_normalized_search_documents.user_id IS NULL OR food_normalized_search_documents.user_id = ${userId})
+          AND food_item_quality.is_search_eligible
+          AND food_normalization_review.review_status = 'valid'
+          ${this.normalizedFoodSearchSamplePredicateSql()}
+          AND food_normalized_search_documents.locale IN ${sqlList(profile.locales)}
+          AND (${predicate})
+      ),
+      scored_rows AS (
+        SELECT base_rows.*,
+               LEAST(1::float, search_score_base + search_display_frequency_bonus) AS search_score
+        FROM base_rows
+      ),
+      ranked_rows AS (
+        SELECT scored_rows.*,
+               row_number() OVER (
+                 PARTITION BY lower(search_display_name)
+                 ORDER BY
+                   search_score DESC,
+                   search_user_rank,
+                   search_locale_rank,
+                   search_result_type_rank,
+                   search_rank_bucket,
+                   search_normalization_confidence DESC,
+                   id
+               ) AS search_display_rank
+        FROM scored_rows
+      )
+      SELECT *
+      FROM ranked_rows
+      WHERE search_display_rank = 1
+      ORDER BY
+        search_user_rank,
+        search_score DESC,
+        search_locale_rank,
+        search_result_type_rank,
+        search_rank_bucket,
+        char_length(search_display_name),
+        search_display_name
+      LIMIT ${searchLimit}
+    `);
+  }
+
+  private async queryNormalizedFoodDocumentsText(
+    userId: string,
+    normalized: string,
+    queryIdentityKey: string | undefined,
+    profile: NormalizedFoodSearchProfile,
+    limit: number,
+  ): Promise<Record<string, unknown>[]> {
+    const searchLimit = normalizedFoodSearchLimit(limit);
+    const searchScore = normalizedFoodTextSearchScoreSql(normalized, queryIdentityKey);
+    const locale0 = profile.locales[0] ?? "any";
+    const locale1 = profile.locales[1] ?? locale0;
+    const locale2 = profile.locales[2] ?? locale1;
+    const locale3 = profile.locales[3] ?? locale2;
+    return this.execute(dbSql`
+      WITH base_rows AS (
+        SELECT food_items.*,
+               food_normalized_search_documents.display_name AS search_display_name,
+               food_normalized_search_documents.display_name AS search_normalized_display_name,
+               food_normalized_search_documents.base_name AS search_normalized_base_name,
+               food_normalized_search_documents.variant_name AS search_normalized_variant_name,
+               food_normalized_search_documents.result_type AS search_normalized_result_type,
+               food_normalized_search_documents.brand_display AS search_normalized_brand_display,
+               food_normalized_search_documents.primary_entity_name AS search_primary_entity_name,
+               food_normalized_search_documents.primary_entity_aliases AS search_primary_entity_aliases,
+               food_normalized_search_documents.secondary_entity_aliases AS search_secondary_entity_aliases,
+               food_normalized_search_documents.primary_entity_category AS search_primary_entity_category,
+               food_normalized_search_documents.primary_entity_category_coherence AS search_primary_entity_category_coherence,
+               food_normalized_search_documents.primary_entity_representativeness AS search_primary_entity_representativeness,
+               food_normalized_search_documents.metadata AS search_normalized_metadata,
+               ${searchScore} AS search_score_base,
+               LEAST(
+                 0.04::float,
+                 GREATEST(
+                   count(*) OVER (PARTITION BY lower(food_normalized_search_documents.display_name))::float - 1::float,
+                   0::float
+                 ) * 0.002::float
+               ) AS search_display_frequency_bonus,
+               CASE WHEN food_normalized_search_documents.user_id = ${userId} THEN 0 ELSE 1 END AS search_user_rank,
+               CASE
+                 WHEN food_normalized_search_documents.locale = ${locale0} THEN 0
+                 WHEN food_normalized_search_documents.locale = ${locale1} THEN 1
+                 WHEN food_normalized_search_documents.locale = ${locale2} THEN 2
+                 WHEN food_normalized_search_documents.locale = ${locale3} THEN 3
+                 ELSE 4
+               END AS search_locale_rank,
+               CASE food_normalized_search_documents.result_type
+                 WHEN 'generic_food' THEN 0
+                 WHEN 'product' THEN 1
+                 ELSE 2
+               END AS search_result_type_rank,
+               food_normalized_search_documents.rank_bucket AS search_rank_bucket,
+               food_normalized_search_documents.normalization_confidence AS search_normalization_confidence
+        FROM food_normalized_search_documents
+        JOIN food_items ON food_items.id = food_normalized_search_documents.food_item_id
+        JOIN food_item_quality ON food_item_quality.food_item_id = food_items.id
+        JOIN food_normalization_review ON food_normalization_review.food_item_id = food_items.id
+          AND food_normalization_review.normalization_version = food_normalized_search_documents.normalization_version
+        ${this.normalizedFoodSearchSampleJoinSql()}
+        WHERE (food_normalized_search_documents.user_id IS NULL OR food_normalized_search_documents.user_id = ${userId})
+          AND food_item_quality.is_search_eligible
+          AND food_normalization_review.review_status = 'valid'
+          ${this.normalizedFoodSearchSamplePredicateSql()}
+          AND food_normalized_search_documents.locale IN ${sqlList(profile.locales)}
+          AND (${normalizedFoodTextSearchPredicateSql(normalized)})
+      ),
+      scored_rows AS (
+        SELECT base_rows.*,
+               LEAST(1::float, search_score_base + search_display_frequency_bonus) AS search_score
+        FROM base_rows
+      ),
+      ranked_rows AS (
+        SELECT scored_rows.*,
+               row_number() OVER (
+                 PARTITION BY lower(search_display_name)
+                 ORDER BY
+                   search_score DESC,
+                   search_user_rank,
+                   search_locale_rank,
+                   search_result_type_rank,
+                   search_rank_bucket,
+                   search_normalization_confidence DESC,
+                   id
+               ) AS search_display_rank
+        FROM scored_rows
+      )
+      SELECT *
+      FROM ranked_rows
+      WHERE search_display_rank = 1
+      ORDER BY
+        search_user_rank,
+        search_score DESC,
+        search_locale_rank,
+        search_result_type_rank,
+        search_rank_bucket,
+        char_length(search_display_name),
+        search_display_name
+      LIMIT ${searchLimit}
+    `);
+  }
+
+  private async queryNormalizedFoodDocumentsFuzzy(
+    userId: string,
+    normalized: string,
+    queryIdentityKey: string | undefined,
+    profile: NormalizedFoodSearchProfile,
+    limit: number,
+  ): Promise<Record<string, unknown>[]> {
+    const searchLimit = normalizedFoodSearchLimit(limit);
+    const locale0 = profile.locales[0] ?? "any";
+    const locale1 = profile.locales[1] ?? locale0;
+    const locale2 = profile.locales[2] ?? locale1;
+    const locale3 = profile.locales[3] ?? locale2;
+    return this.execute(dbSql`
+      WITH base_rows AS (
+        SELECT food_items.*,
+               food_normalized_search_documents.display_name AS search_display_name,
+               food_normalized_search_documents.display_name AS search_normalized_display_name,
+               food_normalized_search_documents.base_name AS search_normalized_base_name,
+               food_normalized_search_documents.variant_name AS search_normalized_variant_name,
+               food_normalized_search_documents.result_type AS search_normalized_result_type,
+               food_normalized_search_documents.brand_display AS search_normalized_brand_display,
+               food_normalized_search_documents.primary_entity_name AS search_primary_entity_name,
+               food_normalized_search_documents.primary_entity_aliases AS search_primary_entity_aliases,
+               food_normalized_search_documents.secondary_entity_aliases AS search_secondary_entity_aliases,
+               food_normalized_search_documents.primary_entity_category AS search_primary_entity_category,
+               food_normalized_search_documents.primary_entity_category_coherence AS search_primary_entity_category_coherence,
+               food_normalized_search_documents.primary_entity_representativeness AS search_primary_entity_representativeness,
+               food_normalized_search_documents.metadata AS search_normalized_metadata,
+               GREATEST(
+                 similarity(food_normalized_search_documents.search_text, ${normalized}),
+                 word_similarity(${normalized}, food_normalized_search_documents.search_text),
+                 strict_word_similarity(${normalized}, food_normalized_search_documents.search_text),
+                 ${normalizedFoodSearchScoreSql(normalized, queryIdentityKey)}
+               ) AS search_score_base,
+               LEAST(
+                 0.04::float,
+                 GREATEST(
+                   count(*) OVER (PARTITION BY lower(food_normalized_search_documents.display_name))::float - 1::float,
+                   0::float
+                 ) * 0.002::float
+               ) AS search_display_frequency_bonus,
+               CASE WHEN food_normalized_search_documents.user_id = ${userId} THEN 0 ELSE 1 END AS search_user_rank,
+               CASE
+                 WHEN food_normalized_search_documents.locale = ${locale0} THEN 0
+                 WHEN food_normalized_search_documents.locale = ${locale1} THEN 1
+                 WHEN food_normalized_search_documents.locale = ${locale2} THEN 2
+                 WHEN food_normalized_search_documents.locale = ${locale3} THEN 3
+                 ELSE 4
+               END AS search_locale_rank,
+               CASE food_normalized_search_documents.result_type
+                 WHEN 'generic_food' THEN 0
+                 WHEN 'product' THEN 1
+                 ELSE 2
+               END AS search_result_type_rank,
+               food_normalized_search_documents.rank_bucket AS search_rank_bucket,
+               food_normalized_search_documents.normalization_confidence AS search_normalization_confidence
+        FROM food_normalized_search_documents
+        JOIN food_items ON food_items.id = food_normalized_search_documents.food_item_id
+        JOIN food_item_quality ON food_item_quality.food_item_id = food_items.id
+        JOIN food_normalization_review ON food_normalization_review.food_item_id = food_items.id
+          AND food_normalization_review.normalization_version = food_normalized_search_documents.normalization_version
+        ${this.normalizedFoodSearchSampleJoinSql()}
+        WHERE (food_normalized_search_documents.user_id IS NULL OR food_normalized_search_documents.user_id = ${userId})
+          AND food_item_quality.is_search_eligible
+          AND food_normalization_review.review_status = 'valid'
+          ${this.normalizedFoodSearchSamplePredicateSql()}
+          AND food_normalized_search_documents.locale IN ${sqlList(profile.locales)}
+          AND (
+            food_normalized_search_documents.search_text % ${normalized}
+            OR ${normalized} <% food_normalized_search_documents.search_text
+            OR ${normalized} <<% food_normalized_search_documents.search_text
+          )
+      ),
+      scored_rows AS (
+        SELECT base_rows.*,
+               LEAST(1::float, search_score_base + search_display_frequency_bonus) AS search_score
+        FROM base_rows
+      ),
+      ranked_rows AS (
+        SELECT scored_rows.*,
+               row_number() OVER (
+                 PARTITION BY lower(search_display_name)
+                 ORDER BY
+                   search_score DESC,
+                   search_user_rank,
+                   search_locale_rank,
+                   search_result_type_rank,
+                   search_rank_bucket,
+                   search_normalization_confidence DESC,
+                   id
+               ) AS search_display_rank
+        FROM scored_rows
+      )
+      SELECT *
+      FROM ranked_rows
+      WHERE search_display_rank = 1
+      ORDER BY
+        search_user_rank,
+        search_score DESC,
+        search_locale_rank,
+        search_result_type_rank,
+        search_rank_bucket,
+        char_length(search_display_name),
+        search_display_name
+      LIMIT ${searchLimit}
+    `);
   }
 
   private async searchFoodDocuments(
@@ -1293,10 +1757,28 @@ async function insertTemplateItem(dbClient: DbExecutor, templateId: string, item
 }
 
 function mapFood(row: Record<string, unknown>): FoodItemRecord {
+  const normalizedDisplayName = optionalString(row.search_normalized_display_name);
+  const normalizedBaseName = optionalString(row.search_normalized_base_name);
+  const normalizedVariantName = optionalString(row.search_normalized_variant_name);
+  const normalizedResultType = optionalString(row.search_normalized_result_type);
+  const normalizedBrandDisplay = optionalString(row.search_normalized_brand_display);
+  const primaryEntityName = optionalString(row.search_primary_entity_name);
+  const primaryEntityAliases = arrayOfStrings(row.search_primary_entity_aliases);
+  const secondaryEntityAliases = arrayOfStrings(row.search_secondary_entity_aliases);
+  const primaryEntityCategory = optionalString(row.search_primary_entity_category);
+  const primaryEntityCategoryCoherence =
+    row.search_primary_entity_category_coherence == null
+      ? undefined
+      : Number(row.search_primary_entity_category_coherence);
+  const primaryEntityRepresentativeness =
+    row.search_primary_entity_representativeness == null
+      ? undefined
+      : Number(row.search_primary_entity_representativeness);
+  const displayDetails = normalizedFoodDisplayDetails(row);
   return {
     id: row.id as string,
     userId: optionalString(row.user_id),
-    name: row.name as string,
+    name: optionalString(row.search_display_name) ?? (row.name as string),
     normalizedName: row.normalized_name as string,
     canonicalName: optionalString(row.canonical_name),
     brand: optionalString(row.brand),
@@ -1314,6 +1796,18 @@ function mapFood(row: Record<string, unknown>): FoodItemRecord {
     foodKey: optionalString(row.food_key),
     ingredients: optionalString(row.ingredients),
     marketCountry: optionalString(row.market_country),
+    normalizedDisplayName,
+    normalizedBaseName,
+    normalizedVariantName,
+    normalizedResultType,
+    normalizedBrandDisplay,
+    primaryEntityName,
+    primaryEntityAliases,
+    secondaryEntityAliases,
+    primaryEntityCategory,
+    primaryEntityCategoryCoherence,
+    primaryEntityRepresentativeness,
+    displayDetails,
     householdServingFulltext: optionalString(row.household_serving_fulltext),
     nutrients: isRecord(row.nutrients_json) ? row.nutrients_json : undefined,
     portions: [],
@@ -1323,6 +1817,30 @@ function mapFood(row: Record<string, unknown>): FoodItemRecord {
     carbsGrams: Number(row.carbs_grams),
     fatGrams: Number(row.fat_grams)
   };
+}
+
+function normalizedFoodDisplayDetails(row: Record<string, unknown>): string[] | undefined {
+  const metadata = isRecord(row.search_normalized_metadata) ? row.search_normalized_metadata : undefined;
+  const displayText = normalizeText([
+    row.search_normalized_display_name,
+    row.search_normalized_base_name,
+  ].filter((value): value is string => typeof value === "string").join(" "));
+  const values = [
+    ...arrayOfStrings(metadata?.retainedDescriptors),
+    ...arrayOfStrings(metadata?.hiddenDescriptors),
+    optionalString(row.search_normalized_variant_name),
+  ];
+  const seen = new Set<string>();
+  const details: string[] = [];
+  for (const value of values) {
+    const trimmed = value?.trim();
+    if (!trimmed) continue;
+    const key = normalizeText(trimmed);
+    if (!key || seen.has(key) || tokenPhraseContained(displayText, key)) continue;
+    seen.add(key);
+    details.push(titleCaseDisplay(trimmed));
+  }
+  return details.length > 0 ? details : undefined;
 }
 
 function mapFoodPortion(row: Record<string, unknown>): FoodPortionRecord {
@@ -1496,8 +2014,23 @@ function optionalNumber(value: unknown): number | undefined {
   return value == null ? undefined : Number(value);
 }
 
+function arrayOfStrings(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function tokenPhraseContained(text: string, phrase: string): boolean {
+  if (!text || !phrase) return false;
+  return ` ${text} `.includes(` ${phrase} `);
+}
+
+function titleCaseDisplay(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/\b[\p{L}\p{N}][\p{L}\p{N}'%-]*/gu, (word) => `${word[0]?.toUpperCase() ?? ""}${word.slice(1)}`);
 }
 
 function previousDatesInWeek(date: string): string[] {
@@ -1528,6 +2061,42 @@ function cloneFoodSearchCandidate(candidate: FoodSearchCandidate): FoodSearchCan
     ...candidate,
     portions: candidate.portions?.map((portion) => ({ ...portion })),
   };
+}
+
+function mergeNormalizedFoodDocumentRows(
+  limit: number,
+  ...rowGroups: Record<string, unknown>[][]
+): Record<string, unknown>[] {
+  const searchLimit = normalizedFoodSearchLimit(limit);
+  const merged: Record<string, unknown>[] = [];
+  const seenFoodIds = new Set<string>();
+  const seenDisplayNames = new Set<string>();
+
+  for (const rows of rowGroups) {
+    for (const row of rows) {
+      const foodId = optionalString(row.id);
+      if (!foodId || seenFoodIds.has(foodId)) continue;
+      const displayName = optionalString(row.search_display_name) ?? optionalString(row.name);
+      const displayKey = displayName?.trim().toLowerCase();
+      if (displayKey && seenDisplayNames.has(displayKey)) continue;
+      seenFoodIds.add(foodId);
+      if (displayKey) seenDisplayNames.add(displayKey);
+      merged.push(row);
+      if (merged.length >= searchLimit) return merged;
+    }
+  }
+
+  return merged;
+}
+
+function normalizedStrongIdentityCanShortCircuit(rows: Record<string, unknown>[], limit: number): boolean {
+  const searchLimit = normalizedFoodSearchLimit(limit);
+  if (rows.length < searchLimit) return false;
+  const resultRows = rows.slice(0, searchLimit);
+  const genericRows = resultRows.filter((row) => row.search_normalized_result_type === "generic_food").length;
+  const productRows = resultRows.filter((row) => row.search_normalized_result_type === "product").length;
+  const topResultType = resultRows[0]?.search_normalized_result_type;
+  return genericRows >= productRows || (topResultType === "generic_food" && genericRows > 0);
 }
 
 function foodSearchCacheKey(
@@ -1562,6 +2131,84 @@ function foodTextSearchScoreSql(normalized: string): SQL {
       ts_rank_cd(food_search_documents.search_vector, websearch_to_tsquery('simple', ${normalized}))::float,
       (ts_rank_cd(food_search_documents.search_vector, to_tsquery('simple', ${prefixQuery})) * 0.9)::float,
       ${foodSearchScoreSql(normalized)}
+    )
+  `;
+}
+
+function normalizedFoodTextSearchPredicateSql(normalized: string): SQL {
+  const prefixQuery = foodSearchPrefixTsQuery(normalized);
+  const queryTokenCount = normalized.split(/\s+/).filter(Boolean).length;
+  const usePrefixQuery = queryTokenCount > 1;
+  if (queryTokenCount === 1) {
+    const tokenPrefix = `${normalized} %`;
+    const tokenContainsMiddle = `% ${normalized} %`;
+    const tokenContainsEnd = `% ${normalized}`;
+    const baseName = dbSql`lower(COALESCE(food_normalized_search_documents.base_name, ''))`;
+    const displayName = dbSql`lower(COALESCE(food_normalized_search_documents.display_name, ''))`;
+    const brandDisplay = dbSql`lower(COALESCE(food_normalized_search_documents.brand_display, ''))`;
+    return dbSql`
+      (
+        food_normalized_search_documents.result_type <> 'product'
+        AND food_normalized_search_documents.search_vector @@ websearch_to_tsquery('simple', ${normalized})
+      )
+      OR (
+        food_normalized_search_documents.result_type = 'product'
+        AND food_normalized_search_documents.search_vector @@ websearch_to_tsquery('simple', ${normalized})
+        AND (
+          ${baseName} = ${normalized}
+          OR ${displayName} = ${normalized}
+          OR ${brandDisplay} = ${normalized}
+          OR ${baseName} LIKE ${tokenPrefix}
+          OR ${displayName} LIKE ${tokenPrefix}
+          OR ${brandDisplay} LIKE ${tokenPrefix}
+          OR ${baseName} LIKE ${tokenContainsMiddle}
+          OR ${baseName} LIKE ${tokenContainsEnd}
+          OR ${displayName} LIKE ${tokenContainsMiddle}
+          OR ${displayName} LIKE ${tokenContainsEnd}
+          OR food_normalized_search_documents.primary_entity_aliases @> ARRAY[${normalized}]::text[]
+          OR food_normalized_search_documents.secondary_entity_aliases @> ARRAY[${normalized}]::text[]
+        )
+      )
+    `;
+  }
+  return dbSql`
+    food_normalized_search_documents.search_vector @@ websearch_to_tsquery('simple', ${normalized})
+    OR (
+      ${usePrefixQuery}
+      AND food_normalized_search_documents.search_vector @@ to_tsquery('simple', ${prefixQuery})
+    )
+  `;
+}
+
+function normalizedFoodStrongIdentityPredicateSql(normalized: string, queryIdentityKey: string | undefined): SQL {
+  const identityPredicate = queryIdentityKey
+    ? dbSql`OR ${normalizedFoodIdentityTokenKeyPredicateSql(queryIdentityKey)}`
+    : dbSql``;
+  return dbSql`
+    lower(food_normalized_search_documents.base_name) = ${normalized}
+    OR lower(food_normalized_search_documents.display_name) = ${normalized}
+    OR lower(food_normalized_search_documents.brand_display) = ${normalized}
+    OR food_normalized_search_documents.primary_entity_aliases @> ARRAY[${normalized}]::text[]
+    ${identityPredicate}
+  `;
+}
+
+function normalizedFoodIdentityTokenKeyPredicateSql(queryIdentityKey: string): SQL {
+  return dbSql`food_normalized_search_documents.identity_token_keys @> ARRAY[${queryIdentityKey}]::text[]`;
+}
+
+function normalizedFoodTextSearchScoreSql(normalized: string, queryIdentityKey: string | undefined): SQL {
+  const prefixQuery = foodSearchPrefixTsQuery(normalized);
+  const usePrefixQuery = normalized.split(/\s+/).filter(Boolean).length > 1;
+  return dbSql`
+    GREATEST(
+      LEAST(0.74::float, ts_rank_cd(food_normalized_search_documents.search_vector, websearch_to_tsquery('simple', ${normalized}))::float),
+      CASE
+        WHEN ${usePrefixQuery}
+        THEN LEAST(0.70::float, (ts_rank_cd(food_normalized_search_documents.search_vector, to_tsquery('simple', ${prefixQuery})) * 0.9)::float)
+        ELSE 0::float
+      END,
+      ${normalizedFoodSearchScoreSql(normalized, queryIdentityKey)}
     )
   `;
 }
@@ -1651,6 +2298,325 @@ function foodSearchScoreSql(normalized: string): SQL {
   `;
 }
 
+function normalizedFoodSearchScoreSql(normalized: string, queryIdentityKey: string | undefined): SQL {
+  const prefix = `${normalized}%`;
+  const tokenPrefix = `${normalized} %`;
+  const tokenContainsMiddle = `% ${normalized} %`;
+  const tokenContainsEnd = `% ${normalized}`;
+  const queryTokenCount = normalized.split(/\s+/).filter(Boolean).length;
+  const isMultiTokenQuery = queryTokenCount > 1;
+  const isSingleTokenQuery = queryTokenCount === 1;
+  const baseName = dbSql`lower(COALESCE(food_normalized_search_documents.base_name, ''))`;
+  const displayName = dbSql`lower(COALESCE(food_normalized_search_documents.display_name, ''))`;
+  const brandDisplay = dbSql`lower(COALESCE(food_normalized_search_documents.brand_display, ''))`;
+  const baseNameWithBrand = dbSql`trim(concat_ws(' ', NULLIF(${baseName}, ''), NULLIF(${brandDisplay}, '')))`;
+  const brandWithBaseName = dbSql`trim(concat_ws(' ', NULLIF(${brandDisplay}, ''), NULLIF(${baseName}, '')))`;
+  const baseNameSecondToken = dbSql`split_part(${baseName}, ' ', 2)`;
+  const primaryEntityName = dbSql`lower(COALESCE(food_normalized_search_documents.primary_entity_name, ''))`;
+  const primaryAliases = dbSql`food_normalized_search_documents.primary_entity_aliases`;
+  const secondaryAliases = dbSql`food_normalized_search_documents.secondary_entity_aliases`;
+  const identityTokenKeyMatch = queryIdentityKey
+    ? dbSql`food_normalized_search_documents.identity_token_keys @> ARRAY[${queryIdentityKey}]::text[]`
+    : dbSql`false`;
+  const primaryEntityCategoryCoherence = dbSql`
+    COALESCE(food_normalized_search_documents.primary_entity_category_coherence, 0)::float
+  `;
+  const primaryEntityRepresentativeness = dbSql`
+    COALESCE(food_normalized_search_documents.primary_entity_representativeness, 0)::float
+  `;
+  const primaryAliasScore = normalizedFoodEntityAliasScoreSql(primaryAliases, normalized, queryTokenCount, {
+    exact: 0.92,
+    prefix: 0.89,
+    queryStartsAlias: 0.82,
+  });
+  const secondaryAliasScore = normalizedFoodEntityAliasScoreSql(secondaryAliases, normalized, queryTokenCount, {
+    exact: 0.82,
+    prefix: 0.72,
+    queryStartsAlias: 0.64,
+  });
+  const baseNamePenalty = compactnessPenaltySql(baseName, normalized, queryTokenCount);
+  const displayNamePenalty = compactnessPenaltySql(displayName, normalized, queryTokenCount);
+  const structuralTieScore = normalizedFoodStructuralTieScoreSql(
+    normalized,
+    baseName,
+    displayName,
+    baseNamePenalty,
+    displayNamePenalty,
+  );
+
+  return dbSql`
+    GREATEST(
+      CASE
+        WHEN food_items.barcode = ${normalized}
+        THEN 1::float
+        ELSE 0::float
+      END,
+      CASE
+        WHEN food_normalized_search_documents.result_type = 'generic_food'
+          AND ${isMultiTokenQuery}
+          AND ${identityTokenKeyMatch}
+        THEN LEAST(
+          0.98::float,
+          0.94::float +
+            (${primaryEntityCategoryCoherence} * 0.015::float) +
+            (${primaryEntityRepresentativeness} * 0.025::float)
+        )
+        ELSE 0::float
+      END,
+      CASE
+        WHEN ${isMultiTokenQuery}
+          AND (
+            food_normalized_search_documents.result_type <> 'product'
+              AND (
+                food_normalized_search_documents.search_text = ${normalized}
+                OR ${displayName} = ${normalized}
+                OR ${baseName} = ${normalized}
+              )
+          )
+        THEN 1::float
+        ELSE 0::float
+      END,
+      CASE
+        WHEN ${isMultiTokenQuery}
+          AND food_normalized_search_documents.result_type = 'product'
+          AND (
+            ${displayName} = ${normalized}
+            OR ${baseName} = ${normalized}
+          )
+        THEN 0.90::float
+        ELSE 0::float
+      END,
+      CASE
+        WHEN ${isMultiTokenQuery}
+          AND food_normalized_search_documents.result_type = 'product'
+          AND ${brandDisplay} <> ''
+          AND (
+            ${baseNameWithBrand} = ${normalized}
+            OR ${brandWithBaseName} = ${normalized}
+          )
+        THEN 0.89::float
+        ELSE 0::float
+      END,
+      CASE
+        WHEN food_normalized_search_documents.result_type = 'product'
+          AND ${isMultiTokenQuery}
+          AND ${identityTokenKeyMatch}
+        THEN 0.84::float
+        ELSE 0::float
+      END,
+      CASE
+        WHEN food_normalized_search_documents.result_type = 'generic_food'
+          AND ${primaryAliasScore} > 0::float
+        THEN LEAST(
+          0.99::float,
+          ${primaryAliasScore} +
+            (${primaryEntityCategoryCoherence} * 0.025::float) +
+            (${primaryEntityRepresentativeness} * 0.045::float) +
+            (${structuralTieScore} * 0.025::float)
+        )
+        WHEN food_normalized_search_documents.result_type = 'product'
+          AND ${primaryAliasScore} >= 0.92::float
+        THEN CASE WHEN ${isSingleTokenQuery} THEN 0.74::float ELSE 0.90::float END
+        WHEN food_normalized_search_documents.result_type = 'product'
+        THEN LEAST(0.78::float, ${primaryAliasScore})
+        ELSE LEAST(0.90::float, ${primaryAliasScore})
+      END,
+      CASE
+        WHEN food_normalized_search_documents.result_type = 'generic_food'
+          AND ${secondaryAliasScore} >= 0.76::float
+          AND (
+            ${baseName} = ${normalized}
+            OR ${displayName} = ${normalized}
+            OR ${baseName} LIKE ${tokenPrefix}
+            OR ${displayName} LIKE ${tokenPrefix}
+          )
+        THEN LEAST(
+          0.96::float,
+          0.91::float +
+            (${primaryEntityCategoryCoherence} * 0.015::float) +
+            (${primaryEntityRepresentativeness} * 0.025::float)
+        )
+        ELSE 0::float
+      END,
+      CASE
+        WHEN food_normalized_search_documents.result_type = 'generic_food'
+          AND ${isSingleTokenQuery}
+          AND ${secondaryAliasScore} > 0::float
+          AND ${baseNameSecondToken} = ${normalized}
+          AND ${primaryEntityName} ~ '^[[:alpha:]][[:alpha:] ]*$'
+        THEN LEAST(
+          0.85::float,
+          0.82::float +
+            (${primaryEntityCategoryCoherence} * 0.010::float) +
+            (${primaryEntityRepresentativeness} * 0.015::float)
+        )
+        ELSE 0::float
+      END,
+      ${secondaryAliasScore},
+      CASE
+        WHEN ${brandDisplay} = ${normalized}
+          OR (
+            ${isMultiTokenQuery}
+            AND ${brandDisplay} LIKE ${tokenPrefix}
+          )
+        THEN 0.62::float
+        ELSE 0::float
+      END,
+      CASE
+        WHEN food_normalized_search_documents.result_type = 'product'
+          AND (
+            ${baseName} = ${normalized}
+            OR ${displayName} = ${normalized}
+          )
+        THEN CASE WHEN ${isSingleTokenQuery} THEN 0.74::float ELSE 0.86::float END
+        ELSE 0::float
+      END,
+      CASE
+        WHEN food_normalized_search_documents.result_type = 'generic_food'
+          AND (
+            ${baseName} LIKE ${tokenPrefix}
+            OR ${displayName} LIKE ${tokenPrefix}
+          )
+        THEN GREATEST(
+          CASE WHEN ${baseName} LIKE ${tokenPrefix} THEN 0.74::float - ${baseNamePenalty} ELSE 0::float END,
+          CASE WHEN ${displayName} LIKE ${tokenPrefix} THEN 0.74::float - ${displayNamePenalty} ELSE 0::float END
+        )
+        ELSE 0::float
+      END,
+      CASE
+        WHEN food_normalized_search_documents.result_type = 'generic_food'
+          AND (
+            ${baseName} LIKE ${tokenContainsMiddle}
+            OR ${baseName} LIKE ${tokenContainsEnd}
+            OR ${displayName} LIKE ${tokenContainsMiddle}
+            OR ${displayName} LIKE ${tokenContainsEnd}
+          )
+        THEN GREATEST(
+          CASE
+            WHEN ${baseName} LIKE ${tokenContainsMiddle}
+              OR ${baseName} LIKE ${tokenContainsEnd}
+            THEN 0.68::float - ${baseNamePenalty}
+            ELSE 0::float
+          END,
+          CASE
+            WHEN ${displayName} LIKE ${tokenContainsMiddle}
+              OR ${displayName} LIKE ${tokenContainsEnd}
+            THEN 0.68::float - ${displayNamePenalty}
+            ELSE 0::float
+          END
+        )
+        ELSE 0::float
+      END,
+      CASE
+        WHEN food_normalized_search_documents.result_type = 'generic_food'
+          AND (
+            ${baseName} LIKE ${prefix}
+            OR ${displayName} = ${normalized}
+          )
+        THEN GREATEST(
+          CASE WHEN ${baseName} LIKE ${prefix} THEN 0.58::float - ${baseNamePenalty} ELSE 0::float END,
+          CASE WHEN ${displayName} LIKE ${prefix} THEN 0.58::float - ${displayNamePenalty} ELSE 0::float END
+        )
+        ELSE 0::float
+      END
+    )
+  `;
+}
+
+function normalizedFoodEntityAliasScoreSql(
+  aliases: SQL,
+  normalized: string,
+  queryTokenCount: number,
+  scores: { exact: number; prefix: number; queryStartsAlias: number },
+): SQL {
+  const tokenPrefix = `${normalized} %`;
+  return dbSql`
+    COALESCE((
+      SELECT MAX(GREATEST(
+        CASE
+          WHEN entity_alias.alias = ${normalized}
+          THEN ${scores.exact}::float
+          ELSE 0::float
+        END,
+        CASE
+          WHEN entity_alias.alias LIKE ${tokenPrefix}
+          THEN ${scores.prefix}::float - ${compactnessPenaltySql(dbSql`entity_alias.alias`, normalized, queryTokenCount)}
+          ELSE 0::float
+        END,
+        CASE
+          WHEN ${normalized} LIKE entity_alias.alias || ' %'
+          THEN ${scores.queryStartsAlias}::float
+          ELSE 0::float
+        END
+      ))
+      FROM unnest(${aliases}) AS entity_alias(alias)
+      WHERE entity_alias.alias <> ''
+    ), 0::float)
+  `;
+}
+
+function normalizedFoodStructuralTieScoreSql(
+  normalized: string,
+  baseName: SQL,
+  displayName: SQL,
+  baseNamePenalty: SQL,
+  displayNamePenalty: SQL,
+): SQL {
+  const prefix = `${normalized}%`;
+  const tokenPrefix = `${normalized} %`;
+  const tokenContainsMiddle = `% ${normalized} %`;
+  const tokenContainsEnd = `% ${normalized}`;
+  return dbSql`
+    GREATEST(
+      CASE
+        WHEN ${baseName} = ${normalized}
+          OR ${displayName} = ${normalized}
+        THEN 1::float
+        ELSE 0::float
+      END,
+      CASE
+        WHEN ${baseName} LIKE ${tokenPrefix}
+          OR ${displayName} LIKE ${tokenPrefix}
+        THEN GREATEST(
+          CASE WHEN ${baseName} LIKE ${tokenPrefix} THEN 0.94::float - ${baseNamePenalty} ELSE 0::float END,
+          CASE WHEN ${displayName} LIKE ${tokenPrefix} THEN 0.94::float - ${displayNamePenalty} ELSE 0::float END
+        )
+        ELSE 0::float
+      END,
+      CASE
+        WHEN ${baseName} LIKE ${tokenContainsMiddle}
+          OR ${baseName} LIKE ${tokenContainsEnd}
+          OR ${displayName} LIKE ${tokenContainsMiddle}
+          OR ${displayName} LIKE ${tokenContainsEnd}
+        THEN GREATEST(
+          CASE
+            WHEN ${baseName} LIKE ${tokenContainsMiddle}
+              OR ${baseName} LIKE ${tokenContainsEnd}
+            THEN 0.82::float - ${baseNamePenalty}
+            ELSE 0::float
+          END,
+          CASE
+            WHEN ${displayName} LIKE ${tokenContainsMiddle}
+              OR ${displayName} LIKE ${tokenContainsEnd}
+            THEN 0.82::float - ${displayNamePenalty}
+            ELSE 0::float
+          END
+        )
+        ELSE 0::float
+      END,
+      CASE
+        WHEN ${baseName} LIKE ${prefix}
+          OR ${displayName} LIKE ${prefix}
+        THEN GREATEST(
+          CASE WHEN ${baseName} LIKE ${prefix} THEN 0.62::float - ${baseNamePenalty} ELSE 0::float END,
+          CASE WHEN ${displayName} LIKE ${prefix} THEN 0.62::float - ${displayNamePenalty} ELSE 0::float END
+        )
+        ELSE 0::float
+      END
+    )
+  `;
+}
+
 function foodSearchPrefixTsQuery(normalized: string): string {
   return normalized
     .split(/\s+/)
@@ -1675,6 +2641,17 @@ function compactnessPenaltySql(text: SQL, normalized: string, queryTokenCount: n
       GREATEST(char_length(trim(${text})) - char_length(${normalized}), 0)::float * 0.001
     )
   `;
+}
+
+function normalizedFoodSearchProfile(input: FoodHybridSearchInput): NormalizedFoodSearchProfile {
+  const locale = normalizeSearchLocale(input.locale);
+  if (locale === "es") return { locales: ["es", "any", "en"] };
+  if (locale === "en") return { locales: ["en", "any", "es"] };
+  return { locales: ["en", "any", "es"] };
+}
+
+function normalizedFoodSearchLimit(limit: number): number {
+  return limit;
 }
 
 function foodSearchProfiles(

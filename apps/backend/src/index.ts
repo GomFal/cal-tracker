@@ -15,7 +15,11 @@ import { PostgresRepository } from "./repository/postgres.js";
 import { RemoteSpeechToTextProvider } from "./stt/speechToTextProvider.js";
 
 const config = loadConfig();
-const repository = new PostgresRepository(config.DATABASE_URL);
+const repository = new PostgresRepository(config.DATABASE_URL, {
+  normalizedSearchEnabled: config.FOOD_NORMALIZED_SEARCH_ENABLED,
+  normalizedSearchScope: config.FOOD_NORMALIZED_SEARCH_SCOPE,
+  normalizedSearchSampleSet: config.FOOD_NORMALIZED_SEARCH_SAMPLE_SET,
+});
 const authService = new AuthService(config, repository);
 const embeddingProvider = config.EMBEDDINGS_ENABLED
   ? new OpenRouterEmbeddingProvider(

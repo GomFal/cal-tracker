@@ -49,7 +49,7 @@ services:
         required: false
     environment:
       DATABASE_SCHEMA: cal_tracker_dev
-      DATABASE_URL: postgres://cal_tracker:${POSTGRES_PASSWORD}@postgres:5432/cal_tracker
+      DATABASE_URL: postgres://cal_tracker:${POSTGRES_PASSWORD}@postgres:5432/${DEV_DATABASE_NAME:-cal_tracker}
       NODE_ENV: production
       PORT: 3000
     ports:
@@ -63,7 +63,7 @@ services:
         required: false
     environment:
       DATABASE_SCHEMA: cal_tracker_dev
-      DATABASE_URL: postgres://cal_tracker:${POSTGRES_PASSWORD}@postgres:5432/cal_tracker
+      DATABASE_URL: postgres://cal_tracker:${POSTGRES_PASSWORD}@postgres:5432/${DEV_DATABASE_NAME:-cal_tracker}
       NODE_ENV: production
       PORT: 3000
     ports:
@@ -77,7 +77,7 @@ services:
         required: false
     environment:
       DATABASE_SCHEMA: cal_tracker_pro
-      DATABASE_URL: postgres://cal_tracker:${POSTGRES_PASSWORD}@postgres:5432/cal_tracker
+      DATABASE_URL: postgres://cal_tracker:${POSTGRES_PASSWORD}@postgres:5432/${PRO_DATABASE_NAME:-cal_tracker}
       NODE_ENV: production
       PORT: 3000
     ports:
@@ -91,7 +91,7 @@ services:
         required: false
     environment:
       DATABASE_SCHEMA: cal_tracker_pro
-      DATABASE_URL: postgres://cal_tracker:${POSTGRES_PASSWORD}@postgres:5432/cal_tracker
+      DATABASE_URL: postgres://cal_tracker:${POSTGRES_PASSWORD}@postgres:5432/${PRO_DATABASE_NAME:-cal_tracker}
       NODE_ENV: production
       PORT: 3000
     ports:

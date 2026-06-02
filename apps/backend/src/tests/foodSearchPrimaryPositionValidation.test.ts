@@ -10,7 +10,7 @@ import {
 } from "../../scripts/validate-food-search-primary-position.js";
 
 describe("food search primary-position validation", () => {
-  it("extracts secondary-token conflicts without filtering normalized tokens", () => {
+  it("extracts secondary-token conflicts while ignoring numeric-only validation tokens", () => {
     const candidates = extractConflictCandidates([
       doc({ foodId: "cookies", displayName: "Cookies Butter", baseName: "Cookies Butter", primaryEntityName: "Cookies", primaryEntityAliases: ["cookies"] }),
       doc({ foodId: "butter", displayName: "Butter Salted", baseName: "Butter Salted", primaryEntityName: "Butter", primaryEntityAliases: ["butter"] }),
@@ -25,10 +25,42 @@ describe("food search primary-position validation", () => {
       expect.objectContaining({ foodId: "cookies", token: "butter" }),
       expect.objectContaining({ foodId: "fat", token: "chicken" }),
       expect.objectContaining({ foodId: "foo", token: "and" }),
-      expect.objectContaining({ foodId: "foo", token: "12" }),
     ]));
     expect(candidates).not.toEqual(expect.arrayContaining([
       expect.objectContaining({ foodId: "butter", token: "butter" }),
+      expect.objectContaining({ foodId: "foo", token: "12" }),
+      expect.objectContaining({ foodId: "12", token: "12" }),
+    ]));
+  });
+
+  it("does not generate validation queries for numeric-only package tokens", () => {
+    const docs = [
+      doc({
+        foodId: "one",
+        resultType: "product",
+        displayName: "Cdc Milk Chocolate - 1",
+        baseName: "Cdc Milk Chocolate",
+        variantName: "1",
+        primaryEntityName: "Cdc Milk Chocolate",
+        primaryEntityAliases: ["cdc milk chocolate"],
+      }),
+      doc({
+        foodId: "twelve",
+        resultType: "product",
+        displayName: "12 Food",
+        baseName: "12 Food",
+        primaryEntityName: "12",
+        primaryEntityAliases: ["12"],
+      }),
+    ];
+
+    const candidates = extractConflictCandidates(docs);
+    const queries = extractValidationQueries(docs, candidates, { includeAllProducts: true });
+
+    expect(candidates).toEqual([]);
+    expect(queries).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ query: "1" }),
+      expect.objectContaining({ query: "12" }),
     ]));
   });
 

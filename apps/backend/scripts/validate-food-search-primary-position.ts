@@ -324,7 +324,7 @@ export function extractConflictCandidates(docs: NormalizedSearchDoc[]): Conflict
 
   for (const doc of docs) {
     const ownPrimaryTokens = new Set(primaryAliasLeadingTokens(doc));
-    for (const token of normalizedTokens([doc.baseName, doc.variantName].filter(Boolean).join(" "))) {
+    for (const token of normalizedTokens([doc.baseName, doc.variantName].filter(Boolean).join(" ")).filter(isValidationToken)) {
       if (ownPrimaryTokens.has(token) || !globalPrimaryTokens.has(token)) continue;
       const key = `${doc.foodId}:${doc.locale}:${token}`;
       if (seen.has(key)) continue;
@@ -362,7 +362,7 @@ export function extractValidationQueries(
   for (const doc of docs) {
     for (const alias of doc.primaryEntityAliases) {
       const query = normalizeText(alias);
-      if (!query) continue;
+      if (!query || !normalizedTokens(query).some(isValidationToken)) continue;
       if (doc.resultType === "generic_food") {
         upsertQuery(queryMap, query, doc.locale, "generic_primary");
       } else if (
@@ -376,7 +376,9 @@ export function extractValidationQueries(
   }
 
   for (const candidate of candidates) {
-    upsertQuery(queryMap, candidate.token, candidate.locale, "conflict_token");
+    if (isValidationToken(candidate.token)) {
+      upsertQuery(queryMap, candidate.token, candidate.locale, "conflict_token");
+    }
   }
 
   const candidateCounts = new Map<string, number>();
@@ -473,7 +475,11 @@ export function normalizedTokens(value: string): string[] {
 function primaryAliasLeadingTokens(doc: Pick<NormalizedSearchDoc, "primaryEntityAliases">): string[] {
   return doc.primaryEntityAliases
     .map((alias) => normalizedTokens(alias)[0])
-    .filter((token): token is string => Boolean(token));
+    .filter((token): token is string => Boolean(token) && isValidationToken(token));
+}
+
+function isValidationToken(token: string): boolean {
+  return /\p{L}/u.test(token);
 }
 
 function isSimpleCategoryLikeEntityName(value: string | undefined): boolean {

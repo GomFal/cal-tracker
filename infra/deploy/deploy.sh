@@ -66,7 +66,12 @@ fi
 
 export BACKEND_IMAGE="$REQUESTED_BACKEND_IMAGE"
 
-docker compose --env-file "$SECRETS_FILE" -f "$COMPOSE_FILE" pull postgres "$NEXT_SERVICE"
+docker compose --env-file "$SECRETS_FILE" -f "$COMPOSE_FILE" pull postgres
+if [[ "${SKIP_BACKEND_PULL:-false}" == "true" ]]; then
+  echo "Skipping backend image pull for $NEXT_SERVICE; using local image $BACKEND_IMAGE"
+else
+  docker compose --env-file "$SECRETS_FILE" -f "$COMPOSE_FILE" pull "$NEXT_SERVICE"
+fi
 docker compose --env-file "$SECRETS_FILE" -f "$COMPOSE_FILE" up -d postgres
 
 for _ in {1..60}; do

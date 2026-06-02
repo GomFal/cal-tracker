@@ -202,6 +202,31 @@ class CalTrackerApiClient {
     return _delete('/v1/meal-templates/$templateId');
   }
 
+  Future<Map<String, Object?>> draftUsualMeal(String text) {
+    return _post('/v1/meal-templates/draft', {'text': text});
+  }
+
+  Future<Map<String, Object?>> getUsualFoods() => _get('/v1/usual-foods');
+
+  Future<Map<String, Object?>> createUsualFood(Map<String, Object?> body) {
+    return _post('/v1/usual-foods', body);
+  }
+
+  Future<Map<String, Object?>> updateUsualFood(
+    String foodId,
+    Map<String, Object?> body,
+  ) {
+    return _put('/v1/usual-foods/$foodId', body);
+  }
+
+  Future<Map<String, Object?>> deleteUsualFood(String foodId) {
+    return _delete('/v1/usual-foods/$foodId');
+  }
+
+  Future<Map<String, Object?>> draftUsualFood(String text) {
+    return _post('/v1/usual-foods/draft', {'text': text});
+  }
+
   Future<Map<String, Object?>> executeAction(
     String actionId,
     Map<String, Object?> input,

@@ -71,7 +71,12 @@ async function createChickenBreadRiceButterProposal(
     output: { proposal: { id: string; items: MealItem[] } };
   };
   expect(body.output.proposal.items.map((item) => item.name)).toEqual(
-    expect.arrayContaining(["Chicken breast", "Bread", "Cooked rice", "Butter"]),
+    expect.arrayContaining([
+      "Chicken breast",
+      "Bread",
+      "Cooked rice",
+      "Butter",
+    ]),
   );
   return body.output.proposal;
 }
@@ -382,42 +387,45 @@ describe("action loop", () => {
       instruction: "Elimina la mantequilla.",
       operation: { type: "remove_item", itemIndex: 3 },
     },
-  ])("removes butter from a proposal $label", async ({ instruction, operation }) => {
-    const { request } = buildTestApp();
-    const auth = await registerAndAuth(request);
-    const proposal = await createChickenBreadRiceButterProposal(
-      request,
-      auth.authHeader,
-    );
+  ])(
+    "removes butter from a proposal $label",
+    async ({ instruction, operation }) => {
+      const { request } = buildTestApp();
+      const auth = await registerAndAuth(request);
+      const proposal = await createChickenBreadRiceButterProposal(
+        request,
+        auth.authHeader,
+      );
 
-    const revised = await request(
-      "http://localhost/v1/actions/revise_meal_proposal/execute",
-      {
-        method: "POST",
-        headers: auth.authHeader,
-        body: JSON.stringify({
-          input: {
-            proposalId: proposal.id,
-            instruction,
-            operations: [operation],
-          },
-          source: "flutter",
-        }),
-      },
-    );
+      const revised = await request(
+        "http://localhost/v1/actions/revise_meal_proposal/execute",
+        {
+          method: "POST",
+          headers: auth.authHeader,
+          body: JSON.stringify({
+            input: {
+              proposalId: proposal.id,
+              instruction,
+              operations: [operation],
+            },
+            source: "flutter",
+          }),
+        },
+      );
 
-    expect(revised.status).toBe(200);
-    const body = (await revised.json()) as {
-      output: { proposal: { id: string; items: MealItem[] } };
-    };
-    expect(body.output.proposal.id).toBe(proposal.id);
-    expect(body.output.proposal.items.map((item) => item.name)).toEqual(
-      expect.arrayContaining(["Chicken breast", "Bread", "Cooked rice"]),
-    );
-    expect(
-      body.output.proposal.items.some((item) => item.name === "Butter"),
-    ).toBe(false);
-  });
+      expect(revised.status).toBe(200);
+      const body = (await revised.json()) as {
+        output: { proposal: { id: string; items: MealItem[] } };
+      };
+      expect(body.output.proposal.id).toBe(proposal.id);
+      expect(body.output.proposal.items.map((item) => item.name)).toEqual(
+        expect.arrayContaining(["Chicken breast", "Bread", "Cooked rice"]),
+      );
+      expect(
+        body.output.proposal.items.some((item) => item.name === "Butter"),
+      ).toBe(false);
+    },
+  );
 
   it("creates a chicken and rice proposal, commits it, and includes it in the daily summary", async () => {
     const { request, repository } = buildTestApp();
@@ -686,7 +694,9 @@ describe("action loop", () => {
     expect(updatedSummary.output.summary.remaining.fatGrams).toBe(0);
     expect(updatedSummary.output.summary.macroMode).toBeUndefined();
     expect(updatedSummary.output.summary.calorieTargetConfigured).toBe(true);
-    expect(updatedSummary.output.summary.calorieTargetSource).toBe("calculator");
+    expect(updatedSummary.output.summary.calorieTargetSource).toBe(
+      "calculator",
+    );
   });
 
   it("updates daily hydration in quarter-liter steps and clamps to the configured goal", async () => {
@@ -762,7 +772,10 @@ describe("action loop", () => {
       (response) =>
         response.json() as Promise<{
           output: {
-            summary: { hydrationGoalLiters: number; waterConsumedLiters: number };
+            summary: {
+              hydrationGoalLiters: number;
+              waterConsumedLiters: number;
+            };
           };
         }>,
     );
@@ -1256,9 +1269,7 @@ describe("action loop", () => {
     const revisedBody = (await revised.json()) as {
       output: { proposal: { title: string } };
     };
-    expect(revisedBody.output.proposal.title).toBe(
-      "Chicken breast, rice, pan",
-    );
+    expect(revisedBody.output.proposal.title).toBe("Chicken breast, rice, pan");
   });
 
   it("requires clarification instead of creating a proposal for unsupported food units", async () => {
@@ -1568,18 +1579,14 @@ describe("action loop", () => {
     const breakfast = templates.output.templates[0]!;
 
     const update = await request(
-      "http://localhost/v1/actions/update_meal_template/execute",
+      `http://localhost/v1/meal-templates/${breakfast.id}`,
       {
-        method: "POST",
+        method: "PUT",
         headers: auth.authHeader,
         body: JSON.stringify({
-          input: {
-            templateId: breakfast.id,
-            trustedAutoCommitEnabled: true,
-            aliases: breakfast.aliases,
-            items: breakfast.items,
-          },
-          source: "flutter",
+          trustedAutoCommitEnabled: true,
+          aliases: breakfast.aliases,
+          items: breakfast.items,
         }),
       },
     );
@@ -1610,6 +1617,51 @@ describe("action loop", () => {
         (event) => event.eventType === "trusted_auto_commit.meal_committed",
       ),
     ).toBe(false);
+  });
+
+  it("reindexes usual meal aliases when a template is updated", async () => {
+    const { request, repository } = buildTestApp();
+    const auth = await registerAndAuth(request);
+    const created = await createTestUsualBreakfastTemplate(
+      request,
+      auth.authHeader,
+    );
+    const template = created.output.template;
+
+    const update = await request(
+      `http://localhost/v1/meal-templates/${template.id}`,
+      {
+        method: "PUT",
+        headers: auth.authHeader,
+        body: JSON.stringify({
+          title: "Updated breakfast",
+          trustedAutoCommitEnabled: false,
+          aliases: ["updated breakfast"],
+          items: template.items,
+        }),
+      },
+    );
+    expect(update.status).toBe(200);
+
+    await expect(
+      repository.queryMemory(auth.user.id, "updated breakfast"),
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          label: "updated breakfast",
+          template: expect.objectContaining({ id: template.id }),
+        }),
+      ]),
+    );
+    await expect(
+      repository.queryMemory(auth.user.id, "usual breakfast"),
+    ).resolves.not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          template: expect.objectContaining({ id: template.id }),
+        }),
+      ]),
+    );
   });
 });
 

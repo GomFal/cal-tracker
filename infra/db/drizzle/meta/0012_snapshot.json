@@ -1,6 +1,6 @@
 {
-  "id": "ce7501c9-2114-47ec-acc5-14dc1fcb9c2a",
-  "prevId": "cec0f645-37dd-45b0-bd32-67a7bb4933b2",
+  "id": "e1429522-a1c5-47a2-b5cf-19a6a03d80f7",
+  "prevId": "31b2ec8f-1a9b-4eba-97db-1421571542ce",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1351,6 +1351,19 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -1788,258 +1801,6 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.food_normalization_review": {
-      "name": "food_normalization_review",
-      "schema": "",
-      "columns": {
-        "food_item_id": {
-          "name": "food_item_id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "normalization_version": {
-          "name": "normalization_version",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "review_status": {
-          "name": "review_status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "severity": {
-          "name": "severity",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "issue_codes": {
-          "name": "issue_codes",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::text[]"
-        },
-        "raw_name": {
-          "name": "raw_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "raw_brand": {
-          "name": "raw_brand",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "raw_source": {
-          "name": "raw_source",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "raw_external_source": {
-          "name": "raw_external_source",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "raw_data_type": {
-          "name": "raw_data_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "display_name": {
-          "name": "display_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "base_name": {
-          "name": "base_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "variant_name": {
-          "name": "variant_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "brand_display": {
-          "name": "brand_display",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "primary_entity_name": {
-          "name": "primary_entity_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "locale": {
-          "name": "locale",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "result_type": {
-          "name": "result_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "normalization_confidence": {
-          "name": "normalization_confidence",
-          "type": "numeric(6, 4)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "metrics": {
-          "name": "metrics",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::jsonb"
-        },
-        "metadata": {
-          "name": "metadata",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::jsonb"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "food_normalization_review_status_severity_idx": {
-          "name": "food_normalization_review_status_severity_idx",
-          "columns": [
-            {
-              "expression": "review_status",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "severity",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "food_normalization_review_issue_codes_gin_idx": {
-          "name": "food_normalization_review_issue_codes_gin_idx",
-          "columns": [
-            {
-              "expression": "issue_codes",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "gin",
-          "with": {}
-        },
-        "food_normalization_review_version_idx": {
-          "name": "food_normalization_review_version_idx",
-          "columns": [
-            {
-              "expression": "normalization_version",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "food_normalization_review_display_idx": {
-          "name": "food_normalization_review_display_idx",
-          "columns": [
-            {
-              "expression": "locale",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "result_type",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "lower(\"display_name\")",
-              "asc": true,
-              "isExpression": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "food_normalization_review_food_item_id_food_items_id_fk": {
-          "name": "food_normalization_review_food_item_id_food_items_id_fk",
-          "tableFrom": "food_normalization_review",
-          "tableTo": "food_items",
-          "columnsFrom": [
-            "food_item_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "food_normalization_review_status_check": {
-          "name": "food_normalization_review_status_check",
-          "value": "\"food_normalization_review\".\"review_status\" IN ('valid', 'needs_review', 'failed')"
-        },
-        "food_normalization_review_severity_check": {
-          "name": "food_normalization_review_severity_check",
-          "value": "\"food_normalization_review\".\"severity\" IN ('info', 'warning', 'error')"
-        }
-      },
       "isRLSEnabled": false
     },
     "public.food_normalization_sample_items": {

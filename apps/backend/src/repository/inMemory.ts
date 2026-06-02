@@ -1,4 +1,18 @@
-import { defaultUserScopes, type CalorieTargetSource, type DailyGoals, type MacroGoalMetadata, type Meal, type MealItem, type MealLabel, type MealProposal, type MealTemplate, type NutritionSnapshot } from "@cal-tracker/contracts";
+import {
+  defaultUserScopes,
+  type CalorieTargetSource,
+  type CreateUsualFoodRequest,
+  type DailyGoals,
+  type MacroGoalMetadata,
+  type Meal,
+  type MealItem,
+  type MealLabel,
+  type MealProposal,
+  type MealTemplate,
+  type NutritionSnapshot,
+  type UpdateUsualFoodRequest,
+  type UsualFood,
+} from "@cal-tracker/contracts";
 import { newId } from "../utils/ids.js";
 import { normalizeText } from "../utils/normalize.js";
 import { applyMacroGoalUpdate } from "../utils/macroGoals.js";
@@ -20,7 +34,7 @@ import type {
   StoredUser,
   UpsertFoodItemEmbeddingInput,
   UserFoodPreference,
-  UpdateDailyGoalsInput
+  UpdateDailyGoalsInput,
 } from "./types.js";
 
 const ACTIVE_EMBEDDING_DIMENSIONS = 1024;
@@ -31,12 +45,18 @@ const VECTOR_SCORE_WEIGHT = 0.25;
 const LEXICAL_ONLY_SCORE_WEIGHT = 0.95;
 const PREFERENCE_SCORE_WEIGHT = 0.05;
 const PREFERENCE_SCORE_NORMALIZER = 10;
+const USER_FOOD_SCORE_BOOST = 0.15;
+const USUAL_FOOD_SOURCE = "user_custom";
+const USUAL_FOOD_ALIASES_KEY = "usualFoodAliases";
 
 export class InMemoryRepository implements AppRepository {
   private users = new Map<string, StoredUser>();
   private authIdentities = new Map<string, AuthIdentityRecord>();
   private sessions = new Map<string, StoredSession>();
-  private passwordResetTokens = new Map<string, { userId: string; expiresAt: string; usedAt?: string }>();
+  private passwordResetTokens = new Map<
+    string,
+    { userId: string; expiresAt: string; usedAt?: string }
+  >();
   private foods = new Map<string, FoodItemRecord>();
   private targets = new Map<string, NutritionSnapshot>();
   private hydrationGoals = new Map<string, number>();
@@ -48,10 +68,26 @@ export class InMemoryRepository implements AppRepository {
   private proposals = new Map<string, MealProposal & { userId: string }>();
   private meals = new Map<string, Meal & { userId: string }>();
   private templates = new Map<string, MealTemplate & { userId: string }>();
-  private memories = new Map<string, { id: string; userId: string; normalizedText: string; label: string; templateId?: string; confidence: number; usageCount: number }>();
-  private foodEmbeddings = new Map<string, FoodItemEmbeddingRecord & { embedding: number[] }>();
+  private memories = new Map<
+    string,
+    {
+      id: string;
+      userId: string;
+      normalizedText: string;
+      label: string;
+      templateId?: string;
+      confidence: number;
+      usageCount: number;
+    }
+  >();
+  private foodEmbeddings = new Map<
+    string,
+    FoodItemEmbeddingRecord & { embedding: number[] }
+  >();
   private foodPreferences = new Map<string, UserFoodPreference>();
-  private foodFeedbackEvents: Array<FoodFeedbackRecord & { createdAt: string }> = [];
+  private foodFeedbackEvents: Array<
+    FoodFeedbackRecord & { createdAt: string }
+  > = [];
   private actionCalls: ActionCallRecord[] = [];
   private auditEvents: AuditEventRecord[] = [];
 
@@ -59,7 +95,12 @@ export class InMemoryRepository implements AppRepository {
     return new InMemoryRepository();
   }
 
-  async createUser(input: { email: string; displayName: string; passwordHash?: string; scopes?: typeof defaultUserScopes }): Promise<StoredUser> {
+  async createUser(input: {
+    email: string;
+    displayName: string;
+    passwordHash?: string;
+    scopes?: typeof defaultUserScopes;
+  }): Promise<StoredUser> {
     if (await this.findUserByEmail(input.email)) {
       throw new Error("email_already_registered");
     }
@@ -70,10 +111,15 @@ export class InMemoryRepository implements AppRepository {
       trustedModeEnabled: false,
       createdAt: new Date().toISOString(),
       ...(input.passwordHash ? { passwordHash: input.passwordHash } : {}),
-      scopes: input.scopes ?? defaultUserScopes
+      scopes: input.scopes ?? defaultUserScopes,
     };
     this.users.set(user.id, user);
-    this.targets.set(user.id, { calories: 2200, proteinGrams: 0, carbsGrams: 0, fatGrams: 0 });
+    this.targets.set(user.id, {
+      calories: 2200,
+      proteinGrams: 0,
+      carbsGrams: 0,
+      fatGrams: 0,
+    });
     this.hydrationGoals.set(user.id, 0);
     this.calorieTargetConfigured.set(user.id, false);
     this.calorieTargetSources.set(user.id, "default");
@@ -81,24 +127,37 @@ export class InMemoryRepository implements AppRepository {
   }
 
   async findUserByEmail(email: string): Promise<StoredUser | undefined> {
-    return [...this.users.values()].find((user) => user.email === email.toLowerCase());
+    return [...this.users.values()].find(
+      (user) => user.email === email.toLowerCase(),
+    );
   }
 
   async findUserById(id: string): Promise<StoredUser | undefined> {
     return this.users.get(id);
   }
 
-  async updateTrustedMode(userId: string, enabled: boolean): Promise<StoredUser> {
+  async updateTrustedMode(
+    userId: string,
+    enabled: boolean,
+  ): Promise<StoredUser> {
     const user = this.requireUser(userId);
     user.trustedModeEnabled = false;
     return user;
   }
 
-  async findAuthIdentity(provider: AuthIdentityProvider, providerUserId: string): Promise<AuthIdentityRecord | undefined> {
+  async findAuthIdentity(
+    provider: AuthIdentityProvider,
+    providerUserId: string,
+  ): Promise<AuthIdentityRecord | undefined> {
     return this.authIdentities.get(`${provider}:${providerUserId}`);
   }
 
-  async linkAuthIdentity(input: { userId: string; provider: AuthIdentityProvider; providerUserId: string; email: string }): Promise<AuthIdentityRecord> {
+  async linkAuthIdentity(input: {
+    userId: string;
+    provider: AuthIdentityProvider;
+    providerUserId: string;
+    email: string;
+  }): Promise<AuthIdentityRecord> {
     const key = `${input.provider}:${input.providerUserId}`;
     const existing = this.authIdentities.get(key);
     if (existing) return existing;
@@ -110,22 +169,29 @@ export class InMemoryRepository implements AppRepository {
       providerUserId: input.providerUserId,
       email: input.email.toLowerCase(),
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     };
     this.authIdentities.set(key, identity);
     return identity;
   }
 
-  async createSession(input: Omit<StoredSession, "createdAt">): Promise<StoredSession> {
+  async createSession(
+    input: Omit<StoredSession, "createdAt">,
+  ): Promise<StoredSession> {
     const session = { ...input, createdAt: new Date().toISOString() };
     this.sessions.set(session.id, session);
     return session;
   }
 
-  async findSessionByRefreshTokenHash(hash: string): Promise<StoredSession | undefined> {
+  async findSessionByRefreshTokenHash(
+    hash: string,
+  ): Promise<StoredSession | undefined> {
     const now = Date.now();
     return [...this.sessions.values()].find(
-      (session) => session.refreshTokenHash === hash && !session.revokedAt && Date.parse(session.expiresAt) > now
+      (session) =>
+        session.refreshTokenHash === hash &&
+        !session.revokedAt &&
+        Date.parse(session.expiresAt) > now,
     );
   }
 
@@ -136,11 +202,16 @@ export class InMemoryRepository implements AppRepository {
 
   async revokeAllSessions(userId: string): Promise<void> {
     for (const session of this.sessions.values()) {
-      if (session.userId === userId) session.revokedAt = new Date().toISOString();
+      if (session.userId === userId)
+        session.revokedAt = new Date().toISOString();
     }
   }
 
-  async rotateSession(sessionId: string, nextHash: string, expiresAt: string): Promise<StoredSession> {
+  async rotateSession(
+    sessionId: string,
+    nextHash: string,
+    expiresAt: string,
+  ): Promise<StoredSession> {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error("session_not_found");
     session.refreshTokenHash = nextHash;
@@ -149,13 +220,24 @@ export class InMemoryRepository implements AppRepository {
     return session;
   }
 
-  async createPasswordReset(input: { userId: string; tokenHash: string; expiresAt: string }): Promise<void> {
-    this.passwordResetTokens.set(input.tokenHash, { userId: input.userId, expiresAt: input.expiresAt });
+  async createPasswordReset(input: {
+    userId: string;
+    tokenHash: string;
+    expiresAt: string;
+  }): Promise<void> {
+    this.passwordResetTokens.set(input.tokenHash, {
+      userId: input.userId,
+      expiresAt: input.expiresAt,
+    });
   }
 
-  async consumePasswordReset(tokenHash: string, newPasswordHash: string): Promise<boolean> {
+  async consumePasswordReset(
+    tokenHash: string,
+    newPasswordHash: string,
+  ): Promise<boolean> {
     const reset = this.passwordResetTokens.get(tokenHash);
-    if (!reset || reset.usedAt || Date.parse(reset.expiresAt) < Date.now()) return false;
+    if (!reset || reset.usedAt || Date.parse(reset.expiresAt) < Date.now())
+      return false;
     const user = this.requireUser(reset.userId);
     user.passwordHash = newPasswordHash;
     reset.usedAt = new Date().toISOString();
@@ -163,34 +245,55 @@ export class InMemoryRepository implements AppRepository {
   }
 
   async listFoods(userId?: string): Promise<FoodItemRecord[]> {
-    return [...this.foods.values()].filter((food) => !userId || !food.userId || food.userId === userId);
+    return [...this.foods.values()].filter(
+      (food) =>
+        !food.deletedAt && (!userId || !food.userId || food.userId === userId),
+    );
   }
 
-  async searchFoods(userId: string, query: string, barcode?: string): Promise<FoodItemRecord[]> {
+  async searchFoods(
+    userId: string,
+    query: string,
+    barcode?: string,
+  ): Promise<FoodItemRecord[]> {
     const candidates = await this.searchFoodsHybrid(userId, { query, barcode });
     return candidates.map(stripFoodSearchCandidate);
   }
 
-  async searchFoodsHybrid(userId: string, input: FoodHybridSearchInput): Promise<FoodSearchCandidate[]> {
+  async searchFoodsHybrid(
+    userId: string,
+    input: FoodHybridSearchInput,
+  ): Promise<FoodSearchCandidate[]> {
     const normalized = normalizeText(input.query);
     const limit = sanitizeLimit(input.limit);
-    const candidates = new Map<string, { food: FoodItemRecord; lexicalScore: number; vectorScore?: number }>();
+    const candidates = new Map<
+      string,
+      { food: FoodItemRecord; lexicalScore: number; vectorScore?: number }
+    >();
     const baseFoods = [...this.foods.values()].filter((food) => {
+      if (food.deletedAt) return false;
       if (food.userId && food.userId !== userId) return false;
       if (input.excludeBranded && food.dataType === "Branded") return false;
       return true;
     });
-    const visibleFoods = baseFoods.filter((food) => foodMatchesSearchLocale(food, input));
-    const primaryFoods = visibleFoods.filter((food) => foodMatchesSearchScope(food, input));
+    const visibleFoods = baseFoods.filter((food) =>
+      foodMatchesSearchLocale(food, input),
+    );
+    const primaryFoods = visibleFoods.filter((food) =>
+      foodMatchesSearchScope(food, input),
+    );
     const primaryFoodIds = new Set(primaryFoods.map((food) => food.id));
 
     if (input.barcode) {
       for (const food of primaryFoods) {
-        if (food.barcode === input.barcode) candidates.set(food.id, { food, lexicalScore: 1 });
+        if (food.barcode === input.barcode)
+          candidates.set(food.id, { food, lexicalScore: 1 });
       }
     } else if (normalized.length > 0) {
       for (const food of primaryFoods) {
-        const lexicalScore = lexicalFoodScore(food, normalized) || fuzzyFoodScore(food, normalized);
+        const lexicalScore =
+          lexicalFoodScore(food, normalized) ||
+          fuzzyFoodScore(food, normalized);
         if (lexicalScore > 0) candidates.set(food.id, { food, lexicalScore });
       }
     }
@@ -200,10 +303,15 @@ export class InMemoryRepository implements AppRepository {
         const food = this.foods.get(embedding.foodItemId);
         if (!food || (food.userId && food.userId !== userId)) continue;
         if (!primaryFoodIds.has(food.id)) continue;
-        const vectorScore = clampScore(cosineSimilarity(input.embedding, embedding.embedding));
+        const vectorScore = clampScore(
+          cosineSimilarity(input.embedding, embedding.embedding),
+        );
         const existing = candidates.get(food.id);
         if (existing) {
-          existing.vectorScore = Math.max(existing.vectorScore ?? 0, vectorScore);
+          existing.vectorScore = Math.max(
+            existing.vectorScore ?? 0,
+            vectorScore,
+          );
         } else {
           candidates.set(food.id, { food, lexicalScore: 0, vectorScore });
         }
@@ -212,35 +320,62 @@ export class InMemoryRepository implements AppRepository {
 
     return [...candidates.values()]
       .map(({ food, lexicalScore, vectorScore }) => {
-        const preference = this.foodPreferences.get(preferenceKey(userId, food.id));
-        const preferenceScore = clamp((preference?.affinityScore ?? 0) / PREFERENCE_SCORE_NORMALIZER, -1, 1);
-        const baseScore = vectorScore == null
-          ? lexicalScore * LEXICAL_ONLY_SCORE_WEIGHT
-          : lexicalScore * LEXICAL_SCORE_WEIGHT + vectorScore * VECTOR_SCORE_WEIGHT;
+        const preference = this.foodPreferences.get(
+          preferenceKey(userId, food.id),
+        );
+        const preferenceScore = clamp(
+          (preference?.affinityScore ?? 0) / PREFERENCE_SCORE_NORMALIZER,
+          -1,
+          1,
+        );
+        const baseScore =
+          vectorScore == null
+            ? lexicalScore * LEXICAL_ONLY_SCORE_WEIGHT
+            : lexicalScore * LEXICAL_SCORE_WEIGHT +
+              vectorScore * VECTOR_SCORE_WEIGHT;
+        const userFoodBoost =
+          food.userId === userId && lexicalScore >= 0.5
+            ? USER_FOOD_SCORE_BOOST
+            : 0;
         return {
           ...food,
           lexicalScore,
           vectorScore,
           preferenceScore,
-          finalScore: clampScore(baseScore + preferenceScore * PREFERENCE_SCORE_WEIGHT)
+          finalScore: clampScore(
+            baseScore +
+              preferenceScore * PREFERENCE_SCORE_WEIGHT +
+              userFoodBoost,
+          ),
         };
       })
-      .sort((a, b) =>
-        b.finalScore - a.finalScore ||
-        b.lexicalScore - a.lexicalScore ||
-        (b.vectorScore ?? 0) - (a.vectorScore ?? 0) ||
-        a.name.localeCompare(b.name)
+      .sort(
+        (a, b) =>
+          b.finalScore - a.finalScore ||
+          b.lexicalScore - a.lexicalScore ||
+          (b.vectorScore ?? 0) - (a.vectorScore ?? 0) ||
+          Number(Boolean(b.userId)) - Number(Boolean(a.userId)) ||
+          a.name.localeCompare(b.name),
       )
       .slice(0, limit);
   }
 
-  async upsertFoodItem(input: Omit<FoodItemRecord, "id">): Promise<FoodItemRecord> {
+  async upsertFoodItem(
+    input: Omit<FoodItemRecord, "id">,
+  ): Promise<FoodItemRecord> {
     const normalized = normalizeText(input.normalizedName || input.name);
     const existing = [...this.foods.values()].find((food) => {
       if (input.externalSource && input.externalId) {
-        return food.externalSource === input.externalSource && food.externalId === input.externalId;
+        return (
+          food.externalSource === input.externalSource &&
+          food.externalId === input.externalId
+        );
       }
-      return food.userId === input.userId && food.normalizedName === normalized && food.source === input.source;
+      return (
+        food.userId === input.userId &&
+        food.normalizedName === normalized &&
+        food.source === input.source
+      );
     });
     if (existing) {
       const updated = { ...existing, ...input, normalizedName: normalized };
@@ -252,10 +387,130 @@ export class InMemoryRepository implements AppRepository {
     return food;
   }
 
-  async recordFoodFeedback(input: FoodFeedbackRecord): Promise<UserFoodPreference | undefined> {
+  async listUsualFoods(userId: string): Promise<UsualFood[]> {
+    return [...this.foods.values()]
+      .filter(
+        (food) =>
+          food.userId === userId &&
+          food.source === USUAL_FOOD_SOURCE &&
+          !food.deletedAt,
+      )
+      .sort(
+        (a, b) =>
+          Date.parse(b.updatedAt ?? b.createdAt ?? "") -
+            Date.parse(a.updatedAt ?? a.createdAt ?? "") ||
+          a.name.localeCompare(b.name),
+      )
+      .map(foodRecordToUsualFood);
+  }
+
+  async createUsualFood(
+    userId: string,
+    input: CreateUsualFoodRequest,
+  ): Promise<UsualFood> {
+    const now = new Date().toISOString();
+    const food: FoodItemRecord = {
+      id: newId(),
+      userId,
+      name: input.name,
+      normalizedName: normalizeText(input.name),
+      canonicalName: input.canonicalName ?? undefined,
+      brand: input.brand ?? undefined,
+      barcode: input.barcode ?? undefined,
+      source: USUAL_FOOD_SOURCE,
+      nutrients: nutrientsWithAliases(input.nutrients, input.aliases),
+      servingGrams: input.servingGrams,
+      calories: input.nutrition.calories,
+      proteinGrams: input.nutrition.proteinGrams,
+      carbsGrams: input.nutrition.carbsGrams,
+      fatGrams: input.nutrition.fatGrams,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.foods.set(food.id, food);
+    return foodRecordToUsualFood(food);
+  }
+
+  async updateUsualFood(
+    userId: string,
+    usualFoodId: string,
+    input: UpdateUsualFoodRequest,
+  ): Promise<UsualFood | undefined> {
+    const existing = this.foods.get(usualFoodId);
+    if (
+      !existing ||
+      existing.userId !== userId ||
+      existing.source !== USUAL_FOOD_SOURCE ||
+      existing.deletedAt
+    ) {
+      return undefined;
+    }
+    const nextAliases =
+      input.aliases ?? aliasesFromNutrients(existing.nutrients);
+    const nutrients =
+      input.nutrients === undefined && input.aliases === undefined
+        ? existing.nutrients
+        : nutrientsWithAliases(
+            input.nutrients ?? publicNutrients(existing.nutrients),
+            nextAliases,
+          );
+    const nextCanonicalName =
+      "canonicalName" in input
+        ? (input.canonicalName ?? undefined)
+        : existing.canonicalName;
+    const nextBrand =
+      "brand" in input ? (input.brand ?? undefined) : existing.brand;
+    const nextBarcode =
+      "barcode" in input ? (input.barcode ?? undefined) : existing.barcode;
+    const updated: FoodItemRecord = {
+      ...existing,
+      name: input.name ?? existing.name,
+      normalizedName: input.name
+        ? normalizeText(input.name)
+        : existing.normalizedName,
+      canonicalName: nextCanonicalName,
+      brand: nextBrand,
+      barcode: nextBarcode,
+      servingGrams: input.servingGrams ?? existing.servingGrams,
+      calories: input.nutrition?.calories ?? existing.calories,
+      proteinGrams: input.nutrition?.proteinGrams ?? existing.proteinGrams,
+      carbsGrams: input.nutrition?.carbsGrams ?? existing.carbsGrams,
+      fatGrams: input.nutrition?.fatGrams ?? existing.fatGrams,
+      nutrients,
+      updatedAt: new Date().toISOString(),
+    };
+    this.foods.set(usualFoodId, updated);
+    return foodRecordToUsualFood(updated);
+  }
+
+  async deleteUsualFood(userId: string, usualFoodId: string): Promise<boolean> {
+    const existing = this.foods.get(usualFoodId);
+    if (
+      !existing ||
+      existing.userId !== userId ||
+      existing.source !== USUAL_FOOD_SOURCE ||
+      existing.deletedAt
+    ) {
+      return false;
+    }
+    this.foods.set(usualFoodId, {
+      ...existing,
+      deletedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    return true;
+  }
+
+  async recordFoodFeedback(
+    input: FoodFeedbackRecord,
+  ): Promise<UserFoodPreference | undefined> {
     const foodItemId = input.foodItemId ?? this.findFoodForFeedback(input)?.id;
     if (!foodItemId) return undefined;
-    this.foodFeedbackEvents.push({ ...input, foodItemId, createdAt: new Date().toISOString() });
+    this.foodFeedbackEvents.push({
+      ...input,
+      foodItemId,
+      createdAt: new Date().toISOString(),
+    });
     const key = preferenceKey(input.userId, foodItemId);
     const existing = this.foodPreferences.get(key);
     const delta = foodFeedbackDelta(input.action);
@@ -264,10 +519,12 @@ export class InMemoryRepository implements AppRepository {
       ? {
           ...existing,
           affinityScore: existing.affinityScore + delta,
-          positiveFeedbackCount: existing.positiveFeedbackCount + (delta > 0 ? 1 : 0),
-          negativeFeedbackCount: existing.negativeFeedbackCount + (delta < 0 ? 1 : 0),
+          positiveFeedbackCount:
+            existing.positiveFeedbackCount + (delta > 0 ? 1 : 0),
+          negativeFeedbackCount:
+            existing.negativeFeedbackCount + (delta < 0 ? 1 : 0),
           lastFeedbackAt: now,
-          updatedAt: now
+          updatedAt: now,
         }
       : {
           userId: input.userId,
@@ -276,29 +533,39 @@ export class InMemoryRepository implements AppRepository {
           positiveFeedbackCount: delta > 0 ? 1 : 0,
           negativeFeedbackCount: delta < 0 ? 1 : 0,
           lastFeedbackAt: now,
-          updatedAt: now
+          updatedAt: now,
         };
     this.foodPreferences.set(key, preference);
     return preference;
   }
 
-  private findFoodForFeedback(input: FoodFeedbackRecord): FoodItemRecord | undefined {
+  private findFoodForFeedback(
+    input: FoodFeedbackRecord,
+  ): FoodItemRecord | undefined {
     if (!input.externalSource || !input.externalId) return undefined;
-    return [...this.foods.values()].find((food) =>
-      food.externalSource === input.externalSource &&
-      food.externalId === input.externalId &&
-      (food.userId === undefined || food.userId === input.userId)
+    return [...this.foods.values()].find(
+      (food) =>
+        food.externalSource === input.externalSource &&
+        food.externalId === input.externalId &&
+        (food.userId === undefined || food.userId === input.userId),
     );
   }
 
   async getUserFoodPreferences(userId: string): Promise<UserFoodPreference[]> {
     return [...this.foodPreferences.values()]
       .filter((preference) => preference.userId === userId)
-      .sort((a, b) => b.affinityScore - a.affinityScore || Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+      .sort(
+        (a, b) =>
+          b.affinityScore - a.affinityScore ||
+          Date.parse(b.updatedAt) - Date.parse(a.updatedAt),
+      );
   }
 
-  async upsertFoodItemEmbedding(input: UpsertFoodItemEmbeddingInput): Promise<FoodItemEmbeddingRecord> {
-    if (input.embedding.length !== ACTIVE_EMBEDDING_DIMENSIONS) throw new Error("invalid_embedding_dimensions");
+  async upsertFoodItemEmbedding(
+    input: UpsertFoodItemEmbeddingInput,
+  ): Promise<FoodItemEmbeddingRecord> {
+    if (input.embedding.length !== ACTIVE_EMBEDDING_DIMENSIONS)
+      throw new Error("invalid_embedding_dimensions");
     const now = new Date().toISOString();
     const key = input.foodItemId;
     const existing = this.foodEmbeddings.get(key);
@@ -309,7 +576,7 @@ export class InMemoryRepository implements AppRepository {
       embeddedTextHash: input.embeddedTextHash,
       embedding: input.embedding,
       createdAt: existing?.createdAt ?? now,
-      updatedAt: now
+      updatedAt: now,
     };
     this.foodEmbeddings.set(key, record);
     const { embedding: _embedding, ...publicRecord } = record;
@@ -317,20 +584,31 @@ export class InMemoryRepository implements AppRepository {
   }
 
   async getNutritionTarget(userId: string): Promise<NutritionSnapshot> {
-    return this.targets.get(userId) ?? { calories: 2200, proteinGrams: 0, carbsGrams: 0, fatGrams: 0 };
+    return (
+      this.targets.get(userId) ?? {
+        calories: 2200,
+        proteinGrams: 0,
+        carbsGrams: 0,
+        fatGrams: 0,
+      }
+    );
   }
 
   async getDailyGoals(userId: string, date: string): Promise<DailyGoals> {
     return this.ensureDailyGoalSnapshot(userId, date, {
       target: await this.getNutritionTarget(userId),
       hydrationGoalLiters: this.hydrationGoals.get(userId) ?? 0,
-      calorieTargetConfigured: this.calorieTargetConfigured.get(userId) ?? false,
+      calorieTargetConfigured:
+        this.calorieTargetConfigured.get(userId) ?? false,
       calorieTargetSource: this.calorieTargetSources.get(userId) ?? "default",
       ...this.currentMacroMetadata(userId),
     });
   }
 
-  async updateDailyGoals(userId: string, input: UpdateDailyGoalsInput): Promise<DailyGoals> {
+  async updateDailyGoals(
+    userId: string,
+    input: UpdateDailyGoalsInput,
+  ): Promise<DailyGoals> {
     const currentTarget = await this.getNutritionTarget(userId);
     const currentHydration = this.hydrationGoals.get(userId) ?? 0;
     const currentConfigured = this.calorieTargetConfigured.get(userId) ?? false;
@@ -346,16 +624,19 @@ export class InMemoryRepository implements AppRepository {
       });
     }
 
-    const { target: nextTarget, metadata: nextMetadata } =
-        applyMacroGoalUpdate(
-          currentTarget,
-          currentMetadata,
-          input,
-          input.calories ?? currentTarget.calories,
-        );
+    const { target: nextTarget, metadata: nextMetadata } = applyMacroGoalUpdate(
+      currentTarget,
+      currentMetadata,
+      input,
+      input.calories ?? currentTarget.calories,
+    );
     const nextHydration = input.hydrationGoalLiters ?? currentHydration;
-    const nextConfigured = input.calories === undefined ? currentConfigured : true;
-    const nextSource = input.calories === undefined ? currentSource : input.calorieTargetSource ?? "manual";
+    const nextConfigured =
+      input.calories === undefined ? currentConfigured : true;
+    const nextSource =
+      input.calories === undefined
+        ? currentSource
+        : (input.calorieTargetSource ?? "manual");
     this.targets.set(userId, nextTarget);
     this.hydrationGoals.set(userId, nextHydration);
     this.calorieTargetConfigured.set(userId, nextConfigured);
@@ -371,11 +652,18 @@ export class InMemoryRepository implements AppRepository {
     };
     this.dailyGoalSnapshots.set(dailyGoalKey(userId, input.date), goals);
     const waterKey = dailyGoalKey(userId, input.date);
-    this.dailyWater.set(waterKey, Math.min(this.dailyWater.get(waterKey) ?? 0, nextHydration));
+    this.dailyWater.set(
+      waterKey,
+      Math.min(this.dailyWater.get(waterKey) ?? 0, nextHydration),
+    );
     return goals;
   }
 
-  async updateDailyHydration(userId: string, date: string, waterConsumedLiters: number): Promise<import("@cal-tracker/contracts").DailySummary> {
+  async updateDailyHydration(
+    userId: string,
+    date: string,
+    waterConsumedLiters: number,
+  ): Promise<import("@cal-tracker/contracts").DailySummary> {
     const goals = await this.getDailyGoals(userId, date);
     this.dailyWater.set(
       dailyGoalKey(userId, date),
@@ -399,28 +687,49 @@ export class InMemoryRepository implements AppRepository {
     return publicMeal;
   }
 
-  async createProposal(userId: string, proposal: Omit<MealProposal, "id" | "createdAt">): Promise<MealProposal> {
-    const stored = { ...proposal, id: newId(), createdAt: new Date().toISOString(), userId };
+  async createProposal(
+    userId: string,
+    proposal: Omit<MealProposal, "id" | "createdAt">,
+  ): Promise<MealProposal> {
+    const stored = {
+      ...proposal,
+      id: newId(),
+      createdAt: new Date().toISOString(),
+      userId,
+    };
     this.proposals.set(stored.id, stored);
     const { userId: _userId, ...publicProposal } = stored;
     return publicProposal;
   }
 
-  async getProposal(userId: string, proposalId: string): Promise<MealProposal | undefined> {
+  async getProposal(
+    userId: string,
+    proposalId: string,
+  ): Promise<MealProposal | undefined> {
     const proposal = this.proposals.get(proposalId);
     if (!proposal || proposal.userId !== userId) return undefined;
     const { userId: _userId, ...publicProposal } = proposal;
     return publicProposal;
   }
 
-  async updateProposal(userId: string, proposal: MealProposal): Promise<MealProposal> {
+  async updateProposal(
+    userId: string,
+    proposal: MealProposal,
+  ): Promise<MealProposal> {
     const existing = this.proposals.get(proposal.id);
-    if (!existing || existing.userId !== userId) throw new Error("proposal_not_found");
+    if (!existing || existing.userId !== userId)
+      throw new Error("proposal_not_found");
     this.proposals.set(proposal.id, { ...proposal, userId });
     return proposal;
   }
 
-  async createMealFromProposal(userId: string, proposal: MealProposal, occurredAt: string, items = proposal.items, mealLabel?: MealLabel | null): Promise<Meal> {
+  async createMealFromProposal(
+    userId: string,
+    proposal: MealProposal,
+    occurredAt: string,
+    items = proposal.items,
+    mealLabel?: MealLabel | null,
+  ): Promise<Meal> {
     const nutrition = sumNutrition(items);
     const meal: Meal & { userId: string } = {
       id: newId(),
@@ -430,7 +739,7 @@ export class InMemoryRepository implements AppRepository {
       nutrition,
       items,
       createdAt: new Date().toISOString(),
-      userId
+      userId,
     };
     this.meals.set(meal.id, meal);
     const updatedProposal = { ...proposal, status: "committed" as const };
@@ -441,7 +750,8 @@ export class InMemoryRepository implements AppRepository {
 
   async updateMeal(userId: string, meal: Meal): Promise<Meal> {
     const existing = this.meals.get(meal.id);
-    if (!existing || existing.userId !== userId) throw new Error("meal_not_found");
+    if (!existing || existing.userId !== userId)
+      throw new Error("meal_not_found");
     this.meals.set(meal.id, { ...meal, userId });
     return meal;
   }
@@ -453,14 +763,26 @@ export class InMemoryRepository implements AppRepository {
     return true;
   }
 
-  async getDailySummary(userId: string, date: string): Promise<import("@cal-tracker/contracts").DailySummary> {
-    const meals = (await this.listMeals(userId, 100)).filter((meal) => meal.occurredAt.slice(0, 10) === date);
-    const consumed = meals.reduce((total, meal) => ({
-      calories: total.calories + meal.nutrition.calories,
-      proteinGrams: Math.round((total.proteinGrams + meal.nutrition.proteinGrams) * 10) / 10,
-      carbsGrams: Math.round((total.carbsGrams + meal.nutrition.carbsGrams) * 10) / 10,
-      fatGrams: Math.round((total.fatGrams + meal.nutrition.fatGrams) * 10) / 10
-    }), { calories: 0, proteinGrams: 0, carbsGrams: 0, fatGrams: 0 });
+  async getDailySummary(
+    userId: string,
+    date: string,
+  ): Promise<import("@cal-tracker/contracts").DailySummary> {
+    const meals = (await this.listMeals(userId, 100)).filter(
+      (meal) => meal.occurredAt.slice(0, 10) === date,
+    );
+    const consumed = meals.reduce(
+      (total, meal) => ({
+        calories: total.calories + meal.nutrition.calories,
+        proteinGrams:
+          Math.round((total.proteinGrams + meal.nutrition.proteinGrams) * 10) /
+          10,
+        carbsGrams:
+          Math.round((total.carbsGrams + meal.nutrition.carbsGrams) * 10) / 10,
+        fatGrams:
+          Math.round((total.fatGrams + meal.nutrition.fatGrams) * 10) / 10,
+      }),
+      { calories: 0, proteinGrams: 0, carbsGrams: 0, fatGrams: 0 },
+    );
     const goals = await this.getDailyGoals(userId, date);
     return {
       date,
@@ -479,7 +801,7 @@ export class InMemoryRepository implements AppRepository {
       fatPct: goals.fatPct,
       macroCalories: goals.macroCalories,
       calorieDeltaKcal: goals.calorieDeltaKcal,
-      meals
+      meals,
     };
   }
 
@@ -489,20 +811,47 @@ export class InMemoryRepository implements AppRepository {
       .map(({ userId: _userId, ...template }) => template);
   }
 
-  async createTemplate(userId: string, input: Omit<MealTemplate, "id">): Promise<MealTemplate> {
+  async createTemplate(
+    userId: string,
+    input: Omit<MealTemplate, "id">,
+  ): Promise<MealTemplate> {
     const stored = { ...input, id: newId(), userId };
     this.templates.set(stored.id, stored);
     for (const alias of input.aliases) {
-      await this.createMemory({ userId, normalizedText: normalizeText(alias), label: alias, templateId: stored.id, confidence: 1 });
+      await this.createMemory({
+        userId,
+        normalizedText: normalizeText(alias),
+        label: alias,
+        templateId: stored.id,
+        confidence: 1,
+      });
     }
     const { userId: _userId, ...template } = stored;
     return template;
   }
 
-  async updateTemplate(userId: string, template: MealTemplate): Promise<MealTemplate> {
+  async updateTemplate(
+    userId: string,
+    template: MealTemplate,
+  ): Promise<MealTemplate> {
     const existing = this.templates.get(template.id);
-    if (!existing || existing.userId !== userId) throw new Error("template_not_found");
+    if (!existing || existing.userId !== userId)
+      throw new Error("template_not_found");
     this.templates.set(template.id, { ...template, userId });
+    for (const [id, memory] of this.memories) {
+      if (memory.userId === userId && memory.templateId === template.id) {
+        this.memories.delete(id);
+      }
+    }
+    for (const alias of template.aliases) {
+      await this.createMemory({
+        userId,
+        normalizedText: normalizeText(alias),
+        label: alias,
+        templateId: template.id,
+        confidence: 1,
+      });
+    }
     return template;
   }
 
@@ -513,37 +862,74 @@ export class InMemoryRepository implements AppRepository {
     return true;
   }
 
-  async queryMemory(userId: string, normalizedText: string): Promise<MemoryMatch[]> {
-    const exact = [...this.memories.values()].filter((memory) => memory.userId === userId && memory.normalizedText === normalizedText);
+  async queryMemory(
+    userId: string,
+    normalizedText: string,
+  ): Promise<MemoryMatch[]> {
+    const exact = [...this.memories.values()].filter(
+      (memory) =>
+        memory.userId === userId && memory.normalizedText === normalizedText,
+    );
     const fuzzy = [...this.memories.values()].filter(
-      (memory) => memory.userId === userId && memory.normalizedText !== normalizedText &&
-        (normalizedText.includes(memory.normalizedText) || memory.normalizedText.includes(normalizedText))
+      (memory) =>
+        memory.userId === userId &&
+        memory.normalizedText !== normalizedText &&
+        (normalizedText.includes(memory.normalizedText) ||
+          memory.normalizedText.includes(normalizedText)),
     );
     return [...exact, ...fuzzy].map((memory) => {
-      const template = memory.templateId ? this.templates.get(memory.templateId) : undefined;
+      const template = memory.templateId
+        ? this.templates.get(memory.templateId)
+        : undefined;
       return {
         id: memory.id,
         userId,
         label: memory.label,
         normalizedText: memory.normalizedText,
-        confidence: exact.includes(memory) || normalizedText.includes(memory.normalizedText) ? memory.confidence : Math.min(memory.confidence, 0.82),
-        template: template ? stripUserId(template) : null
+        confidence:
+          exact.includes(memory) ||
+          normalizedText.includes(memory.normalizedText)
+            ? memory.confidence
+            : Math.min(memory.confidence, 0.82),
+        template: template ? stripUserId(template) : null,
       };
     });
   }
 
-  async createMemory(input: { userId: string; normalizedText: string; label: string; templateId?: string; confidence: number }): Promise<void> {
-    this.memories.set(`${input.userId}:${input.normalizedText}`, { id: newId(), usageCount: 0, ...input });
+  async createMemory(input: {
+    userId: string;
+    normalizedText: string;
+    label: string;
+    templateId?: string;
+    confidence: number;
+  }): Promise<void> {
+    this.memories.set(`${input.userId}:${input.normalizedText}`, {
+      id: newId(),
+      usageCount: 0,
+      ...input,
+    });
   }
 
-  async recordActionCall(input: Omit<ActionCallRecord, "id" | "createdAt">): Promise<ActionCallRecord> {
-    const record = { ...input, id: newId(), createdAt: new Date().toISOString() };
+  async recordActionCall(
+    input: Omit<ActionCallRecord, "id" | "createdAt">,
+  ): Promise<ActionCallRecord> {
+    const record = {
+      ...input,
+      id: newId(),
+      createdAt: new Date().toISOString(),
+    };
     this.actionCalls.push(record);
     return record;
   }
 
-  async recordAuditEvent(input: Omit<AuditEventRecord, "id" | "createdAt">): Promise<AuditEventRecord> {
-    const record = { ...input, id: newId(), createdAt: new Date().toISOString() };
+  async recordAuditEvent(
+    input: Omit<AuditEventRecord, "id" | "createdAt">,
+  ): Promise<AuditEventRecord> {
+    const record = {
+      ...input,
+      id: newId(),
+      createdAt: new Date().toISOString(),
+    };
     this.auditEvents.push(record);
     return record;
   }
@@ -562,7 +948,11 @@ export class InMemoryRepository implements AppRepository {
     return user;
   }
 
-  private ensureDailyGoalSnapshot(userId: string, date: string, goals: Omit<DailyGoals, "date">): DailyGoals {
+  private ensureDailyGoalSnapshot(
+    userId: string,
+    date: string,
+    goals: Omit<DailyGoals, "date">,
+  ): DailyGoals {
     const key = dailyGoalKey(userId, date);
     const existing = this.dailyGoalSnapshots.get(key);
     if (existing) return existing;
@@ -574,10 +964,11 @@ export class InMemoryRepository implements AppRepository {
   private currentMacroMetadata(userId: string): MacroGoalMetadata {
     return this.macroGoalMetadata.get(userId) ?? {};
   }
-
 }
 
-function stripUserId<T extends { userId: string }>(value: T): Omit<T, "userId"> {
+function stripUserId<T extends { userId: string }>(
+  value: T,
+): Omit<T, "userId"> {
   const { userId: _userId, ...rest } = value;
   return rest;
 }
@@ -598,7 +989,9 @@ function previousDatesInWeek(date: string): string[] {
   return dates;
 }
 
-function stripFoodSearchCandidate(candidate: FoodSearchCandidate): FoodItemRecord {
+function stripFoodSearchCandidate(
+  candidate: FoodSearchCandidate,
+): FoodItemRecord {
   const {
     lexicalScore: _lexicalScore,
     vectorScore: _vectorScore,
@@ -609,25 +1002,90 @@ function stripFoodSearchCandidate(candidate: FoodSearchCandidate): FoodItemRecor
   return food;
 }
 
-function foodMatchesSearchScope(food: FoodItemRecord, input: FoodHybridSearchInput): boolean {
+function foodRecordToUsualFood(food: FoodItemRecord): UsualFood {
+  const nutrients = publicNutrients(food.nutrients);
+  return {
+    id: food.id,
+    name: food.name,
+    canonicalName: food.canonicalName,
+    brand: food.brand,
+    barcode: food.barcode,
+    servingGrams: food.servingGrams,
+    nutrition: {
+      calories: food.calories,
+      proteinGrams: food.proteinGrams,
+      carbsGrams: food.carbsGrams,
+      fatGrams: food.fatGrams,
+    },
+    ...(Object.keys(nutrients).length > 0 ? { nutrients } : {}),
+    aliases: aliasesFromNutrients(food.nutrients),
+    createdAt: food.createdAt,
+    updatedAt: food.updatedAt,
+  };
+}
+
+function nutrientsWithAliases(
+  nutrients: Record<string, unknown> | undefined,
+  aliases: string[] | undefined,
+): Record<string, unknown> {
+  const next = publicNutrients(nutrients);
+  const normalizedAliases = uniqueStrings(
+    (aliases ?? []).map((alias) => alias.trim()).filter(Boolean),
+  );
+  if (normalizedAliases.length > 0)
+    next[USUAL_FOOD_ALIASES_KEY] = normalizedAliases;
+  return next;
+}
+
+function publicNutrients(
+  nutrients: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  const next = { ...(nutrients ?? {}) };
+  delete next[USUAL_FOOD_ALIASES_KEY];
+  return next;
+}
+
+function aliasesFromNutrients(
+  nutrients: Record<string, unknown> | undefined,
+): string[] {
+  const aliases = nutrients?.[USUAL_FOOD_ALIASES_KEY];
+  if (!Array.isArray(aliases)) return [];
+  return uniqueStrings(
+    aliases
+      .map(String)
+      .map((alias) => alias.trim())
+      .filter(Boolean),
+  );
+}
+
+function uniqueStrings(values: string[]): string[] {
+  return [...new Set(values)];
+}
+
+function foodMatchesSearchScope(
+  food: FoodItemRecord,
+  input: FoodHybridSearchInput,
+): boolean {
   if (!input.scope) return true;
   const scope = foodSearchScopeForFood(food);
-  if (input.scope === "market") return scope === "market" || scope === "generic";
+  if (input.scope === "market")
+    return scope === "market" || scope === "generic";
   return scope === input.scope;
 }
 
 function foodSearchScopeForFood(food: FoodItemRecord): "generic" | "market" {
   return food.userId ||
-    (
-      food.dataType !== "Branded" &&
+    (food.dataType !== "Branded" &&
       food.source !== "usda_branded" &&
-      (food.source !== "openfoodfacts" || (!food.barcode && !food.brand))
-    )
+      (food.source !== "openfoodfacts" || (!food.barcode && !food.brand)))
     ? "generic"
     : "market";
 }
 
-function foodMatchesSearchLocale(food: FoodItemRecord, input: FoodHybridSearchInput): boolean {
+function foodMatchesSearchLocale(
+  food: FoodItemRecord,
+  input: FoodHybridSearchInput,
+): boolean {
   const locale = normalizeSearchLocale(input.locale);
   if (!locale) return true;
   if (input.scope === "market") return true;
@@ -652,7 +1110,10 @@ function normalizeSearchLocale(locale?: string): "es" | "en" | undefined {
 
 function sanitizeLimit(limit?: number): number {
   if (!Number.isFinite(limit)) return DEFAULT_FOOD_SEARCH_LIMIT;
-  return Math.max(1, Math.min(MAX_FOOD_SEARCH_LIMIT, Math.floor(limit as number)));
+  return Math.max(
+    1,
+    Math.min(MAX_FOOD_SEARCH_LIMIT, Math.floor(limit as number)),
+  );
 }
 
 function clampScore(score: number): number {

@@ -1,6 +1,6 @@
 {
-  "id": "cec0f645-37dd-45b0-bd32-67a7bb4933b2",
-  "prevId": "82d21927-90ee-4c91-905f-dc2c5d1bb72b",
+  "id": "31b2ec8f-1a9b-4eba-97db-1421571542ce",
+  "prevId": "454eb4f7-a660-4600-82b3-2be230aff68f",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1351,6 +1351,19 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -2066,13 +2079,6 @@
         },
         "primary_entity_category_coherence": {
           "name": "primary_entity_category_coherence",
-          "type": "numeric(6, 4)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'0'"
-        },
-        "primary_entity_representativeness": {
-          "name": "primary_entity_representativeness",
           "type": "numeric(6, 4)",
           "primaryKey": false,
           "notNull": true,

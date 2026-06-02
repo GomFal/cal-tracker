@@ -5,8 +5,14 @@ import {
   correctMealInputSchema,
   createMealProposalFromItemsInputSchema,
   createMealTemplateInputSchema,
+  createUsualFoodInputSchema,
   deleteMealInputSchema,
   deleteMealTemplateInputSchema,
+  deleteUsualFoodInputSchema,
+  draftUsualFoodInputSchema,
+  draftUsualFoodOutputSchema,
+  draftUsualMealInputSchema,
+  draftUsualMealOutputSchema,
   getDailySummaryInputSchema,
   getMealHistoryInputSchema,
   getRemainingTargetsInputSchema,
@@ -15,6 +21,7 @@ import {
   reviseMealProposalInputSchema,
   searchNutritionDatabaseInputSchema,
   updateMealTemplateInputSchema,
+  updateUsualFoodInputSchema,
   type ActionContext,
   type FoodCandidateGroup,
   type FoodMention,
@@ -22,6 +29,12 @@ import {
   type MealItem,
   type MealLabel,
   type MealProposal,
+  type DraftUsualFoodProviderOutput,
+  type DraftUsualMealProviderOutput,
+  type UsualFoodDraft,
+  type UsualFoodDraftRequiredField,
+  type UsualMealDraft,
+  type UsualMealDraftRequiredField,
 } from "@cal-tracker/contracts";
 import type { AppConfig } from "../config/env.js";
 import type {
@@ -39,6 +52,8 @@ import {
 } from "../utils/mealTitle.js";
 import { normalizeText } from "../utils/normalize.js";
 import { sumNutrition } from "../utils/nutrition.js";
+import type { UsualFoodDraftProvider } from "../agent/usualFoodDraftProvider.js";
+import type { UsualMealDraftProvider } from "../agent/usualMealDraftProvider.js";
 
 export type ExecuteActionResult = {
   actionCallId: string;
@@ -105,6 +120,8 @@ export class ActionExecutor {
     private readonly repository: AppRepository,
     private readonly nutritionProvider: NutritionProvider,
     private readonly memoryRetrievalService?: MemoryRetrievalService,
+    private readonly usualFoodDraftProvider?: UsualFoodDraftProvider,
+    private readonly usualMealDraftProvider?: UsualMealDraftProvider,
   ) {}
 
   listActions() {
@@ -327,6 +344,38 @@ export class ActionExecutor {
         return {
           templates: await this.repository.listTemplates(context.actorUserId),
         };
+      case "get_usual_foods":
+        return {
+          usualFoods: await this.repository.listUsualFoods(context.actorUserId),
+        };
+      case "create_usual_food": {
+        const parsed = createUsualFoodInputSchema.parse(input);
+        return {
+          usualFood: await this.repository.createUsualFood(
+            context.actorUserId,
+            parsed,
+          ),
+        };
+      }
+      case "update_usual_food": {
+        const parsed = updateUsualFoodInputSchema.parse(input);
+        const usualFood = await this.repository.updateUsualFood(
+          context.actorUserId,
+          parsed.usualFoodId,
+          parsed,
+        );
+        if (!usualFood) throw new ActionExecutionError("usual_food_not_found");
+        return { usualFood };
+      }
+      case "delete_usual_food": {
+        const parsed = deleteUsualFoodInputSchema.parse(input);
+        return {
+          deleted: await this.repository.deleteUsualFood(
+            context.actorUserId,
+            parsed.usualFoodId,
+          ),
+        };
+      }
       case "create_meal_template": {
         const parsed = createMealTemplateInputSchema.parse(input);
         const nutrition = sumNutrition(parsed.items);
@@ -371,9 +420,115 @@ export class ActionExecutor {
           ),
         };
       }
+      case "draft_usual_food":
+        return this.draftUsualFood(input, context);
+      case "draft_usual_meal":
+        return this.draftUsualMeal(input, context);
       default:
         throw new ActionExecutionError("unimplemented_action", actionId);
     }
+  }
+
+  private async draftUsualFood(input: unknown, context: ActionContext) {
+    const parsed = draftUsualFoodInputSchema.parse(input);
+    if (!this.usualFoodDraftProvider) {
+      throw new ActionExecutionError("usual_food_draft_provider_unavailable");
+    }
+    const providerDraft = await this.usualFoodDraftProvider.draft({
+      text: parsed.text,
+      locale: context.locale,
+      traceId: context.traceId,
+    });
+    return draftUsualFoodOutputSchema.parse(
+      buildValidatedUsualFoodDraft(providerDraft),
+    );
+  }
+
+  private async draftUsualMeal(input: unknown, context: ActionContext) {
+    const parsed = draftUsualMealInputSchema.parse(input);
+    if (!this.usualMealDraftProvider) {
+      throw new ActionExecutionError("usual_meal_draft_provider_unavailable");
+    }
+    const providerDraft = await this.usualMealDraftProvider.draft({
+      text: parsed.text,
+      locale: context.locale,
+      traceId: context.traceId,
+    });
+    const output = await this.buildResolvedUsualMealDraft(
+      context.actorUserId,
+      providerDraft,
+      context.locale,
+    );
+    return draftUsualMealOutputSchema.parse(output);
+  }
+
+  private async buildResolvedUsualMealDraft(
+    userId: string,
+    providerOutput: DraftUsualMealProviderOutput,
+    locale?: string,
+  ) {
+    const title = providerOutput.title;
+    const aliases = providerOutput.aliases;
+    const mentions = providerOutput.mentions;
+    if (mentions.length === 0) {
+      const draft = buildUsualMealDraft({
+        title,
+        aliases,
+        items: [],
+      });
+      return {
+        draft,
+        requiresReview: true,
+        clarificationRequired: true,
+        resolvedItems: [],
+        unresolvedMentions: [],
+        options: [],
+        candidateGroups: [],
+        message:
+          "I could not identify ingredients for this usual meal. Please provide foods and quantities before saving.",
+      };
+    }
+
+    const resolution = await this.resolveMealMentions(userId, mentions, locale);
+    const draft = buildUsualMealDraft({
+      title,
+      aliases,
+      items: resolution.items,
+    });
+
+    if (resolution.clarificationRequired) {
+      const unresolvedMentions = resolution.unresolvedMentions.length > 0
+        ? resolution.unresolvedMentions
+        : mentions;
+      const options = candidateGroupsForMentions(
+        resolution.candidateGroups,
+        unresolvedMentions,
+      );
+      return {
+        draft,
+        requiresReview: true,
+        clarificationRequired: true,
+        resolvedItems: resolution.items,
+        unresolvedMentions,
+        options,
+        candidateGroups: resolution.candidateGroups,
+        message:
+          unsupportedUnitClarification(options) ??
+          foodMatchClarificationMessage(
+            options,
+            "Please choose food matches or edit the ingredients before saving.",
+            "in this usual meal",
+          ),
+      };
+    }
+
+    return {
+      draft,
+      requiresReview: true,
+      clarificationRequired: false,
+      resolvedItems: resolution.items,
+      candidateGroups: resolution.candidateGroups,
+    };
   }
 
   private async proposeMeal(
@@ -1273,6 +1428,137 @@ function normalizeMealLabel(
     return { type: "other", label };
   }
   return { type: input.type, label: fixedMealLabels[input.type] };
+}
+
+const usualFoodDraftRequiredFields: UsualFoodDraftRequiredField[] = [
+  "name",
+  "servingGrams",
+  "calories",
+  "proteinGrams",
+  "carbsGrams",
+  "fatGrams",
+];
+
+function buildValidatedUsualFoodDraft(
+  providerOutput: DraftUsualFoodProviderOutput,
+): { draft: UsualFoodDraft; requiresReview: true; message?: string } {
+  const explicitFields = new Set(providerOutput.explicitFields);
+  const nutrition = providerOutput.nutrition ?? {};
+  const draft: UsualFoodDraft = {
+    aliases: explicitFields.has("aliases") ? providerOutput.aliases : [],
+    missingRequiredFields: [],
+  };
+
+  if (explicitFields.has("name") && providerOutput.name) {
+    draft.name = providerOutput.name;
+  }
+  if (explicitFields.has("canonicalName") && providerOutput.canonicalName) {
+    draft.canonicalName = providerOutput.canonicalName;
+  }
+  if (explicitFields.has("brand") && providerOutput.brand) {
+    draft.brand = providerOutput.brand;
+  }
+  if (explicitFields.has("barcode") && providerOutput.barcode) {
+    draft.barcode = providerOutput.barcode;
+  }
+  if (
+    explicitFields.has("servingGrams") &&
+    providerOutput.servingGrams !== undefined
+  ) {
+    draft.servingGrams = providerOutput.servingGrams;
+  }
+
+  const acceptedNutrition: UsualFoodDraft["nutrition"] = {};
+  if (explicitFields.has("calories") && nutrition.calories !== undefined) {
+    acceptedNutrition.calories = nutrition.calories;
+  }
+  if (
+    explicitFields.has("proteinGrams") &&
+    nutrition.proteinGrams !== undefined
+  ) {
+    acceptedNutrition.proteinGrams = nutrition.proteinGrams;
+  }
+  if (explicitFields.has("carbsGrams") && nutrition.carbsGrams !== undefined) {
+    acceptedNutrition.carbsGrams = nutrition.carbsGrams;
+  }
+  if (explicitFields.has("fatGrams") && nutrition.fatGrams !== undefined) {
+    acceptedNutrition.fatGrams = nutrition.fatGrams;
+  }
+  if (Object.keys(acceptedNutrition).length > 0) {
+    draft.nutrition = acceptedNutrition;
+  }
+  if (explicitFields.has("nutrients") && providerOutput.nutrients) {
+    draft.nutrients = providerOutput.nutrients;
+  }
+
+  draft.missingRequiredFields = usualFoodDraftRequiredFields.filter(
+    (field) => !hasUsualFoodDraftRequiredField(draft, field),
+  );
+  return {
+    draft,
+    requiresReview: true,
+    ...(draft.missingRequiredFields.length > 0
+      ? {
+          message:
+            "Missing required nutrition values. Please complete them before saving.",
+        }
+      : {}),
+  };
+}
+
+function hasUsualFoodDraftRequiredField(
+  draft: UsualFoodDraft,
+  field: UsualFoodDraftRequiredField,
+): boolean {
+  switch (field) {
+    case "name":
+      return Boolean(draft.name);
+    case "servingGrams":
+      return draft.servingGrams !== undefined;
+    case "calories":
+      return draft.nutrition?.calories !== undefined;
+    case "proteinGrams":
+      return draft.nutrition?.proteinGrams !== undefined;
+    case "carbsGrams":
+      return draft.nutrition?.carbsGrams !== undefined;
+    case "fatGrams":
+      return draft.nutrition?.fatGrams !== undefined;
+  }
+}
+
+const usualMealDraftRequiredFields: UsualMealDraftRequiredField[] = [
+  "title",
+  "items",
+];
+
+function buildUsualMealDraft(input: {
+  title?: string;
+  aliases: string[];
+  items: MealItem[];
+}): UsualMealDraft {
+  const draft: UsualMealDraft = {
+    aliases: input.aliases,
+    items: input.items,
+    missingRequiredFields: [],
+  };
+  if (input.title) draft.title = input.title;
+  if (input.items.length > 0) draft.nutrition = sumNutrition(input.items);
+  draft.missingRequiredFields = usualMealDraftRequiredFields.filter(
+    (field) => !hasUsualMealDraftRequiredField(draft, field),
+  );
+  return draft;
+}
+
+function hasUsualMealDraftRequiredField(
+  draft: UsualMealDraft,
+  field: UsualMealDraftRequiredField,
+): boolean {
+  switch (field) {
+    case "title":
+      return Boolean(draft.title);
+    case "items":
+      return draft.items.length > 0;
+  }
 }
 
 function today(): string {

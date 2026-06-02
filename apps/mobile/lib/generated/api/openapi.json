@@ -1987,6 +1987,1436 @@
         ],
         "additionalProperties": false
       },
+      "CreateUsualFoodRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "canonicalName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "brand": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "barcode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "servingGrams": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "nutrition": {
+            "type": "object",
+            "properties": {
+              "calories": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "proteinGrams": {
+                "type": "number",
+                "minimum": 0
+              },
+              "carbsGrams": {
+                "type": "number",
+                "minimum": 0
+              },
+              "fatGrams": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "calories",
+              "proteinGrams",
+              "carbsGrams",
+              "fatGrams"
+            ],
+            "additionalProperties": false
+          },
+          "nutrients": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "default": []
+          }
+        },
+        "required": [
+          "name",
+          "servingGrams",
+          "nutrition"
+        ],
+        "additionalProperties": false
+      },
+      "UpdateUsualFoodRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "canonicalName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "brand": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "barcode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "servingGrams": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "nutrition": {
+            "type": "object",
+            "properties": {
+              "calories": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "proteinGrams": {
+                "type": "number",
+                "minimum": 0
+              },
+              "carbsGrams": {
+                "type": "number",
+                "minimum": 0
+              },
+              "fatGrams": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "calories",
+              "proteinGrams",
+              "carbsGrams",
+              "fatGrams"
+            ],
+            "additionalProperties": false
+          },
+          "nutrients": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "default": []
+          }
+        },
+        "additionalProperties": false
+      },
+      "UsualFoodResponse": {
+        "type": "object",
+        "properties": {
+          "usualFood": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "canonicalName": {
+                "type": "string",
+                "minLength": 1
+              },
+              "brand": {
+                "type": "string",
+                "minLength": 1
+              },
+              "barcode": {
+                "type": "string",
+                "minLength": 1
+              },
+              "servingGrams": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "nutrition": {
+                "type": "object",
+                "properties": {
+                  "calories": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "proteinGrams": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "carbsGrams": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "fatGrams": {
+                    "type": "number",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "calories",
+                  "proteinGrams",
+                  "carbsGrams",
+                  "fatGrams"
+                ],
+                "additionalProperties": false
+              },
+              "nutrients": {
+                "type": "object",
+                "additionalProperties": {}
+              },
+              "aliases": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "default": []
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "servingGrams",
+              "nutrition"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "usualFood"
+        ],
+        "additionalProperties": false
+      },
+      "UsualFoodsResponse": {
+        "type": "object",
+        "properties": {
+          "usualFoods": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "canonicalName": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "brand": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "barcode": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "servingGrams": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "nutrition": {
+                  "type": "object",
+                  "properties": {
+                    "calories": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "proteinGrams": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "carbsGrams": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "fatGrams": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "calories",
+                    "proteinGrams",
+                    "carbsGrams",
+                    "fatGrams"
+                  ],
+                  "additionalProperties": false
+                },
+                "nutrients": {
+                  "type": "object",
+                  "additionalProperties": {}
+                },
+                "aliases": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "default": []
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "servingGrams",
+                "nutrition"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "usualFoods"
+        ],
+        "additionalProperties": false
+      },
+      "UsualFoodDraftRequest": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "UsualFoodDraftResponse": {
+        "type": "object",
+        "properties": {
+          "draft": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "canonicalName": {
+                "type": "string",
+                "minLength": 1
+              },
+              "brand": {
+                "type": "string",
+                "minLength": 1
+              },
+              "barcode": {
+                "type": "string",
+                "minLength": 1
+              },
+              "servingGrams": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "nutrition": {
+                "type": "object",
+                "properties": {
+                  "calories": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "proteinGrams": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "carbsGrams": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "fatGrams": {
+                    "type": "number",
+                    "minimum": 0
+                  }
+                },
+                "additionalProperties": false
+              },
+              "nutrients": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "number"
+                }
+              },
+              "aliases": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "default": []
+              },
+              "missingRequiredFields": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "name",
+                    "servingGrams",
+                    "calories",
+                    "proteinGrams",
+                    "carbsGrams",
+                    "fatGrams"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "missingRequiredFields"
+            ],
+            "additionalProperties": false
+          },
+          "requiresReview": {
+            "type": "boolean",
+            "const": true
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "draft",
+          "requiresReview"
+        ],
+        "additionalProperties": false
+      },
+      "UsualMealDraftRequest": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "UsualMealDraftResponse": {
+        "type": "object",
+        "properties": {
+          "draft": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "minLength": 1
+              },
+              "aliases": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "default": []
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "quantity": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "unit": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "calories": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "proteinGrams": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "carbsGrams": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "fatGrams": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "source": {
+                      "type": "string",
+                      "default": "backend_estimate"
+                    },
+                    "originalText": {
+                      "type": "string"
+                    },
+                    "canonicalName": {
+                      "type": "string"
+                    },
+                    "language": {
+                      "type": "string",
+                      "minLength": 2,
+                      "maxLength": 16
+                    },
+                    "externalSource": {
+                      "type": "string"
+                    },
+                    "externalId": {
+                      "type": "string"
+                    },
+                    "sourceUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "license": {
+                      "type": "string"
+                    },
+                    "confidence": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "needsReview": {
+                      "type": "boolean"
+                    },
+                    "resolvedGrams": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "portionDescription": {
+                      "type": "string"
+                    },
+                    "rank": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "matchScore": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "lexicalScore": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "vectorScore": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "preferenceScore": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "matchReason": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "quantity",
+                    "unit",
+                    "calories",
+                    "proteinGrams",
+                    "carbsGrams",
+                    "fatGrams"
+                  ],
+                  "additionalProperties": false
+                },
+                "default": []
+              },
+              "nutrition": {
+                "type": "object",
+                "properties": {
+                  "calories": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "proteinGrams": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "carbsGrams": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "fatGrams": {
+                    "type": "number",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "calories",
+                  "proteinGrams",
+                  "carbsGrams",
+                  "fatGrams"
+                ],
+                "additionalProperties": false
+              },
+              "missingRequiredFields": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "title",
+                    "items"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "missingRequiredFields"
+            ],
+            "additionalProperties": false
+          },
+          "requiresReview": {
+            "type": "boolean",
+            "const": true
+          },
+          "clarificationRequired": {
+            "type": "boolean"
+          },
+          "resolvedItems": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "quantity": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "unit": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "calories": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "proteinGrams": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "carbsGrams": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "fatGrams": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "source": {
+                  "type": "string",
+                  "default": "backend_estimate"
+                },
+                "originalText": {
+                  "type": "string"
+                },
+                "canonicalName": {
+                  "type": "string"
+                },
+                "language": {
+                  "type": "string",
+                  "minLength": 2,
+                  "maxLength": 16
+                },
+                "externalSource": {
+                  "type": "string"
+                },
+                "externalId": {
+                  "type": "string"
+                },
+                "sourceUrl": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "license": {
+                  "type": "string"
+                },
+                "confidence": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "needsReview": {
+                  "type": "boolean"
+                },
+                "resolvedGrams": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "portionDescription": {
+                  "type": "string"
+                },
+                "rank": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "matchScore": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "lexicalScore": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "vectorScore": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "preferenceScore": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "matchReason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "quantity",
+                "unit",
+                "calories",
+                "proteinGrams",
+                "carbsGrams",
+                "fatGrams"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "unresolvedMentions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "originalText": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "canonicalName": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "canonicalEnglishName": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "language": {
+                  "type": "string",
+                  "minLength": 2,
+                  "maxLength": 16
+                },
+                "quantity": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "unit": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "rawUnitText": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "unitKind": {
+                  "type": "string",
+                  "enum": [
+                    "metric",
+                    "household",
+                    "implicit_count",
+                    "unknown"
+                  ]
+                },
+                "portionDescriptorRaw": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "portionDescriptor": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "brand": {
+                  "type": "string"
+                },
+                "barcode": {
+                  "type": "string"
+                },
+                "confidence": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "marketProduct": {
+                  "type": "boolean",
+                  "default": false
+                }
+              },
+              "required": [
+                "originalText",
+                "quantity",
+                "unit",
+                "confidence"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "mention": {
+                  "type": "object",
+                  "properties": {
+                    "originalText": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "canonicalName": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "canonicalEnglishName": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "language": {
+                      "type": "string",
+                      "minLength": 2,
+                      "maxLength": 16
+                    },
+                    "quantity": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "unit": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "rawUnitText": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "unitKind": {
+                      "type": "string",
+                      "enum": [
+                        "metric",
+                        "household",
+                        "implicit_count",
+                        "unknown"
+                      ]
+                    },
+                    "portionDescriptorRaw": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "portionDescriptor": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "brand": {
+                      "type": "string"
+                    },
+                    "barcode": {
+                      "type": "string"
+                    },
+                    "confidence": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "marketProduct": {
+                      "type": "boolean",
+                      "default": false
+                    }
+                  },
+                  "required": [
+                    "originalText",
+                    "quantity",
+                    "unit",
+                    "confidence"
+                  ],
+                  "additionalProperties": false
+                },
+                "candidates": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "quantity": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "unit": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "calories": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "proteinGrams": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "carbsGrams": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "fatGrams": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "source": {
+                        "type": "string",
+                        "default": "backend_estimate"
+                      },
+                      "originalText": {
+                        "type": "string"
+                      },
+                      "canonicalName": {
+                        "type": "string"
+                      },
+                      "language": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 16
+                      },
+                      "externalSource": {
+                        "type": "string"
+                      },
+                      "externalId": {
+                        "type": "string"
+                      },
+                      "sourceUrl": {
+                        "type": "string",
+                        "format": "uri"
+                      },
+                      "license": {
+                        "type": "string"
+                      },
+                      "confidence": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "needsReview": {
+                        "type": "boolean"
+                      },
+                      "resolvedGrams": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "portionDescription": {
+                        "type": "string"
+                      },
+                      "rank": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0
+                      },
+                      "matchScore": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "lexicalScore": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "vectorScore": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "preferenceScore": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "matchReason": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "quantity",
+                      "unit",
+                      "calories",
+                      "proteinGrams",
+                      "carbsGrams",
+                      "fatGrams"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "portionOptions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "quantity": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "unit": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "gramWeight": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "totalGrams": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "count_size",
+                          "whole_item",
+                          "household",
+                          "piece_shape",
+                          "serving",
+                          "metric"
+                        ]
+                      },
+                      "portionDescriptor": {
+                        "type": "string"
+                      },
+                      "canonicalFoodName": {
+                        "type": "string"
+                      },
+                      "sourceDescription": {
+                        "type": "string"
+                      },
+                      "externalSource": {
+                        "type": "string"
+                      },
+                      "externalFoodId": {
+                        "type": "string"
+                      },
+                      "actionText": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "label",
+                      "quantity",
+                      "unit"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "mention",
+                "candidates"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "candidateGroups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "mention": {
+                  "type": "object",
+                  "properties": {
+                    "originalText": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "canonicalName": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "canonicalEnglishName": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "language": {
+                      "type": "string",
+                      "minLength": 2,
+                      "maxLength": 16
+                    },
+                    "quantity": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "unit": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "rawUnitText": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "unitKind": {
+                      "type": "string",
+                      "enum": [
+                        "metric",
+                        "household",
+                        "implicit_count",
+                        "unknown"
+                      ]
+                    },
+                    "portionDescriptorRaw": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "portionDescriptor": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "brand": {
+                      "type": "string"
+                    },
+                    "barcode": {
+                      "type": "string"
+                    },
+                    "confidence": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "marketProduct": {
+                      "type": "boolean",
+                      "default": false
+                    }
+                  },
+                  "required": [
+                    "originalText",
+                    "quantity",
+                    "unit",
+                    "confidence"
+                  ],
+                  "additionalProperties": false
+                },
+                "candidates": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "quantity": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "unit": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "calories": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "proteinGrams": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "carbsGrams": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "fatGrams": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "source": {
+                        "type": "string",
+                        "default": "backend_estimate"
+                      },
+                      "originalText": {
+                        "type": "string"
+                      },
+                      "canonicalName": {
+                        "type": "string"
+                      },
+                      "language": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 16
+                      },
+                      "externalSource": {
+                        "type": "string"
+                      },
+                      "externalId": {
+                        "type": "string"
+                      },
+                      "sourceUrl": {
+                        "type": "string",
+                        "format": "uri"
+                      },
+                      "license": {
+                        "type": "string"
+                      },
+                      "confidence": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "needsReview": {
+                        "type": "boolean"
+                      },
+                      "resolvedGrams": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "portionDescription": {
+                        "type": "string"
+                      },
+                      "rank": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0
+                      },
+                      "matchScore": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "lexicalScore": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "vectorScore": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "preferenceScore": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "matchReason": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "quantity",
+                      "unit",
+                      "calories",
+                      "proteinGrams",
+                      "carbsGrams",
+                      "fatGrams"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "portionOptions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "quantity": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "unit": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "gramWeight": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "totalGrams": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "count_size",
+                          "whole_item",
+                          "household",
+                          "piece_shape",
+                          "serving",
+                          "metric"
+                        ]
+                      },
+                      "portionDescriptor": {
+                        "type": "string"
+                      },
+                      "canonicalFoodName": {
+                        "type": "string"
+                      },
+                      "sourceDescription": {
+                        "type": "string"
+                      },
+                      "externalSource": {
+                        "type": "string"
+                      },
+                      "externalFoodId": {
+                        "type": "string"
+                      },
+                      "actionText": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "label",
+                      "quantity",
+                      "unit"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "mention",
+                "candidates"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "draft",
+          "requiresReview"
+        ],
+        "additionalProperties": false
+      },
       "AgentRunRequest": {
         "type": "object",
         "properties": {
@@ -2030,6 +3460,8 @@
               "templates",
               "template_saved",
               "template_deleted",
+              "usual_food_draft",
+              "usual_meal_draft",
               "confirmation_required",
               "meal_deleted",
               "clarification_required"
@@ -3643,6 +5075,1042 @@
               "trustedAutoCommitEnabled",
               "nutrition",
               "items"
+            ],
+            "additionalProperties": false
+          },
+          "usualFoodDraft": {
+            "type": "object",
+            "properties": {
+              "draft": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "canonicalName": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "brand": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "barcode": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "servingGrams": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "nutrition": {
+                    "type": "object",
+                    "properties": {
+                      "calories": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "proteinGrams": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "carbsGrams": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "fatGrams": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "nutrients": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "number"
+                    }
+                  },
+                  "aliases": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "default": []
+                  },
+                  "missingRequiredFields": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "name",
+                        "servingGrams",
+                        "calories",
+                        "proteinGrams",
+                        "carbsGrams",
+                        "fatGrams"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "missingRequiredFields"
+                ],
+                "additionalProperties": false
+              },
+              "requiresReview": {
+                "type": "boolean",
+                "const": true
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "draft",
+              "requiresReview"
+            ],
+            "additionalProperties": false
+          },
+          "usualMealDraft": {
+            "type": "object",
+            "properties": {
+              "draft": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "aliases": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "default": []
+                  },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "quantity": {
+                          "type": "number",
+                          "exclusiveMinimum": 0
+                        },
+                        "unit": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "calories": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "proteinGrams": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "carbsGrams": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "fatGrams": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "source": {
+                          "type": "string",
+                          "default": "backend_estimate"
+                        },
+                        "originalText": {
+                          "type": "string"
+                        },
+                        "canonicalName": {
+                          "type": "string"
+                        },
+                        "language": {
+                          "type": "string",
+                          "minLength": 2,
+                          "maxLength": 16
+                        },
+                        "externalSource": {
+                          "type": "string"
+                        },
+                        "externalId": {
+                          "type": "string"
+                        },
+                        "sourceUrl": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "license": {
+                          "type": "string"
+                        },
+                        "confidence": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        "needsReview": {
+                          "type": "boolean"
+                        },
+                        "resolvedGrams": {
+                          "type": "number",
+                          "exclusiveMinimum": 0
+                        },
+                        "portionDescription": {
+                          "type": "string"
+                        },
+                        "rank": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0
+                        },
+                        "matchScore": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        "lexicalScore": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        "vectorScore": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        "preferenceScore": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        "matchReason": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "quantity",
+                        "unit",
+                        "calories",
+                        "proteinGrams",
+                        "carbsGrams",
+                        "fatGrams"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "default": []
+                  },
+                  "nutrition": {
+                    "type": "object",
+                    "properties": {
+                      "calories": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "proteinGrams": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "carbsGrams": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "fatGrams": {
+                        "type": "number",
+                        "minimum": 0
+                      }
+                    },
+                    "required": [
+                      "calories",
+                      "proteinGrams",
+                      "carbsGrams",
+                      "fatGrams"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "missingRequiredFields": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "title",
+                        "items"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "missingRequiredFields"
+                ],
+                "additionalProperties": false
+              },
+              "requiresReview": {
+                "type": "boolean",
+                "const": true
+              },
+              "clarificationRequired": {
+                "type": "boolean"
+              },
+              "resolvedItems": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "quantity": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "unit": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "calories": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "proteinGrams": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "carbsGrams": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "fatGrams": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "source": {
+                      "type": "string",
+                      "default": "backend_estimate"
+                    },
+                    "originalText": {
+                      "type": "string"
+                    },
+                    "canonicalName": {
+                      "type": "string"
+                    },
+                    "language": {
+                      "type": "string",
+                      "minLength": 2,
+                      "maxLength": 16
+                    },
+                    "externalSource": {
+                      "type": "string"
+                    },
+                    "externalId": {
+                      "type": "string"
+                    },
+                    "sourceUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "license": {
+                      "type": "string"
+                    },
+                    "confidence": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "needsReview": {
+                      "type": "boolean"
+                    },
+                    "resolvedGrams": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "portionDescription": {
+                      "type": "string"
+                    },
+                    "rank": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "matchScore": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "lexicalScore": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "vectorScore": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "preferenceScore": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "matchReason": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "quantity",
+                    "unit",
+                    "calories",
+                    "proteinGrams",
+                    "carbsGrams",
+                    "fatGrams"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "unresolvedMentions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "originalText": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "canonicalName": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "canonicalEnglishName": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "language": {
+                      "type": "string",
+                      "minLength": 2,
+                      "maxLength": 16
+                    },
+                    "quantity": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "unit": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "rawUnitText": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "unitKind": {
+                      "type": "string",
+                      "enum": [
+                        "metric",
+                        "household",
+                        "implicit_count",
+                        "unknown"
+                      ]
+                    },
+                    "portionDescriptorRaw": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "portionDescriptor": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "brand": {
+                      "type": "string"
+                    },
+                    "barcode": {
+                      "type": "string"
+                    },
+                    "confidence": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "marketProduct": {
+                      "type": "boolean",
+                      "default": false
+                    }
+                  },
+                  "required": [
+                    "originalText",
+                    "quantity",
+                    "unit",
+                    "confidence"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "options": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "mention": {
+                      "type": "object",
+                      "properties": {
+                        "originalText": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "canonicalName": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "canonicalEnglishName": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "language": {
+                          "type": "string",
+                          "minLength": 2,
+                          "maxLength": 16
+                        },
+                        "quantity": {
+                          "type": "number",
+                          "exclusiveMinimum": 0
+                        },
+                        "unit": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "rawUnitText": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "unitKind": {
+                          "type": "string",
+                          "enum": [
+                            "metric",
+                            "household",
+                            "implicit_count",
+                            "unknown"
+                          ]
+                        },
+                        "portionDescriptorRaw": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "portionDescriptor": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "brand": {
+                          "type": "string"
+                        },
+                        "barcode": {
+                          "type": "string"
+                        },
+                        "confidence": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        "marketProduct": {
+                          "type": "boolean",
+                          "default": false
+                        }
+                      },
+                      "required": [
+                        "originalText",
+                        "quantity",
+                        "unit",
+                        "confidence"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "candidates": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "quantity": {
+                            "type": "number",
+                            "exclusiveMinimum": 0
+                          },
+                          "unit": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "calories": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "proteinGrams": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "carbsGrams": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "fatGrams": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "source": {
+                            "type": "string",
+                            "default": "backend_estimate"
+                          },
+                          "originalText": {
+                            "type": "string"
+                          },
+                          "canonicalName": {
+                            "type": "string"
+                          },
+                          "language": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 16
+                          },
+                          "externalSource": {
+                            "type": "string"
+                          },
+                          "externalId": {
+                            "type": "string"
+                          },
+                          "sourceUrl": {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          "license": {
+                            "type": "string"
+                          },
+                          "confidence": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "needsReview": {
+                            "type": "boolean"
+                          },
+                          "resolvedGrams": {
+                            "type": "number",
+                            "exclusiveMinimum": 0
+                          },
+                          "portionDescription": {
+                            "type": "string"
+                          },
+                          "rank": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0
+                          },
+                          "matchScore": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "lexicalScore": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "vectorScore": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "preferenceScore": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "matchReason": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "quantity",
+                          "unit",
+                          "calories",
+                          "proteinGrams",
+                          "carbsGrams",
+                          "fatGrams"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "reason": {
+                      "type": "string"
+                    },
+                    "portionOptions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "quantity": {
+                            "type": "number",
+                            "exclusiveMinimum": 0
+                          },
+                          "unit": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "gramWeight": {
+                            "type": "number",
+                            "exclusiveMinimum": 0
+                          },
+                          "totalGrams": {
+                            "type": "number",
+                            "exclusiveMinimum": 0
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "count_size",
+                              "whole_item",
+                              "household",
+                              "piece_shape",
+                              "serving",
+                              "metric"
+                            ]
+                          },
+                          "portionDescriptor": {
+                            "type": "string"
+                          },
+                          "canonicalFoodName": {
+                            "type": "string"
+                          },
+                          "sourceDescription": {
+                            "type": "string"
+                          },
+                          "externalSource": {
+                            "type": "string"
+                          },
+                          "externalFoodId": {
+                            "type": "string"
+                          },
+                          "actionText": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "quantity",
+                          "unit"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "mention",
+                    "candidates"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "candidateGroups": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "mention": {
+                      "type": "object",
+                      "properties": {
+                        "originalText": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "canonicalName": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "canonicalEnglishName": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "language": {
+                          "type": "string",
+                          "minLength": 2,
+                          "maxLength": 16
+                        },
+                        "quantity": {
+                          "type": "number",
+                          "exclusiveMinimum": 0
+                        },
+                        "unit": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "rawUnitText": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "unitKind": {
+                          "type": "string",
+                          "enum": [
+                            "metric",
+                            "household",
+                            "implicit_count",
+                            "unknown"
+                          ]
+                        },
+                        "portionDescriptorRaw": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "portionDescriptor": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "brand": {
+                          "type": "string"
+                        },
+                        "barcode": {
+                          "type": "string"
+                        },
+                        "confidence": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 1
+                        },
+                        "marketProduct": {
+                          "type": "boolean",
+                          "default": false
+                        }
+                      },
+                      "required": [
+                        "originalText",
+                        "quantity",
+                        "unit",
+                        "confidence"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "candidates": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "quantity": {
+                            "type": "number",
+                            "exclusiveMinimum": 0
+                          },
+                          "unit": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "calories": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "proteinGrams": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "carbsGrams": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "fatGrams": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "source": {
+                            "type": "string",
+                            "default": "backend_estimate"
+                          },
+                          "originalText": {
+                            "type": "string"
+                          },
+                          "canonicalName": {
+                            "type": "string"
+                          },
+                          "language": {
+                            "type": "string",
+                            "minLength": 2,
+                            "maxLength": 16
+                          },
+                          "externalSource": {
+                            "type": "string"
+                          },
+                          "externalId": {
+                            "type": "string"
+                          },
+                          "sourceUrl": {
+                            "type": "string",
+                            "format": "uri"
+                          },
+                          "license": {
+                            "type": "string"
+                          },
+                          "confidence": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "needsReview": {
+                            "type": "boolean"
+                          },
+                          "resolvedGrams": {
+                            "type": "number",
+                            "exclusiveMinimum": 0
+                          },
+                          "portionDescription": {
+                            "type": "string"
+                          },
+                          "rank": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0
+                          },
+                          "matchScore": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "lexicalScore": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "vectorScore": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "preferenceScore": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1
+                          },
+                          "matchReason": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "quantity",
+                          "unit",
+                          "calories",
+                          "proteinGrams",
+                          "carbsGrams",
+                          "fatGrams"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "reason": {
+                      "type": "string"
+                    },
+                    "portionOptions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "quantity": {
+                            "type": "number",
+                            "exclusiveMinimum": 0
+                          },
+                          "unit": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "gramWeight": {
+                            "type": "number",
+                            "exclusiveMinimum": 0
+                          },
+                          "totalGrams": {
+                            "type": "number",
+                            "exclusiveMinimum": 0
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "count_size",
+                              "whole_item",
+                              "household",
+                              "piece_shape",
+                              "serving",
+                              "metric"
+                            ]
+                          },
+                          "portionDescriptor": {
+                            "type": "string"
+                          },
+                          "canonicalFoodName": {
+                            "type": "string"
+                          },
+                          "sourceDescription": {
+                            "type": "string"
+                          },
+                          "externalSource": {
+                            "type": "string"
+                          },
+                          "externalFoodId": {
+                            "type": "string"
+                          },
+                          "actionText": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "quantity",
+                          "unit"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "mention",
+                    "candidates"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "draft",
+              "requiresReview"
             ],
             "additionalProperties": false
           },
@@ -9818,6 +12286,513 @@
         ],
         "additionalProperties": false
       },
+      "get_usual_foods_input": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "default": {}
+      },
+      "get_usual_foods_output": {
+        "type": "object",
+        "properties": {
+          "usualFoods": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "canonicalName": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "brand": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "barcode": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "servingGrams": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "nutrition": {
+                  "type": "object",
+                  "properties": {
+                    "calories": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "proteinGrams": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "carbsGrams": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "fatGrams": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "calories",
+                    "proteinGrams",
+                    "carbsGrams",
+                    "fatGrams"
+                  ],
+                  "additionalProperties": false
+                },
+                "nutrients": {
+                  "type": "object",
+                  "additionalProperties": {}
+                },
+                "aliases": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "default": []
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "servingGrams",
+                "nutrition"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "usualFoods"
+        ],
+        "additionalProperties": false
+      },
+      "create_usual_food_input": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "canonicalName": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "brand": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "barcode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "servingGrams": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "nutrition": {
+            "type": "object",
+            "properties": {
+              "calories": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "proteinGrams": {
+                "type": "number",
+                "minimum": 0
+              },
+              "carbsGrams": {
+                "type": "number",
+                "minimum": 0
+              },
+              "fatGrams": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "calories",
+              "proteinGrams",
+              "carbsGrams",
+              "fatGrams"
+            ],
+            "additionalProperties": false
+          },
+          "nutrients": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "aliases": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "default": []
+          }
+        },
+        "required": [
+          "name",
+          "servingGrams",
+          "nutrition"
+        ],
+        "additionalProperties": false
+      },
+      "create_usual_food_output": {
+        "type": "object",
+        "properties": {
+          "usualFood": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "canonicalName": {
+                "type": "string",
+                "minLength": 1
+              },
+              "brand": {
+                "type": "string",
+                "minLength": 1
+              },
+              "barcode": {
+                "type": "string",
+                "minLength": 1
+              },
+              "servingGrams": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "nutrition": {
+                "type": "object",
+                "properties": {
+                  "calories": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "proteinGrams": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "carbsGrams": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "fatGrams": {
+                    "type": "number",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "calories",
+                  "proteinGrams",
+                  "carbsGrams",
+                  "fatGrams"
+                ],
+                "additionalProperties": false
+              },
+              "nutrients": {
+                "type": "object",
+                "additionalProperties": {}
+              },
+              "aliases": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "default": []
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "servingGrams",
+              "nutrition"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "usualFood"
+        ],
+        "additionalProperties": false
+      },
+      "update_usual_food_input": {
+        "allOf": [
+          {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "canonicalName": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "brand": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "barcode": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "servingGrams": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "nutrition": {
+                "type": "object",
+                "properties": {
+                  "calories": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "proteinGrams": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "carbsGrams": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "fatGrams": {
+                    "type": "number",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "calories",
+                  "proteinGrams",
+                  "carbsGrams",
+                  "fatGrams"
+                ],
+                "additionalProperties": false
+              },
+              "nutrients": {
+                "type": "object",
+                "additionalProperties": {}
+              },
+              "aliases": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "default": []
+              }
+            }
+          },
+          {
+            "type": "object",
+            "properties": {
+              "usualFoodId": {
+                "type": "string",
+                "format": "uuid"
+              }
+            },
+            "required": [
+              "usualFoodId"
+            ]
+          }
+        ]
+      },
+      "update_usual_food_output": {
+        "type": "object",
+        "properties": {
+          "usualFood": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "canonicalName": {
+                "type": "string",
+                "minLength": 1
+              },
+              "brand": {
+                "type": "string",
+                "minLength": 1
+              },
+              "barcode": {
+                "type": "string",
+                "minLength": 1
+              },
+              "servingGrams": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "nutrition": {
+                "type": "object",
+                "properties": {
+                  "calories": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "proteinGrams": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "carbsGrams": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "fatGrams": {
+                    "type": "number",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "calories",
+                  "proteinGrams",
+                  "carbsGrams",
+                  "fatGrams"
+                ],
+                "additionalProperties": false
+              },
+              "nutrients": {
+                "type": "object",
+                "additionalProperties": {}
+              },
+              "aliases": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "default": []
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "servingGrams",
+              "nutrition"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "usualFood"
+        ],
+        "additionalProperties": false
+      },
+      "delete_usual_food_input": {
+        "type": "object",
+        "properties": {
+          "usualFoodId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "usualFoodId"
+        ],
+        "additionalProperties": false
+      },
+      "delete_usual_food_output": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "deleted"
+        ],
+        "additionalProperties": false
+      },
       "get_usual_meals_input": {
         "type": "object",
         "properties": {},
@@ -10011,6 +12986,959 @@
         },
         "required": [
           "templates"
+        ],
+        "additionalProperties": false
+      },
+      "draft_usual_meal_input": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "draft_usual_meal_output": {
+        "type": "object",
+        "properties": {
+          "draft": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "minLength": 1
+              },
+              "aliases": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "default": []
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "quantity": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "unit": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "calories": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "proteinGrams": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "carbsGrams": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "fatGrams": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "source": {
+                      "type": "string",
+                      "default": "backend_estimate"
+                    },
+                    "originalText": {
+                      "type": "string"
+                    },
+                    "canonicalName": {
+                      "type": "string"
+                    },
+                    "language": {
+                      "type": "string",
+                      "minLength": 2,
+                      "maxLength": 16
+                    },
+                    "externalSource": {
+                      "type": "string"
+                    },
+                    "externalId": {
+                      "type": "string"
+                    },
+                    "sourceUrl": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "license": {
+                      "type": "string"
+                    },
+                    "confidence": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "needsReview": {
+                      "type": "boolean"
+                    },
+                    "resolvedGrams": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "portionDescription": {
+                      "type": "string"
+                    },
+                    "rank": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0
+                    },
+                    "matchScore": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "lexicalScore": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "vectorScore": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "preferenceScore": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "matchReason": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "quantity",
+                    "unit",
+                    "calories",
+                    "proteinGrams",
+                    "carbsGrams",
+                    "fatGrams"
+                  ],
+                  "additionalProperties": false
+                },
+                "default": []
+              },
+              "nutrition": {
+                "type": "object",
+                "properties": {
+                  "calories": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "proteinGrams": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "carbsGrams": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "fatGrams": {
+                    "type": "number",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "calories",
+                  "proteinGrams",
+                  "carbsGrams",
+                  "fatGrams"
+                ],
+                "additionalProperties": false
+              },
+              "missingRequiredFields": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "title",
+                    "items"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "missingRequiredFields"
+            ],
+            "additionalProperties": false
+          },
+          "requiresReview": {
+            "type": "boolean",
+            "const": true
+          },
+          "clarificationRequired": {
+            "type": "boolean"
+          },
+          "resolvedItems": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "quantity": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "unit": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "calories": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "proteinGrams": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "carbsGrams": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "fatGrams": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "source": {
+                  "type": "string",
+                  "default": "backend_estimate"
+                },
+                "originalText": {
+                  "type": "string"
+                },
+                "canonicalName": {
+                  "type": "string"
+                },
+                "language": {
+                  "type": "string",
+                  "minLength": 2,
+                  "maxLength": 16
+                },
+                "externalSource": {
+                  "type": "string"
+                },
+                "externalId": {
+                  "type": "string"
+                },
+                "sourceUrl": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "license": {
+                  "type": "string"
+                },
+                "confidence": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "needsReview": {
+                  "type": "boolean"
+                },
+                "resolvedGrams": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "portionDescription": {
+                  "type": "string"
+                },
+                "rank": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                "matchScore": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "lexicalScore": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "vectorScore": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "preferenceScore": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "matchReason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "quantity",
+                "unit",
+                "calories",
+                "proteinGrams",
+                "carbsGrams",
+                "fatGrams"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "unresolvedMentions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "originalText": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "canonicalName": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "canonicalEnglishName": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "language": {
+                  "type": "string",
+                  "minLength": 2,
+                  "maxLength": 16
+                },
+                "quantity": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "unit": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "rawUnitText": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "unitKind": {
+                  "type": "string",
+                  "enum": [
+                    "metric",
+                    "household",
+                    "implicit_count",
+                    "unknown"
+                  ]
+                },
+                "portionDescriptorRaw": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "portionDescriptor": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "brand": {
+                  "type": "string"
+                },
+                "barcode": {
+                  "type": "string"
+                },
+                "confidence": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                },
+                "marketProduct": {
+                  "type": "boolean",
+                  "default": false
+                }
+              },
+              "required": [
+                "originalText",
+                "quantity",
+                "unit",
+                "confidence"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "mention": {
+                  "type": "object",
+                  "properties": {
+                    "originalText": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "canonicalName": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "canonicalEnglishName": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "language": {
+                      "type": "string",
+                      "minLength": 2,
+                      "maxLength": 16
+                    },
+                    "quantity": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "unit": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "rawUnitText": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "unitKind": {
+                      "type": "string",
+                      "enum": [
+                        "metric",
+                        "household",
+                        "implicit_count",
+                        "unknown"
+                      ]
+                    },
+                    "portionDescriptorRaw": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "portionDescriptor": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "brand": {
+                      "type": "string"
+                    },
+                    "barcode": {
+                      "type": "string"
+                    },
+                    "confidence": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "marketProduct": {
+                      "type": "boolean",
+                      "default": false
+                    }
+                  },
+                  "required": [
+                    "originalText",
+                    "quantity",
+                    "unit",
+                    "confidence"
+                  ],
+                  "additionalProperties": false
+                },
+                "candidates": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "quantity": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "unit": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "calories": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "proteinGrams": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "carbsGrams": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "fatGrams": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "source": {
+                        "type": "string",
+                        "default": "backend_estimate"
+                      },
+                      "originalText": {
+                        "type": "string"
+                      },
+                      "canonicalName": {
+                        "type": "string"
+                      },
+                      "language": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 16
+                      },
+                      "externalSource": {
+                        "type": "string"
+                      },
+                      "externalId": {
+                        "type": "string"
+                      },
+                      "sourceUrl": {
+                        "type": "string",
+                        "format": "uri"
+                      },
+                      "license": {
+                        "type": "string"
+                      },
+                      "confidence": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "needsReview": {
+                        "type": "boolean"
+                      },
+                      "resolvedGrams": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "portionDescription": {
+                        "type": "string"
+                      },
+                      "rank": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0
+                      },
+                      "matchScore": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "lexicalScore": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "vectorScore": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "preferenceScore": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "matchReason": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "quantity",
+                      "unit",
+                      "calories",
+                      "proteinGrams",
+                      "carbsGrams",
+                      "fatGrams"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "portionOptions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "quantity": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "unit": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "gramWeight": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "totalGrams": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "count_size",
+                          "whole_item",
+                          "household",
+                          "piece_shape",
+                          "serving",
+                          "metric"
+                        ]
+                      },
+                      "portionDescriptor": {
+                        "type": "string"
+                      },
+                      "canonicalFoodName": {
+                        "type": "string"
+                      },
+                      "sourceDescription": {
+                        "type": "string"
+                      },
+                      "externalSource": {
+                        "type": "string"
+                      },
+                      "externalFoodId": {
+                        "type": "string"
+                      },
+                      "actionText": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "label",
+                      "quantity",
+                      "unit"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "mention",
+                "candidates"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "candidateGroups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "mention": {
+                  "type": "object",
+                  "properties": {
+                    "originalText": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "canonicalName": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "canonicalEnglishName": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "language": {
+                      "type": "string",
+                      "minLength": 2,
+                      "maxLength": 16
+                    },
+                    "quantity": {
+                      "type": "number",
+                      "exclusiveMinimum": 0
+                    },
+                    "unit": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "rawUnitText": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "unitKind": {
+                      "type": "string",
+                      "enum": [
+                        "metric",
+                        "household",
+                        "implicit_count",
+                        "unknown"
+                      ]
+                    },
+                    "portionDescriptorRaw": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "portionDescriptor": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "brand": {
+                      "type": "string"
+                    },
+                    "barcode": {
+                      "type": "string"
+                    },
+                    "confidence": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "marketProduct": {
+                      "type": "boolean",
+                      "default": false
+                    }
+                  },
+                  "required": [
+                    "originalText",
+                    "quantity",
+                    "unit",
+                    "confidence"
+                  ],
+                  "additionalProperties": false
+                },
+                "candidates": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "name": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "quantity": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "unit": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "calories": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "proteinGrams": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "carbsGrams": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "fatGrams": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "source": {
+                        "type": "string",
+                        "default": "backend_estimate"
+                      },
+                      "originalText": {
+                        "type": "string"
+                      },
+                      "canonicalName": {
+                        "type": "string"
+                      },
+                      "language": {
+                        "type": "string",
+                        "minLength": 2,
+                        "maxLength": 16
+                      },
+                      "externalSource": {
+                        "type": "string"
+                      },
+                      "externalId": {
+                        "type": "string"
+                      },
+                      "sourceUrl": {
+                        "type": "string",
+                        "format": "uri"
+                      },
+                      "license": {
+                        "type": "string"
+                      },
+                      "confidence": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "needsReview": {
+                        "type": "boolean"
+                      },
+                      "resolvedGrams": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "portionDescription": {
+                        "type": "string"
+                      },
+                      "rank": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0
+                      },
+                      "matchScore": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "lexicalScore": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "vectorScore": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "preferenceScore": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      },
+                      "matchReason": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "quantity",
+                      "unit",
+                      "calories",
+                      "proteinGrams",
+                      "carbsGrams",
+                      "fatGrams"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "portionOptions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "quantity": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "unit": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "gramWeight": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "totalGrams": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "count_size",
+                          "whole_item",
+                          "household",
+                          "piece_shape",
+                          "serving",
+                          "metric"
+                        ]
+                      },
+                      "portionDescriptor": {
+                        "type": "string"
+                      },
+                      "canonicalFoodName": {
+                        "type": "string"
+                      },
+                      "sourceDescription": {
+                        "type": "string"
+                      },
+                      "externalSource": {
+                        "type": "string"
+                      },
+                      "externalFoodId": {
+                        "type": "string"
+                      },
+                      "actionText": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "label",
+                      "quantity",
+                      "unit"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "mention",
+                "candidates"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "draft",
+          "requiresReview"
         ],
         "additionalProperties": false
       },
@@ -10707,6 +14635,115 @@
           "deleted"
         ],
         "additionalProperties": false
+      },
+      "draft_usual_food_input": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "draft_usual_food_output": {
+        "type": "object",
+        "properties": {
+          "draft": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "canonicalName": {
+                "type": "string",
+                "minLength": 1
+              },
+              "brand": {
+                "type": "string",
+                "minLength": 1
+              },
+              "barcode": {
+                "type": "string",
+                "minLength": 1
+              },
+              "servingGrams": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "nutrition": {
+                "type": "object",
+                "properties": {
+                  "calories": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "proteinGrams": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "carbsGrams": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "fatGrams": {
+                    "type": "number",
+                    "minimum": 0
+                  }
+                },
+                "additionalProperties": false
+              },
+              "nutrients": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "number"
+                }
+              },
+              "aliases": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "default": []
+              },
+              "missingRequiredFields": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "name",
+                    "servingGrams",
+                    "calories",
+                    "proteinGrams",
+                    "carbsGrams",
+                    "fatGrams"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "missingRequiredFields"
+            ],
+            "additionalProperties": false
+          },
+          "requiresReview": {
+            "type": "boolean",
+            "const": true
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "draft",
+          "requiresReview"
+        ],
+        "additionalProperties": false
       }
     }
   },
@@ -11015,6 +15052,164 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/FoodSearchResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/usual-foods": {
+      "get": {
+        "operationId": "getUsualFoods",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Usual foods action result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecuteActionResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createUsualFood",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUsualFoodRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Usual food action result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecuteActionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/usual-foods/draft": {
+      "post": {
+        "operationId": "draftUsualFood",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UsualFoodDraftRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Review-only usual food draft",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsualFoodDraftResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/usual-foods/{usualFoodId}": {
+      "put": {
+        "operationId": "updateUsualFood",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "usualFoodId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUsualFoodRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Usual food action result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecuteActionResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteUsualFood",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "usualFoodId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Usual food delete action result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecuteActionResponse"
                 }
               }
             }
@@ -11434,6 +15629,38 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ExecuteActionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/meal-templates/draft": {
+      "post": {
+        "operationId": "draftUsualMeal",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UsualMealDraftRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Review-only usual meal draft",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsualMealDraftResponse"
                 }
               }
             }

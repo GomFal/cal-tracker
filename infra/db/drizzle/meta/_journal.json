@@ -68,50 +68,57 @@
     {
       "idx": 9,
       "version": "7",
-      "when": 1779988330736,
-      "tag": "0009_food_data_quality_normalized_search",
+      "when": 1780413038814,
+      "tag": "0009_food_items_lifecycle",
       "breakpoints": true
     },
     {
       "idx": 10,
       "version": "7",
-      "when": 1780054195450,
-      "tag": "0010_food_normalized_primary_entity",
+      "when": 1780413039432,
+      "tag": "0010_food_data_quality_normalized_search",
       "breakpoints": true
     },
     {
       "idx": 11,
       "version": "7",
-      "when": 1780054813800,
-      "tag": "0011_food_normalized_representativeness",
+      "when": 1780413040130,
+      "tag": "0011_food_normalized_primary_entity",
       "breakpoints": true
     },
     {
       "idx": 12,
       "version": "7",
-      "when": 1780068180000,
-      "tag": "0012_food_normalization_review",
+      "when": 1780413040753,
+      "tag": "0012_food_normalized_representativeness",
       "breakpoints": true
     },
     {
       "idx": 13,
       "version": "7",
-      "when": 1780070000000,
-      "tag": "0013_food_normalized_identity_trgm_indexes",
+      "when": 1780413041374,
+      "tag": "0013_food_normalization_review",
       "breakpoints": true
     },
     {
       "idx": 14,
       "version": "7",
-      "when": 1780070100000,
-      "tag": "0014_food_normalized_identity_btree_indexes",
+      "when": 1780413041995,
+      "tag": "0014_food_normalized_identity_trgm_indexes",
       "breakpoints": true
     },
     {
       "idx": 15,
       "version": "7",
-      "when": 1780070200000,
-      "tag": "0015_food_normalized_identity_token_keys",
+      "when": 1780413042645,
+      "tag": "0015_food_normalized_identity_btree_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1780413043280,
+      "tag": "0016_food_normalized_identity_token_keys",
       "breakpoints": true
     }
   ]

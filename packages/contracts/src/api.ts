@@ -3,6 +3,10 @@ import {
   calorieTargetSourceSchema,
   dailyGoalsSchema,
   dailySummarySchema,
+  draftUsualFoodInputSchema,
+  draftUsualFoodOutputSchema,
+  draftUsualMealInputSchema,
+  draftUsualMealOutputSchema,
   foodCandidateSchema,
   macroModeSchema,
   macroPresetSchema,
@@ -13,7 +17,8 @@ import {
   mealTemplateSchema,
   nutritionSnapshotSchema,
   quarterLiterSchema,
-  uuidSchema
+  usualFoodSchema,
+  uuidSchema,
 } from "./common.js";
 
 export const errorResponseSchema = z.object({
@@ -21,25 +26,35 @@ export const errorResponseSchema = z.object({
     code: z.string(),
     message: z.string(),
     traceId: z.string().optional(),
-    details: z.unknown().optional()
-  })
+    details: z.unknown().optional(),
+  }),
 });
 
 export const executeActionRequestSchema = z.object({
   input: z.unknown().default({}),
-  source: z.enum(["flutter", "internal_agent", "android_appfunctions", "ios_appintents", "rest"]).default("rest")
+  source: z
+    .enum([
+      "flutter",
+      "internal_agent",
+      "android_appfunctions",
+      "ios_appintents",
+      "rest",
+    ])
+    .default("rest"),
 });
 
 export const executeActionResponseSchema = z.object({
   actionCallId: uuidSchema,
   confirmationRequired: z.boolean(),
-  output: z.unknown()
+  output: z.unknown(),
 });
 
 export const agentRunRequestSchema = z.object({
   text: z.string().min(1),
-  source: z.enum(["flutter", "ios_appintents", "android_appfunctions"]).default("flutter"),
-  activeProposalId: uuidSchema.optional()
+  source: z
+    .enum(["flutter", "ios_appintents", "android_appfunctions"])
+    .default("flutter"),
+  activeProposalId: uuidSchema.optional(),
 });
 
 export const agentRunResponseSchema = z.object({
@@ -55,9 +70,11 @@ export const agentRunResponseSchema = z.object({
     "templates",
     "template_saved",
     "template_deleted",
+    "usual_food_draft",
+    "usual_meal_draft",
     "confirmation_required",
     "meal_deleted",
-    "clarification_required"
+    "clarification_required",
   ]),
   message: z.string(),
   proposal: mealProposalSchema.optional(),
@@ -68,6 +85,8 @@ export const agentRunResponseSchema = z.object({
   items: z.array(mealItemSchema).optional(),
   templates: z.array(mealTemplateSchema).optional(),
   template: mealTemplateSchema.optional(),
+  usualFoodDraft: draftUsualFoodOutputSchema.optional(),
+  usualMealDraft: draftUsualMealOutputSchema.optional(),
   matches: z.array(z.unknown()).optional(),
   deleted: z.boolean().optional(),
   actionId: z.string().optional(),
@@ -75,14 +94,14 @@ export const agentRunResponseSchema = z.object({
   options: z.array(z.union([foodCandidateSchema, z.unknown()])).optional(),
   candidateGroups: z
     .array(z.union([foodCandidateSchema, z.unknown()]))
-    .optional()
+    .optional(),
 });
 
 export const transcriptionResponseSchema = z.object({
   transcript: z.string(),
   provider: z.string(),
   model: z.string(),
-  traceId: z.string()
+  traceId: z.string(),
 });
 
 export const voiceMealRunResponseSchema = z.object({
@@ -90,103 +109,163 @@ export const voiceMealRunResponseSchema = z.object({
   provider: z.string(),
   model: z.string(),
   traceId: z.string(),
-  result: agentRunResponseSchema
+  result: agentRunResponseSchema,
 });
 
 export const foodSearchRequestSchema = z.object({
   query: z.string().trim().min(1),
   barcode: z.string().trim().min(1).optional(),
-  limit: z.number().int().min(1).max(25).default(10)
+  limit: z.number().int().min(1).max(25).default(10),
 });
 
 export const foodSearchResponseSchema = z.object({
   items: z.array(mealItemSchema),
-  candidateGroups: z.array(foodCandidateSchema).optional()
+  candidateGroups: z.array(foodCandidateSchema).optional(),
+});
+
+const optionalNullableTrimmedStringSchema = z.preprocess(
+  (value) => (typeof value === "string" && value.trim() === "" ? null : value),
+  z.string().trim().min(1).nullable().optional(),
+);
+
+const aliasesSchema = z.preprocess(
+  (value) =>
+    Array.isArray(value)
+      ? value.filter(
+          (alias) => typeof alias !== "string" || alias.trim() !== "",
+        )
+      : value,
+  z.array(z.string().trim().min(1)).default([]),
+);
+
+const usualFoodMutationBaseSchema = z.object({
+  name: z.string().trim().min(1),
+  canonicalName: optionalNullableTrimmedStringSchema,
+  brand: optionalNullableTrimmedStringSchema,
+  barcode: optionalNullableTrimmedStringSchema,
+  servingGrams: z.number().positive(),
+  nutrition: nutritionSnapshotSchema,
+  nutrients: z.record(z.unknown()).optional(),
+  aliases: aliasesSchema,
+});
+
+export const createUsualFoodRequestSchema = usualFoodMutationBaseSchema;
+
+export const updateUsualFoodRequestSchema = usualFoodMutationBaseSchema
+  .partial()
+  .refine(
+    (value) => Object.keys(value).length > 0,
+    "at least one field is required",
+  );
+
+export const usualFoodResponseSchema = z.object({
+  usualFood: usualFoodSchema,
+});
+
+export const usualFoodsResponseSchema = z.object({
+  usualFoods: z.array(usualFoodSchema),
 });
 
 export const settingsUpdateSchema = z.object({
-  trustedModeEnabled: z.boolean().optional()
+  trustedModeEnabled: z.boolean().optional(),
 });
 
-export const goalsUpdateSchema = z.object({
-  date: z.string().optional(),
-  calories: z.number().int().min(800).max(10000).optional(),
-  hydrationGoalLiters: quarterLiterSchema.optional(),
-  calorieTargetSource: calorieTargetSourceSchema.optional(),
-  macroMode: macroModeSchema.optional(),
-  macroSource: macroSourceSchema.optional(),
-  macroPreset: macroPresetSchema.nullable().optional(),
-  proteinPct: z.number().int().min(0).max(100).optional(),
-  carbsPct: z.number().int().min(0).max(100).optional(),
-  fatPct: z.number().int().min(0).max(100).optional(),
-  proteinGrams: z.number().nonnegative().max(2000).optional(),
-  carbsGrams: z.number().nonnegative().max(2000).optional(),
-  fatGrams: z.number().nonnegative().max(2000).optional(),
-  macroCalories: z.number().int().nonnegative().optional(),
-  calorieDeltaKcal: z.number().int().optional()
-}).superRefine((value, ctx) => {
-  const hasMacroField = value.macroMode !== undefined ||
-    value.macroSource !== undefined ||
-    value.macroPreset !== undefined ||
-    value.proteinPct !== undefined ||
-    value.carbsPct !== undefined ||
-    value.fatPct !== undefined ||
-    value.proteinGrams !== undefined ||
-    value.carbsGrams !== undefined ||
-    value.fatGrams !== undefined ||
-    value.macroCalories !== undefined ||
-    value.calorieDeltaKcal !== undefined;
-  if (value.calories === undefined && value.hydrationGoalLiters === undefined && !hasMacroField) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "calories, hydrationGoalLiters, or macro fields are required"
-    });
-  }
-  if (!hasMacroField) return;
-  if (value.macroMode === undefined) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["macroMode"],
-      message: "macroMode is required when macro fields are provided"
-    });
-    return;
-  }
-  if (value.macroMode === "percentage") {
-    if (value.proteinPct === undefined || value.carbsPct === undefined || value.fatPct === undefined) {
+export const goalsUpdateSchema = z
+  .object({
+    date: z.string().optional(),
+    calories: z.number().int().min(800).max(10000).optional(),
+    hydrationGoalLiters: quarterLiterSchema.optional(),
+    calorieTargetSource: calorieTargetSourceSchema.optional(),
+    macroMode: macroModeSchema.optional(),
+    macroSource: macroSourceSchema.optional(),
+    macroPreset: macroPresetSchema.nullable().optional(),
+    proteinPct: z.number().int().min(0).max(100).optional(),
+    carbsPct: z.number().int().min(0).max(100).optional(),
+    fatPct: z.number().int().min(0).max(100).optional(),
+    proteinGrams: z.number().nonnegative().max(2000).optional(),
+    carbsGrams: z.number().nonnegative().max(2000).optional(),
+    fatGrams: z.number().nonnegative().max(2000).optional(),
+    macroCalories: z.number().int().nonnegative().optional(),
+    calorieDeltaKcal: z.number().int().optional(),
+  })
+  .superRefine((value, ctx) => {
+    const hasMacroField =
+      value.macroMode !== undefined ||
+      value.macroSource !== undefined ||
+      value.macroPreset !== undefined ||
+      value.proteinPct !== undefined ||
+      value.carbsPct !== undefined ||
+      value.fatPct !== undefined ||
+      value.proteinGrams !== undefined ||
+      value.carbsGrams !== undefined ||
+      value.fatGrams !== undefined ||
+      value.macroCalories !== undefined ||
+      value.calorieDeltaKcal !== undefined;
+    if (
+      value.calories === undefined &&
+      value.hydrationGoalLiters === undefined &&
+      !hasMacroField
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["proteinPct"],
-        message: "proteinPct, carbsPct, and fatPct are required in percentage mode"
+        message: "calories, hydrationGoalLiters, or macro fields are required",
+      });
+    }
+    if (!hasMacroField) return;
+    if (value.macroMode === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["macroMode"],
+        message: "macroMode is required when macro fields are provided",
       });
       return;
     }
-    const total = value.proteinPct + value.carbsPct + value.fatPct;
-    if (total !== 100) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["proteinPct"],
-        message: "macro percentages must total 100"
-      });
+    if (value.macroMode === "percentage") {
+      if (
+        value.proteinPct === undefined ||
+        value.carbsPct === undefined ||
+        value.fatPct === undefined
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["proteinPct"],
+          message:
+            "proteinPct, carbsPct, and fatPct are required in percentage mode",
+        });
+        return;
+      }
+      const total = value.proteinPct + value.carbsPct + value.fatPct;
+      if (total !== 100) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["proteinPct"],
+          message: "macro percentages must total 100",
+        });
+      }
     }
-  }
-  if (value.macroMode === "grams") {
-    if (value.proteinGrams === undefined || value.carbsGrams === undefined || value.fatGrams === undefined) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["proteinGrams"],
-        message: "proteinGrams, carbsGrams, and fatGrams are required in grams mode"
-      });
+    if (value.macroMode === "grams") {
+      if (
+        value.proteinGrams === undefined ||
+        value.carbsGrams === undefined ||
+        value.fatGrams === undefined
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["proteinGrams"],
+          message:
+            "proteinGrams, carbsGrams, and fatGrams are required in grams mode",
+        });
+      }
     }
-  }
-});
+  });
 
 export const dailyHydrationUpdateSchema = z.object({
   date: z.string().optional(),
-  waterConsumedLiters: quarterLiterSchema
+  waterConsumedLiters: quarterLiterSchema,
 });
 
 export const dailyHydrationResponseSchema = z.object({
-  summary: dailySummarySchema
+  summary: dailySummarySchema,
 });
 
 export const calorieEstimateRequestSchema = z.object({
@@ -194,9 +273,17 @@ export const calorieEstimateRequestSchema = z.object({
   sex: z.enum(["male", "female"]),
   heightCm: z.number().min(120).max(230),
   weightKg: z.number().min(35).max(250),
-  activityLevel: z.enum(["sedentary", "lightly_active", "moderately_active", "very_active", "extra_active"]),
+  activityLevel: z.enum([
+    "sedentary",
+    "lightly_active",
+    "moderately_active",
+    "very_active",
+    "extra_active",
+  ]),
   goal: z.enum(["lose_fat", "maintain", "gain_muscle"]),
-  pace: z.enum(["slow", "moderate", "aggressive", "lean", "standard"]).optional()
+  pace: z
+    .enum(["slow", "moderate", "aggressive", "lean", "standard"])
+    .optional(),
 });
 
 export const calorieEstimateResponseSchema = z.object({
@@ -205,30 +292,45 @@ export const calorieEstimateResponseSchema = z.object({
   targetCalories: z.number().int().min(800).max(10000),
   recommendedRange: z.object({
     min: z.number().int().min(800).max(10000),
-    max: z.number().int().min(800).max(10000)
+    max: z.number().int().min(800).max(10000),
   }),
   activityFactor: z.number().positive(),
   adjustmentCalories: z.number().int(),
   warnings: z.array(z.string()),
-  explanation: z.string()
+  explanation: z.string(),
 });
 
 export const goalsResponseSchema = z.object({
   goals: dailyGoalsSchema,
-  summary: dailySummarySchema.optional()
+  summary: dailySummarySchema.optional(),
 });
 
-export type CalorieEstimateRequest = z.infer<typeof calorieEstimateRequestSchema>;
-export type CalorieEstimateResponse = z.infer<typeof calorieEstimateResponseSchema>;
+export type CalorieEstimateRequest = z.infer<
+  typeof calorieEstimateRequestSchema
+>;
+export type CalorieEstimateResponse = z.infer<
+  typeof calorieEstimateResponseSchema
+>;
+export type CreateUsualFoodRequest = z.infer<
+  typeof createUsualFoodRequestSchema
+>;
+export type UpdateUsualFoodRequest = z.infer<
+  typeof updateUsualFoodRequestSchema
+>;
 
 export const dashboardResponseSchema = z.object({
-  summary: dailySummarySchema
+  summary: dailySummarySchema,
 });
 
 export const mealHistoryResponseSchema = z.object({
-  meals: z.array(mealSchema)
+  meals: z.array(mealSchema),
 });
 
 export const templatesResponseSchema = z.object({
-  templates: z.array(mealTemplateSchema)
+  templates: z.array(mealTemplateSchema),
 });
+
+export const usualFoodDraftRequestSchema = draftUsualFoodInputSchema;
+export const usualFoodDraftResponseSchema = draftUsualFoodOutputSchema;
+export const usualMealDraftRequestSchema = draftUsualMealInputSchema;
+export const usualMealDraftResponseSchema = draftUsualMealOutputSchema;

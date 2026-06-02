@@ -2,14 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
+import '../domain/models/nutrition_models.dart';
 import '../l10n/app_localizations_context.dart';
 import '../ui/core/design_system.dart';
 import '../ui/core/app_shell.dart';
+import '../ui/core/shell_modal_lock.dart';
 import '../ui/features/auth/view_models/auth_view_model.dart';
 import '../ui/features/auth/views/auth_screen.dart';
 import '../ui/features/dashboard/views/dashboard_screen.dart';
 import '../ui/features/meal_history/views/meal_history_screen.dart';
+import '../ui/features/meal_templates/views/meal_template_editor_screen.dart';
 import '../ui/features/meal_templates/views/meal_templates_screen.dart';
+import '../ui/features/meal_templates/views/usual_food_editor_screen.dart';
 import '../ui/features/settings/views/settings_screen.dart';
 import '../ui/features/voice_log/views/voice_log_screen.dart';
 import 'theme.dart';
@@ -18,8 +22,13 @@ GoRouter buildRouter(
   AuthViewModel authViewModel, {
   GlobalKey<NavigatorState>? navigatorKey,
 }) {
+  final modalLockController = ShellModalLockController();
+  List<NavigatorObserver> modalLockObservers() => [
+        ShellModalLockObserver(modalLockController),
+      ];
   return GoRouter(
     navigatorKey: navigatorKey,
+    observers: modalLockObservers(),
     initialLocation: '/dashboard',
     refreshListenable: authViewModel,
     redirect: (context, state) {
@@ -42,10 +51,16 @@ GoRouter buildRouter(
       ),
       GoRoute(
         path: '/meal/create',
-        builder: (context, state) => _AuthRestoreGate(
-          authViewModel: authViewModel,
-          child: const MealCreateScreen(),
-        ),
+        builder: (context, state) {
+          final extra = state.extra;
+          return _AuthRestoreGate(
+            authViewModel: authViewModel,
+            child: MealCreateScreen(
+              initialItems:
+                  extra is MealCreateInitialItems ? extra.items : const [],
+            ),
+          );
+        },
       ),
       StatefulShellRoute(
         builder: (context, state, navigationShell) => _AuthRestoreGate(
@@ -53,17 +68,24 @@ GoRouter buildRouter(
           child: AppShell(navigationShell: navigationShell),
         ),
         navigatorContainerBuilder: (context, navigationShell, children) {
-          return SlidingBranchContainer(
-            currentIndex: navigationShell.currentIndex,
-            children: children,
-            onPageChanged: (index) {
-              if (index == navigationShell.currentIndex) return;
-              navigationShell.goBranch(index);
+          return ListenableBuilder(
+            listenable: modalLockController,
+            builder: (context, _) {
+              return SlidingBranchContainer(
+                currentIndex: navigationShell.currentIndex,
+                userScrollEnabled: !modalLockController.isLocked,
+                onPageChanged: (index) {
+                  if (index == navigationShell.currentIndex) return;
+                  navigationShell.goBranch(index);
+                },
+                children: children,
+              );
             },
           );
         },
         branches: [
           StatefulShellBranch(
+            observers: modalLockObservers(),
             routes: [
               GoRoute(
                 path: '/dashboard',
@@ -78,6 +100,7 @@ GoRouter buildRouter(
             ],
           ),
           StatefulShellBranch(
+            observers: modalLockObservers(),
             routes: [
               GoRoute(
                 path: '/history',
@@ -92,6 +115,7 @@ GoRouter buildRouter(
             ],
           ),
           StatefulShellBranch(
+            observers: modalLockObservers(),
             routes: [
               GoRoute(
                 path: '/templates',
@@ -102,10 +126,53 @@ GoRouter buildRouter(
                     child: const MealTemplatesScreen(),
                   ),
                 ),
+                routes: [
+                  GoRoute(
+                    path: 'ingredients/new',
+                    builder: (context, state) => _AuthRestoreGate(
+                      authViewModel: authViewModel,
+                      child: UsualFoodEditorScreen(
+                        initialDraft: state.extra is UsualFoodDraft
+                            ? state.extra as UsualFoodDraft
+                            : null,
+                      ),
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'ingredients/:id/edit',
+                    builder: (context, state) => _AuthRestoreGate(
+                      authViewModel: authViewModel,
+                      child: UsualFoodEditorScreen(
+                        foodId: state.pathParameters['id'],
+                      ),
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'meals/new',
+                    builder: (context, state) => _AuthRestoreGate(
+                      authViewModel: authViewModel,
+                      child: MealTemplateEditorScreen(
+                        initialDraft: state.extra is UsualMealDraft
+                            ? state.extra as UsualMealDraft
+                            : null,
+                      ),
+                    ),
+                  ),
+                  GoRoute(
+                    path: 'meals/:id/edit',
+                    builder: (context, state) => _AuthRestoreGate(
+                      authViewModel: authViewModel,
+                      child: MealTemplateEditorScreen(
+                        templateId: state.pathParameters['id'],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
           StatefulShellBranch(
+            observers: modalLockObservers(),
             routes: [
               GoRoute(
                 path: '/settings',
@@ -124,16 +191,14 @@ GoRouter buildRouter(
     ],
     errorBuilder: (context, state) => Scaffold(
       body: Center(
-          child: Text(state.error?.message ?? context.l10n.routeNotFound)),
+        child: Text(state.error?.message ?? context.l10n.routeNotFound),
+      ),
     ),
   );
 }
 
 class _AuthRestoreGate extends StatelessWidget {
-  const _AuthRestoreGate({
-    required this.authViewModel,
-    required this.child,
-  });
+  const _AuthRestoreGate({required this.authViewModel, required this.child});
 
   final AuthViewModel authViewModel;
   final Widget child;
@@ -164,10 +229,7 @@ class _AuthRestoreGate extends StatelessWidget {
 }
 
 Page<void> _tabPage(GoRouterState state, Widget child) {
-  return NoTransitionPage<void>(
-    key: state.pageKey,
-    child: child,
-  );
+  return NoTransitionPage<void>(key: state.pageKey, child: child);
 }
 
 class _LightOnlyAuthRoute extends StatelessWidget {
@@ -185,10 +247,7 @@ class _LightOnlyAuthRoute extends StatelessWidget {
   Widget build(BuildContext context) {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: _overlayStyle,
-      child: Theme(
-        data: buildLightTheme(),
-        child: const AuthScreen(),
-      ),
+      child: Theme(data: buildLightTheme(), child: const AuthScreen()),
     );
   }
 }

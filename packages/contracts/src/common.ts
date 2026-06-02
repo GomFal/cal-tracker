@@ -10,6 +10,75 @@ export const nutritionSnapshotSchema = z.object({
   fatGrams: z.number().nonnegative()
 });
 
+export const usualFoodSchema = z.object({
+  id: uuidSchema,
+  name: z.string().trim().min(1),
+  canonicalName: z.string().trim().min(1).optional(),
+  brand: z.string().trim().min(1).optional(),
+  barcode: z.string().trim().min(1).optional(),
+  servingGrams: z.number().positive(),
+  nutrition: nutritionSnapshotSchema,
+  nutrients: z.record(z.unknown()).optional(),
+  aliases: z.array(z.string().trim().min(1)).default([]),
+  createdAt: isoDateTimeSchema.optional(),
+  updatedAt: isoDateTimeSchema.optional()
+});
+
+export const usualFoodDraftRequiredFieldSchema = z.enum([
+  "name",
+  "servingGrams",
+  "calories",
+  "proteinGrams",
+  "carbsGrams",
+  "fatGrams",
+]);
+
+export const draftUsualFoodExplicitFieldSchema = z.union([
+  usualFoodDraftRequiredFieldSchema,
+  z.enum([
+    "brand",
+    "canonicalName",
+    "barcode",
+    "aliases",
+    "nutrients",
+  ]),
+]);
+
+export const draftUsualFoodInputSchema = z.object({
+  text: z.string().trim().min(1),
+});
+
+export const usualFoodDraftNutritionSchema = z.object({
+  calories: z.number().int().nonnegative().optional(),
+  proteinGrams: z.number().nonnegative().optional(),
+  carbsGrams: z.number().nonnegative().optional(),
+  fatGrams: z.number().nonnegative().optional(),
+});
+
+export const usualFoodDraftSchema = z.object({
+  name: z.string().trim().min(1).optional(),
+  canonicalName: z.string().trim().min(1).optional(),
+  brand: z.string().trim().min(1).optional(),
+  barcode: z.string().trim().min(1).optional(),
+  servingGrams: z.number().positive().optional(),
+  nutrition: usualFoodDraftNutritionSchema.optional(),
+  nutrients: z.record(z.number().finite()).optional(),
+  aliases: z.array(z.string().trim().min(1)).default([]),
+  missingRequiredFields: z.array(usualFoodDraftRequiredFieldSchema),
+});
+
+export const draftUsualFoodProviderOutputSchema = usualFoodDraftSchema
+  .omit({ missingRequiredFields: true })
+  .extend({
+    explicitFields: z.array(draftUsualFoodExplicitFieldSchema).default([]),
+  });
+
+export const draftUsualFoodOutputSchema = z.object({
+  draft: usualFoodDraftSchema,
+  requiresReview: z.literal(true),
+  message: z.string().optional(),
+});
+
 export const calorieTargetSourceSchema = z.enum(["manual", "calculator", "default"]);
 export const macroModeSchema = z.enum(["percentage", "grams"]);
 export const macroSourceSchema = z.enum(["preset", "custom"]);
@@ -128,6 +197,37 @@ export const foodCandidateSchema = z.object({
   portionOptions: z.array(foodPortionChoiceSchema).optional()
 });
 
+export const draftUsualMealInputSchema = z.object({
+  text: z.string().trim().min(1),
+});
+
+export const draftUsualMealProviderOutputSchema = z.object({
+  title: z.string().trim().min(1).optional(),
+  aliases: z.array(z.string().trim().min(1)).default([]),
+  mentions: z.array(foodMentionSchema).default([]),
+});
+
+export const usualMealDraftRequiredFieldSchema = z.enum(["title", "items"]);
+
+export const usualMealDraftSchema = z.object({
+  title: z.string().trim().min(1).optional(),
+  aliases: z.array(z.string().trim().min(1)).default([]),
+  items: z.array(mealItemSchema).default([]),
+  nutrition: nutritionSnapshotSchema.optional(),
+  missingRequiredFields: z.array(usualMealDraftRequiredFieldSchema),
+});
+
+export const draftUsualMealOutputSchema = z.object({
+  draft: usualMealDraftSchema,
+  requiresReview: z.literal(true),
+  clarificationRequired: z.boolean().optional(),
+  resolvedItems: z.array(mealItemSchema).optional(),
+  unresolvedMentions: z.array(foodMentionSchema).optional(),
+  options: z.array(foodCandidateSchema).optional(),
+  candidateGroups: z.array(foodCandidateSchema).optional(),
+  message: z.string().optional(),
+});
+
 export const mealLabelTypeSchema = z.enum([
   "breakfast",
   "lunch",
@@ -191,12 +291,21 @@ export const mealTemplateSchema = z.object({
 });
 
 export type NutritionSnapshot = z.infer<typeof nutritionSnapshotSchema>;
+export type UsualFood = z.infer<typeof usualFoodSchema>;
 export type CalorieTargetSource = z.infer<typeof calorieTargetSourceSchema>;
 export type MacroMode = z.infer<typeof macroModeSchema>;
 export type MacroSource = z.infer<typeof macroSourceSchema>;
 export type MacroPreset = z.infer<typeof macroPresetSchema>;
 export type MacroGoalMetadata = z.infer<typeof macroGoalMetadataSchema>;
 export type DailyGoals = z.infer<typeof dailyGoalsSchema>;
+export type UsualFoodDraftRequiredField = z.infer<typeof usualFoodDraftRequiredFieldSchema>;
+export type DraftUsualFoodProviderOutput = z.infer<typeof draftUsualFoodProviderOutputSchema>;
+export type UsualFoodDraft = z.infer<typeof usualFoodDraftSchema>;
+export type DraftUsualFoodOutput = z.infer<typeof draftUsualFoodOutputSchema>;
+export type DraftUsualMealProviderOutput = z.infer<typeof draftUsualMealProviderOutputSchema>;
+export type UsualMealDraftRequiredField = z.infer<typeof usualMealDraftRequiredFieldSchema>;
+export type UsualMealDraft = z.infer<typeof usualMealDraftSchema>;
+export type DraftUsualMealOutput = z.infer<typeof draftUsualMealOutputSchema>;
 export type FoodResolutionProvenance = z.infer<typeof foodResolutionProvenanceSchema>;
 export type FoodPortionChoice = z.infer<typeof foodPortionChoiceSchema>;
 export type MealItem = z.infer<typeof mealItemSchema>;

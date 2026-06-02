@@ -16,6 +16,8 @@ import type {
   TranscriptionResult,
 } from "../stt/speechToTextProvider.js";
 import type { ChatAgentProvider, AgentToolDecision } from "../agent/chatAgentProvider.js";
+import type { UsualFoodDraftProvider } from "../agent/usualFoodDraftProvider.js";
+import type { UsualMealDraftProvider } from "../agent/usualMealDraftProvider.js";
 import type { LocalRunLogger } from "../observability/localRunLogger.js";
 import { seedTestFoods } from "./foodFixtures.js";
 
@@ -53,6 +55,8 @@ export function buildTestApp(options?: {
   sttProvider?: SpeechToTextProvider;
   runLogger?: LocalRunLogger;
   googleTokenVerifier?: GoogleTokenVerifier;
+  usualFoodDraftProvider?: UsualFoodDraftProvider;
+  usualMealDraftProvider?: UsualMealDraftProvider;
 }) {
   const config = loadConfig({ NODE_ENV: "test" } as NodeJS.ProcessEnv);
   const repository = InMemoryRepository.seeded();
@@ -63,7 +67,14 @@ export function buildTestApp(options?: {
     config.FOOD_RESOLVER_MIN_CONFIDENCE
   );
   const nutritionProvider = new ResolverNutritionProvider(foodResolver);
-  const actionExecutor = new ActionExecutor(config, repository, nutritionProvider);
+  const actionExecutor = new ActionExecutor(
+    config,
+    repository,
+    nutritionProvider,
+    undefined,
+    options?.usualFoodDraftProvider,
+    options?.usualMealDraftProvider,
+  );
   const sttProvider = options?.sttProvider ?? new FakeSpeechToTextProvider();
   const defaultAgentProvider = new FakeChatAgentProvider({
     toolCalls: [
@@ -103,17 +114,14 @@ export async function createTestUsualBreakfastTemplate(
   request: (input: string, init?: RequestInit) => Promise<Response>,
   authHeader: Record<string, string>
 ) {
-  const response = await request("http://localhost/v1/actions/create_meal_template/execute", {
+  const response = await request("http://localhost/v1/meal-templates", {
     method: "POST",
     headers: authHeader,
     body: JSON.stringify({
-      input: {
-        title: "Usual breakfast",
-        trustedAutoCommitEnabled: false,
-        items: [testBreadItem],
-        aliases: ["usual breakfast", "normal breakfast"]
-      },
-      source: "flutter"
+      title: "Usual breakfast",
+      trustedAutoCommitEnabled: false,
+      items: [testBreadItem],
+      aliases: ["usual breakfast", "normal breakfast"]
     })
   });
   return response.json() as Promise<{ output: { template: { id: string; items: MealItem[]; aliases: string[] } } }>;

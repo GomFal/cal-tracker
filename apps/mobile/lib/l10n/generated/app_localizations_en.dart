@@ -30,6 +30,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commonCreate => 'Create';
 
   @override
+  String get commonClose => 'Close';
+
+  @override
+  String get commonBack => 'Back';
+
+  @override
   String get commonRefresh => 'Refresh';
 
   @override
@@ -98,6 +104,39 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get commonAddAtLeastOneIngredient => 'Add at least one ingredient.';
+
+  @override
+  String get mealEditorMealTotal => 'Meal total';
+
+  @override
+  String get mealEditorIngredientsSection => 'Ingredients';
+
+  @override
+  String get mealEditorEditDetails => 'Edit details';
+
+  @override
+  String get mealEditorNutritionDetails => 'Nutrition details';
+
+  @override
+  String get mealEditorApplySuggestion => 'Apply suggestion';
+
+  @override
+  String mealEditorCalculatedFromMacros(int calories) {
+    return 'Calculated from macros: $calories kcal';
+  }
+
+  @override
+  String mealEditorMacroCaloriesShort(int calories) {
+    return '$calories kcal from macros';
+  }
+
+  @override
+  String get mealEditorCaloriesMismatchTitle => 'Calories differ from macros';
+
+  @override
+  String mealEditorCaloriesMismatchMessage(int calories) {
+    return 'Calculated from macros: $calories kcal';
+  }
 
   @override
   String get mealTitleListSeparator => ', ';
@@ -179,7 +218,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authPasswordTooShortError => 'Use at least 8 characters.';
 
   @override
-  String get authHeroHeadline => 'Track your\ncalories better.';
+  String get authHeroHeadline => 'Track your\ncalories, better.';
 
   @override
   String get darkModeSwitchToLight => 'Switch to light mode';
@@ -912,10 +951,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get templatesTitle => 'Usual meals';
+  String get templatesTitle => 'Habituals';
 
   @override
-  String get templatesSubtitle => 'Safe familiar templates';
+  String get templatesSubtitle => 'Usual meals and ingredients';
 
   @override
   String get templatesAddTooltip => 'Add usual meal';
@@ -923,9 +962,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get templatesExplainer =>
       'Usual meals are trusted meals you can log quickly.';
-
-  @override
-  String get templatesCouldNotLoad => 'Could not load usual meals';
 
   @override
   String get templatesNoUsualMealsYet => 'No usual meals yet';
@@ -937,16 +973,312 @@ class AppLocalizationsEn extends AppLocalizations {
   String get templatesDeleteUsualMealTitle => 'Delete usual meal?';
 
   @override
-  String get templatesNewUsualMealTitle => 'New usual meal';
-
-  @override
-  String get templatesTitleLabel => 'Title';
-
-  @override
-  String get templatesAliasesLabel => 'Aliases, separated by commas';
-
-  @override
   String get templatesNoAliasesYet => 'No aliases yet';
+
+  @override
+  String get templatesCreateUnavailableTitle =>
+      'Meal templates need ingredients';
+
+  @override
+  String get templatesCreateUnavailableMessage =>
+      'Create usual meals from selected ingredients or a reviewed draft. Placeholder meal templates are disabled.';
+
+  @override
+  String get mealTemplateEditorCreateTitle => 'Create usual meal';
+
+  @override
+  String get mealTemplateEditorEditTitle => 'Edit usual meal';
+
+  @override
+  String get mealTemplateEditorSubtitle =>
+      'Build a reviewed reusable meal. Nothing is logged to today.';
+
+  @override
+  String get mealTemplateEditorMissingTemplateTitle => 'Usual meal not found';
+
+  @override
+  String get mealTemplateEditorMissingTemplateMessage =>
+      'Refresh habituals and try opening this meal again.';
+
+  @override
+  String get mealTemplateEditorDetailsSection => 'Meal details';
+
+  @override
+  String get mealTemplateEditorTitleLabel => 'Meal title';
+
+  @override
+  String get mealTemplateEditorTitleHint => 'Gym lunch';
+
+  @override
+  String get mealTemplateEditorAliasesLabel => 'Aliases';
+
+  @override
+  String get mealTemplateEditorAliasesHint =>
+      'Comma-separated phrases you use by voice';
+
+  @override
+  String get mealTemplateEditorDraftSection => 'Fill from voice';
+
+  @override
+  String get mealTemplateEditorDraftHelper =>
+      'Describe the usual meal by voice. Review ingredients, matches, and quantities before saving.';
+
+  @override
+  String get mealTemplateEditorDraftLabel => 'Transcript';
+
+  @override
+  String get mealTemplateEditorDraftHint =>
+      'Record the usual meal to fill this transcript.';
+
+  @override
+  String get mealTemplateEditorDraftButton => 'Build draft';
+
+  @override
+  String get mealTemplateEditorVoiceTooltip => 'Record usual meal';
+
+  @override
+  String get mealTemplateEditorStopVoiceTooltip => 'Stop and build draft';
+
+  @override
+  String get mealTemplateEditorVoiceRecording =>
+      'Recording. Stop when you finish describing the meal.';
+
+  @override
+  String get mealTemplateEditorVoiceTranscribing => 'Transcribing recording.';
+
+  @override
+  String get mealTemplateEditorDraftEmptyError =>
+      'Record the meal before building a draft.';
+
+  @override
+  String get mealTemplateEditorDraftApplied =>
+      'Draft applied. Review and edit before saving.';
+
+  @override
+  String get mealTemplateEditorDraftNeedsItems =>
+      'Draft returned no ingredients yet. Add foods manually or clarify by voice.';
+
+  @override
+  String get mealTemplateEditorCandidatesSection => 'Food matches';
+
+  @override
+  String get mealTemplateEditorCandidatesHelper =>
+      'Choose a candidate when the draft needs a database match.';
+
+  @override
+  String get mealTemplateEditorNoCandidates =>
+      'No candidates returned for this ingredient.';
+
+  @override
+  String get mealTemplateEditorAddFromSearch => 'Add from food search';
+
+  @override
+  String get mealTemplateEditorSaveButton => 'Save usual meal';
+
+  @override
+  String get mealTemplateEditorTitleRequired =>
+      'Add a meal title before saving.';
+
+  @override
+  String get usualsMealsTab => 'Meals';
+
+  @override
+  String get usualsIngredientsTab => 'Ingredients';
+
+  @override
+  String get usualsCouldNotLoad => 'Could not load habituals';
+
+  @override
+  String get usualFoodsAddTooltip => 'Add usual ingredient';
+
+  @override
+  String get usualFoodsExplainer =>
+      'Usual ingredients are foods you enter manually so they appear first in search and meal logging.';
+
+  @override
+  String get usualFoodsEmptyTitle => 'No usual ingredients yet';
+
+  @override
+  String get usualFoodsEmptyMessage =>
+      'Add foods you use often so they appear first in search and meal logging.';
+
+  @override
+  String get usualFoodsCreateTitle => 'New usual ingredient';
+
+  @override
+  String get usualFoodsEditTitle => 'Edit usual ingredient';
+
+  @override
+  String get usualFoodsDraftLabel => 'Fill from text with AI (optional)';
+
+  @override
+  String get usualFoodsDraftHint =>
+      'Example: My rice per 100 g has 360 kcal, 79 g carbs, 7 g protein, 1 g fat and 0.01 g salt.';
+
+  @override
+  String get usualFoodsDraftButton => 'Fill fields';
+
+  @override
+  String get usualFoodsDraftEmptyError =>
+      'Enter label text before filling fields.';
+
+  @override
+  String get usualFoodsDraftApplied =>
+      'Draft applied. Review the fields before saving.';
+
+  @override
+  String get usualFoodsDraftMissingFields =>
+      'Draft applied. Complete the empty required fields before saving.';
+
+  @override
+  String get usualFoodsDraftFailed =>
+      'Could not fill the draft. Enter the values manually or try again.';
+
+  @override
+  String get usualFoodsEditorSubtitle =>
+      'Review the label values before saving.';
+
+  @override
+  String get usualFoodsIdentitySectionTitle => 'Identity';
+
+  @override
+  String get usualFoodsServingSectionTitle => 'Serving';
+
+  @override
+  String get usualFoodsMacrosSectionTitle => 'Macros';
+
+  @override
+  String get usualFoodsOptionalSectionTitle => 'Optional nutrients';
+
+  @override
+  String get usualFoodsOptionalSectionSubtitle =>
+      'Add label details only when you have them.';
+
+  @override
+  String get usualFoodsVoiceDraftTitle => 'Fill faster with voice';
+
+  @override
+  String get usualFoodsVoiceDraftMessage =>
+      'Dictate the nutrition label. The transcript is read-only, fields stay editable, and nothing is saved until you confirm.';
+
+  @override
+  String get usualFoodsVoiceRecordButton => 'Record label';
+
+  @override
+  String get usualFoodsVoiceStopButton => 'Stop and fill';
+
+  @override
+  String get usualFoodsVoicePermissionStatus =>
+      'Requesting microphone permission...';
+
+  @override
+  String get usualFoodsVoiceRecordingStatus =>
+      'Recording. Say the serving size, calories, protein, carbs, fat, and any optional label values.';
+
+  @override
+  String get usualFoodsVoiceStoppingStatus => 'Saving audio...';
+
+  @override
+  String get usualFoodsVoiceTranscribingStatus => 'Transcribing label...';
+
+  @override
+  String get usualFoodsVoiceDraftingStatus =>
+      'Filling fields from transcript...';
+
+  @override
+  String get usualFoodsVoicePermissionError =>
+      'Microphone permission is required to fill from voice.';
+
+  @override
+  String get usualFoodsTranscriptLabel => 'Transcript';
+
+  @override
+  String get usualFoodsSaveFailedTitle => 'Could not save ingredient';
+
+  @override
+  String get usualFoodsNotFoundTitle => 'Ingredient not found';
+
+  @override
+  String get usualFoodsNotFoundMessage =>
+      'This usual ingredient is no longer available.';
+
+  @override
+  String get usualFoodsNameLabel => 'Name';
+
+  @override
+  String get usualFoodsBrandLabel => 'Brand (optional)';
+
+  @override
+  String get usualFoodsCanonicalNameLabel => 'Canonical name (optional)';
+
+  @override
+  String get usualFoodsBarcodeLabel => 'Barcode (optional)';
+
+  @override
+  String get usualFoodsAliasesLabel =>
+      'Aliases, separated by commas (optional)';
+
+  @override
+  String get usualFoodsServingGramsLabel => 'Serving grams';
+
+  @override
+  String get usualFoodsCaloriesLabel => 'Calories';
+
+  @override
+  String get usualFoodsProteinLabel => 'Protein grams';
+
+  @override
+  String get usualFoodsCarbsLabel => 'Carbs grams';
+
+  @override
+  String get usualFoodsFatLabel => 'Fat grams';
+
+  @override
+  String get usualFoodsSaltLabel => 'Salt grams (optional)';
+
+  @override
+  String get usualFoodsSodiumLabel => 'Sodium milligrams (optional)';
+
+  @override
+  String get usualFoodsFiberLabel => 'Fiber grams (optional)';
+
+  @override
+  String get usualFoodsSugarsLabel => 'Sugars grams (optional)';
+
+  @override
+  String get usualFoodsServingDescriptionLabel =>
+      'Serving description (optional)';
+
+  @override
+  String get usualFoodsRequiredFieldError => 'Enter a value.';
+
+  @override
+  String get usualFoodsPositiveNumberError => 'Enter a number greater than 0.';
+
+  @override
+  String get usualFoodsNonNegativeNumberError => 'Enter 0 or a greater number.';
+
+  @override
+  String usualFoodsPerServing(String grams) {
+    return 'per $grams g';
+  }
+
+  @override
+  String get usualFoodsManualSource => 'Manual';
+
+  @override
+  String get usualFoodsEditTooltip => 'Edit usual ingredient';
+
+  @override
+  String get usualFoodsDeleteTooltip => 'Delete usual ingredient';
+
+  @override
+  String get usualFoodsDeleteTitle => 'Delete usual ingredient?';
+
+  @override
+  String usualFoodsDeleteMessage(String name) {
+    return 'Delete $name from your usual ingredients?';
+  }
 
   @override
   String get voiceTitle => 'Log meal';
@@ -1195,4 +1527,97 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get mealConfirmationEmbedded =>
       'Meal confirmation is embedded in the logging flow.';
+
+  @override
+  String get localToolkitToolButtonTooltip => 'Open local toolkit';
+
+  @override
+  String get localToolkitPanelTitle => 'Local toolkit';
+
+  @override
+  String get localToolkitPanelSubtitle =>
+      'Jump routes, apply scenarios, and mutate local state.';
+
+  @override
+  String get localToolkitRouteSectionTitle => 'Routes';
+
+  @override
+  String get localToolkitScenarioSectionTitle => 'Scenarios';
+
+  @override
+  String get localToolkitQuickMutatorsSectionTitle => 'Quick mutators';
+
+  @override
+  String get localToolkitRouteAuth => 'Auth';
+
+  @override
+  String get localToolkitRouteDashboard => 'Dashboard';
+
+  @override
+  String get localToolkitRouteLogMeal => 'Log Meal';
+
+  @override
+  String get localToolkitRouteHistory => 'History';
+
+  @override
+  String get localToolkitRouteTemplates => 'Templates';
+
+  @override
+  String get localToolkitRouteSettings => 'Settings';
+
+  @override
+  String get localToolkitScenarioUnauthenticated => 'Unauthenticated';
+
+  @override
+  String get localToolkitScenarioEmptyDay => 'Empty day';
+
+  @override
+  String get localToolkitScenarioNormalDay => 'Normal day';
+
+  @override
+  String get localToolkitScenarioOverTarget => 'Over target';
+
+  @override
+  String get localToolkitScenarioGoalsNotConfigured => 'Goals not configured';
+
+  @override
+  String get localToolkitScenarioProposalReady => 'Proposal ready';
+
+  @override
+  String get localToolkitScenarioClarificationRequired =>
+      'Clarification required';
+
+  @override
+  String get localToolkitScenarioAutoCommittedMeal => 'Auto-committed meal';
+
+  @override
+  String get localToolkitScenarioTemplateHeavyAccount =>
+      'Template-heavy account';
+
+  @override
+  String get localToolkitQuickResetScenario => 'Reset scenario';
+
+  @override
+  String get localToolkitQuickAddSampleMeal => 'Add sample meal';
+
+  @override
+  String get localToolkitQuickClearMeals => 'Clear meals';
+
+  @override
+  String get localToolkitQuickToggleTrustedMode => 'Toggle trusted mode';
+
+  @override
+  String get localToolkitQuickSwitchLocale => 'Switch locale';
+
+  @override
+  String get localToolkitQuickSwitchTheme => 'Switch light/dark theme';
+
+  @override
+  String get localToolkitTrustedModeOn => 'Trusted on';
+
+  @override
+  String get localToolkitTrustedModeOff => 'Trusted off';
+
+  @override
+  String get localToolkitCloseTooltip => 'Close toolkit';
 }

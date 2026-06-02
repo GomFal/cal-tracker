@@ -26,6 +26,12 @@ import 'router.dart';
 import 'theme.dart';
 import 'theme_mode_view_model.dart';
 
+typedef CalTrackerAppWrapperBuilder = Widget Function(
+  BuildContext context,
+  Widget child,
+  GoRouter router,
+);
+
 class CalTrackerBootstrap extends StatelessWidget {
   const CalTrackerBootstrap({
     super.key,
@@ -35,6 +41,9 @@ class CalTrackerBootstrap extends StatelessWidget {
     this.nutritionRepository,
     this.tokenStorage,
     this.mobileUpdateService,
+    this.audioRecorderService,
+    this.checkForUpdates = true,
+    this.appWrapperBuilder,
   });
 
   final ApiConfig apiConfig;
@@ -43,6 +52,9 @@ class CalTrackerBootstrap extends StatelessWidget {
   final NutritionRepository? nutritionRepository;
   final TokenStorage? tokenStorage;
   final MobileUpdateService? mobileUpdateService;
+  final AudioRecorderService? audioRecorderService;
+  final bool checkForUpdates;
+  final CalTrackerAppWrapperBuilder? appWrapperBuilder;
 
   @override
   Widget build(BuildContext context) {
@@ -61,18 +73,27 @@ class CalTrackerBootstrap extends StatelessWidget {
         );
     final mobileUpdateService =
         this.mobileUpdateService ?? MobileUpdateService(apiConfig: apiConfig);
+    final audioRecorderService =
+        this.audioRecorderService ?? AudioRecorderService();
 
     return MultiProvider(
       providers: [
         Provider<AuthRepository>.value(value: authRepository),
         Provider<NutritionRepository>.value(value: nutritionRepository),
+        Provider<AudioRecorderService>.value(value: audioRecorderService),
         Provider<AppPreferencesRepository>.value(
           value: preferencesRepository,
         ),
         ChangeNotifierProvider(
-          create: (_) => MobileUpdateViewModel(
-            updateService: mobileUpdateService,
-          )..checkForUpdate(),
+          create: (_) {
+            final viewModel = MobileUpdateViewModel(
+              updateService: mobileUpdateService,
+            );
+            if (checkForUpdates) {
+              viewModel.checkForUpdate();
+            }
+            return viewModel;
+          },
         ),
         ChangeNotifierProvider(
           create: (_) => ThemeModeViewModel(
@@ -90,7 +111,7 @@ class CalTrackerBootstrap extends StatelessWidget {
         ChangeNotifierProvider(
             create: (_) => VoiceLogViewModel(
                   nutritionRepository: nutritionRepository,
-                  audioRecorderService: AudioRecorderService(),
+                  audioRecorderService: audioRecorderService,
                 )),
         ChangeNotifierProvider(
             create: (_) =>
@@ -107,13 +128,15 @@ class CalTrackerBootstrap extends StatelessWidget {
                   nutritionRepository: nutritionRepository,
                 )),
       ],
-      child: const _CalTrackerApp(),
+      child: _CalTrackerApp(appWrapperBuilder: appWrapperBuilder),
     );
   }
 }
 
 class _CalTrackerApp extends StatefulWidget {
-  const _CalTrackerApp();
+  const _CalTrackerApp({this.appWrapperBuilder});
+
+  final CalTrackerAppWrapperBuilder? appWrapperBuilder;
 
   @override
   State<_CalTrackerApp> createState() => _CalTrackerAppState();
@@ -159,10 +182,13 @@ class _CalTrackerAppState extends State<_CalTrackerApp> {
       darkTheme: buildDarkTheme(),
       themeMode: themeMode,
       routerConfig: _router!,
-      builder: (context, child) => MobileUpdateDialogHost(
-        navigatorKey: _navigatorKey,
-        child: child ?? const SizedBox.shrink(),
-      ),
+      builder: (context, child) {
+        final app = MobileUpdateDialogHost(
+          navigatorKey: _navigatorKey,
+          child: child ?? const SizedBox.shrink(),
+        );
+        return widget.appWrapperBuilder?.call(context, app, _router!) ?? app;
+      },
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'dart:io';
 
 import '../../../../data/repositories/nutrition_repository.dart';
 import '../../../../domain/models/nutrition_models.dart';
@@ -9,14 +10,15 @@ class MealTemplatesViewModel extends ChangeNotifier {
     required NutritionRepository nutritionRepository,
     Duration cacheTtl = const Duration(seconds: 60),
     DateTime Function()? now,
-  }) : _nutritionRepository = nutritionRepository,
-       _cacheTtl = cacheTtl,
-       _now = now ?? DateTime.now;
+  })  : _nutritionRepository = nutritionRepository,
+        _cacheTtl = cacheTtl,
+        _now = now ?? DateTime.now;
 
   final NutritionRepository _nutritionRepository;
   final Duration _cacheTtl;
   final DateTime Function() _now;
   List<MealTemplate> _templates = const [];
+  List<UsualFood> _usualFoods = const [];
   bool _isLoading = false;
   bool _hasLoaded = false;
   DateTime? _lastLoadedAt;
@@ -24,8 +26,17 @@ class MealTemplatesViewModel extends ChangeNotifier {
   String? _error;
 
   List<MealTemplate> get templates => _templates;
+  List<UsualFood> get usualFoods => _usualFoods;
   bool get isLoading => _isLoading;
+  bool get hasLoaded => _hasLoaded;
   String? get error => _error;
+
+  MealTemplate? templateById(String id) {
+    for (final template in _templates) {
+      if (template.id == id) return template;
+    }
+    return null;
+  }
 
   Future<void> load({bool forceRefresh = false}) {
     final isCacheFresh =
@@ -49,6 +60,7 @@ class MealTemplatesViewModel extends ChangeNotifier {
     }
     try {
       _templates = await _nutritionRepository.getTemplates();
+      _usualFoods = await _nutritionRepository.getUsualFoods();
       _hasLoaded = true;
       _lastLoadedAt = _now();
       _error = null;
@@ -80,8 +92,9 @@ class MealTemplatesViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> createBasicTemplate({
+  Future<MealTemplate> createTemplate({
     required String title,
+    required List<MealItem> items,
     required List<String> aliases,
   }) async {
     _isLoading = true;
@@ -89,43 +102,138 @@ class MealTemplatesViewModel extends ChangeNotifier {
     try {
       final template = await _nutritionRepository.createTemplate(
         title: title,
+        items: items,
         aliases: aliases,
-        items: const [
-          MealItem(
-            name: 'Chicken breast',
-            quantity: 150,
-            unit: 'g',
-            calories: 248,
-            proteinGrams: 46.5,
-            carbsGrams: 0,
-            fatGrams: 5.4,
-            source: 'manual',
-          ),
-          MealItem(
-            name: 'Cooked rice',
-            quantity: 150,
-            unit: 'g',
-            calories: 195,
-            proteinGrams: 4.1,
-            carbsGrams: 42,
-            fatGrams: 0.5,
-            source: 'manual',
-          ),
-        ],
+        trustedAutoCommitEnabled: false,
       );
       _templates = [..._templates, template];
       _hasLoaded = true;
       _lastLoadedAt = _now();
       _error = null;
+      return template;
     } catch (error) {
       _error = userVisibleErrorMessage(
         error,
         context: UserErrorContext.mealTemplatesSave,
       );
+      rethrow;
     } finally {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  Future<MealTemplate> updateTemplate(
+    MealTemplate template, {
+    required String title,
+    required List<MealItem> items,
+    required List<String> aliases,
+  }) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      final updated = await _nutritionRepository.updateTemplate(
+        templateId: template.id,
+        title: title,
+        items: items,
+        aliases: aliases,
+        trustedAutoCommitEnabled: false,
+      );
+      _templates = _templates
+          .map((item) => item.id == updated.id ? updated : item)
+          .toList();
+      _hasLoaded = true;
+      _lastLoadedAt = _now();
+      _error = null;
+      return updated;
+    } catch (error) {
+      _error = userVisibleErrorMessage(
+        error,
+        context: UserErrorContext.mealTemplatesSave,
+      );
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<UsualMealDraft> draftUsualMeal(String text) {
+    return _nutritionRepository.draftUsualMeal(text);
+  }
+
+  Future<FoodSearchResult> searchFoods(String query, {int limit = 10}) {
+    return _nutritionRepository.searchFoods(query, limit: limit);
+  }
+
+  Future<String> transcribeAudio(File audioFile) {
+    return _nutritionRepository.transcribeAudio(audioFile);
+  }
+
+  Future<String> transcribeUsualFoodAudio(File audioFile) {
+    return transcribeAudio(audioFile);
+  }
+
+  Future<void> createUsualFood(UsualFoodInput input) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      final food = await _nutritionRepository.createUsualFood(input);
+      _usualFoods = [..._usualFoods, food];
+      _hasLoaded = true;
+      _lastLoadedAt = _now();
+      _error = null;
+    } catch (error) {
+      _error = userVisibleErrorMessage(error);
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> updateUsualFood(UsualFood food, UsualFoodInput input) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      final updated = await _nutritionRepository.updateUsualFood(
+        food.id,
+        input,
+      );
+      _usualFoods = _usualFoods
+          .map((item) => item.id == updated.id ? updated : item)
+          .toList();
+      _hasLoaded = true;
+      _lastLoadedAt = _now();
+      _error = null;
+    } catch (error) {
+      _error = userVisibleErrorMessage(error);
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> deleteUsualFood(UsualFood food) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      final deleted = await _nutritionRepository.deleteUsualFood(food.id);
+      if (deleted) {
+        _usualFoods = _usualFoods.where((item) => item.id != food.id).toList();
+      }
+      _hasLoaded = true;
+      _lastLoadedAt = _now();
+      _error = null;
+    } catch (error) {
+      _error = userVisibleErrorMessage(error);
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<UsualFoodDraft> draftUsualFood(String text) {
+    return _nutritionRepository.draftUsualFood(text);
   }
 
   Future<void> deleteTemplate(MealTemplate template) async {
@@ -134,9 +242,8 @@ class MealTemplatesViewModel extends ChangeNotifier {
     try {
       final deleted = await _nutritionRepository.deleteTemplate(template.id);
       if (deleted) {
-        _templates = _templates
-            .where((item) => item.id != template.id)
-            .toList();
+        _templates =
+            _templates.where((item) => item.id != template.id).toList();
       }
       _hasLoaded = true;
       _lastLoadedAt = _now();

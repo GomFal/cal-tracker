@@ -1,6 +1,6 @@
 {
-  "id": "adcea77a-bdea-4768-8cf4-938c602b6354",
-  "prevId": "f97ab1f0-9b99-4962-bb82-fef3714bd89e",
+  "id": "f67d0258-19b7-457b-967e-84a906f085af",
+  "prevId": "fde91855-f255-47f1-bac4-02246aa848db",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1351,6 +1351,19 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -2310,13 +2323,6 @@
           "notNull": true,
           "default": "'{}'::text[]"
         },
-        "identity_token_keys": {
-          "name": "identity_token_keys",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::text[]"
-        },
         "primary_entity_category": {
           "name": "primary_entity_category",
           "type": "text",
@@ -2529,21 +2535,6 @@
           "columns": [
             {
               "expression": "secondary_entity_aliases",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "gin",
-          "with": {}
-        },
-        "food_normalized_search_documents_identity_token_keys_gin_idx": {
-          "name": "food_normalized_search_documents_identity_token_keys_gin_idx",
-          "columns": [
-            {
-              "expression": "identity_token_keys",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

@@ -1,7 +1,7 @@
 name: cal_tracker_mobile
 description: Agent-operable calorie and nutrition tracker MVP.
 publish_to: "none"
-version: 0.1.7+8
+version: 0.1.9+10
 
 environment:
   sdk: ">=3.4.0 <4.0.0"
@@ -59,3 +59,4 @@ flutter:
     - assets/images/icons/
     - assets/images/login/
     - assets/images/login/cropped/
+    - assets/google_brand/android_neutral_rd_ctn@4x.png

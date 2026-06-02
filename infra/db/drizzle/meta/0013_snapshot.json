@@ -1,6 +1,6 @@
 {
-  "id": "4ffdaf17-4f6e-407c-bfec-eb7eb05b155a",
-  "prevId": "ce7501c9-2114-47ec-acc5-14dc1fcb9c2a",
+  "id": "17b51a94-3d7a-453f-be7d-306bee276e7e",
+  "prevId": "e1429522-a1c5-47a2-b5cf-19a6a03d80f7",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1351,6 +1351,19 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -2405,51 +2418,6 @@
               "asc": true,
               "nulls": "last",
               "opclass": "gin_trgm_ops"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "gin",
-          "with": {}
-        },
-        "food_normalized_search_documents_base_name_trgm_idx": {
-          "name": "food_normalized_search_documents_base_name_trgm_idx",
-          "columns": [
-            {
-              "expression": "lower(\"base_name\") gin_trgm_ops",
-              "asc": true,
-              "isExpression": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "gin",
-          "with": {}
-        },
-        "food_normalized_search_documents_display_name_trgm_idx": {
-          "name": "food_normalized_search_documents_display_name_trgm_idx",
-          "columns": [
-            {
-              "expression": "lower(\"display_name\") gin_trgm_ops",
-              "asc": true,
-              "isExpression": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "gin",
-          "with": {}
-        },
-        "food_normalized_search_documents_brand_display_trgm_idx": {
-          "name": "food_normalized_search_documents_brand_display_trgm_idx",
-          "columns": [
-            {
-              "expression": "lower(\"brand_display\") gin_trgm_ops",
-              "asc": true,
-              "isExpression": true,
-              "nulls": "last"
             }
           ],
           "isUnique": false,

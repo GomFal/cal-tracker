@@ -7,6 +7,7 @@ import {
   agentRunResponseSchema,
   calorieEstimateRequestSchema,
   calorieEstimateResponseSchema,
+  createUsualFoodRequestSchema,
   dailyHydrationResponseSchema,
   dailyHydrationUpdateSchema,
   errorResponseSchema,
@@ -24,7 +25,14 @@ import {
   registerRequestSchema,
   settingsUpdateSchema,
   tokenPairSchema,
-  transcriptionResponseSchema
+  transcriptionResponseSchema,
+  updateUsualFoodRequestSchema,
+  usualFoodDraftRequestSchema,
+  usualFoodDraftResponseSchema,
+  usualFoodResponseSchema,
+  usualMealDraftRequestSchema,
+  usualMealDraftResponseSchema,
+  usualFoodsResponseSchema
 } from "./index.js";
 
 const schema = (name: string, zodSchema: Parameters<typeof zodToJsonSchema>[0]) =>
@@ -86,6 +94,14 @@ const spec = {
       ExecuteActionResponse: schema("ExecuteActionResponse", executeActionResponseSchema),
       FoodSearchRequest: schema("FoodSearchRequest", foodSearchRequestSchema),
       FoodSearchResponse: schema("FoodSearchResponse", foodSearchResponseSchema),
+      CreateUsualFoodRequest: schema("CreateUsualFoodRequest", createUsualFoodRequestSchema),
+      UpdateUsualFoodRequest: schema("UpdateUsualFoodRequest", updateUsualFoodRequestSchema),
+      UsualFoodResponse: schema("UsualFoodResponse", usualFoodResponseSchema),
+      UsualFoodsResponse: schema("UsualFoodsResponse", usualFoodsResponseSchema),
+      UsualFoodDraftRequest: schema("UsualFoodDraftRequest", usualFoodDraftRequestSchema),
+      UsualFoodDraftResponse: schema("UsualFoodDraftResponse", usualFoodDraftResponseSchema),
+      UsualMealDraftRequest: schema("UsualMealDraftRequest", usualMealDraftRequestSchema),
+      UsualMealDraftResponse: schema("UsualMealDraftResponse", usualMealDraftResponseSchema),
       AgentRunRequest: schema("AgentRunRequest", agentRunRequestSchema),
       AgentRunResponse: schema("AgentRunResponse", agentRunResponseSchema),
       TranscriptionResponse: schema("TranscriptionResponse", transcriptionResponseSchema),
@@ -231,6 +247,61 @@ const spec = {
         },
         responses: {
           "200": { description: "Food search results", content: { "application/json": { schema: { $ref: "#/components/schemas/FoodSearchResponse" } } } }
+        }
+      }
+    },
+    "/v1/usual-foods": {
+      get: {
+        operationId: "getUsualFoods",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          "200": { description: "Usual foods action result", content: { "application/json": { schema: { $ref: "#/components/schemas/ExecuteActionResponse" } } } }
+        }
+      },
+      post: {
+        operationId: "createUsualFood",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/CreateUsualFoodRequest" } } }
+        },
+        responses: {
+          "200": { description: "Usual food action result", content: { "application/json": { schema: { $ref: "#/components/schemas/ExecuteActionResponse" } } } }
+        }
+      }
+    },
+    "/v1/usual-foods/draft": {
+      post: {
+        operationId: "draftUsualFood",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/UsualFoodDraftRequest" } } }
+        },
+        responses: {
+          "200": { description: "Review-only usual food draft", content: { "application/json": { schema: { $ref: "#/components/schemas/UsualFoodDraftResponse" } } } }
+        }
+      }
+    },
+    "/v1/usual-foods/{usualFoodId}": {
+      put: {
+        operationId: "updateUsualFood",
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: "usualFoodId", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/UpdateUsualFoodRequest" } } }
+        },
+        responses: {
+          "200": { description: "Usual food action result", content: { "application/json": { schema: { $ref: "#/components/schemas/ExecuteActionResponse" } } } }
+        }
+      },
+      delete: {
+        operationId: "deleteUsualFood",
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: "usualFoodId", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
+        responses: {
+          "200": { description: "Usual food delete action result", content: { "application/json": { schema: { $ref: "#/components/schemas/ExecuteActionResponse" } } } }
         }
       }
     },
@@ -397,6 +468,19 @@ const spec = {
         },
         responses: {
           "200": { description: "Template action result", content: { "application/json": { schema: { $ref: "#/components/schemas/ExecuteActionResponse" } } } }
+        }
+      }
+    },
+    "/v1/meal-templates/draft": {
+      post: {
+        operationId: "draftUsualMeal",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/UsualMealDraftRequest" } } }
+        },
+        responses: {
+          "200": { description: "Review-only usual meal draft", content: { "application/json": { schema: { $ref: "#/components/schemas/UsualMealDraftResponse" } } } }
         }
       }
     },

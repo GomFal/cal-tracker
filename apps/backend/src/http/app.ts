@@ -13,6 +13,8 @@ import {
   refreshRequestSchema,
   registerRequestSchema,
   settingsUpdateSchema,
+  usualFoodDraftRequestSchema,
+  usualMealDraftRequestSchema,
   uuidSchema,
   type ActionContext,
   type ActionSource,
@@ -238,9 +240,15 @@ export function createApp(input: {
   app.get("/v1/actions", (c) => c.json({ actions: actionExecutor.listActions() }));
   app.post("/v1/actions/:actionId/execute", async (c) => {
     const user = c.get("authUser");
+    const actionId = c.req.param("actionId");
+    if (isReviewedUsualWriteAction(actionId)) {
+      throw new HTTPException(404, {
+        message: "Use the reviewed usual foods or meal templates endpoints.",
+      });
+    }
     const body = executeActionRequestSchema.parse(await c.req.json());
     const context = buildActionContext(c, user, body.source);
-    return c.json(await actionExecutor.execute(c.req.param("actionId"), body.input, context));
+    return c.json(await actionExecutor.execute(actionId, body.input, context));
   });
 
   app.post("/v1/foods/search", async (c) => {
@@ -255,6 +263,28 @@ export function createApp(input: {
       buildActionContext(c, user, "flutter"),
     );
     return c.json(limitFoodSearchOutput(result.output, body.limit));
+  });
+
+  app.post("/v1/usual-foods/draft", async (c) => {
+    const user = c.get("authUser");
+    const body = usualFoodDraftRequestSchema.parse(await c.req.json());
+    const result = await actionExecutor.execute(
+      "draft_usual_food",
+      body,
+      buildActionContext(c, user, "flutter"),
+    );
+    return c.json(result.output);
+  });
+
+  app.post("/v1/meal-templates/draft", async (c) => {
+    const user = c.get("authUser");
+    const body = usualMealDraftRequestSchema.parse(await c.req.json());
+    const result = await actionExecutor.execute(
+      "draft_usual_meal",
+      body,
+      buildActionContext(c, user, "flutter"),
+    );
+    return c.json(result.output);
   });
 
   app.post("/v1/agent/runs", async (c) => {
@@ -467,6 +497,30 @@ export function createApp(input: {
   app.get("/v1/meal-templates", async (c) => {
     const user = c.get("authUser");
     return c.json(await actionExecutor.execute("get_usual_meals", {}, buildActionContext(c, user, "flutter")));
+  });
+  app.get("/v1/usual-foods", async (c) => {
+    const user = c.get("authUser");
+    return c.json(await actionExecutor.execute("get_usual_foods", {}, buildActionContext(c, user, "flutter")));
+  });
+  app.post("/v1/usual-foods", async (c) => {
+    const user = c.get("authUser");
+    return c.json(await actionExecutor.execute("create_usual_food", await c.req.json(), buildActionContext(c, user, "flutter")));
+  });
+  app.put("/v1/usual-foods/:id", async (c) => {
+    const user = c.get("authUser");
+    return c.json(await actionExecutor.execute(
+      "update_usual_food",
+      { ...(await c.req.json()), usualFoodId: c.req.param("id") },
+      buildActionContext(c, user, "flutter")
+    ));
+  });
+  app.delete("/v1/usual-foods/:id", async (c) => {
+    const user = c.get("authUser");
+    return c.json(await actionExecutor.execute(
+      "delete_usual_food",
+      { usualFoodId: c.req.param("id") },
+      buildActionContext(c, user, "flutter")
+    ));
   });
   app.post("/v1/meal-templates", async (c) => {
     const user = c.get("authUser");
@@ -682,6 +736,15 @@ function buildActionContext(c: Context, user: StoredUser, source: ActionSource):
     trustedModeEnabled: false,
     traceId: getTraceId(c)
   };
+}
+
+function isReviewedUsualWriteAction(actionId: string): boolean {
+  return actionId === "create_usual_food" ||
+    actionId === "update_usual_food" ||
+    actionId === "delete_usual_food" ||
+    actionId === "create_meal_template" ||
+    actionId === "update_meal_template" ||
+    actionId === "delete_meal_template";
 }
 
 function speechHintForProposal(proposal?: MealProposal): {

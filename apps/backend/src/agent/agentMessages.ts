@@ -37,6 +37,8 @@ Rules:
 - For revise_meal_proposal, use itemIndex when the correction targets a listed item unambiguously. Use matchText when the user names the item. For added or replacement foods, include a structured food mention and do not include calories or macros.
 - Use search_nutrition_database only when the user is asking to inspect or look up nutrition data, not when they are asking to add food to their log.
 - Do not use query_food_memory or search_nutrition_database as the final action for a complete meal proposal request. Those tools only answer lookup/search requests.
+- For explicit requests to create or save a usual ingredient, use draft_usual_food. Never save usual ingredients directly from an agent run.
+- For explicit requests to create or save a usual meal, saved meal, or meal template, use draft_usual_meal. Never save meal templates directly from an agent run.
 - For questions about calories left, use get_remaining_targets.
 - For history lookup, use get_meal_history.
 - For deletion, use delete_meal (the user will be asked to confirm).

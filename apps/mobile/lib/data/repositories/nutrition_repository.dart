@@ -22,6 +22,8 @@ class AgentRunResult {
     this.input,
     this.clarificationOptions,
     this.candidateGroups,
+    this.usualFoodDraft,
+    this.usualMealDraft,
   });
 
   final String kind;
@@ -40,6 +42,8 @@ class AgentRunResult {
   final dynamic input;
   final List<FoodCandidateGroup>? clarificationOptions;
   final List<FoodCandidateGroup>? candidateGroups;
+  final UsualFoodDraft? usualFoodDraft;
+  final UsualMealDraft? usualMealDraft;
 }
 
 class VoiceMealRunResult {
@@ -59,10 +63,7 @@ class VoiceMealRunResult {
 }
 
 class FoodSearchResult {
-  const FoodSearchResult({
-    required this.items,
-    this.candidateGroups,
-  });
+  const FoodSearchResult({required this.items, this.candidateGroups});
 
   final List<MealItem> items;
   final List<FoodCandidateGroup>? candidateGroups;
@@ -175,6 +176,16 @@ class NutritionRepository {
       clarificationOptions: _parseCandidateGroups(json['options']),
       candidateGroups: _parseCandidateGroups(json['candidateGroups']) ??
           _parseCandidateGroups(json['options']),
+      usualFoodDraft: json['usualFoodDraft'] == null
+          ? _parseTopLevelUsualFoodDraft(json)
+          : _parseNestedUsualFoodDraft(
+              json['usualFoodDraft'] as Map<String, Object?>,
+            ),
+      usualMealDraft: json['usualMealDraft'] == null
+          ? null
+          : UsualMealDraft.fromJson(
+              _responseOutput(json['usualMealDraft'] as Map<String, Object?>),
+            ),
     );
   }
 
@@ -311,6 +322,16 @@ class NutritionRepository {
         .toList();
   }
 
+  Future<List<UsualFood>> getUsualFoods() async {
+    final json = await _apiClient.getUsualFoods();
+    final output = _responseOutput(json);
+    final foods = output['usualFoods'] ?? output['foods'] ?? output['items'];
+    return (foods as List<Object?>? ?? const [])
+        .cast<Map<String, Object?>>()
+        .map(UsualFood.fromJson)
+        .toList();
+  }
+
   Future<MealTemplate> setTemplateTrustedMode(
     MealTemplate template,
     bool enabled,
@@ -326,15 +347,73 @@ class NutritionRepository {
     required String title,
     required List<MealItem> items,
     required List<String> aliases,
+    bool trustedAutoCommitEnabled = false,
   }) async {
     final json = await _apiClient.createTemplate({
       'title': title,
-      'trustedAutoCommitEnabled': false,
+      'trustedAutoCommitEnabled': trustedAutoCommitEnabled,
       'items': items.map((item) => item.toJson()).toList(),
       'aliases': aliases,
     });
     final output = json['output'] as Map<String, Object?>;
     return MealTemplate.fromJson(output['template'] as Map<String, Object?>);
+  }
+
+  Future<MealTemplate> updateTemplate({
+    required String templateId,
+    required String title,
+    required List<MealItem> items,
+    required List<String> aliases,
+    bool trustedAutoCommitEnabled = false,
+  }) async {
+    final json = await _apiClient.updateTemplate(templateId, {
+      'title': title,
+      'trustedAutoCommitEnabled': trustedAutoCommitEnabled,
+      'items': items.map((item) => item.toJson()).toList(),
+      'aliases': aliases,
+    });
+    final output = json['output'] as Map<String, Object?>;
+    return MealTemplate.fromJson(output['template'] as Map<String, Object?>);
+  }
+
+  Future<UsualMealDraft> draftUsualMeal(String text) async {
+    Map<String, Object?> json;
+    try {
+      json = await _apiClient.draftUsualMeal(text);
+    } on ApiException catch (error) {
+      if (error.statusCode != 404 && error.code != 'unimplemented_action') {
+        rethrow;
+      }
+      json = await _apiClient.executeAction('draft_usual_meal', {
+        'text': text,
+      });
+    }
+    return UsualMealDraft.fromJson(_responseOutput(json));
+  }
+
+  Future<UsualFood> createUsualFood(UsualFoodInput input) async {
+    final json = await _apiClient.createUsualFood(input.toJson());
+    return _parseUsualFoodResponse(json);
+  }
+
+  Future<UsualFood> updateUsualFood(String foodId, UsualFoodInput input) async {
+    final json = await _apiClient.updateUsualFood(
+      foodId,
+      input.toJson(includeEmptyOptional: true),
+    );
+    return _parseUsualFoodResponse(json);
+  }
+
+  Future<bool> deleteUsualFood(String foodId) async {
+    final json = await _apiClient.deleteUsualFood(foodId);
+    final output = _responseOutput(json);
+    return output['deleted'] as bool? ?? true;
+  }
+
+  Future<UsualFoodDraft> draftUsualFood(String text) async {
+    final json = await _apiClient.draftUsualFood(text);
+    final output = _responseOutput(json);
+    return UsualFoodDraft.fromJson(output['draft'] as Map<String, Object?>);
   }
 
   Future<bool> deleteTemplate(String templateId) async {
@@ -347,6 +426,32 @@ class NutritionRepository {
     final json = await _apiClient.transcribeAudio(audioFile, source: 'flutter');
     return json['transcript'] as String;
   }
+}
+
+Map<String, Object?> _responseOutput(Map<String, Object?> json) {
+  return json['output'] as Map<String, Object?>? ?? json;
+}
+
+UsualFood _parseUsualFoodResponse(Map<String, Object?> json) {
+  final output = _responseOutput(json);
+  if (output['id'] is String) {
+    return UsualFood.fromJson(output);
+  }
+  final food = output['usualFood'] ?? output['food'] ?? output['item'];
+  return UsualFood.fromJson(food as Map<String, Object?>);
+}
+
+UsualFoodDraft? _parseTopLevelUsualFoodDraft(Map<String, Object?> json) {
+  if (json['draft'] is! Map<String, Object?>) return null;
+  return UsualFoodDraft.fromJson(json['draft'] as Map<String, Object?>);
+}
+
+UsualFoodDraft _parseNestedUsualFoodDraft(Map<String, Object?> json) {
+  final output = _responseOutput(json);
+  final draft = output['draft'] is Map<String, Object?>
+      ? output['draft'] as Map<String, Object?>
+      : output;
+  return UsualFoodDraft.fromJson(draft);
 }
 
 List<FoodCandidateGroup>? _parseCandidateGroups(Object? value) {

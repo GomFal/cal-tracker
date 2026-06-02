@@ -1,6 +1,6 @@
 {
-  "id": "82d21927-90ee-4c91-905f-dc2c5d1bb72b",
-  "prevId": "216640c0-1366-4f34-a55d-452f33149c2a",
+  "id": "454eb4f7-a660-4600-82b3-2be230aff68f",
+  "prevId": "93e63bd8-3820-4f84-9975-48a717141007",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1351,6 +1351,19 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -2037,40 +2050,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "primary_entity_name": {
-          "name": "primary_entity_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "''"
-        },
-        "primary_entity_aliases": {
-          "name": "primary_entity_aliases",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::text[]"
-        },
-        "secondary_entity_aliases": {
-          "name": "secondary_entity_aliases",
-          "type": "text[]",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::text[]"
-        },
-        "primary_entity_category": {
-          "name": "primary_entity_category",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "primary_entity_category_coherence": {
-          "name": "primary_entity_category_coherence",
-          "type": "numeric(6, 4)",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'0'"
-        },
         "search_text": {
           "name": "search_text",
           "type": "text",
@@ -2146,36 +2125,6 @@
               "asc": true,
               "nulls": "last",
               "opclass": "gin_trgm_ops"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "gin",
-          "with": {}
-        },
-        "food_normalized_search_documents_primary_aliases_gin_idx": {
-          "name": "food_normalized_search_documents_primary_aliases_gin_idx",
-          "columns": [
-            {
-              "expression": "primary_entity_aliases",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "gin",
-          "with": {}
-        },
-        "food_normalized_search_documents_secondary_aliases_gin_idx": {
-          "name": "food_normalized_search_documents_secondary_aliases_gin_idx",
-          "columns": [
-            {
-              "expression": "secondary_entity_aliases",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
             }
           ],
           "isUnique": false,

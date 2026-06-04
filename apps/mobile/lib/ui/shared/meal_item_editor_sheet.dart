@@ -1,11 +1,10 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
 import '../../domain/models/nutrition_edit.dart';
 import '../../domain/models/nutrition_models.dart';
 import '../../l10n/app_localizations_context.dart';
 import '../core/design_system.dart';
+import 'editable_meal_item_controller.dart';
 import 'food_search_panel.dart';
 import 'nutrition_edit_components.dart';
 import 'nutrition_edit_sheet.dart';
@@ -27,16 +26,18 @@ class MealItemEditorSheet extends StatefulWidget {
 }
 
 class _MealItemEditorSheetState extends State<MealItemEditorSheet> {
-  late final List<_EditableMealItem> _items;
+  late final List<EditableMealItemController> _items;
   bool _addSearchExpanded = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _items = [for (final item in widget.meal.items) _EditableMealItem(item)];
+    _items = [
+      for (final item in widget.meal.items) EditableMealItemController(item),
+    ];
     if (_items.isEmpty) {
-      _items.add(_EditableMealItem.empty());
+      _items.add(EditableMealItemController.empty());
     }
   }
 
@@ -112,7 +113,7 @@ class _MealItemEditorSheetState extends State<MealItemEditorSheet> {
                           searchFoods: widget.searchFoods!,
                           onSelected: (item) {
                             setState(() {
-                              _items.add(_EditableMealItem(item));
+                              _items.add(EditableMealItemController(item));
                               _addSearchExpanded = false;
                               _error = null;
                             });
@@ -156,7 +157,7 @@ class _MealItemEditorSheetState extends State<MealItemEditorSheet> {
                   onReplace: (replacement) {
                     setState(() {
                       _items[index].dispose();
-                      _items[index] = _EditableMealItem(replacement);
+                      _items[index] = EditableMealItemController(replacement);
                       _error = null;
                     });
                   },
@@ -174,7 +175,7 @@ class _MealItemEditorSheetState extends State<MealItemEditorSheet> {
                 key: ValueKey('add_${widget.keyPrefix}_item_button'),
                 onPressed: () {
                   setState(() {
-                    _items.add(_EditableMealItem.empty());
+                    _items.add(EditableMealItemController.empty());
                     _error = null;
                   });
                 },
@@ -198,7 +199,7 @@ class _MealItemEditorSheetState extends State<MealItemEditorSheet> {
   void _save() {
     final edited = <MealItem>[];
     for (final item in _items) {
-      final mealItem = item.toMealItem();
+      final mealItem = item.toValidatedMealItem();
       if (mealItem == null) {
         setState(() {
           _error = context.l10n.commonIngredientDetailsError;
@@ -220,7 +221,7 @@ class _MealItemEditorSheetState extends State<MealItemEditorSheet> {
 class _MealTotalSummary extends StatelessWidget {
   const _MealTotalSummary({required this.items});
 
-  final List<_EditableMealItem> items;
+  final List<EditableMealItemController> items;
 
   @override
   Widget build(BuildContext context) {
@@ -300,7 +301,7 @@ class _IngredientEditorCard extends StatelessWidget {
     required this.onDelete,
   });
 
-  final _EditableMealItem item;
+  final EditableMealItemController item;
   final int index;
   final String keyPrefix;
   final FoodSearchCallback? searchFoods;
@@ -553,7 +554,7 @@ class _InlineReplacementFoodSearch extends StatefulWidget {
   });
 
   final int index;
-  final _EditableMealItem item;
+  final EditableMealItemController item;
   final String keyPrefix;
   final FoodSearchCallback searchFoods;
   final ValueChanged<MealItem> onSelected;
@@ -635,120 +636,7 @@ class _QuantityStepButton extends StatelessWidget {
 
 
 
-class _EditableMealItem {
-  _EditableMealItem(MealItem item)
-      : original = item,
-        isNew = false {
-    nameController = TextEditingController(text: item.name);
-    quantityController = TextEditingController(
-      text: formatQuantity(item.quantity),
-    );
-    unitController = TextEditingController(text: item.unit);
-  }
 
-  _EditableMealItem.empty()
-      : original = const MealItem(
-          name: '',
-          quantity: 100,
-          unit: 'g',
-          calories: 0,
-          proteinGrams: 0,
-          carbsGrams: 0,
-          fatGrams: 0,
-          source: 'manual_edit',
-        ),
-        isNew = true {
-    nameController = TextEditingController();
-    quantityController = TextEditingController(text: '100');
-    unitController = TextEditingController(text: 'g');
-  }
-
-  final MealItem original;
-  final bool isNew;
-  NutritionEdit? _nutritionOverride;
-  double? _nutritionOverrideQuantity;
-  late final TextEditingController nameController;
-  late final TextEditingController quantityController;
-  late final TextEditingController unitController;
-
-  bool get isGramUnit => normalizedText(unitController.text) == 'g';
-
-  void adjustQuantity(double delta) {
-    final current = double.tryParse(quantityController.text.trim());
-    final next = math.max(0.1, (current ?? original.quantity) + delta);
-    setQuantity(next);
-  }
-
-  void setQuantity(double value) {
-    quantityController.text = formatQuantity(value);
-  }
-
-  void setNutritionOverride(NutritionEdit value) {
-    _nutritionOverride = value;
-    _nutritionOverrideQuantity = double.tryParse(
-      quantityController.text.trim(),
-    );
-  }
-
-  NutritionEdit currentNutrition() {
-    final quantity = double.tryParse(quantityController.text.trim());
-    final override = _nutritionOverride;
-    if (override != null) {
-      final baseQuantity = _nutritionOverrideQuantity;
-      final factor = baseQuantity != null &&
-              baseQuantity > 0 &&
-              quantity != null &&
-              quantity > 0
-          ? quantity / baseQuantity
-          : 1.0;
-      return override.scaled(factor);
-    }
-    final factor = original.quantity > 0 && quantity != null && quantity > 0
-        ? quantity / original.quantity
-        : 1.0;
-    return NutritionEdit(
-      calories: (original.calories * factor).round(),
-      proteinGrams: roundMacroToTenth(original.proteinGrams * factor),
-      carbsGrams: roundMacroToTenth(original.carbsGrams * factor),
-      fatGrams: roundMacroToTenth(original.fatGrams * factor),
-    );
-  }
-
-  MealItem? toMealItem() {
-    final name = nameController.text.trim();
-    final quantity = double.tryParse(quantityController.text.trim());
-    final unit = unitController.text.trim();
-    if (name.isEmpty || quantity == null || quantity <= 0 || unit.isEmpty) {
-      return null;
-    }
-    final nutrition = currentNutrition();
-    if (nutrition.calories < 0 ||
-        nutrition.proteinGrams < 0 ||
-        nutrition.carbsGrams < 0 ||
-        nutrition.fatGrams < 0) {
-      return null;
-    }
-    final source = original.source.contains('manual_edit')
-        ? original.source
-        : '${original.source}:manual_edit';
-    return original.copyWith(
-      name: name,
-      quantity: quantity,
-      unit: unit,
-      calories: nutrition.calories,
-      proteinGrams: nutrition.proteinGrams,
-      carbsGrams: nutrition.carbsGrams,
-      fatGrams: nutrition.fatGrams,
-      source: isNew ? 'manual_edit' : source,
-    );
-  }
-
-  void dispose() {
-    nameController.dispose();
-    quantityController.dispose();
-    unitController.dispose();
-  }
-}
 
 
 

@@ -11,6 +11,7 @@ import '../../../core/content_frame.dart';
 import '../../../core/design_system.dart';
 import '../../../core/voice_action_button.dart';
 import '../view_models/voice_log_view_model.dart';
+import '../../../shared/editable_meal_item_controller.dart';
 import '../../../shared/nutrition_edit_components.dart';
 import '../../../shared/nutrition_edit_sheet.dart';
 
@@ -311,7 +312,7 @@ class _ManualFoodSearchPanel extends StatefulWidget {
 }
 
 class _ManualFoodSearchPanelState extends State<_ManualFoodSearchPanel> {
-  final List<_EditableMealItem> _items = [];
+  final List<EditableMealItemController> _items = [];
 
   @override
   void dispose() {
@@ -357,7 +358,7 @@ class _ManualFoodSearchPanelState extends State<_ManualFoodSearchPanel> {
             hintText: context.l10n.foodSearchHint,
             onSelected: (candidate) {
               setState(() {
-                _items.add(_EditableMealItem(candidate));
+                _items.add(EditableMealItemController(candidate));
               });
             },
           ),
@@ -442,7 +443,9 @@ class _ManualFoodSearchPanelState extends State<_ManualFoodSearchPanel> {
       if (name.isEmpty || quantity == null || quantity <= 0 || unit.isEmpty) {
         continue;
       }
-      edited.add(item.toMealItem(name: name, quantity: quantity, unit: unit));
+      edited.add(
+        item.toMealItemWith(name: name, quantity: quantity, unit: unit),
+      );
     }
     if (edited.isEmpty) return;
     await widget.viewModel.createProposalFromManualItems(edited);
@@ -468,7 +471,7 @@ class _ManualDraftIngredientRow extends StatelessWidget {
     required this.onDelete,
   });
 
-  final _EditableMealItem item;
+  final EditableMealItemController item;
   final int index;
   final VoidCallback onChanged;
   final VoidCallback onNutritionEdit;
@@ -1982,13 +1985,14 @@ class _ProposalEditorSheet extends StatefulWidget {
 }
 
 class _ProposalEditorSheetState extends State<_ProposalEditorSheet> {
-  late final List<_EditableMealItem> _items;
+  late final List<EditableMealItemController> _items;
 
   @override
   void initState() {
     super.initState();
     _items = [
-      for (final item in widget.proposal.items) _EditableMealItem(item),
+      for (final item in widget.proposal.items)
+        EditableMealItemController(item),
     ];
   }
 
@@ -2060,7 +2064,7 @@ class _ProposalEditorSheetState extends State<_ProposalEditorSheet> {
                 key: const ValueKey('add_proposal_item_button'),
                 onPressed: () {
                   setState(() {
-                    _items.add(_EditableMealItem.empty());
+                    _items.add(EditableMealItemController.empty());
                   });
                 },
                 icon: const Icon(Icons.add_rounded),
@@ -2088,7 +2092,9 @@ class _ProposalEditorSheetState extends State<_ProposalEditorSheet> {
       if (name.isEmpty || quantity == null || quantity <= 0 || unit.isEmpty) {
         continue;
       }
-      edited.add(item.toMealItem(name: name, quantity: quantity, unit: unit));
+      edited.add(
+        item.toMealItemWith(name: name, quantity: quantity, unit: unit),
+      );
     }
     if (edited.isEmpty) return;
     if (_mealItemListsMateriallyEqual(widget.proposal.items, edited)) {
@@ -2140,7 +2146,7 @@ class _ProposalEditorSheetState extends State<_ProposalEditorSheet> {
   }
 
   MealItem _replacementCandidateFor(
-    _EditableMealItem item,
+    EditableMealItemController item,
     MealItem candidate,
   ) {
     final quantity = double.tryParse(item.quantityController.text.trim());
@@ -2163,7 +2169,7 @@ class _EditableIngredientRow extends StatelessWidget {
     required this.onDelete,
   });
 
-  final _EditableMealItem item;
+  final EditableMealItemController item;
   final int index;
   final List<MealItem> candidates;
   final ValueChanged<MealItem> onCandidateSelected;
@@ -2363,7 +2369,7 @@ class _InlineReplacementFoodSearch extends StatefulWidget {
   });
 
   final int index;
-  final _EditableMealItem item;
+  final EditableMealItemController item;
   final ValueChanged<MealItem> onSelected;
 
   @override
@@ -2462,115 +2468,7 @@ String _nutritionLabel(NutritionEdit nutrition) {
       '${formatMacro(nutrition.fatGrams)}F';
 }
 
-class _EditableMealItem {
-  _EditableMealItem(MealItem item) : original = item {
-    nameController = TextEditingController(text: item.name);
-    quantityController = TextEditingController(
-      text: formatQuantity(item.quantity),
-    );
-    unitController = TextEditingController(text: item.unit);
-  }
 
-  _EditableMealItem.empty()
-      : original = const MealItem(
-          name: '',
-          quantity: 100,
-          unit: 'g',
-          calories: 0,
-          proteinGrams: 0,
-          carbsGrams: 0,
-          fatGrams: 0,
-          source: 'manual_edit',
-        ) {
-    nameController = TextEditingController();
-    quantityController = TextEditingController(text: '100');
-    unitController = TextEditingController(text: 'g');
-  }
-
-  MealItem original;
-  NutritionEdit? _nutritionOverride;
-  double? _nutritionOverrideQuantity;
-  late final TextEditingController nameController;
-  late final TextEditingController quantityController;
-  late final TextEditingController unitController;
-
-  bool get isGramUnit => normalizedText(unitController.text) == 'g';
-
-  void replaceWith(MealItem item) {
-    original = item;
-    _nutritionOverride = null;
-    nameController.text = item.name;
-    quantityController.text = formatQuantity(item.quantity);
-    unitController.text = item.unit;
-  }
-
-  void setNutritionOverride(NutritionEdit value) {
-    _nutritionOverride = value;
-    _nutritionOverrideQuantity = double.tryParse(
-      quantityController.text.trim(),
-    );
-  }
-
-  void adjustQuantity(double delta) {
-    final current = double.tryParse(quantityController.text.trim());
-    final next = (current ?? original.quantity) + delta;
-    setQuantity(next <= 0 ? 0.1 : next);
-  }
-
-  void setQuantity(double value) {
-    quantityController.text = formatQuantity(value);
-  }
-
-  NutritionEdit currentNutrition() {
-    final override = _nutritionOverride;
-    final quantity = double.tryParse(quantityController.text.trim());
-    if (override != null) {
-      final overrideQuantity = _nutritionOverrideQuantity;
-      final factor = overrideQuantity != null &&
-              overrideQuantity > 0 &&
-              quantity != null &&
-              quantity > 0
-          ? quantity / overrideQuantity
-          : 1.0;
-      return override.scaled(factor);
-    }
-    final factor = original.quantity > 0 && quantity != null && quantity > 0
-        ? quantity / original.quantity
-        : 1.0;
-    return NutritionEdit(
-      calories: (original.calories * factor).round(),
-      proteinGrams: roundMacroToTenth(original.proteinGrams * factor),
-      carbsGrams: roundMacroToTenth(original.carbsGrams * factor),
-      fatGrams: roundMacroToTenth(original.fatGrams * factor),
-    );
-  }
-
-  MealItem toMealItem({
-    required String name,
-    required double quantity,
-    required String unit,
-  }) {
-    final nutrition = currentNutrition();
-    return original.copyWith(
-      name: name,
-      quantity: quantity,
-      unit: unit,
-      calories: nutrition.calories,
-      proteinGrams: nutrition.proteinGrams,
-      carbsGrams: nutrition.carbsGrams,
-      fatGrams: nutrition.fatGrams,
-      source: original.source == 'manual_edit'
-          ? 'manual_edit'
-          : '${original.source}:manual_edit',
-    );
-  }
-
-  void dispose() {
-    nameController.dispose();
-    quantityController.dispose();
-    unitController.dispose();
-  }
-}
 
 bool _itemMatchesCandidateGroup(MealItem item, FoodCandidateGroup group) {
   if (group.candidates.any((candidate) => _sameMealItem(candidate, item))) {

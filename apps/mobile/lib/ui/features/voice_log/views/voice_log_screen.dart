@@ -12,6 +12,7 @@ import '../../../core/design_system.dart';
 import '../../../core/voice_action_button.dart';
 import '../view_models/voice_log_view_model.dart';
 import '../../../shared/nutrition_edit_components.dart';
+import '../../../shared/nutrition_edit_sheet.dart';
 
 class MealCreateScreen extends StatefulWidget {
   const MealCreateScreen({super.key, this.initialItems = const []});
@@ -401,13 +402,29 @@ class _ManualFoodSearchPanelState extends State<_ManualFoodSearchPanel> {
   }
 
   Future<void> _editNutrition(int index) async {
+    final item = _items[index];
+    final palette = context.freshPalette;
     final edited = await showModalBottomSheet<NutritionEdit>(
       context: context,
       isScrollControlled: true,
-      builder: (context) => _NutritionEditorSheet(
-        item: _items[index],
+      builder: (context) => NutritionEditSheet(
+        initialNutrition: item.currentNutrition(),
+        ingredientName: item.nameController.text.trim(),
+        title: 'Edit nutrition',
+        subtitleFallback: 'Manual ingredient',
         keyPrefix: 'manual_food',
         index: index,
+        fieldKeySuffix: 'nutrition',
+        saveButtonKeySuffix: 'save_nutrition_button',
+        macroColors: {
+          NutritionMacroKind.protein: palette.coral,
+          NutritionMacroKind.carbs: palette.orange,
+          NutritionMacroKind.fat: palette.leaf,
+        },
+        useMacroFieldStyle: false,
+        errorTitle: 'Check nutrition',
+        errorMessage: 'Use non-negative numbers for calories and macros.',
+        useSafeArea: true,
       ),
     );
     if (edited == null) return;
@@ -2082,13 +2099,29 @@ class _ProposalEditorSheetState extends State<_ProposalEditorSheet> {
   }
 
   Future<void> _editNutrition(int index) async {
+    final item = _items[index];
+    final palette = context.freshPalette;
     final edited = await showModalBottomSheet<NutritionEdit>(
       context: context,
       isScrollControlled: true,
-      builder: (context) => _NutritionEditorSheet(
-        item: _items[index],
+      builder: (context) => NutritionEditSheet(
+        initialNutrition: item.currentNutrition(),
+        ingredientName: item.nameController.text.trim(),
+        title: 'Edit nutrition',
+        subtitleFallback: 'Manual ingredient',
         keyPrefix: 'proposal',
         index: index,
+        fieldKeySuffix: 'nutrition',
+        saveButtonKeySuffix: 'save_nutrition_button',
+        macroColors: {
+          NutritionMacroKind.protein: palette.coral,
+          NutritionMacroKind.carbs: palette.orange,
+          NutritionMacroKind.fat: palette.leaf,
+        },
+        useMacroFieldStyle: false,
+        errorTitle: 'Check nutrition',
+        errorMessage: 'Use non-negative numbers for calories and macros.',
+        useSafeArea: true,
       ),
     );
     if (edited == null) return;
@@ -2383,255 +2416,6 @@ class _InlineReplacementFoodSearchState
     );
   }
 }
-
-class _NutritionEditorSheet extends StatefulWidget {
-  const _NutritionEditorSheet({
-    required this.item,
-    required this.keyPrefix,
-    required this.index,
-  });
-
-  final _EditableMealItem item;
-  final String keyPrefix;
-  final int index;
-
-  @override
-  State<_NutritionEditorSheet> createState() => _NutritionEditorSheetState();
-}
-
-class _NutritionEditorSheetState extends State<_NutritionEditorSheet> {
-  late final TextEditingController _caloriesController;
-  late final TextEditingController _proteinController;
-  late final TextEditingController _carbsController;
-  late final TextEditingController _fatController;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    final nutrition = widget.item.currentNutrition();
-    _caloriesController = TextEditingController(
-      text: nutrition.calories.toString(),
-    );
-    _proteinController = TextEditingController(
-      text: formatMacro(nutrition.proteinGrams),
-    );
-    _carbsController = TextEditingController(
-      text: formatMacro(nutrition.carbsGrams),
-    );
-    _fatController = TextEditingController(
-      text: formatMacro(nutrition.fatGrams),
-    );
-  }
-
-  @override
-  void dispose() {
-    _caloriesController.dispose();
-    _proteinController.dispose();
-    _carbsController.dispose();
-    _fatController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-    final textTheme = Theme.of(context).textTheme;
-    final palette = context.freshPalette;
-    final preview = _previewNutrition();
-    final macroCalories = preview?.macroCalories ?? 0;
-    final showSuggestion = preview?.hasCalorieMismatch ?? false;
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(18, 12, 18, bottomInset + 18),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(
-              child: Container(
-                width: 44,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: palette.rule,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
-            ),
-            const SizedBox(height: FreshSpacing.lg),
-            Text('Edit nutrition', style: textTheme.titleLarge),
-            const SizedBox(height: FreshSpacing.xs),
-            Text(
-              widget.item.nameController.text.trim().isEmpty
-                  ? 'Manual ingredient'
-                  : widget.item.nameController.text.trim(),
-              style: textTheme.bodyMedium?.copyWith(
-                color: palette.inkMuted,
-              ),
-            ),
-            const SizedBox(height: FreshSpacing.md),
-            if (_error != null) ...[
-              FreshStatusBanner(
-                icon: Icons.error_outline_rounded,
-                title: 'Check nutrition',
-                message: _error!,
-                color: palette.coral,
-              ),
-              const SizedBox(height: FreshSpacing.md),
-            ],
-            TextField(
-              key: ValueKey(
-                '${widget.keyPrefix}_nutrition_calories_${widget.index}',
-              ),
-              controller: _caloriesController,
-              keyboardType: TextInputType.number,
-              onChanged: (_) => setState(() {}),
-              decoration: InputDecoration(
-                labelText: context.l10n.commonCalories,
-                suffixIcon: showSuggestion
-                    ? NutritionCalorieSuggestionSuffix(
-                        key: ValueKey(
-                          '${widget.keyPrefix}_nutrition_apply_suggestion_${widget.index}',
-                        ),
-                        calories: macroCalories,
-                        onApply: () => _applyMacroCalories(macroCalories),
-                      )
-                    : null,
-                suffixIconConstraints: const BoxConstraints(
-                  minWidth: 0,
-                  minHeight: 0,
-                ),
-              ),
-            ),
-            const SizedBox(height: FreshSpacing.sm),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    key: ValueKey(
-                      '${widget.keyPrefix}_nutrition_protein_${widget.index}',
-                    ),
-                    controller: _proteinController,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    onChanged: (_) => setState(() {}),
-                    decoration: macroInputDecoration(
-                      label: context.l10n.commonProtein,
-                      color: context.freshPalette.coral,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: FreshSpacing.sm),
-                Expanded(
-                  child: TextField(
-                    key: ValueKey(
-                      '${widget.keyPrefix}_nutrition_carbs_${widget.index}',
-                    ),
-                    controller: _carbsController,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    onChanged: (_) => setState(() {}),
-                    decoration: macroInputDecoration(
-                      label: context.l10n.commonCarbs,
-                      color: context.freshPalette.orange,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: FreshSpacing.sm),
-                Expanded(
-                  child: TextField(
-                    key: ValueKey(
-                      '${widget.keyPrefix}_nutrition_fat_${widget.index}',
-                    ),
-                    controller: _fatController,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    onChanged: (_) => setState(() {}),
-                    decoration: macroInputDecoration(
-                      label: context.l10n.commonFat,
-                      color: context.freshPalette.leaf,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: FreshSpacing.sm),
-            if (!showSuggestion) ...[
-              const SizedBox(height: FreshSpacing.md),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: palette.surfaceSoft,
-                  borderRadius: BorderRadius.circular(FreshRadii.md),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Text(
-                    context.l10n.mealEditorCalculatedFromMacros(macroCalories),
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: palette.inkMuted,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-            const SizedBox(height: FreshSpacing.md),
-            FilledButton.icon(
-              key: ValueKey(
-                '${widget.keyPrefix}_save_nutrition_button_${widget.index}',
-              ),
-              onPressed: _save,
-              icon: const Icon(Icons.check_rounded),
-              label: Text(context.l10n.commonSave),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  NutritionEdit? _previewNutrition() {
-    final calories = int.tryParse(_caloriesController.text.trim());
-    final protein = double.tryParse(_proteinController.text.trim());
-    final carbs = double.tryParse(_carbsController.text.trim());
-    final fat = double.tryParse(_fatController.text.trim());
-    if (calories == null || protein == null || carbs == null || fat == null) {
-      return null;
-    }
-    return NutritionEdit(
-      calories: calories,
-      proteinGrams: roundMacroToTenth(protein),
-      carbsGrams: roundMacroToTenth(carbs),
-      fatGrams: roundMacroToTenth(fat),
-    );
-  }
-
-  void _applyMacroCalories(int calories) {
-    _caloriesController.text = calories.toString();
-    _caloriesController.selection = TextSelection.collapsed(
-      offset: _caloriesController.text.length,
-    );
-    setState(() {});
-  }
-
-  void _save() {
-    final nutrition = _previewNutrition();
-    if (nutrition == null ||
-        nutrition.calories < 0 ||
-        nutrition.proteinGrams < 0 ||
-        nutrition.carbsGrams < 0 ||
-        nutrition.fatGrams < 0) {
-      setState(() {
-        _error = 'Use non-negative numbers for calories and macros.';
-      });
-      return;
-    }
-    Navigator.of(context).pop(nutrition);
-  }
-}
-
 
 
 MealItem _candidateWithMentionQuantity(

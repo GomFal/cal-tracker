@@ -8,6 +8,7 @@ import '../../l10n/app_localizations_context.dart';
 import '../core/design_system.dart';
 import 'food_search_panel.dart';
 import 'nutrition_edit_components.dart';
+import 'nutrition_edit_sheet.dart';
 
 class MealItemEditorSheet extends StatefulWidget {
   const MealItemEditorSheet({
@@ -502,10 +503,17 @@ class _IngredientEditorCard extends StatelessWidget {
                         context: context,
                         isScrollControlled: true,
                         useSafeArea: true,
-                        builder: (context) => _NutritionDetailsSheet(
-                          item: item,
+                        builder: (sheetContext) => NutritionEditSheet(
+                          initialNutrition: item.currentNutrition(),
+                          ingredientName: item.nameController.text.trim(),
+                          title: sheetContext.l10n.mealEditorNutritionDetails,
+                          subtitleFallback: sheetContext.l10n.commonIngredient,
                           keyPrefix: keyPrefix,
                           index: index,
+                          fieldKeySuffix: 'item',
+                          saveButtonKeySuffix: 'item_save_details',
+                          useMacroFieldStyle: true,
+                          useSafeArea: false,
                         ),
                       );
                       if (edited == null) return;
@@ -625,255 +633,7 @@ class _QuantityStepButton extends StatelessWidget {
   }
 }
 
-class _NutritionDetailsSheet extends StatefulWidget {
-  const _NutritionDetailsSheet({
-    required this.item,
-    required this.keyPrefix,
-    required this.index,
-  });
 
-  final _EditableMealItem item;
-  final String keyPrefix;
-  final int index;
-
-  @override
-  State<_NutritionDetailsSheet> createState() => _NutritionDetailsSheetState();
-}
-
-class _NutritionDetailsSheetState extends State<_NutritionDetailsSheet> {
-  late final TextEditingController _caloriesController;
-  late final TextEditingController _proteinController;
-  late final TextEditingController _carbsController;
-  late final TextEditingController _fatController;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    final nutrition = widget.item.currentNutrition();
-    _caloriesController = TextEditingController(
-      text: nutrition.calories.toString(),
-    );
-    _proteinController = TextEditingController(
-      text: formatMacro(nutrition.proteinGrams),
-    );
-    _carbsController = TextEditingController(
-      text: formatMacro(nutrition.carbsGrams),
-    );
-    _fatController = TextEditingController(
-      text: formatMacro(nutrition.fatGrams),
-    );
-  }
-
-  @override
-  void dispose() {
-    _caloriesController.dispose();
-    _proteinController.dispose();
-    _carbsController.dispose();
-    _fatController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-    final textTheme = Theme.of(context).textTheme;
-    final l10n = context.l10n;
-    final palette = context.freshPalette;
-    final preview = _previewNutrition();
-    final macroCalories = preview?.macroCalories ?? 0;
-    final showSuggestion = preview?.hasCalorieMismatch ?? false;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(18, 12, 18, bottomInset + 18),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(
-              child: Container(
-                width: 44,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: context.freshPalette.rule,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
-            ),
-            const SizedBox(height: FreshSpacing.lg),
-            Text(l10n.mealEditorNutritionDetails, style: textTheme.titleLarge),
-            const SizedBox(height: FreshSpacing.xs),
-            Text(
-              widget.item.nameController.text.trim().isEmpty
-                  ? l10n.commonIngredient
-                  : widget.item.nameController.text.trim(),
-              style: textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
-            ),
-            const SizedBox(height: FreshSpacing.md),
-            if (_error != null) ...[
-              FreshStatusBanner(
-                icon: Icons.error_outline_rounded,
-                title: l10n.commonCheckIngredientDetails,
-                message: _error!,
-                color: palette.coral,
-              ),
-              const SizedBox(height: FreshSpacing.md),
-            ],
-            TextField(
-              key: ValueKey(
-                '${widget.keyPrefix}_item_calories_${widget.index}',
-              ),
-              controller: _caloriesController,
-              keyboardType: TextInputType.number,
-              onChanged: (_) => setState(() {}),
-              decoration: InputDecoration(
-                labelText: l10n.commonCalories,
-                suffixIcon: showSuggestion
-                    ? NutritionCalorieSuggestionSuffix(
-                        key: ValueKey(
-                          '${widget.keyPrefix}_item_apply_suggestion_${widget.index}',
-                        ),
-                        calories: macroCalories,
-                        onApply: () => _applyMacroCalories(macroCalories),
-                      )
-                    : null,
-                suffixIconConstraints: const BoxConstraints(
-                  minWidth: 0,
-                  minHeight: 0,
-                ),
-              ),
-            ),
-            const SizedBox(height: FreshSpacing.sm),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    key: ValueKey(
-                      '${widget.keyPrefix}_item_protein_${widget.index}',
-                    ),
-                    controller: _proteinController,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    onChanged: (_) => setState(() {}),
-                    style: macroFieldStyle(Theme.of(context).textTheme, defaultNutritionMacroColors(context)[NutritionMacroKind.protein]!),
-                    decoration: macroInputDecoration(
-                      label: l10n.commonProtein,
-                      color: defaultNutritionMacroColors(context)[NutritionMacroKind.protein]!,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: FreshSpacing.sm),
-                Expanded(
-                  child: TextField(
-                    key: ValueKey(
-                      '${widget.keyPrefix}_item_carbs_${widget.index}',
-                    ),
-                    controller: _carbsController,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    onChanged: (_) => setState(() {}),
-                    style: macroFieldStyle(Theme.of(context).textTheme, defaultNutritionMacroColors(context)[NutritionMacroKind.carbs]!),
-                    decoration: macroInputDecoration(
-                      label: l10n.commonCarbs,
-                      color: defaultNutritionMacroColors(context)[NutritionMacroKind.carbs]!,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: FreshSpacing.sm),
-                Expanded(
-                  child: TextField(
-                    key: ValueKey(
-                      '${widget.keyPrefix}_item_fat_${widget.index}',
-                    ),
-                    controller: _fatController,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    onChanged: (_) => setState(() {}),
-                    style: macroFieldStyle(Theme.of(context).textTheme, defaultNutritionMacroColors(context)[NutritionMacroKind.fat]!),
-                    decoration: macroInputDecoration(
-                      label: l10n.commonFat,
-                      color: defaultNutritionMacroColors(context)[NutritionMacroKind.fat]!,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: FreshSpacing.sm),
-            if (!showSuggestion) ...[
-              const SizedBox(height: FreshSpacing.md),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: palette.surfaceSoft,
-                  borderRadius: BorderRadius.circular(FreshRadii.md),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Text(
-                    l10n.mealEditorCalculatedFromMacros(macroCalories),
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: palette.inkMuted,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-            const SizedBox(height: FreshSpacing.md),
-            FilledButton.icon(
-              key: ValueKey(
-                '${widget.keyPrefix}_item_save_details_${widget.index}',
-              ),
-              onPressed: _save,
-              icon: const Icon(Icons.check_rounded),
-              label: Text(l10n.commonSave),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  NutritionEdit? _previewNutrition() {
-    final calories = int.tryParse(_caloriesController.text.trim());
-    final protein = double.tryParse(_proteinController.text.trim());
-    final carbs = double.tryParse(_carbsController.text.trim());
-    final fat = double.tryParse(_fatController.text.trim());
-    if (calories == null || protein == null || carbs == null || fat == null) {
-      return null;
-    }
-    return NutritionEdit(
-      calories: calories,
-      proteinGrams: roundMacroToTenth(protein),
-      carbsGrams: roundMacroToTenth(carbs),
-      fatGrams: roundMacroToTenth(fat),
-    );
-  }
-
-  void _applyMacroCalories(int calories) {
-    _caloriesController.text = calories.toString();
-    _caloriesController.selection = TextSelection.collapsed(
-      offset: _caloriesController.text.length,
-    );
-    setState(() {});
-  }
-
-  void _save() {
-    final nutrition = _previewNutrition();
-    if (nutrition == null ||
-        nutrition.calories < 0 ||
-        nutrition.proteinGrams < 0 ||
-        nutrition.carbsGrams < 0 ||
-        nutrition.fatGrams < 0) {
-      setState(() {
-        _error = context.l10n.commonIngredientDetailsError;
-      });
-      return;
-    }
-    Navigator.of(context).pop(nutrition);
-  }
-}
 
 class _EditableMealItem {
   _EditableMealItem(MealItem item)

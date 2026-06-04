@@ -17,8 +17,10 @@ void main() {
     expect(grams.fatGrams, 67);
     expect(macroCaloriesFromGrams(grams), 2003);
     expect(macroWarningLevel(3), MacroCalorieWarningLevel.none);
-    expect(macroWarningLevel(50), MacroCalorieWarningLevel.soft);
-    expect(macroWarningLevel(100), MacroCalorieWarningLevel.clear);
+    expect(macroWarningLevel(50), MacroCalorieWarningLevel.none);
+    expect(macroWarningLevel(75), MacroCalorieWarningLevel.soft);
+    expect(macroWarningLevel(100), MacroCalorieWarningLevel.soft);
+    expect(macroWarningLevel(150), MacroCalorieWarningLevel.clear);
   });
 
   testWidgets('full macro sheet shows presets and personalized card',

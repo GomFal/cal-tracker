@@ -222,8 +222,8 @@ bool isBlockingMacroCalorieDelta(int calorieDeltaKcal) {
 
 MacroCalorieWarningLevel macroWarningLevel(int calorieDeltaKcal) {
   final absoluteDelta = calorieDeltaKcal.abs();
-  if (absoluteDelta <= 25) return MacroCalorieWarningLevel.none;
-  if (absoluteDelta <= 75) return MacroCalorieWarningLevel.soft;
+  if (absoluteDelta <= 50) return MacroCalorieWarningLevel.none;
+  if (absoluteDelta <= 100) return MacroCalorieWarningLevel.soft;
   return MacroCalorieWarningLevel.clear;
 }
 

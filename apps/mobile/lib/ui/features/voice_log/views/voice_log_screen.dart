@@ -2760,6 +2760,8 @@ class _NutritionEditorSheetState extends State<_NutritionEditorSheet> {
   }
 }
 
+const kCalorieMismatchTolerance = 50;
+
 class _NutritionEdit {
   const _NutritionEdit({
     required this.calories,
@@ -2781,7 +2783,7 @@ class _NutritionEdit {
         ),
       );
 
-  bool get hasCalorieMismatch => (calories - macroCalories).abs() >= 5;
+  bool get hasCalorieMismatch => (calories - macroCalories).abs() >= kCalorieMismatchTolerance;
 
   _NutritionEdit scaled(double factor) {
     return _NutritionEdit(

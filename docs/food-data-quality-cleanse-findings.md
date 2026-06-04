@@ -15,6 +15,26 @@ cd apps/backend
 bun --env-file=.env run food-quality audit
 ```
 
+## Current Operational Status
+
+The cleanse is now implemented by `apps/backend/scripts/food-data-quality.ts` and exposed through:
+
+```bash
+cd apps/backend
+bun --env-file=.env run food-quality audit
+bun --env-file=.env run food-quality apply
+```
+
+`audit` computes the same classification and writes a JSON report under ignored `data/food-quality/`. `apply` also upserts the derived classification into `food_item_quality`.
+
+For dev/pro/VPS operations, pass script guards on mutating runs:
+
+```bash
+bun --env-file=.env run food-quality apply --require-db-name cal_tracker --require-schema cal_tracker_dev
+```
+
+The quality layer does not delete or rewrite source `food_items`. It marks canonical search eligibility so downstream normalization and runtime search can require `food_item_quality.is_search_eligible = true`.
+
 The audit uses `food-quality-v1`. It does not delete imported source rows. It classifies each row for search eligibility so normalization and search can ignore rows that are duplicated, incomplete, suspicious, or nutritionally invalid.
 
 ## Headline Result

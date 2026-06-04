@@ -1,126 +1,185 @@
-# Food Search Benchmark and Acceptance Plan
+# Food Search Benchmark And Acceptance Runbook
 
-## Summary
+Status: implemented reusable benchmark and validation reference.
 
-Add a reusable backend benchmark script for ingredient search that compares normalized sample search against the legacy flag-off PostgreSQL search path in the same branch and database. The script records latency, top-k ranking quality, source/result-type mix, data-quality violations, duplicate display-name flooding, and explicit acceptance checks across a broad English/Spanish ingredient set.
+This document describes how to reuse the PostgreSQL food search benchmarks after changes to food data quality, normalized search, repository ranking, indexes, or meal proposal ingredient resolution.
 
-Benchmark cases may be explicit fixtures. Runtime search logic must remain generic: no query-specific, ingredient-specific, or language-shortcut ranking rules are allowed in production code.
+Runtime fixes must remain generic. Do not add exact ingredient/query fixes, hardcoded translations, stopword lists, regex food understanding, or deterministic ingredient inference.
 
-## Key Changes
+## Reusable Scripts
 
-- Add `apps/backend/scripts/benchmark-food-search.ts`.
-- Add package script `benchmark:food-search`.
-- Add `apps/backend/scripts/validate-food-search-primary-position.ts`.
-- Add package script `validate:food-search-primary`.
-- Compare:
-  - `legacy`: `PostgresRepository(..., { normalizedSearchEnabled: false })`
-  - `normalized`: `PostgresRepository(..., { normalizedSearchEnabled: true, normalizedSearchSampleSet })`
-- Keep `FoodSearchCandidate` unchanged. After repository search returns IDs, query DB metadata for quality status, normalized docs, sample membership, and raw `food_items` fields.
-- Write ignored reports under `data/food-search-benchmarks/`:
-  - JSON with full per-query results.
-  - Markdown with summary tables and failed checks.
-- Write primary-position validation reports under `data/food-search-benchmarks/secondary-token-conflicts/`:
-  - generated validation queries
-  - extracted conflict candidates
-  - full top-k result evidence
-  - markdown summary with failed query and candidate-review tables
+Run from `apps/backend`.
 
-## Benchmark Behavior
+| Script | Purpose |
+| --- | --- |
+| `bun --env-file=.env run benchmark:food-search` | Measures repository food search quality and latency for legacy and normalized modes. |
+| `bun --env-file=.env run validate:food-search-primary` | Exhaustively validates primary-token ranking behavior over normalized docs. |
+| `bun --env-file=.env run benchmark:agent-foods` | Measures agent/tool food flows with prompt fixtures. |
 
-- Default CLI:
-  - `--mode compare`
-  - `--top-k 10`
-  - `--warmup 1`
-  - `--iterations 5`
-- Supported CLI:
-  - `--mode legacy|normalized|compare`
-  - `--case <id>`
-  - `--top-k <n>`
-  - `--iterations <n>`
-  - `--warmup <n>`
-  - `--repeat <n>`
-  - `--report-only`
-  - `--output-dir <path>`
-- Use a fixed benchmark user namespace with no food preferences. Vary the user ID per measured iteration so repository cache does not hide DB search cost.
-- Cases include the plan queries and broader generic coverage:
-  - `rice`, `arroz`, `arroz goya`, `chicken breast`, `egg`, `milk`, `apple`, `yogur natural`
-  - oats, lentils/lentejas, beans/frijoles, potato/patata, tomato/tomate, banana/platano, olive oil/aceite oliva, bread/pan, salmon, tuna
-  - representative barcode case discovered dynamically from eligible sampled product docs
+One-off benchmark harnesses that are not part of the app should live under ignored `tools/benchmarks/`. They should not be added to `apps/backend/scripts` unless they are intended to be maintained, tested, and shipped in the backend image.
 
-## Exhaustive Primary-Position Validation
+Reports are written under ignored paths:
 
-Run `validate:food-search-primary` after every search-ranking change. This script iterates every eligible row in `normalized_search_v1`, extracts normalized tokens from the normalized base/variant names, and generates validation queries from:
+```text
+data/food-search-benchmarks/
+data/food-search-benchmarks/secondary-token-conflicts/
+logs/agent-benchmarks/
+```
 
-- generic primary aliases
-- product aliases that collide with conflict tokens
-- tokens that appear as non-primary tokens in one row but as leading primary tokens in another row
+## Food Search Benchmark
 
-The validation gate is intentionally general. It must not contain ingredient-specific expected rows, token stoplists, exact query exceptions, or language shortcuts. It accepts:
+Default command:
 
-- normal primary aliases and names at the first position
-- generic USDA category-prefix rows where the first token is a simple alphabetic category-like entity and the searched single token is the second normalized base token, such as source shapes like `Fish Tuna` or `Cereals Oats`
+```bash
+bun --env-file=.env run benchmark:food-search
+```
 
-It rejects brand-shaped or product-line category-prefix boosts, such as first entities containing punctuation or symbols. This keeps restaurant/product-line USDA rows from outranking actual first-position product names.
+Default behavior:
 
-## Recorded Metrics
+- `--mode compare`
+- `--scope sample`
+- `--top-k 10`
+- `--iterations 5`
+- `--warmup 1`
+- `--repeat 1`
 
-- query, locale, mode, top-k, iterations
-- latency min/p50/p90/p99/max/average
-- top result and top-k rows
-- returned display name, raw name, brand, barcode, source, external source, data type
-- result type: `generic_food`, `product`, or `custom_food`
-- quality status and flags
-- source/result-type mix
-- duplicate display-name maximum and unique-display ratio
-- quarantined/ineligible counts
-- sample membership violations in normalized mode
-- optional MRR/nDCG when relevance grades are defined
+Supported flags:
 
-## Acceptance Gates
+| Flag | Meaning |
+| --- | --- |
+| `--mode legacy|normalized|compare` | Run legacy search, normalized search, or both. |
+| `--scope sample|full` | Use sample normalized docs or full normalized docs. |
+| `--case <id>` | Run one benchmark case. |
+| `--top-k <n>` | Number of returned rows to inspect. |
+| `--iterations <n>` | Measured iterations per case. |
+| `--warmup <n>` | Warmup iterations excluded from latency summaries. |
+| `--repeat <n>` | Repeat the selected run set. |
+| `--sample-set <name>` | Sample set for normalized sample scope. |
+| `--output-dir <path>` | Override report output directory. |
+| `--baseline-db-url <url>` | Compare against a separate baseline database URL. |
+| `--candidate-db-url <url>` | Compare against a separate candidate database URL. |
+| `--baseline-label <label>` | Label for baseline database reports. |
+| `--candidate-label <label>` | Label for candidate database reports. |
+| `--profile-sql` | Write `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)` SQL profiles for selected normalized queries. |
+| `--profile-top-n <n>` | Number of slow/important normalized queries to profile. |
+| `--report-only` | Write reports without failing the process on failed acceptance checks. |
 
-- Normalized mode must return no quarantined or ineligible rows.
-- Normalized mode must return no rows outside `normalized_search_v1`.
-- Normalized top 10 must not be flooded by duplicate display names:
-  - max duplicate display-name count <= 2
-  - unique display-name ratio >= 0.8
-- Broad generic ingredient cases with sampled generic coverage must have a `generic_food` row in top 3.
-- Broad generic ingredient cases with enough sampled generic base-name coverage must have at least as many generic rows as product rows in top 10. Generic coverage is counted from normalized `base_name`, not incidental matches in ingredients/category/search text. If fewer than half of top-k sampled generic base-name matches exist, all available matches must appear before the product-domination gate is considered satisfied.
-- Brand-intent cases must allow product rows to beat generic rows:
-  - `arroz goya` must return `Arroz - Goya` at rank 1.
-- Barcode case must return the exact barcode match at rank 1.
-- The known bad zero-calorie OpenFoodFacts rice row must never appear.
-- Normalized p50 and p90 latency must be at least 25% faster than legacy overall.
+Useful examples:
 
-## Continuous Validation Loop
+```bash
+# Compare legacy vs normalized sample search locally.
+bun --env-file=.env run benchmark:food-search -- --mode compare --scope sample
 
-1. Run `bun --env-file=.env run validate:food-search-primary`.
-2. If it fails, inspect the generated report and classify failures by generic behavior class.
-3. Apply only generic runtime or validator fixes. Do not add exact ingredient/query fixes, stopword lists, hardcoded normalization, or exact token exceptions.
-4. Run `bun --env-file=.env run benchmark:food-search -- --mode compare`.
-5. Fix failed quality gates before speed.
-6. Optimize slow normalized queries through generic search changes only.
-7. Rerun both scripts after every change.
-8. Stop when gates pass or the remaining optimization would require a product/data-quality decision.
+# Validate full normalized search after full backfill.
+bun --env-file=.env run benchmark:food-search -- --mode normalized --scope full --profile-sql
 
-Forbidden runtime fixes:
+# Focus one known brand-intent case.
+bun --env-file=.env run benchmark:food-search -- --mode normalized --scope full --case arroz-goya
 
-- `if query === "rice"` or equivalent query-specific code.
-- ingredient-specific repository boosts.
-- regex-based food intent parsing.
-- deterministic ingredient inference in meal proposal/search flows.
+# Compare two database URLs, for example pro-like baseline vs normalized dev clone.
+bun --env-file=.env run benchmark:food-search -- \
+  --scope full \
+  --baseline-db-url "$BASELINE_DATABASE_URL" \
+  --candidate-db-url "$CANDIDATE_DATABASE_URL" \
+  --baseline-label pro-legacy \
+  --candidate-label dev-normalized \
+  --profile-sql
+```
 
-## Verification
+The benchmark records:
 
-- Add unit tests for benchmark helper functions:
-  - percentile calculation
-  - duplicate display-name flood detection
-  - source/result-type aggregation
-  - acceptance gate evaluation
-  - MRR/nDCG calculation with synthetic graded relevance
-- Run:
-  - `bun run typecheck`
-  - `bun run test`
-  - `bun --env-file=.env run validate:food-search-primary`
-  - `bun --env-file=.env run benchmark:food-search -- --mode compare`
-  - `bun --env-file=.env run benchmark:food-search -- --mode normalized --case arroz-goya`
-  - `git diff --check`
+- query, locale, mode, scope, top-k, iterations, and target database label;
+- latency min/p50/p90/p99/max/average;
+- top result and full top-k rows;
+- raw and normalized display fields, source, external source, data type, brand, and barcode;
+- result type mix: `generic_food`, `product`, `custom_food`;
+- quality status and quality flags;
+- duplicate display-name flooding;
+- quarantined/ineligible rows;
+- normalized sample membership violations when scope is `sample`;
+- SQL profile files when `--profile-sql` is enabled.
+
+Acceptance gates include:
+
+- no quarantined or ineligible rows in normalized results;
+- no sample membership violations in sample scope;
+- no duplicate display-name flooding;
+- generic ingredient cases return generic rows near the top when generic coverage exists;
+- brand-intent cases can rank products above generic foods;
+- barcode cases return exact barcode matches;
+- known invalid zero-calorie rice rows do not appear;
+- normalized search must be materially faster or quality-improved against legacy for the measured set.
+
+## Primary-Position Validation
+
+Run this after any ranking, normalization, or search-index change:
+
+```bash
+bun --env-file=.env run validate:food-search-primary
+```
+
+Default behavior:
+
+- `--scope sample`
+- `--sample-set normalized_search_v1`
+- `--top-k 10`
+- no mutation of review rows
+
+Supported flags:
+
+| Flag | Meaning |
+| --- | --- |
+| `--scope sample|full` | Validate sample or full normalized docs. |
+| `--sample-set <name>` | Sample set for sample scope. |
+| `--top-k <n>` | Number of returned rows to inspect. |
+| `--output-dir <path>` | Override report output directory. |
+| `--query <text>` | Validate one generated or manual query. |
+| `--max-queries <n>` | Limit generated validation queries. |
+| `--include-all-products` | Include product-heavy conflicts that are normally reduced for signal. |
+| `--mark-review-issues` | Mutate `food_normalization_review` with discovered review issues. |
+| `--report-only` | Write reports without failing the process on failed validation. |
+
+`--mark-review-issues` is intentionally mutating. Do not use it during normal benchmarking unless the objective is to update review rows.
+
+The validator generates general query cases from normalized documents. It does not encode expected ingredient names or exact rows. It checks that rows whose normalized primary identity starts with the query token are not consistently outranked by rows where that token is secondary, embedded later in the name, or product-line noise.
+
+Useful examples:
+
+```bash
+# Exhaustive sample validation.
+bun --env-file=.env run validate:food-search-primary
+
+# Full-scope validation after full apply.
+bun --env-file=.env run validate:food-search-primary -- --scope full
+
+# Inspect one query without failing the process.
+bun --env-file=.env run validate:food-search-primary -- --scope full --query "butter" --report-only
+```
+
+## Agent Food Benchmark
+
+`benchmark:agent-foods` exercises agent/tool flows rather than only repository search. It is useful when a change might affect the route from user prompt to tool call, food resolution, or result kind.
+
+Default output is under `logs/agent-benchmarks/`.
+
+Use it after changes to:
+
+- food-related tool schemas;
+- agent prompt/tool orchestration;
+- meal proposal ingredient resolution;
+- correction flows that call food search;
+- nutrition search actions exposed through the agent.
+
+## Validation Loop
+
+Use this loop for future normalized search changes:
+
+1. Run `validate:food-search-primary`.
+2. Classify failures by generic behavior class.
+3. Fix data quality, normalization, indexing, or ranking generically.
+4. Run `benchmark:food-search -- --mode compare --scope full --profile-sql`.
+5. Inspect failed gates before optimizing latency.
+6. Use SQL profile JSON to identify query/index bottlenecks.
+7. Rerun validation and benchmark after every search change.
+
+Do not accept a speed improvement that reintroduces invalid rows, duplicate flooding, or query-specific overfitting.

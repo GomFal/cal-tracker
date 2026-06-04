@@ -14,6 +14,9 @@ Current authoritative files:
 | `db-vector-architecture.md` | PostgreSQL/pgvector architecture, tables, field requirements, vector retrieval, migrations, local/production DB deployment, backup/restore rules. | Product UX, action semantics beyond DB effects, Flutter UI architecture. |
 | `voice-agent-gap-analysis.md` | Current implementation gaps for voice input, STT, OpenRouter agent orchestration, and the technical slices needed to align the code with the MVP plan. | General product scope, database table ownership, production deployment. |
 | `spec-usual-foods-flow.md` | Task specification for usual ingredients inside the usual meals area, including manual CRUD, AI-assisted drafts, search priority, backend contracts, Flutter UI, and tests. | General nutrition source strategy outside usual foods, unrelated dashboard or onboarding UX. |
+| `food-data-quality-cleanse-findings.md` | Food corpus quality findings, search eligibility meaning, invalid nutrition/duplicate/suspicious row slices, and operational use of `food-quality`. | Runtime ranking strategy, normalized search query plans. |
+| `food-data-quality-normalized-search-plan.md` | Implemented PostgreSQL normalized food search runbook: quality/normalization tables, scripts, env flags, rollout sequence, and runtime search behavior. | General product nutrition-source priority outside normalized PostgreSQL search. |
+| `food-search-benchmark-acceptance-plan.md` | Reusable food search benchmark and primary-position validation commands, metrics, acceptance gates, and profiling workflow. | Data normalization rules and production rollout sequencing. |
 
 This split is intentional:
 
@@ -50,6 +53,11 @@ Task-specific reading:
 | Vector memory/retrieval | `db-vector-architecture.md` -> Retrieval Flow, User-Scoped Vector Query, Retrieval Ranking, Memory Creation and Update Rules |
 | Production deployment | `db-vector-architecture.md` -> Production Deployment, Backup and Restore |
 | Auth/session storage | `app-description.md` -> Authentication decision; `db-vector-architecture.md` -> users, user_credentials, auth_sessions, password_reset_tokens |
+| Food data quality cleanup | `food-data-quality-cleanse-findings.md`; then `food-data-quality-normalized-search-plan.md` -> Operational Commands |
+| Normalized PostgreSQL food search | `food-data-quality-normalized-search-plan.md`; then `db-vector-architecture.md` if migrations or schema ownership are touched |
+| Food search ranking or index optimization | `food-data-quality-normalized-search-plan.md` -> Runtime Search Behavior; then `food-search-benchmark-acceptance-plan.md` |
+| Food search benchmark or acceptance validation | `food-search-benchmark-acceptance-plan.md` |
+| Meal proposal food-resolution regressions | `food-search-benchmark-acceptance-plan.md`; then `app-description.md` -> Canonical Action Layer |
 
 ## Authority and Conflict Rules
 

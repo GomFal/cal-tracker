@@ -12,6 +12,7 @@ import '../../../core/content_frame.dart';
 import '../../../core/design_system.dart';
 import '../../../core/user_visible_error.dart';
 import '../../../core/voice_action_button.dart';
+import '../../../shared/food_search_panel.dart';
 import '../view_models/meal_templates_view_model.dart';
 
 class MealTemplateEditorScreen extends StatefulWidget {
@@ -773,8 +774,11 @@ class _TemplateItemsSectionState extends State<_TemplateItemsSection> {
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 160),
           child: _searchExpanded
-              ? _FoodSearchPanel(
+              ? FoodSearchPanel(
                   key: const ValueKey('meal_template_food_search_panel'),
+                  keyPrefix: 'meal_template_food_search',
+                  searchFoods:
+                      context.read<MealTemplatesViewModel>().searchFoods,
                   onSelected: (item) {
                     widget.onAddFood(item);
                     setState(() => _searchExpanded = false);
@@ -810,126 +814,6 @@ class _TemplateItemsSectionState extends State<_TemplateItemsSection> {
         ),
       ],
     );
-  }
-}
-
-class _FoodSearchPanel extends StatefulWidget {
-  const _FoodSearchPanel({
-    super.key,
-    required this.onSelected,
-    required this.onClose,
-  });
-
-  final ValueChanged<MealItem> onSelected;
-  final VoidCallback onClose;
-
-  @override
-  State<_FoodSearchPanel> createState() => _FoodSearchPanelState();
-}
-
-class _FoodSearchPanelState extends State<_FoodSearchPanel> {
-  final _queryController = TextEditingController();
-  List<MealItem> _results = const [];
-  bool _isSearching = false;
-  String? _error;
-
-  @override
-  void dispose() {
-    _queryController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    return FreshCard(
-      padding: const EdgeInsets.all(14),
-      color: FreshColors.surfaceSoft,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          TextField(
-            key: const ValueKey('meal_template_food_search_field'),
-            controller: _queryController,
-            autofocus: true,
-            textInputAction: TextInputAction.search,
-            onSubmitted: (_) => _search(),
-            decoration: InputDecoration(
-              labelText: l10n.foodSearchHint,
-              suffixIcon: IconButton(
-                key: const ValueKey('meal_template_food_search_submit'),
-                onPressed: _isSearching ? null : _search,
-                icon: _isSearching
-                    ? const SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.search_rounded),
-              ),
-            ),
-          ),
-          if (_error != null) ...[
-            const SizedBox(height: FreshSpacing.sm),
-            Text(
-              _error!,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: FreshColors.coral),
-            ),
-          ],
-          if (_results.isNotEmpty) ...[
-            const SizedBox(height: FreshSpacing.md),
-            for (var index = 0; index < _results.length; index++)
-              ListTile(
-                key: ValueKey('meal_template_food_search_result_$index'),
-                contentPadding: EdgeInsets.zero,
-                onTap: () => widget.onSelected(_results[index]),
-                title: Text(_results[index].name),
-                subtitle: Text(_foodSubtitle(_results[index])),
-                trailing: FilledButton(
-                  onPressed: () => widget.onSelected(_results[index]),
-                  child: Text(l10n.foodSearchAddAction),
-                ),
-              ),
-          ],
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              key: const ValueKey('meal_template_food_search_close'),
-              onPressed: widget.onClose,
-              icon: const Icon(Icons.keyboard_arrow_up_rounded),
-              label: Text(l10n.foodSearchHideSearch),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _search() async {
-    final query = _queryController.text.trim();
-    if (query.isEmpty) return;
-    setState(() {
-      _isSearching = true;
-      _error = null;
-    });
-    try {
-      final result = await context.read<MealTemplatesViewModel>().searchFoods(
-            query,
-          );
-      if (!mounted) return;
-      setState(() {
-        _results = result.items;
-        _error = result.items.isEmpty ? context.l10n.foodSearchEmpty : null;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _error = context.l10n.foodSearchError);
-    } finally {
-      if (mounted) {
-        setState(() => _isSearching = false);
-      }
-    }
   }
 }
 
@@ -1381,14 +1265,6 @@ MealItem _candidateWithMentionQuantity(
     carbsGrams: _roundMacro(candidate.carbsGrams * factor),
     fatGrams: _roundMacro(candidate.fatGrams * factor),
   );
-}
-
-String _foodSubtitle(MealItem item) {
-  return '${_formatQuantity(item.quantity)} ${item.unit} · '
-      '${item.calories} Kcal · '
-      '${_formatQuantity(item.proteinGrams)}P · '
-      '${_formatQuantity(item.carbsGrams)}C · '
-      '${_formatQuantity(item.fatGrams)}F';
 }
 
 String _nutritionLabel(BuildContext context, NutritionSnapshot nutrition) {

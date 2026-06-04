@@ -6,16 +6,19 @@ import '../../domain/models/macro_distribution.dart';
 import '../../domain/models/nutrition_models.dart';
 import '../../l10n/app_localizations_context.dart';
 import '../core/design_system.dart';
+import 'food_search_panel.dart';
 
 class MealItemEditorSheet extends StatefulWidget {
   const MealItemEditorSheet({
     super.key,
     required this.meal,
     this.keyPrefix = 'meal',
+    this.searchFoods,
   });
 
   final Meal meal;
   final String keyPrefix;
+  final FoodSearchCallback? searchFoods;
 
   @override
   State<MealItemEditorSheet> createState() => _MealItemEditorSheetState();
@@ -23,6 +26,7 @@ class MealItemEditorSheet extends StatefulWidget {
 
 class _MealItemEditorSheetState extends State<MealItemEditorSheet> {
   late final List<_EditableMealItem> _items;
+  bool _addSearchExpanded = false;
   String? _error;
 
   @override
@@ -94,17 +98,65 @@ class _MealItemEditorSheetState extends State<MealItemEditorSheet> {
                 ),
               ),
               const SizedBox(height: FreshSpacing.sm),
+              if (widget.searchFoods != null) ...[
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 160),
+                  child: _addSearchExpanded
+                      ? FoodSearchPanel(
+                          key: ValueKey(
+                            '${widget.keyPrefix}_food_search_panel',
+                          ),
+                          keyPrefix: '${widget.keyPrefix}_food_search',
+                          searchFoods: widget.searchFoods!,
+                          onSelected: (item) {
+                            setState(() {
+                              _items.add(_EditableMealItem(item));
+                              _addSearchExpanded = false;
+                              _error = null;
+                            });
+                          },
+                          onClose: () {
+                            setState(() => _addSearchExpanded = false);
+                          },
+                        )
+                      : Align(
+                          key: ValueKey(
+                            '${widget.keyPrefix}_food_search_collapsed',
+                          ),
+                          alignment: Alignment.centerLeft,
+                          child: OutlinedButton.icon(
+                            key: ValueKey(
+                              '${widget.keyPrefix}_add_from_search_button',
+                            ),
+                            onPressed: () {
+                              setState(() => _addSearchExpanded = true);
+                            },
+                            icon: const Icon(Icons.search_rounded),
+                            label: Text(l10n.mealTemplateEditorAddFromSearch),
+                          ),
+                        ),
+                ),
+                const SizedBox(height: FreshSpacing.md),
+              ],
               for (var index = 0; index < _items.length; index++) ...[
                 _IngredientEditorCard(
                   key: ValueKey('${widget.keyPrefix}_item_card_$index'),
                   item: _items[index],
                   index: index,
                   keyPrefix: widget.keyPrefix,
+                  searchFoods: widget.searchFoods,
                   onChanged: () {
                     if (_error != null) {
                       _error = null;
                     }
                     setState(() {});
+                  },
+                  onReplace: (replacement) {
+                    setState(() {
+                      _items[index].dispose();
+                      _items[index] = _EditableMealItem(replacement);
+                      _error = null;
+                    });
                   },
                   onDelete: _items.length == 1
                       ? null
@@ -240,14 +292,18 @@ class _IngredientEditorCard extends StatelessWidget {
     required this.item,
     required this.index,
     required this.keyPrefix,
+    required this.searchFoods,
     required this.onChanged,
+    required this.onReplace,
     required this.onDelete,
   });
 
   final _EditableMealItem item;
   final int index;
   final String keyPrefix;
+  final FoodSearchCallback? searchFoods;
   final VoidCallback onChanged;
+  final ValueChanged<MealItem> onReplace;
   final VoidCallback? onDelete;
 
   @override
@@ -421,6 +477,17 @@ class _IngredientEditorCard extends StatelessWidget {
               message: l10n.mealEditorCaloriesMismatchMessage(macroCalories),
             ),
           ],
+          if (searchFoods != null) ...[
+            const SizedBox(height: FreshSpacing.sm),
+            _InlineReplacementFoodSearch(
+              key: ValueKey('${keyPrefix}_item_search_$index'),
+              index: index,
+              item: item,
+              keyPrefix: keyPrefix,
+              searchFoods: searchFoods!,
+              onSelected: onReplace,
+            ),
+          ],
           const SizedBox(height: FreshSpacing.sm),
           Row(
             children: [
@@ -462,6 +529,62 @@ class _IngredientEditorCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _InlineReplacementFoodSearch extends StatefulWidget {
+  const _InlineReplacementFoodSearch({
+    super.key,
+    required this.index,
+    required this.item,
+    required this.keyPrefix,
+    required this.searchFoods,
+    required this.onSelected,
+  });
+
+  final int index;
+  final _EditableMealItem item;
+  final String keyPrefix;
+  final FoodSearchCallback searchFoods;
+  final ValueChanged<MealItem> onSelected;
+
+  @override
+  State<_InlineReplacementFoodSearch> createState() =>
+      _InlineReplacementFoodSearchState();
+}
+
+class _InlineReplacementFoodSearchState
+    extends State<_InlineReplacementFoodSearch> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final searchKeyPrefix = '${widget.keyPrefix}_item_${widget.index}_search';
+    if (!_expanded) {
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          key: ValueKey('${searchKeyPrefix}_toggle'),
+          onPressed: () => setState(() => _expanded = true),
+          icon: const Icon(Icons.search_rounded, size: 18),
+          label: Text(context.l10n.foodSearchReplaceSearch),
+        ),
+      );
+    }
+
+    return FoodSearchPanel(
+      keyPrefix: searchKeyPrefix,
+      searchFoods: widget.searchFoods,
+      onSelected: (item) {
+        widget.onSelected(item);
+        setState(() => _expanded = false);
+      },
+      onClose: () => setState(() => _expanded = false),
+      actionLabel: context.l10n.foodSearchReplaceAction,
+      actionIcon: Icons.swap_horiz_rounded,
+      initialQuery: widget.item.nameController.text,
+      closeKeySuffix: 'collapse',
     );
   }
 }
@@ -905,7 +1028,9 @@ class _NutritionDetailsSheetState extends State<_NutritionDetailsSheet> {
 }
 
 class _EditableMealItem {
-  _EditableMealItem(MealItem item) : original = item, isNew = false {
+  _EditableMealItem(MealItem item)
+      : original = item,
+        isNew = false {
     nameController = TextEditingController(text: item.name);
     quantityController = TextEditingController(
       text: _formatQuantity(item.quantity),
@@ -914,17 +1039,17 @@ class _EditableMealItem {
   }
 
   _EditableMealItem.empty()
-    : original = const MealItem(
-        name: '',
-        quantity: 100,
-        unit: 'g',
-        calories: 0,
-        proteinGrams: 0,
-        carbsGrams: 0,
-        fatGrams: 0,
-        source: 'manual_edit',
-      ),
-      isNew = true {
+      : original = const MealItem(
+          name: '',
+          quantity: 100,
+          unit: 'g',
+          calories: 0,
+          proteinGrams: 0,
+          carbsGrams: 0,
+          fatGrams: 0,
+          source: 'manual_edit',
+        ),
+        isNew = true {
     nameController = TextEditingController();
     quantityController = TextEditingController(text: '100');
     unitController = TextEditingController(text: 'g');
@@ -962,8 +1087,7 @@ class _EditableMealItem {
     final override = _nutritionOverride;
     if (override != null) {
       final baseQuantity = _nutritionOverrideQuantity;
-      final factor =
-          baseQuantity != null &&
+      final factor = baseQuantity != null &&
               baseQuantity > 0 &&
               quantity != null &&
               quantity > 0
@@ -1032,12 +1156,12 @@ class _NutritionEdit {
   final double fatGrams;
 
   int get macroCalories => macroCaloriesFromGrams(
-    MacroGrams(
-      proteinGrams: proteinGrams,
-      carbsGrams: carbsGrams,
-      fatGrams: fatGrams,
-    ),
-  );
+        MacroGrams(
+          proteinGrams: proteinGrams,
+          carbsGrams: carbsGrams,
+          fatGrams: fatGrams,
+        ),
+      );
 
   bool get hasCalorieMismatch => (calories - macroCalories).abs() >= 5;
 
@@ -1091,10 +1215,10 @@ InputDecoration _macroInputDecoration(
 
 TextStyle _macroFieldStyle(BuildContext context, _MacroKind kind) {
   return Theme.of(context).textTheme.bodyLarge?.copyWith(
-        color: _macroColor(context, kind),
-        fontWeight: FontWeight.w700,
-        letterSpacing: 0,
-      ) ??
+            color: _macroColor(context, kind),
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0,
+          ) ??
       TextStyle(
         color: _macroColor(context, kind),
         fontWeight: FontWeight.w700,

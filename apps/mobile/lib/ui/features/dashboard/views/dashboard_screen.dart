@@ -105,6 +105,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       builder: (context) => MealItemEditorSheet(
         meal: meal,
         keyPrefix: 'dashboard',
+        searchFoods: viewModel.searchFoods,
       ),
     );
     if (!context.mounted || items == null) return;
@@ -169,9 +170,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (!context.mounted) return;
     if (!saved) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(context.l10n.calorieCouldNotSaveCalories),
-        ),
+        SnackBar(content: Text(context.l10n.calorieCouldNotSaveCalories)),
       );
       return;
     }
@@ -188,9 +187,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final shouldConfigure = await showModalBottomSheet<bool>(
           context: context,
           useSafeArea: true,
-          builder: (context) => PostCalorieSaveMacroPrompt(
-            calories: selection.calories,
-          ),
+          builder: (context) =>
+              PostCalorieSaveMacroPrompt(calories: selection.calories),
         ) ??
         false;
     if (!context.mounted || !shouldConfigure) return;
@@ -198,9 +196,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (context) => MacroDistributionSheet(
-        calories: selection.calories,
-      ),
+      builder: (context) =>
+          MacroDistributionSheet(calories: selection.calories),
     );
     if (!context.mounted || macroConfig == null) return;
     final macroSaved = await viewModel.updateCalorieTarget(
@@ -211,9 +208,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (!context.mounted) return;
     if (!macroSaved) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(context.l10n.calorieCouldNotSaveMacros),
-        ),
+        SnackBar(content: Text(context.l10n.calorieCouldNotSaveMacros)),
       );
       return;
     }
@@ -248,10 +243,7 @@ class _Avatar extends StatelessWidget {
 }
 
 class _DailyProgressCard extends StatelessWidget {
-  const _DailyProgressCard({
-    required this.summary,
-    required this.onSetup,
-  });
+  const _DailyProgressCard({required this.summary, required this.onSetup});
 
   final DailySummary? summary;
   final VoidCallback onSetup;
@@ -474,8 +466,9 @@ class _CalorieSetupProgressCard extends StatelessWidget {
                                   vertical: 5,
                                 ),
                                 decoration: BoxDecoration(
-                                  color:
-                                      palette.limeWash.withValues(alpha: 0.86),
+                                  color: palette.limeWash.withValues(
+                                    alpha: 0.86,
+                                  ),
                                   borderRadius: BorderRadius.circular(18),
                                 ),
                                 child: Text(
@@ -909,10 +902,7 @@ class _MealSection extends StatelessWidget {
 }
 
 class _DashboardEmptyMealsCard extends StatelessWidget {
-  const _DashboardEmptyMealsCard({
-    required this.title,
-    required this.message,
-  });
+  const _DashboardEmptyMealsCard({required this.title, required this.message});
 
   final String title;
   final String message;
@@ -1003,8 +993,9 @@ class _MealRow extends StatelessWidget {
                 Text(meal.title, style: textTheme.titleMedium),
                 Text(
                   l10n.caloriesValue(meal.nutrition.calories),
-                  style:
-                      textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: palette.inkMuted,
+                  ),
                 ),
               ],
             ),

@@ -279,6 +279,150 @@ void main() {
     expect(find.text('Breakfast'), findsOneWidget);
   });
 
+  testWidgets('dashboard meal editor adds an ingredient from food search', (
+    tester,
+  ) async {
+    final nutritionRepository = _FakeNutritionRepository(
+      dailySummary: _summaryWithMeal,
+      searchItems: [_publicRice],
+    );
+    final authViewModel = AuthViewModel(authRepository: _FakeAuthRepository())
+      ..setUser(_testUser);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<AuthViewModel>.value(value: authViewModel),
+          ChangeNotifierProvider(
+            create: (_) => ThemeModeViewModel(
+              preferencesRepository: _FakePreferencesRepository(),
+            ),
+          ),
+          ChangeNotifierProvider(
+            create: (_) =>
+                DashboardViewModel(nutritionRepository: nutritionRepository),
+          ),
+        ],
+        child: _testApp(const DashboardScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('dashboard_edit_meal_meal-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find
+          .byKey(const ValueKey('dashboard_add_from_search_button'))
+          .hitTestable(),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('dashboard_food_search_field')),
+      'rice',
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('dashboard_food_search_submit')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find
+          .byKey(const ValueKey('dashboard_food_search_result_0'))
+          .hitTestable(),
+    );
+    await tester.pumpAndSettle();
+
+    final addedNameField = tester.widget<TextField>(
+      find.byKey(const ValueKey('dashboard_item_name_1')),
+    );
+    expect(addedNameField.controller!.text, 'Public rice');
+    expect(nutritionRepository.searchQueries, ['rice']);
+    expect(nutritionRepository.lastCorrectedItems, isNull);
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('save_dashboard_item_edits_button')),
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('save_dashboard_item_edits_button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(nutritionRepository.lastCorrectedItems, hasLength(2));
+    expect(nutritionRepository.lastCorrectedItems!.last.name, 'Public rice');
+    expect(nutritionRepository.lastCorrectedItems!.last.externalId, 'rice');
+  });
+
+  testWidgets('dashboard meal editor replaces an ingredient from food search', (
+    tester,
+  ) async {
+    final nutritionRepository = _FakeNutritionRepository(
+      dailySummary: _summaryWithMeal,
+      searchItems: [_publicBread],
+    );
+    final authViewModel = AuthViewModel(authRepository: _FakeAuthRepository())
+      ..setUser(_testUser);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<AuthViewModel>.value(value: authViewModel),
+          ChangeNotifierProvider(
+            create: (_) => ThemeModeViewModel(
+              preferencesRepository: _FakePreferencesRepository(),
+            ),
+          ),
+          ChangeNotifierProvider(
+            create: (_) =>
+                DashboardViewModel(nutritionRepository: nutritionRepository),
+          ),
+        ],
+        child: _testApp(const DashboardScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('dashboard_edit_meal_meal-1')));
+    await tester.pumpAndSettle();
+    final searchToggle = find.byKey(
+      const ValueKey('dashboard_item_0_search_toggle'),
+    );
+    await tester.ensureVisible(searchToggle);
+    await tester.tap(searchToggle.hitTestable());
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('dashboard_item_0_search_field')),
+      'bread',
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('dashboard_item_0_search_submit')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find
+          .byKey(const ValueKey('dashboard_item_0_search_result_0'))
+          .hitTestable(),
+    );
+    await tester.pumpAndSettle();
+
+    final replacedNameField = tester.widget<TextField>(
+      find.byKey(const ValueKey('dashboard_item_name_0')),
+    );
+    expect(replacedNameField.controller!.text, 'Bread');
+    expect(nutritionRepository.lastCorrectedItems, isNull);
+
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('save_dashboard_item_edits_button')),
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('save_dashboard_item_edits_button')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(nutritionRepository.lastCorrectedItems, hasLength(1));
+    expect(nutritionRepository.lastCorrectedItems!.single.name, 'Bread');
+    expect(nutritionRepository.lastCorrectedItems!.single.calories, 265);
+    expect(nutritionRepository.lastCorrectedItems!.single.externalId, 'bread');
+  });
+
   testWidgets('dashboard meal cards delete after confirmation', (tester) async {
     final nutritionRepository = _FakeNutritionRepository(
       dailySummary: _summaryWithMeal,
@@ -490,18 +634,25 @@ class _FakeNutritionRepository extends NutritionRepository {
     DailySummary? dailySummary,
     List<Meal>? mealHistory,
     List<Completer<DailySummary>>? hydrationUpdateCompleters,
+    List<MealItem> searchItems = const [],
+    Object? searchError,
   })  : _dailySummary = dailySummary ?? _summaryWithNoMeals,
         _mealHistory = mealHistory ?? const [],
         _hydrationUpdateCompleters =
             hydrationUpdateCompleters ?? <Completer<DailySummary>>[],
+        _searchItems = searchItems,
+        _searchError = searchError,
         super(apiClient: _unusedApiClient());
 
   DailySummary _dailySummary;
   final List<Meal> _mealHistory;
   final List<Completer<DailySummary>> _hydrationUpdateCompleters;
+  final List<MealItem> _searchItems;
+  final Object? _searchError;
   List<MealItem>? lastCorrectedItems;
   final List<String> deletedMealIds = [];
   final List<double> hydrationUpdateRequests = [];
+  final List<String> searchQueries = [];
   int? updatedCalories;
   String? updateSource;
 
@@ -510,6 +661,20 @@ class _FakeNutritionRepository extends NutritionRepository {
 
   @override
   Future<List<Meal>> getMealHistory() async => _mealHistory;
+
+  @override
+  Future<FoodSearchResult> searchFoods(
+    String query, {
+    int limit = 10,
+    String? barcode,
+  }) async {
+    searchQueries.add(query);
+    final error = _searchError;
+    if (error != null) {
+      throw error;
+    }
+    return FoodSearchResult(items: _searchItems.take(limit).toList());
+  }
 
   @override
   Future<DailyGoals> updateDailyGoals({
@@ -849,6 +1014,32 @@ final _summaryWithMeal = DailySummary(
   calorieTargetConfigured: true,
   calorieTargetSource: 'manual',
   meals: [_testMeal],
+);
+
+const _publicRice = MealItem(
+  name: 'Public rice',
+  quantity: 100,
+  unit: 'g',
+  calories: 130,
+  proteinGrams: 2.7,
+  carbsGrams: 28,
+  fatGrams: 0.3,
+  source: 'public_food_search',
+  externalSource: 'test_food_db',
+  externalId: 'rice',
+);
+
+const _publicBread = MealItem(
+  name: 'Bread',
+  quantity: 100,
+  unit: 'g',
+  calories: 265,
+  proteinGrams: 9,
+  carbsGrams: 49,
+  fatGrams: 3.2,
+  source: 'public_food_search',
+  externalSource: 'test_food_db',
+  externalId: 'bread',
 );
 
 NutritionSnapshot _sumNutrition(List<MealItem> items) {

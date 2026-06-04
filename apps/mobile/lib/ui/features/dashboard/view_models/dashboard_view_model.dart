@@ -90,6 +90,10 @@ class DashboardViewModel extends ChangeNotifier {
     }
   }
 
+  Future<FoodSearchResult> searchFoods(String query, {int limit = 10}) {
+    return _nutritionRepository.searchFoods(query, limit: limit);
+  }
+
   Future<bool> deleteMeal(Meal meal) async {
     _isLoading = true;
     notifyListeners();

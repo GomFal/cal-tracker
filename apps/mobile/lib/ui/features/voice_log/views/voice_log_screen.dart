@@ -11,6 +11,7 @@ import '../../../core/content_frame.dart';
 import '../../../core/design_system.dart';
 import '../../../core/voice_action_button.dart';
 import '../view_models/voice_log_view_model.dart';
+import '../../../shared/nutrition_edit_components.dart';
 
 class MealCreateScreen extends StatefulWidget {
   const MealCreateScreen({super.key, this.initialItems = const []});
@@ -554,7 +555,19 @@ class _ManualDraftIngredientRow extends StatelessWidget {
             ),
           ],
           const SizedBox(height: FreshSpacing.xs),
-          _MacroSummaryText(nutrition: nutrition),
+          NutritionMacroSummaryText(
+            nutrition: nutrition,
+            baseStyle: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: context.freshPalette.inkMuted,
+              letterSpacing: 0,
+            ),
+            overflow: TextOverflow.ellipsis,
+            macroColors: {
+              NutritionMacroKind.protein: context.freshPalette.coral,
+              NutritionMacroKind.carbs: context.freshPalette.orange,
+              NutritionMacroKind.fat: context.freshPalette.leaf,
+            },
+          ),
           const SizedBox(height: FreshSpacing.xs),
           Align(
             alignment: Alignment.centerLeft,
@@ -567,7 +580,7 @@ class _ManualDraftIngredientRow extends StatelessWidget {
           ),
           if (hasWarning) ...[
             const SizedBox(height: FreshSpacing.sm),
-            _MacroWarningBanner(
+            NutritionMacroWarningBanner(
               key: ValueKey('manual_food_item_macro_warning_$index'),
               title: context.l10n.mealEditorCaloriesMismatchTitle,
               message: context.l10n.mealEditorCaloriesMismatchMessage(
@@ -1354,7 +1367,7 @@ class _CandidateMealLine extends StatelessWidget {
     if (portion != null && portion.isNotEmpty) {
       parts.add(portion);
     } else if (candidate.resolvedGrams != null) {
-      parts.add('${_formatQuantity(candidate.resolvedGrams!)} g');
+      parts.add('${formatQuantity(candidate.resolvedGrams!)} g');
     }
     final license = candidate.license;
     if (license != null && license.isNotEmpty) parts.add(license);
@@ -1377,7 +1390,7 @@ class _PortionChoiceChip extends StatelessWidget {
     final grams = choice.totalGrams ?? choice.gramWeight;
     final label = grams == null
         ? choice.label
-        : '${choice.label} (${_formatQuantity(grams)} g)';
+        : '${choice.label} (${formatQuantity(grams)} g)';
     final canSelect = choice.actionText?.isNotEmpty ?? false;
     return ActionChip(
       label: Text(label),
@@ -1636,7 +1649,7 @@ class _NutritionItemsCard extends StatelessWidget {
           for (final item in items)
             _MealLine(
               title: item.name,
-              subtitle: '${_formatQuantity(item.quantity)} ${item.unit}',
+              subtitle: '${formatQuantity(item.quantity)} ${item.unit}',
               calories: item.calories,
             ),
         ],
@@ -1698,7 +1711,7 @@ class _RemainingCard extends StatelessWidget {
               Expanded(
                 child: _MetricBlock(
                   label: 'Protein',
-                  value: _formatQuantity(remaining.proteinGrams),
+                  value: formatQuantity(remaining.proteinGrams),
                   unit: 'g',
                   color: palette.orange,
                 ),
@@ -1908,7 +1921,7 @@ class _ProposalCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: Text(
-                '${_mealItemDisplayName(item)} ${_formatQuantity(item.quantity)} ${item.unit}',
+                '${_mealItemDisplayName(item)} ${formatQuantity(item.quantity)} ${item.unit}',
                 style: textTheme.bodyMedium,
               ),
             ),
@@ -2235,7 +2248,19 @@ class _EditableIngredientRow extends StatelessWidget {
             ),
           ],
           const SizedBox(height: FreshSpacing.sm),
-          _MacroSummaryText(nutrition: nutrition),
+          NutritionMacroSummaryText(
+            nutrition: nutrition,
+            baseStyle: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: context.freshPalette.inkMuted,
+              letterSpacing: 0,
+            ),
+            overflow: TextOverflow.ellipsis,
+            macroColors: {
+              NutritionMacroKind.protein: context.freshPalette.coral,
+              NutritionMacroKind.carbs: context.freshPalette.orange,
+              NutritionMacroKind.fat: context.freshPalette.leaf,
+            },
+          ),
           const SizedBox(height: FreshSpacing.xs),
           Align(
             alignment: Alignment.centerLeft,
@@ -2248,7 +2273,7 @@ class _EditableIngredientRow extends StatelessWidget {
           ),
           if (hasWarning) ...[
             const SizedBox(height: FreshSpacing.sm),
-            _MacroWarningBanner(
+            NutritionMacroWarningBanner(
               key: ValueKey('proposal_item_macro_warning_$index'),
               title: context.l10n.mealEditorCaloriesMismatchTitle,
               message: context.l10n.mealEditorCaloriesMismatchMessage(
@@ -2374,156 +2399,6 @@ class _NutritionEditorSheet extends StatefulWidget {
   State<_NutritionEditorSheet> createState() => _NutritionEditorSheetState();
 }
 
-enum _MacroKind { protein, carbs, fat }
-
-class _MacroSummaryText extends StatelessWidget {
-  const _MacroSummaryText({required this.nutrition});
-
-  final NutritionEdit? nutrition;
-
-  @override
-  Widget build(BuildContext context) {
-    final value = nutrition;
-    if (value == null) {
-      return const SizedBox.shrink();
-    }
-    final l10n = context.l10n;
-    final textTheme = Theme.of(context).textTheme;
-    final baseStyle = textTheme.labelMedium?.copyWith(
-      color: context.freshPalette.inkMuted,
-      letterSpacing: 0,
-    );
-    return RichText(
-      overflow: TextOverflow.ellipsis,
-      text: TextSpan(
-        style: baseStyle,
-        children: [
-          _macroSpan(
-            context,
-            kind: _MacroKind.protein,
-            text: '${l10n.commonProtein} ${_formatMacro(value.proteinGrams)}g',
-          ),
-          const TextSpan(text: ' · '),
-          _macroSpan(
-            context,
-            kind: _MacroKind.carbs,
-            text: '${l10n.commonCarbs} ${_formatMacro(value.carbsGrams)}g',
-          ),
-          const TextSpan(text: ' · '),
-          _macroSpan(
-            context,
-            kind: _MacroKind.fat,
-            text: '${l10n.commonFat} ${_formatMacro(value.fatGrams)}g',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MacroWarningBanner extends StatelessWidget {
-  const _MacroWarningBanner({
-    super.key,
-    required this.title,
-    required this.message,
-  });
-
-  final String title;
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final palette = context.freshPalette;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: palette.coral.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(FreshRadii.lg),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          children: [
-            FreshIconChip(
-              icon: Icons.info_outline_rounded,
-              color: palette.coral,
-              backgroundColor: palette.coral.withValues(alpha: 0.14),
-            ),
-            const SizedBox(width: FreshSpacing.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: FreshSpacing.xs),
-                  Text(
-                    message,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: palette.inkSoft,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CalorieSuggestionSuffix extends StatelessWidget {
-  const _CalorieSuggestionSuffix({
-    super.key,
-    required this.calories,
-    required this.onApply,
-  });
-
-  final int calories;
-  final VoidCallback onApply;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.freshPalette;
-    final textTheme = Theme.of(context).textTheme;
-    return Padding(
-      padding: const EdgeInsets.only(right: 6),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            context.l10n.caloriesValue(calories),
-            style: textTheme.labelMedium?.copyWith(
-              color: palette.inkMuted,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(width: FreshSpacing.xs),
-          TextButton(
-            onPressed: onApply,
-            style: TextButton.styleFrom(
-              minimumSize: const Size(0, 30),
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              foregroundColor: palette.ink,
-              backgroundColor: palette.lime,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-            child: Text(context.l10n.mealEditorApplySuggestion),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _NutritionEditorSheetState extends State<_NutritionEditorSheet> {
   late final TextEditingController _caloriesController;
   late final TextEditingController _proteinController;
@@ -2539,13 +2414,13 @@ class _NutritionEditorSheetState extends State<_NutritionEditorSheet> {
       text: nutrition.calories.toString(),
     );
     _proteinController = TextEditingController(
-      text: _formatMacro(nutrition.proteinGrams),
+      text: formatMacro(nutrition.proteinGrams),
     );
     _carbsController = TextEditingController(
-      text: _formatMacro(nutrition.carbsGrams),
+      text: formatMacro(nutrition.carbsGrams),
     );
     _fatController = TextEditingController(
-      text: _formatMacro(nutrition.fatGrams),
+      text: formatMacro(nutrition.fatGrams),
     );
   }
 
@@ -2614,7 +2489,7 @@ class _NutritionEditorSheetState extends State<_NutritionEditorSheet> {
               decoration: InputDecoration(
                 labelText: context.l10n.commonCalories,
                 suffixIcon: showSuggestion
-                    ? _CalorieSuggestionSuffix(
+                    ? NutritionCalorieSuggestionSuffix(
                         key: ValueKey(
                           '${widget.keyPrefix}_nutrition_apply_suggestion_${widget.index}',
                         ),
@@ -2641,10 +2516,9 @@ class _NutritionEditorSheetState extends State<_NutritionEditorSheet> {
                       decimal: true,
                     ),
                     onChanged: (_) => setState(() {}),
-                    decoration: _macroInputDecoration(
-                      context,
+                    decoration: macroInputDecoration(
                       label: context.l10n.commonProtein,
-                      color: _macroColor(context, _MacroKind.protein),
+                      color: context.freshPalette.coral,
                     ),
                   ),
                 ),
@@ -2659,10 +2533,9 @@ class _NutritionEditorSheetState extends State<_NutritionEditorSheet> {
                       decimal: true,
                     ),
                     onChanged: (_) => setState(() {}),
-                    decoration: _macroInputDecoration(
-                      context,
+                    decoration: macroInputDecoration(
                       label: context.l10n.commonCarbs,
-                      color: _macroColor(context, _MacroKind.carbs),
+                      color: context.freshPalette.orange,
                     ),
                   ),
                 ),
@@ -2677,10 +2550,9 @@ class _NutritionEditorSheetState extends State<_NutritionEditorSheet> {
                       decimal: true,
                     ),
                     onChanged: (_) => setState(() {}),
-                    decoration: _macroInputDecoration(
-                      context,
+                    decoration: macroInputDecoration(
                       label: context.l10n.commonFat,
-                      color: _macroColor(context, _MacroKind.fat),
+                      color: context.freshPalette.leaf,
                     ),
                   ),
                 ),
@@ -2778,7 +2650,7 @@ MealItem _candidateWithQuantity(
   required double quantity,
   required String unit,
 }) {
-  if (_normalizedText(candidate.unit) != _normalizedText(unit) ||
+  if (normalizedText(candidate.unit) != normalizedText(unit) ||
       candidate.quantity <= 0 ||
       quantity <= 0) {
     return candidate;
@@ -2795,57 +2667,22 @@ MealItem _candidateWithQuantity(
 }
 
 String _foodSearchItemSubtitle(MealItem item) {
-  return '${_formatQuantity(item.quantity)} ${item.unit} · '
+  return '${formatQuantity(item.quantity)} ${item.unit} · '
       '${_nutritionLabel(NutritionEdit(calories: item.calories, proteinGrams: item.proteinGrams, carbsGrams: item.carbsGrams, fatGrams: item.fatGrams))}';
 }
 
 String _nutritionLabel(NutritionEdit nutrition) {
   return '${nutrition.calories} Kcal · '
-      '${_formatMacro(nutrition.proteinGrams)}P · '
-      '${_formatMacro(nutrition.carbsGrams)}C · '
-      '${_formatMacro(nutrition.fatGrams)}F';
-}
-
-InputDecoration _macroInputDecoration(
-  BuildContext context, {
-  required String label,
-  required Color color,
-}) {
-  return InputDecoration(
-    labelText: label,
-    labelStyle: TextStyle(color: color, fontWeight: FontWeight.w700),
-    floatingLabelStyle: TextStyle(color: color, fontWeight: FontWeight.w800),
-  );
-}
-
-Color _macroColor(BuildContext context, _MacroKind kind) {
-  final palette = context.freshPalette;
-  return switch (kind) {
-    _MacroKind.protein => palette.coral,
-    _MacroKind.carbs => palette.orange,
-    _MacroKind.fat => palette.leaf,
-  };
-}
-
-TextSpan _macroSpan(
-  BuildContext context, {
-  required _MacroKind kind,
-  required String text,
-}) {
-  return TextSpan(
-    text: text,
-    style: TextStyle(
-      color: _macroColor(context, kind),
-      fontWeight: FontWeight.w700,
-    ),
-  );
+      '${formatMacro(nutrition.proteinGrams)}P · '
+      '${formatMacro(nutrition.carbsGrams)}C · '
+      '${formatMacro(nutrition.fatGrams)}F';
 }
 
 class _EditableMealItem {
   _EditableMealItem(MealItem item) : original = item {
     nameController = TextEditingController(text: item.name);
     quantityController = TextEditingController(
-      text: _formatQuantity(item.quantity),
+      text: formatQuantity(item.quantity),
     );
     unitController = TextEditingController(text: item.unit);
   }
@@ -2873,13 +2710,13 @@ class _EditableMealItem {
   late final TextEditingController quantityController;
   late final TextEditingController unitController;
 
-  bool get isGramUnit => _normalizedText(unitController.text) == 'g';
+  bool get isGramUnit => normalizedText(unitController.text) == 'g';
 
   void replaceWith(MealItem item) {
     original = item;
     _nutritionOverride = null;
     nameController.text = item.name;
-    quantityController.text = _formatQuantity(item.quantity);
+    quantityController.text = formatQuantity(item.quantity);
     unitController.text = item.unit;
   }
 
@@ -2897,7 +2734,7 @@ class _EditableMealItem {
   }
 
   void setQuantity(double value) {
-    quantityController.text = _formatQuantity(value);
+    quantityController.text = formatQuantity(value);
   }
 
   NutritionEdit currentNutrition() {
@@ -2986,16 +2823,14 @@ bool _mealItemsMateriallyEqual(MealItem a, MealItem b) {
       (a.externalId != b.externalId || a.externalSource != b.externalSource)) {
     return false;
   }
-  return _normalizedText(a.name) == _normalizedText(b.name) &&
-      _normalizedText(a.unit) == _normalizedText(b.unit) &&
+  return normalizedText(a.name) == normalizedText(b.name) &&
+      normalizedText(a.unit) == normalizedText(b.unit) &&
       _sameNumber(a.quantity, b.quantity) &&
       a.calories == b.calories &&
       _sameNumber(a.proteinGrams, b.proteinGrams) &&
       _sameNumber(a.carbsGrams, b.carbsGrams) &&
       _sameNumber(a.fatGrams, b.fatGrams);
 }
-
-String _normalizedText(String value) => value.trim().toLowerCase();
 
 bool _sameNumber(double a, double b) => (a - b).abs() < 0.05;
 
@@ -3102,18 +2937,8 @@ class _MealLine extends StatelessWidget {
   }
 }
 
-String _formatQuantity(double value) {
-  if (value == value.roundToDouble()) return value.toInt().toString();
-  return value.toStringAsFixed(1);
-}
-
 String _mealItemDisplayName(MealItem item) =>
     item.canonicalName?.isNotEmpty == true ? item.canonicalName! : item.name;
-
-String _formatMacro(double value) {
-  if (value == value.roundToDouble()) return value.toInt().toString();
-  return value.toStringAsFixed(1);
-}
 
 String _stateLabel(VoiceLogState state) {
   return switch (state) {

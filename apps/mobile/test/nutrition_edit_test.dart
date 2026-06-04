@@ -3,18 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('NutritionEdit.hasCalorieMismatch', () {
-    test('delta 49 returns false (within tolerance)', () {
-      const edit = NutritionEdit(
-        calories: 649,
-        proteinGrams: 50,
-        carbsGrams: 50,
-        fatGrams: 50,
-      );
-      // 50*4 + 50*4 + 50*9 = 200 + 200 + 450 = 850 -> macroCalories = 850
-      // |649 - 850| = 201 > 50 -> mismatch? Wait, let me recalculate.
-      // Actually I need to set values that give a delta of exactly 49.
-    });
-
     test('delta 49 returns false', () {
       // 100 P = 400 kcal, 50 C = 200 kcal, 50 F = 450 kcal
       // macroCalories = 1050

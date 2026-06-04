@@ -8,6 +8,7 @@ import '../../../../data/services/audio_recorder_service.dart';
 import '../../../../domain/models/nutrition_models.dart';
 import '../../../core/user_visible_error.dart';
 import 'voice_log_helpers.dart';
+import 'voice_log_timers.dart';
 
 enum VoiceLogState {
   idle,
@@ -179,7 +180,13 @@ class VoiceLogViewModel extends ChangeNotifier {
     DateTime Function()? now,
   })  : _nutritionRepository = nutritionRepository,
         _audioRecorderService = audioRecorderService ?? AudioRecorderService(),
-        _now = now ?? DateTime.now;
+        _now = now ?? DateTime.now {
+    _timers = VoiceLogTimers(
+      onRecordingDurationTick: _onRecordingDurationTick,
+      onProposalChangeSuccessExpired: _onProposalChangeSuccessExpired,
+      now: _now,
+    );
+  }
 
   static const proposalChangeSuccessDuration = Duration(milliseconds: 2500);
 
@@ -203,9 +210,7 @@ class VoiceLogViewModel extends ChangeNotifier {
 
   Duration get recordingDuration => _uiState.recordingDuration;
 
-  Timer? _durationTimer;
-  Timer? _proposalChangeSuccessTimer;
-  DateTime? _recordingStartedAt;
+  late final VoiceLogTimers _timers;
 
   MealProposal? get proposal => _uiState.proposal;
 
@@ -304,7 +309,7 @@ class VoiceLogViewModel extends ChangeNotifier {
 
   Future<void> _startRecording() async {
     if (!_canStartRecording) return;
-    _cancelRecordingTimer();
+    _timers.stopRecordingDuration();
     final activeProposal = _uiState.proposal;
     _setUiState(
       _uiState.copyWith(
@@ -337,19 +342,15 @@ class VoiceLogViewModel extends ChangeNotifier {
     );
     try {
       await _audioRecorderService.start();
-      _recordingStartedAt = _now();
+      _timers.startRecordingDuration(_now());
       _setUiState(
         _uiState.copyWith(
           phase: VoiceLogState.recording,
           recordingDuration: Duration.zero,
         ),
       );
-      _durationTimer = Timer.periodic(
-        const Duration(seconds: 1),
-        (_) => _syncRecordingDuration(),
-      );
     } on RecorderException catch (e) {
-      _cancelRecordingTimer();
+      _timers.stopRecordingDuration();
       if (e.code == 'permission_denied') {
         _setError('Microphone permission is required to record voice logs.');
       } else {
@@ -362,7 +363,7 @@ class VoiceLogViewModel extends ChangeNotifier {
         );
       }
     } catch (e) {
-      _cancelRecordingTimer();
+      _timers.stopRecordingDuration();
       _setError(
         userVisibleErrorMessage(e, context: UserErrorContext.voiceRecording),
       );
@@ -372,7 +373,7 @@ class VoiceLogViewModel extends ChangeNotifier {
   Future<AgentRunResult?> _stopRecording({
     bool submitAfterTranscription = false,
   }) async {
-    _cancelRecordingTimer();
+    _timers.stopRecordingDuration();
     _setState(VoiceLogState.stopping);
     try {
       final audio = await _audioRecorderService.stop();
@@ -608,7 +609,7 @@ class VoiceLogViewModel extends ChangeNotifier {
   Future<void> commitProposal({MealLabel? mealLabel}) async {
     final proposal = _uiState.proposal;
     if (proposal == null) return;
-    _proposalChangeSuccessTimer?.cancel();
+    _timers.clearProposalChangeSuccess();
     _setUiState(
       _uiState.copyWith(
         phase: VoiceLogState.agentRunning,
@@ -659,7 +660,7 @@ class VoiceLogViewModel extends ChangeNotifier {
       if (hasChanges) {
         _scheduleProposalChangeSuccessDismissal();
       } else {
-        _proposalChangeSuccessTimer?.cancel();
+        _timers.clearProposalChangeSuccess();
       }
     } catch (error) {
       _setError(
@@ -801,7 +802,7 @@ class VoiceLogViewModel extends ChangeNotifier {
   }
 
   void clearResult() {
-    _proposalChangeSuccessTimer?.cancel();
+    _timers.clearProposalChangeSuccess();
     _setUiState(const VoiceLogUiState());
   }
 
@@ -820,7 +821,7 @@ class VoiceLogViewModel extends ChangeNotifier {
   }
 
   void _setError(String message) {
-    _proposalChangeSuccessTimer?.cancel();
+    _timers.clearProposalChangeSuccess();
     _setUiState(
       _uiState.copyWith(
         phase: VoiceLogState.error,
@@ -831,44 +832,32 @@ class VoiceLogViewModel extends ChangeNotifier {
   }
 
   void _scheduleProposalChangeSuccessDismissal() {
-    _proposalChangeSuccessTimer?.cancel();
-    _proposalChangeSuccessTimer = Timer(proposalChangeSuccessDuration, () {
-      if (!_uiState.showProposalChangeSuccess) return;
-      _setUiState(_uiState.copyWith(showProposalChangeSuccess: false));
-    });
+    _timers.showProposalChangeSuccess(proposalChangeSuccessDuration);
   }
 
   void _setUiState(VoiceLogUiState value) {
     final wasRecording = _uiState.phase == VoiceLogState.recording;
     final isRecording = value.phase == VoiceLogState.recording;
     if (wasRecording && !isRecording) {
-      _cancelRecordingTimer();
+      _timers.stopRecordingDuration();
     }
     _uiState = value;
     notifyListeners();
   }
 
-  void _syncRecordingDuration() {
-    final startedAt = _recordingStartedAt;
-    if (startedAt == null || _uiState.phase != VoiceLogState.recording) {
-      return;
-    }
-    final elapsed = _now().difference(startedAt);
-    if (elapsed.isNegative) return;
+  void _onRecordingDurationTick(Duration elapsed) {
     _setUiState(_uiState.copyWith(recordingDuration: elapsed));
   }
 
-  void _cancelRecordingTimer() {
-    _durationTimer?.cancel();
-    _durationTimer = null;
-    _recordingStartedAt = null;
+  void _onProposalChangeSuccessExpired() {
+    if (!_uiState.showProposalChangeSuccess) return;
+    _setUiState(_uiState.copyWith(showProposalChangeSuccess: false));
   }
 
   @override
   void dispose() {
     _audioRecorderService.dispose();
-    _cancelRecordingTimer();
-    _proposalChangeSuccessTimer?.cancel();
+    _timers.dispose();
     super.dispose();
   }
 }

@@ -9,17 +9,8 @@ import '../../../../l10n/app_localizations_context.dart';
 import '../../../../l10n/generated/app_localizations.dart';
 import '../../../core/design_system.dart';
 import '../../../core/user_visible_error.dart';
+import '../models/calorie_target_validation.dart';
 import 'macro_distribution_sheet.dart';
-
-// Validation range constants
-const int kMinDailyCalories = 800;
-const int kMaxDailyCalories = 10000;
-const int kMinAgeYears = 18;
-const int kMaxAgeYears = 100;
-const int kMinHeightCm = 120;
-const int kMaxHeightCm = 230;
-const int kMinWeightKg = 35;
-const int kMaxWeightKg = 250;
 
 class CalorieTargetSelection {
   const CalorieTargetSelection({
@@ -565,75 +556,36 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
     );
   }
 
-  String _formatCompactNumber(double value) {
-    if ((value - value.roundToDouble()).abs() < 0.01) {
-      return value.round().toString();
-    }
-    return value.toStringAsFixed(1);
-  }
+  String _formatCompactNumber(double value) => formatCompactNumber(value);
 
-  String _formatFeetAndInches(double value) {
-    final totalInches = value.round();
-    final feet = totalInches ~/ 12;
-    final inches = totalInches % 12;
-    return '$feet\'$inches"';
-  }
+  String _formatFeetAndInches(double value) => formatFeetAndInches(value);
 
-  DateTime _today() {
-    final now = DateTime.now();
-    return DateTime(now.year, now.month, now.day);
-  }
+  DateTime _youngestAllowedBirthDate() => youngestAllowedBirthDate(DateTime.now());
 
-  DateTime _youngestAllowedBirthDate() {
-    final today = _today();
-    return DateTime(today.year - kMinAgeYears, today.month, today.day);
-  }
+  DateTime _oldestAllowedBirthDate() => oldestAllowedBirthDate(DateTime.now());
 
-  DateTime _oldestAllowedBirthDate() {
-    final today = _today();
-    return DateTime(today.year - kMaxAgeYears, today.month, today.day);
-  }
+  DateTime _defaultBirthDate() => defaultBirthDate(DateTime.now());
 
-  DateTime _defaultBirthDate() {
-    final today = _today();
-    return DateTime(today.year - 30, today.month, today.day);
-  }
-
-  List<int> get _birthYearValues {
-    final oldest = _oldestAllowedBirthDate().year;
-    final youngest = _youngestAllowedBirthDate().year;
-    return List<int>.generate(youngest - oldest + 1, (index) => oldest + index);
-  }
-
-  int _daysInMonth(int year, int month) {
-    return DateTime(year, month + 1, 0).day;
-  }
-
-  DateTime _clampBirthDate(DateTime date) {
-    final oldest = _oldestAllowedBirthDate();
-    final youngest = _youngestAllowedBirthDate();
-    if (date.isBefore(oldest)) return oldest;
-    if (date.isAfter(youngest)) return youngest;
-    return date;
-  }
+  List<int> get _birthYearValues => birthYearValues(DateTime.now());
 
   DateTime _safeBirthDate({
     required int year,
     required int month,
     required int day,
   }) {
-    final safeDay = day.clamp(1, _daysInMonth(year, month)).toInt();
-    return _clampBirthDate(DateTime(year, month, safeDay));
+    final oldest = _oldestAllowedBirthDate();
+    final youngest = _youngestAllowedBirthDate();
+    return safeBirthDate(
+      year: year,
+      month: month,
+      day: day,
+      oldest: oldest,
+      youngest: youngest,
+    );
   }
 
-  int _ageFromBirthDate(DateTime birthDate) {
-    final today = _today();
-    var age = today.year - birthDate.year;
-    final hadBirthdayThisYear = today.month > birthDate.month ||
-        (today.month == birthDate.month && today.day >= birthDate.day);
-    if (!hadBirthdayThisYear) age -= 1;
-    return age;
-  }
+  int _ageFromBirthDate(DateTime birthDate) =>
+      ageFromBirthDate(birthDate, DateTime.now());
 
   void _syncBirthWheelControllers() {
     final yearIndex = _birthDate.year - _oldestAllowedBirthDate().year;
@@ -1022,7 +974,7 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
     switch (step) {
       case _WizardStep.age:
         final age = _ageFromBirthDate(_birthDate);
-        if (age < kMinAgeYears || age > kMaxAgeYears) {
+        if (!isValidAge(age)) {
           setState(
               () => _error = context.l10n.calorieWizardBirthdayValidationError);
           return false;
@@ -1032,7 +984,7 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
         final heightCm = _heightMetric
             ? double.tryParse(_heightController.text.trim())
             : _heightInCm();
-        if (heightCm == null || heightCm < kMinHeightCm || heightCm > kMaxHeightCm) {
+        if (heightCm == null || !isValidHeightCm(heightCm)) {
           setState(
               () => _error = context.l10n.calorieWizardHeightValidationError);
           return false;
@@ -1042,7 +994,7 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
         final weightKg = _weightMetric
             ? double.tryParse(_weightController.text.trim())
             : _weightInKg();
-        if (weightKg == null || weightKg < kMinWeightKg || weightKg > kMaxWeightKg) {
+        if (weightKg == null || !isValidWeightKg(weightKg)) {
           setState(
               () => _error = context.l10n.calorieWizardWeightValidationError);
           return false;
@@ -1097,7 +1049,7 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
     }
   }
 
-  _ProfileValues? _profileValues() {
+  ProfileValues? _profileValues() {
     final age = _ageFromBirthDate(_birthDate);
     final heightCm = _heightMetric
         ? double.tryParse(_heightController.text.trim())
@@ -1105,43 +1057,19 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
     final weightKg = _weightMetric
         ? double.tryParse(_weightController.text.trim())
         : _weightInKg();
-    if (age < kMinAgeYears ||
-        age > kMaxAgeYears ||
+    if (!isValidAge(age) ||
         heightCm == null ||
-        heightCm < kMinHeightCm ||
-        heightCm > kMaxHeightCm ||
+        !isValidHeightCm(heightCm) ||
         weightKg == null ||
-        weightKg < kMinWeightKg ||
-        weightKg > kMaxWeightKg) {
+        !isValidWeightKg(weightKg)) {
       return null;
     }
-    return _ProfileValues(age: age, heightCm: heightCm, weightKg: weightKg);
+    return ProfileValues(age: age, heightCm: heightCm, weightKg: weightKg);
   }
 
-  double? _heightInCm() {
-    final feet = double.tryParse(_feetController.text.trim());
-    final inches = double.tryParse(_inchesController.text.trim());
-    if (feet == null || inches == null) return null;
-    return (feet * 12 + inches) * 2.54;
-  }
+  double? _heightInCm() => heightInCm(_feetController.text, _inchesController.text);
 
-  double? _weightInKg() {
-    final pounds = double.tryParse(_poundsController.text.trim());
-    if (pounds == null) return null;
-    return pounds * 0.45359237;
-  }
-}
-
-class _ProfileValues {
-  const _ProfileValues({
-    required this.age,
-    required this.heightCm,
-    required this.weightKg,
-  });
-
-  final int age;
-  final double heightCm;
-  final double weightKg;
+  double? _weightInKg() => weightInKg(_poundsController.text);
 }
 
 class _WizardOption {

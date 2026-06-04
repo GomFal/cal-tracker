@@ -183,8 +183,7 @@ class _MealTemplateEditorScreenState extends State<MealTemplateEditorScreen> {
                       ),
                       const SizedBox(height: FreshSpacing.lg),
                       _SaveBar(
-                        isSaving: (viewModel.isLoading && _hydrated) ||
-                            isVoiceProcessing,
+                        isSaving: viewModel.isSaving || isVoiceProcessing,
                         nutrition: _totalNutrition(),
                         onSave: template == null && _isEditing
                             ? null
@@ -245,8 +244,8 @@ class _MealTemplateEditorScreenState extends State<MealTemplateEditorScreen> {
     });
     try {
       final draft = await context.read<MealTemplatesViewModel>().draftUsualMeal(
-            text,
-          );
+        text,
+      );
       if (!mounted) return;
       setState(() => _applyDraft(draft));
     } catch (error) {
@@ -302,7 +301,8 @@ class _MealTemplateEditorScreenState extends State<MealTemplateEditorScreen> {
     } on RecorderException catch (error) {
       if (!mounted) return;
       setState(() {
-        _status = error.message ??
+        _status =
+            error.message ??
             userVisibleErrorMessage(
               error,
               context: UserErrorContext.voiceRecording,
@@ -347,7 +347,8 @@ class _MealTemplateEditorScreenState extends State<MealTemplateEditorScreen> {
     } on RecorderException catch (error) {
       if (!mounted) return;
       setState(() {
-        _status = error.message ??
+        _status =
+            error.message ??
             userVisibleErrorMessage(
               error,
               context: UserErrorContext.voiceRecording,
@@ -610,8 +611,9 @@ class _DraftBuilderCard extends StatelessWidget {
                     : l10n.mealTemplateEditorVoiceTooltip,
                 child: VoiceActionButtonChrome(
                   dimension: 48,
-                  backgroundColor:
-                      isRecording ? FreshColors.coral : FreshColors.lime,
+                  backgroundColor: isRecording
+                      ? FreshColors.coral
+                      : FreshColors.lime,
                   isRecording: isRecording,
                   child: IconButton(
                     key: const ValueKey('meal_template_voice_button'),
@@ -633,9 +635,9 @@ class _DraftBuilderCard extends StatelessWidget {
             Text(
               status!,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: statusIsError ? FreshColors.coral : null,
-                    fontWeight: FontWeight.w700,
-                  ),
+                color: statusIsError ? FreshColors.coral : null,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ],
         ],
@@ -777,8 +779,9 @@ class _TemplateItemsSectionState extends State<_TemplateItemsSection> {
               ? FoodSearchPanel(
                   key: const ValueKey('meal_template_food_search_panel'),
                   keyPrefix: 'meal_template_food_search',
-                  searchFoods:
-                      context.read<MealTemplatesViewModel>().searchFoods,
+                  searchFoods: context
+                      .read<MealTemplatesViewModel>()
+                      .searchFoods,
                   onSelected: (item) {
                     widget.onAddFood(item);
                     setState(() => _searchExpanded = false);
@@ -1063,13 +1066,13 @@ class _TemplateMealItemController {
     this.needsReview,
     this.resolvedGrams,
     this.portionDescription,
-  })  : nameController = TextEditingController(text: name),
-        quantityController = TextEditingController(text: quantity),
-        unitController = TextEditingController(text: unit),
-        caloriesController = TextEditingController(text: calories),
-        proteinController = TextEditingController(text: protein),
-        carbsController = TextEditingController(text: carbs),
-        fatController = TextEditingController(text: fat);
+  }) : nameController = TextEditingController(text: name),
+       quantityController = TextEditingController(text: quantity),
+       unitController = TextEditingController(text: unit),
+       caloriesController = TextEditingController(text: calories),
+       proteinController = TextEditingController(text: protein),
+       carbsController = TextEditingController(text: carbs),
+       fatController = TextEditingController(text: fat);
 
   factory _TemplateMealItemController.empty() {
     return _TemplateMealItemController(

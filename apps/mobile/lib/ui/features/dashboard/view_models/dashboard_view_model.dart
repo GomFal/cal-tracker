@@ -1,27 +1,28 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../../../data/repositories/nutrition_repository.dart';
 import '../../../../domain/models/macro_distribution.dart';
 import '../../../../domain/models/nutrition_models.dart';
+import '../../../../domain/models/nutrition_summary_updates.dart';
 import '../../../core/user_visible_error.dart';
 import '../../hydration/hydration_format.dart';
 
 class DashboardViewModel extends ChangeNotifier {
   DashboardViewModel({
     required NutritionRepository nutritionRepository,
-    Duration cacheTtl = const Duration(seconds: 60),
     DateTime Function()? now,
-  })  : _nutritionRepository = nutritionRepository,
-        _cacheTtl = cacheTtl,
-        _now = now ?? DateTime.now;
+  }) : _nutritionRepository = nutritionRepository,
+       _now = now ?? DateTime.now;
 
   final NutritionRepository _nutritionRepository;
-  final Duration _cacheTtl;
   final DateTime Function() _now;
   DailySummary? _summary;
   bool _isLoading = false;
+  bool _isRefreshing = false;
+  bool _isSaving = false;
   bool _isSavingWater = false;
-  DateTime? _lastLoadedAt;
   Future<void>? _loadOperation;
   Future<void>? _waterSaveOperation;
   DailySummary? _confirmedWaterSummary;
@@ -29,63 +30,92 @@ class DashboardViewModel extends ChangeNotifier {
   String? _error;
 
   DailySummary? get summary => _summary;
-  bool get isLoading => _isLoading && !_isSavingWater;
+  bool get hasVisibleData => _summary != null;
+  bool get isLoading => _isLoading && !hasVisibleData;
+  bool get isRefreshing => _isRefreshing;
+  bool get isSaving => _isSaving || _isSavingWater;
   String? get error => _error;
 
   Future<void> load({bool forceRefresh = false}) {
-    final isCacheFresh =
-        _lastLoadedAt != null && _now().difference(_lastLoadedAt!) < _cacheTtl;
-    if (!forceRefresh && _summary != null && isCacheFresh) {
-      return Future.value();
-    }
     if (_loadOperation != null) return _loadOperation!;
-
-    final showLoading = forceRefresh || _summary == null;
-    _loadOperation = _load(showLoading: showLoading).whenComplete(() {
+    _loadOperation = _load(forceRefresh: forceRefresh).whenComplete(() {
       _loadOperation = null;
     });
     return _loadOperation!;
   }
 
-  Future<void> _load({required bool showLoading}) async {
-    if (showLoading) {
-      _isLoading = true;
-      notifyListeners();
+  Future<void> _load({required bool forceRefresh}) async {
+    final date = _today;
+    if (!forceRefresh) {
+      final cached = await _nutritionRepository.cachedDailySummary(date: date);
+      if (cached != null) {
+        _summary = cached.value;
+        _error = null;
+        _isLoading = false;
+        notifyListeners();
+      }
     }
+
+    final hadVisibleData = hasVisibleData;
+    if (hadVisibleData) {
+      _isRefreshing = true;
+    } else {
+      _isLoading = true;
+    }
+    notifyListeners();
+
     try {
-      _summary = await _nutritionRepository.getDailySummary();
-      _lastLoadedAt = _now();
+      _summary = await _nutritionRepository.refreshDailySummary(
+        date: date,
+        force: forceRefresh,
+      );
       _error = null;
     } catch (error) {
-      if (showLoading) {
+      if (!hadVisibleData) {
         _error = userVisibleErrorMessage(
           error,
           context: UserErrorContext.dashboardLoad,
         );
       }
     } finally {
-      if (showLoading) {
-        _isLoading = false;
-      }
+      _isLoading = false;
+      _isRefreshing = false;
       notifyListeners();
     }
   }
 
   Future<void> correctMealItems(Meal meal, List<MealItem> items) async {
-    _isLoading = true;
+    final previous = _summary;
+    final optimisticMeal = mealWithItems(meal, items);
+    if (previous != null) {
+      _summary = replaceMealInSummary(previous, optimisticMeal);
+      unawaited(_nutritionRepository.putCachedDailySummary(_summary!));
+    }
+    _isSaving = true;
+    _error = null;
     notifyListeners();
+
     try {
-      await _nutritionRepository.correctMealItems(meal.id, items);
-      _summary = await _nutritionRepository.getDailySummary();
-      _lastLoadedAt = _now();
+      final savedMeal = await _nutritionRepository.correctMealItems(
+        meal.id,
+        items,
+      );
+      if (_summary != null) {
+        _summary = replaceMealInSummary(_summary!, savedMeal);
+        await _nutritionRepository.putCachedDailySummary(_summary!);
+      }
       _error = null;
     } catch (error) {
+      _summary = previous;
+      if (previous != null) {
+        await _nutritionRepository.putCachedDailySummary(previous);
+      }
       _error = userVisibleErrorMessage(
         error,
         context: UserErrorContext.dashboardSave,
       );
     } finally {
-      _isLoading = false;
+      _isSaving = false;
       notifyListeners();
     }
   }
@@ -95,27 +125,40 @@ class DashboardViewModel extends ChangeNotifier {
   }
 
   Future<bool> deleteMeal(Meal meal) async {
-    _isLoading = true;
+    final previous = _summary;
+    if (previous != null) {
+      _summary = removeMealFromSummary(previous, meal.id);
+      unawaited(_nutritionRepository.putCachedDailySummary(_summary!));
+    }
+    _isSaving = true;
+    _error = null;
     notifyListeners();
+
     try {
       final deleted = await _nutritionRepository.deleteMeal(
         meal.id,
         confirmed: true,
       );
-      if (deleted) {
-        _summary = await _nutritionRepository.getDailySummary();
-        _lastLoadedAt = _now();
+      if (!deleted) {
+        _summary = previous;
+        if (previous != null) {
+          await _nutritionRepository.putCachedDailySummary(previous);
+        }
       }
       _error = null;
       return deleted;
     } catch (error) {
+      _summary = previous;
+      if (previous != null) {
+        await _nutritionRepository.putCachedDailySummary(previous);
+      }
       _error = userVisibleErrorMessage(
         error,
         context: UserErrorContext.dashboardSave,
       );
       return false;
     } finally {
-      _isLoading = false;
+      _isSaving = false;
       notifyListeners();
     }
   }
@@ -125,26 +168,47 @@ class DashboardViewModel extends ChangeNotifier {
     String source = 'manual',
     MacroDistributionConfig? macroConfig,
   }) async {
-    _isLoading = true;
-    notifyListeners();
-    try {
-      await _nutritionRepository.updateDailyGoals(
+    final previous = _summary;
+    if (previous != null) {
+      final optimisticGoals = goalsWithOverrides(
+        goalsFromSummary(previous),
         calories: calories,
         calorieTargetSource: source,
         macroConfig: macroConfig,
         macroCalorieTarget: calories,
       );
-      _summary = await _nutritionRepository.getDailySummary();
+      _summary = dailySummaryWithGoals(previous, optimisticGoals);
+      unawaited(_nutritionRepository.putCachedDailySummary(_summary!));
+    }
+    _isSaving = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final goals = await _nutritionRepository.updateDailyGoals(
+        calories: calories,
+        calorieTargetSource: source,
+        macroConfig: macroConfig,
+        macroCalorieTarget: calories,
+      );
+      if (_summary != null) {
+        _summary = dailySummaryWithGoals(_summary!, goals);
+        await _nutritionRepository.putCachedDailySummary(_summary!);
+      }
       _error = null;
       return true;
     } catch (error) {
+      _summary = previous;
+      if (previous != null) {
+        await _nutritionRepository.putCachedDailySummary(previous);
+      }
       _error = userVisibleErrorMessage(
         error,
         context: UserErrorContext.dashboardSave,
       );
       return false;
     } finally {
-      _isLoading = false;
+      _isSaving = false;
       notifyListeners();
     }
   }
@@ -155,7 +219,8 @@ class DashboardViewModel extends ChangeNotifier {
     _pendingWaterLiters = nextWater;
     _isSavingWater = true;
     if (_summary != null) {
-      _summary = _summaryWithWater(_summary!, nextWater);
+      _summary = dailySummaryWithWater(_summary!, nextWater);
+      unawaited(_nutritionRepository.putCachedDailySummary(_summary!));
     }
     _error = null;
     notifyListeners();
@@ -173,7 +238,6 @@ class DashboardViewModel extends ChangeNotifier {
           waterConsumedLiters: waterToSave,
         );
         _confirmedWaterSummary = savedSummary;
-        _lastLoadedAt = _now();
         _error = null;
         if (_pendingWaterLiters == null) {
           _summary = savedSummary;
@@ -182,6 +246,9 @@ class DashboardViewModel extends ChangeNotifier {
       }
     } catch (error) {
       _summary = _confirmedWaterSummary;
+      if (_summary != null) {
+        await _nutritionRepository.putCachedDailySummary(_summary!);
+      }
       _pendingWaterLiters = null;
       _error = userVisibleErrorMessage(
         error,
@@ -196,35 +263,24 @@ class DashboardViewModel extends ChangeNotifier {
     }
   }
 
+  void reset() {
+    _summary = null;
+    _isLoading = false;
+    _isRefreshing = false;
+    _isSaving = false;
+    _isSavingWater = false;
+    _loadOperation = null;
+    _waterSaveOperation = null;
+    _confirmedWaterSummary = null;
+    _pendingWaterLiters = null;
+    _error = null;
+    notifyListeners();
+  }
+
   double _normalizedWater(double waterConsumedLiters) {
     final goal = roundHydrationLiters(_summary?.hydrationGoalLiters ?? 10);
     final clamped = waterConsumedLiters.clamp(0, goal).toDouble();
     return roundHydrationLiters(clamped);
-  }
-
-  DailySummary _summaryWithWater(
-    DailySummary summary,
-    double waterConsumedLiters,
-  ) {
-    return DailySummary(
-      date: summary.date,
-      consumed: summary.consumed,
-      target: summary.target,
-      remaining: summary.remaining,
-      hydrationGoalLiters: summary.hydrationGoalLiters,
-      waterConsumedLiters: waterConsumedLiters,
-      calorieTargetConfigured: summary.calorieTargetConfigured,
-      calorieTargetSource: summary.calorieTargetSource,
-      macroMode: summary.macroMode,
-      macroSource: summary.macroSource,
-      macroPreset: summary.macroPreset,
-      proteinPct: summary.proteinPct,
-      carbsPct: summary.carbsPct,
-      fatPct: summary.fatPct,
-      macroCalories: summary.macroCalories,
-      calorieDeltaKcal: summary.calorieDeltaKcal,
-      meals: summary.meals,
-    );
   }
 
   Future<CalorieEstimate> estimateCalories({
@@ -245,5 +301,10 @@ class DashboardViewModel extends ChangeNotifier {
       goal: goal,
       pace: pace,
     );
+  }
+
+  String get _today {
+    final now = _now();
+    return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
   }
 }

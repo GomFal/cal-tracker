@@ -10,9 +10,10 @@ import '../../../../l10n/app_localizations_context.dart';
 import '../../../core/content_frame.dart';
 import '../../../core/design_system.dart';
 import '../../../core/voice_action_button.dart';
+import '../view_models/voice_log_helpers.dart';
 import '../view_models/voice_log_view_model.dart';
 import '../../../shared/editable_meal_item_controller.dart';
-import '../../../shared/nutrition_edit_components.dart';
+import '../../../shared/nutrition_edit_components.dart' hide normalizedText;
 import '../../../shared/nutrition_edit_sheet.dart';
 
 class MealCreateScreen extends StatefulWidget {
@@ -2097,7 +2098,7 @@ class _ProposalEditorSheetState extends State<_ProposalEditorSheet> {
       );
     }
     if (edited.isEmpty) return;
-    if (_mealItemListsMateriallyEqual(widget.proposal.items, edited)) {
+    if (mealItemListsMateriallyEqual(widget.proposal.items, edited)) {
       Navigator.of(context).pop();
       return;
     }
@@ -2354,7 +2355,7 @@ class _CandidateSwapStripState extends State<_CandidateSwapStrip> {
       expanded: _expanded,
       itemKeyPrefix: 'proposal_item_${widget.index}_candidate',
       toggleKey: ValueKey('proposal_item_${widget.index}_candidate_toggle'),
-      isSelected: (candidate) => _sameMealItem(candidate, widget.selectedItem),
+      isSelected: (candidate) => sameMealItem(candidate, widget.selectedItem),
       onSelected: widget.onSelected,
       onToggleExpanded: () => setState(() => _expanded = !_expanded),
     );
@@ -2471,50 +2472,12 @@ String _nutritionLabel(NutritionEdit nutrition) {
 
 
 bool _itemMatchesCandidateGroup(MealItem item, FoodCandidateGroup group) {
-  if (group.candidates.any((candidate) => _sameMealItem(candidate, item))) {
+  if (group.candidates.any((candidate) => sameMealItem(candidate, item))) {
     return true;
   }
   return item.canonicalName == group.mention.canonicalName ||
       item.originalText == group.mention.originalText;
 }
-
-bool _sameMealItem(MealItem a, MealItem b) {
-  if (a.externalId != null && b.externalId != null) {
-    return a.externalId == b.externalId && a.externalSource == b.externalSource;
-  }
-  return a.name == b.name &&
-      a.source == b.source &&
-      a.quantity == b.quantity &&
-      a.unit == b.unit;
-}
-
-bool _mealItemListsMateriallyEqual(List<MealItem> a, List<MealItem> b) {
-  if (a.length != b.length) return false;
-  for (var index = 0; index < a.length; index++) {
-    if (!_mealItemsMateriallyEqual(a[index], b[index])) return false;
-  }
-  return true;
-}
-
-bool _mealItemsMateriallyEqual(MealItem a, MealItem b) {
-  final hasExternalIdentity = a.externalId != null ||
-      b.externalId != null ||
-      a.externalSource != null ||
-      b.externalSource != null;
-  if (hasExternalIdentity &&
-      (a.externalId != b.externalId || a.externalSource != b.externalSource)) {
-    return false;
-  }
-  return normalizedText(a.name) == normalizedText(b.name) &&
-      normalizedText(a.unit) == normalizedText(b.unit) &&
-      _sameNumber(a.quantity, b.quantity) &&
-      a.calories == b.calories &&
-      _sameNumber(a.proteinGrams, b.proteinGrams) &&
-      _sameNumber(a.carbsGrams, b.carbsGrams) &&
-      _sameNumber(a.fatGrams, b.fatGrams);
-}
-
-bool _sameNumber(double a, double b) => (a - b).abs() < 0.05;
 
 class _MetricBlock extends StatelessWidget {
   const _MetricBlock({

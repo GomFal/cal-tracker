@@ -388,9 +388,9 @@ class _CenterVoiceButtonState extends State<_CenterVoiceButton> {
         viewModel.state == VoiceLogState.agentRunning;
     final hasError = viewModel.state == VoiceLogState.error;
     final backgroundColor = isRecording
-        ? FreshColors.coral
+        ? palette.coral
         : hasError
-            ? FreshColors.yellow
+            ? palette.yellow
             : isBusy
                 ? palette.surfaceMuted
                 : palette.lime;

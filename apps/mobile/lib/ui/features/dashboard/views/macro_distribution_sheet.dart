@@ -370,6 +370,7 @@ class _PersonalizedMacroSheetState extends State<_PersonalizedMacroSheet> {
 
   Widget _percentageEditor() {
     final l10n = context.l10n;
+    final palette = context.freshPalette;
     final total = _percentages.total;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -413,7 +414,7 @@ class _PersonalizedMacroSheetState extends State<_PersonalizedMacroSheet> {
             icon: Icons.error_outline_rounded,
             title: l10n.macroPercentagesMustTotal,
             message: l10n.macroPercentagesTotalMessage(total),
-            color: FreshColors.coral,
+            color: palette.coral,
           ),
           const SizedBox(height: FreshSpacing.sm),
           Wrap(
@@ -455,6 +456,7 @@ class _PersonalizedMacroSheetState extends State<_PersonalizedMacroSheet> {
 
   Widget _gramsEditor() {
     final l10n = context.l10n;
+    final palette = context.freshPalette;
     final grams = _grams;
     final gramsWithinLimits = areMacroGramsWithinLimits(grams);
     final delta = calorieDeltaKcal(widget.calories, grams);
@@ -501,7 +503,7 @@ class _PersonalizedMacroSheetState extends State<_PersonalizedMacroSheet> {
             icon: Icons.error_outline_rounded,
             title: l10n.macroGramsTooHigh,
             message: l10n.macroGramsTooHighMessage,
-            color: FreshColors.coral,
+            color: palette.coral,
           ),
         ] else if (warning != MacroCalorieWarningLevel.none) ...[
           const SizedBox(height: FreshSpacing.md),
@@ -523,8 +525,8 @@ class _PersonalizedMacroSheetState extends State<_PersonalizedMacroSheet> {
                     delta.abs(),
                   ),
             color: warning == MacroCalorieWarningLevel.soft
-                ? FreshColors.orange
-                : FreshColors.coral,
+                ? palette.orange
+                : palette.coral,
           ),
           const SizedBox(height: FreshSpacing.sm),
           Wrap(
@@ -754,11 +756,11 @@ class _PersonalizedMacroCard extends StatelessWidget {
               color: selected ? palette.lime : palette.ruleSoft,
               width: selected ? 2 : 1,
             ),
-            boxShadow: const [
+            boxShadow: [
               BoxShadow(
-                color: Color(0x17080907),
+                color: palette.ink.withValues(alpha: 0.09),
                 blurRadius: 28,
-                offset: Offset(0, 14),
+                offset: const Offset(0, 14),
               ),
             ],
           ),
@@ -892,11 +894,11 @@ class MacroPresetCard extends StatelessWidget {
               color: selected ? palette.lime : palette.ruleSoft,
               width: selected ? 2 : 1,
             ),
-            boxShadow: const [
+            boxShadow: [
               BoxShadow(
-                color: Color(0x17080907),
+                color: palette.ink.withValues(alpha: 0.09),
                 blurRadius: 28,
-                offset: Offset(0, 14),
+                offset: const Offset(0, 14),
               ),
             ],
           ),

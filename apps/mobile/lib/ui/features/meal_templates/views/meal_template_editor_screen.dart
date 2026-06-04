@@ -106,6 +106,7 @@ class _MealTemplateEditorScreenState extends State<MealTemplateEditorScreen> {
     final isMissingTemplate =
         _isEditing && viewModel.hasLoaded && template == null;
     final isVoiceProcessing = _isDrafting || _isTranscribing;
+    final palette = context.freshPalette;
     return ContentFrame(
       title: _isEditing
           ? l10n.mealTemplateEditorEditTitle
@@ -123,7 +124,7 @@ class _MealTemplateEditorScreenState extends State<MealTemplateEditorScreen> {
               icon: Icons.error_outline_rounded,
               title: l10n.mealTemplateEditorMissingTemplateTitle,
               message: l10n.mealTemplateEditorMissingTemplateMessage,
-              color: FreshColors.coral,
+              color: palette.coral,
             )
           : Stack(
               children: [
@@ -500,6 +501,7 @@ class _MealTemplateBasicsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final palette = context.freshPalette;
     return FreshCard(
       radius: FreshRadii.xl,
       child: Column(
@@ -507,10 +509,10 @@ class _MealTemplateBasicsCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const FreshIconChip(
+              FreshIconChip(
                 icon: Icons.restaurant_menu_rounded,
-                color: FreshColors.orange,
-                backgroundColor: FreshColors.yellow,
+                color: palette.orange,
+                backgroundColor: palette.yellow,
               ),
               const SizedBox(width: FreshSpacing.md),
               Expanded(
@@ -568,10 +570,17 @@ class _DraftBuilderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final palette = context.freshPalette;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final transcriptBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(FreshRadii.md),
+      borderSide: BorderSide(color: palette.ruleSoft),
+    );
     final busy = isDrafting || isTranscribing;
     return FreshCard(
+      key: const ValueKey('meal_template_draft_card'),
       radius: FreshRadii.xl,
-      color: FreshColors.limeWash,
+      color: isDark ? palette.surface : palette.limeWash,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -584,7 +593,7 @@ class _DraftBuilderCard extends StatelessWidget {
             l10n.mealTemplateEditorDraftHelper,
             style: Theme.of(
               context,
-            ).textTheme.bodyMedium?.copyWith(color: FreshColors.inkMuted),
+            ).textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
           ),
           const SizedBox(height: FreshSpacing.md),
           TextField(
@@ -593,9 +602,25 @@ class _DraftBuilderCard extends StatelessWidget {
             readOnly: true,
             minLines: 2,
             maxLines: 5,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: palette.inkSoft),
             decoration: InputDecoration(
               labelText: l10n.mealTemplateEditorDraftLabel,
               hintText: l10n.mealTemplateEditorDraftHint,
+              filled: true,
+              fillColor: isDark ? palette.surfaceMuted : palette.surfaceSoft,
+              labelStyle: Theme.of(
+                context,
+              ).textTheme.labelLarge?.copyWith(color: palette.inkMuted),
+              hintStyle: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
+              enabledBorder: transcriptBorder,
+              focusedBorder: transcriptBorder.copyWith(
+                borderSide: BorderSide(color: palette.lime, width: 2),
+              ),
+              disabledBorder: transcriptBorder,
             ),
           ),
           const SizedBox(height: FreshSpacing.md),
@@ -611,19 +636,27 @@ class _DraftBuilderCard extends StatelessWidget {
                     : l10n.mealTemplateEditorVoiceTooltip,
                 child: VoiceActionButtonChrome(
                   dimension: 48,
-                  backgroundColor: isRecording
-                      ? FreshColors.coral
-                      : FreshColors.lime,
+                  backgroundColor: isRecording ? palette.coral : palette.lime,
                   isRecording: isRecording,
                   child: IconButton(
                     key: const ValueKey('meal_template_voice_button'),
                     onPressed: busy ? null : onVoiceToggle,
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      foregroundColor: isRecording
+                          ? Theme.of(context).colorScheme.onError
+                          : Theme.of(context).colorScheme.onPrimary,
+                      disabledBackgroundColor: Colors.transparent,
+                      disabledForegroundColor: palette.inkMuted,
+                    ),
                     tooltip: isRecording
                         ? l10n.mealTemplateEditorStopVoiceTooltip
                         : l10n.mealTemplateEditorVoiceTooltip,
                     icon: Icon(
                       isRecording ? Icons.stop_rounded : Icons.mic_rounded,
-                      color: FreshColors.ink,
+                      color: isRecording
+                          ? Theme.of(context).colorScheme.onError
+                          : Theme.of(context).colorScheme.onPrimary,
                     ),
                   ),
                 ),
@@ -635,7 +668,7 @@ class _DraftBuilderCard extends StatelessWidget {
             Text(
               status!,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: statusIsError ? FreshColors.coral : null,
+                color: statusIsError ? palette.coral : palette.inkSoft,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -655,6 +688,7 @@ class _CandidateGroupsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final palette = context.freshPalette;
     return FreshCard(
       radius: FreshRadii.xl,
       child: Column(
@@ -669,7 +703,7 @@ class _CandidateGroupsCard extends StatelessWidget {
             l10n.mealTemplateEditorCandidatesHelper,
             style: Theme.of(
               context,
-            ).textTheme.bodyMedium?.copyWith(color: FreshColors.inkMuted),
+            ).textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
           ),
           const SizedBox(height: FreshSpacing.md),
           for (final group in groups) ...[
@@ -840,6 +874,7 @@ class _TemplateItemCardState extends State<_TemplateItemCard> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final palette = context.freshPalette;
     final nutrition = widget.item.previewNutrition;
     return FreshCard(
       padding: const EdgeInsets.all(16),
@@ -940,7 +975,7 @@ class _TemplateItemCardState extends State<_TemplateItemCard> {
             Text(
               _nutritionLabel(context, nutrition),
               style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: FreshColors.inkMuted,
+                color: palette.inkMuted,
                 fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),
@@ -979,9 +1014,11 @@ class _SaveBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.freshPalette;
     return FreshCard(
+      key: const ValueKey('meal_template_save_bar'),
       radius: FreshRadii.xl,
-      color: FreshColors.surface,
+      color: palette.surface,
       child: LayoutBuilder(
         builder: (context, constraints) {
           final compact = constraints.maxWidth < 420;
@@ -989,6 +1026,12 @@ class _SaveBar extends StatelessWidget {
           final button = FilledButton.icon(
             key: const ValueKey('meal_template_save_button'),
             onPressed: isSaving ? null : onSave,
+            style: FilledButton.styleFrom(
+              backgroundColor: palette.lime,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
+              disabledBackgroundColor: palette.surfaceMuted,
+              disabledForegroundColor: palette.inkMuted,
+            ),
             icon: isSaving
                 ? const SizedBox.square(
                     dimension: 16,
@@ -1028,19 +1071,36 @@ class _TotalNutrition extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          l10n.mealEditorMealTotal,
-          style: Theme.of(context).textTheme.labelLarge,
+    final palette = context.freshPalette;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return DecoratedBox(
+      key: const ValueKey('meal_template_total_nutrition_summary'),
+      decoration: BoxDecoration(
+        color: isDark ? palette.surfaceMuted : palette.surfaceSoft,
+        borderRadius: BorderRadius.circular(FreshRadii.md),
+        border: Border.all(color: palette.ruleSoft),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(FreshSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l10n.mealEditorMealTotal,
+              style: Theme.of(
+                context,
+              ).textTheme.labelLarge?.copyWith(color: palette.inkMuted),
+            ),
+            const SizedBox(height: FreshSpacing.xs),
+            Text(
+              _nutritionLabel(context, nutrition),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(color: palette.ink),
+            ),
+          ],
         ),
-        const SizedBox(height: FreshSpacing.xs),
-        Text(
-          _nutritionLabel(context, nutrition),
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-      ],
+      ),
     );
   }
 }

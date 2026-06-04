@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../app/locale_view_model.dart';
+import '../../../../app/theme_mode_view_model.dart';
 import '../../../../domain/models/macro_distribution.dart';
 import '../../../../domain/models/nutrition_models.dart';
 import '../../../../l10n/app_localizations_context.dart';
@@ -38,10 +39,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final auth = context.watch<AuthViewModel>();
     final settings = context.watch<SettingsViewModel>();
     final locale = context.watch<LocaleViewModel>();
+    final themeMode = context.watch<ThemeModeViewModel>().themeMode;
     final l10n = context.l10n;
+    final palette = context.freshPalette;
     final user = auth.user;
     final goals = settings.goals;
-    final limeCardTextColor = FreshPalette.dark.limeWash;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final limeCardTextColor = isDark ? palette.ink : FreshPalette.dark.limeWash;
     return ContentFrame(
       title: l10n.settingsTitle,
       subtitle: l10n.settingsSubtitle,
@@ -56,19 +60,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           FreshCard(
             radius: FreshRadii.xl,
-            color: FreshColors.limeSoft,
+            color: palette.limeSoft,
             child: Row(
               children: [
                 Container(
                   width: 58,
                   height: 58,
-                  decoration: const BoxDecoration(
-                    color: FreshColors.surface,
+                  decoration: BoxDecoration(
+                    color: palette.surface,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.person_rounded,
-                    color: FreshColors.limeDeep,
+                    color: palette.limeDeep,
                     size: 30,
                   ),
                 ),
@@ -105,14 +109,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               icon: Icons.error_outline_rounded,
               title: l10n.settingsCouldNotUpdateGoals,
               message: settings.error!,
-              color: FreshColors.coral,
+              color: palette.coral,
             ),
             const SizedBox(height: FreshSpacing.md),
           ],
           _SettingsGoalRow(
             key: const ValueKey('hydration_goal_row'),
             icon: Icons.water_drop_rounded,
-            color: FreshColors.water,
+            color: palette.water,
             title: l10n.settingsHydrationGoal,
             subtitle: l10n.settingsHydrationGoalSubtitle(
               formatHydrationLiters(goals?.hydrationGoalLiters ?? 0),
@@ -125,7 +129,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _SettingsGoalRow(
             key: const ValueKey('calorie_target_row'),
             icon: Icons.flag_rounded,
-            color: FreshColors.orange,
+            color: palette.orange,
             title: l10n.settingsCalorieTarget,
             subtitle: goals?.calorieTargetConfigured == true
                 ? l10n.settingsCalorieTargetSubtitle(
@@ -140,7 +144,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _SettingsGoalRow(
             key: const ValueKey('macro_distribution_row'),
             icon: Icons.pie_chart_rounded,
-            color: FreshColors.leaf,
+            color: palette.leaf,
             title: 'Macro distribution',
             subtitle: _macroDistributionSubtitle(l10n, goals),
             onTap: settings.isLoading || settings.isSaving
@@ -151,12 +155,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _SettingsGoalRow(
             key: const ValueKey('language_settings_row'),
             icon: Icons.translate_rounded,
-            color: FreshColors.mint,
+            color: palette.mint,
             title: l10n.settingsLanguageTitle,
             subtitle: locale.localeCode == 'es'
                 ? l10n.settingsLanguageSubtitleSpanish
                 : l10n.settingsLanguageSubtitleEnglish,
             onTap: () => _showLanguageSheet(context),
+          ),
+          const SizedBox(height: FreshSpacing.md),
+          _SettingsGoalRow(
+            key: const ValueKey('theme_settings_row'),
+            icon: Icons.contrast_rounded,
+            color: palette.limeDeep,
+            title: l10n.settingsThemeTitle,
+            subtitle: _themeModeSubtitle(l10n, themeMode),
+            onTap: () => _showThemeSheet(context),
           ),
           const SizedBox(height: FreshSpacing.md),
           _DataSourcesCard(
@@ -309,6 +322,79 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return '${goals.target.proteinGrams.round()}g protein, ${goals.target.carbsGrams.round()}g carbs, ${goals.target.fatGrams.round()}g fat';
   }
 
+  String _themeModeSubtitle(AppLocalizations l10n, ThemeMode themeMode) {
+    return switch (themeMode) {
+      ThemeMode.system => l10n.settingsThemeSystem,
+      ThemeMode.light => l10n.settingsThemeLight,
+      ThemeMode.dark => l10n.settingsThemeDark,
+    };
+  }
+
+  Future<void> _showThemeSheet(BuildContext context) {
+    return showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      builder: (sheetContext) {
+        final l10n = sheetContext.l10n;
+        final themeModeViewModel = sheetContext.watch<ThemeModeViewModel>();
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: sheetContext.freshPalette.rule,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              const SizedBox(height: FreshSpacing.lg),
+              Text(
+                l10n.settingsThemeSheetTitle,
+                style: Theme.of(sheetContext).textTheme.titleLarge,
+              ),
+              const SizedBox(height: FreshSpacing.md),
+              _SettingsOption(
+                key: const ValueKey('theme_option_system'),
+                title: l10n.settingsThemeSystem,
+                selected: themeModeViewModel.themeMode == ThemeMode.system,
+                onTap: () async {
+                  await themeModeViewModel.setThemeMode(ThemeMode.system);
+                  if (sheetContext.mounted) Navigator.of(sheetContext).pop();
+                },
+              ),
+              const SizedBox(height: FreshSpacing.sm),
+              _SettingsOption(
+                key: const ValueKey('theme_option_light'),
+                title: l10n.settingsThemeLight,
+                selected: themeModeViewModel.themeMode == ThemeMode.light,
+                onTap: () async {
+                  await themeModeViewModel.setThemeMode(ThemeMode.light);
+                  if (sheetContext.mounted) Navigator.of(sheetContext).pop();
+                },
+              ),
+              const SizedBox(height: FreshSpacing.sm),
+              _SettingsOption(
+                key: const ValueKey('theme_option_dark'),
+                title: l10n.settingsThemeDark,
+                selected: themeModeViewModel.themeMode == ThemeMode.dark,
+                onTap: () async {
+                  await themeModeViewModel.setThemeMode(ThemeMode.dark);
+                  if (sheetContext.mounted) Navigator.of(sheetContext).pop();
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _showLanguageSheet(BuildContext context) {
     return showModalBottomSheet<void>(
       context: context,
@@ -338,7 +424,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 style: Theme.of(sheetContext).textTheme.titleLarge,
               ),
               const SizedBox(height: FreshSpacing.md),
-              _LanguageOption(
+              _SettingsOption(
                 key: const ValueKey('language_option_en'),
                 title: l10n.settingsLanguageEnglish,
                 selected: localeViewModel.localeCode == 'en',
@@ -348,7 +434,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 },
               ),
               const SizedBox(height: FreshSpacing.sm),
-              _LanguageOption(
+              _SettingsOption(
                 key: const ValueKey('language_option_es'),
                 title: l10n.settingsLanguageSpanish,
                 selected: localeViewModel.localeCode == 'es',
@@ -380,6 +466,7 @@ class _DataSourcesCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.freshPalette;
     final textTheme = Theme.of(context).textTheme;
     return FreshCard(
       padding: const EdgeInsets.all(16),
@@ -387,9 +474,9 @@ class _DataSourcesCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const FreshIconChip(
+          FreshIconChip(
             icon: Icons.source_rounded,
-            color: FreshColors.orange,
+            color: palette.orange,
           ),
           const SizedBox(width: FreshSpacing.md),
           Expanded(
@@ -401,21 +488,21 @@ class _DataSourcesCard extends StatelessWidget {
                 Text(
                   subtitle,
                   style: textTheme.bodyMedium?.copyWith(
-                    color: FreshColors.inkMuted,
+                    color: palette.inkMuted,
                   ),
                 ),
                 const SizedBox(height: FreshSpacing.sm),
                 Text(
                   openFoodFacts,
                   style: textTheme.bodySmall?.copyWith(
-                    color: FreshColors.inkMuted,
+                    color: palette.inkMuted,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   usda,
                   style: textTheme.bodySmall?.copyWith(
-                    color: FreshColors.inkMuted,
+                    color: palette.inkMuted,
                   ),
                 ),
               ],
@@ -427,8 +514,8 @@ class _DataSourcesCard extends StatelessWidget {
   }
 }
 
-class _LanguageOption extends StatelessWidget {
-  const _LanguageOption({
+class _SettingsOption extends StatelessWidget {
+  const _SettingsOption({
     super.key,
     required this.title,
     required this.selected,
@@ -531,6 +618,7 @@ class _SettingsGoalRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.freshPalette;
     return FreshCard(
       padding: const EdgeInsets.all(16),
       onTap: onTap,
@@ -545,9 +633,10 @@ class _SettingsGoalRow extends StatelessWidget {
                 Text(title, style: Theme.of(context).textTheme.titleMedium),
                 Text(
                   subtitle,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(color: FreshColors.inkMuted),
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.copyWith(color: palette.inkMuted),
                 ),
               ],
             ),

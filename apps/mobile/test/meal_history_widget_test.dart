@@ -7,6 +7,7 @@ import 'package:cal_tracker_mobile/data/services/secure_token_storage.dart';
 import 'package:cal_tracker_mobile/domain/models/nutrition_models.dart';
 import 'package:cal_tracker_mobile/generated/api/cal_tracker_api.dart';
 import 'package:cal_tracker_mobile/l10n/generated/app_localizations.dart';
+import 'package:cal_tracker_mobile/ui/core/design_system.dart';
 import 'package:cal_tracker_mobile/ui/features/meal_history/view_models/meal_history_view_model.dart';
 import 'package:cal_tracker_mobile/ui/features/meal_history/views/meal_history_screen.dart';
 import 'package:flutter/material.dart';
@@ -49,17 +50,17 @@ void main() {
     _expectMacroFieldColor(
       tester,
       key: const ValueKey('history_item_protein_0'),
-      color: const Color(0xffc95a5a),
+      color: FreshPalette.light.coral,
     );
     _expectMacroFieldColor(
       tester,
       key: const ValueKey('history_item_carbs_0'),
-      color: const Color(0xffb88758),
+      color: FreshPalette.light.orange,
     );
     _expectMacroFieldColor(
       tester,
       key: const ValueKey('history_item_fat_0'),
-      color: const Color(0xffe0b93b),
+      color: FreshPalette.light.yellow,
     );
 
     await tester.enterText(
@@ -245,40 +246,40 @@ class _TestApp extends StatelessWidget {
 
 class _FakeNutritionRepository extends NutritionRepository {
   _FakeNutritionRepository()
-    : _meal = Meal(
-        id: 'meal-1',
-        title: 'Chicken and rice',
-        occurredAt: DateTime.now(),
-        nutrition: const NutritionSnapshot(
-          calories: 295,
-          proteinGrams: 33.7,
-          carbsGrams: 28,
-          fatGrams: 3.9,
-        ),
-        items: const [
-          MealItem(
-            name: 'Chicken breast',
-            quantity: 100,
-            unit: 'g',
-            calories: 165,
-            proteinGrams: 31,
-            carbsGrams: 0,
-            fatGrams: 3.6,
-            source: 'test_fixture',
-          ),
-          MealItem(
-            name: 'Cooked rice',
-            quantity: 100,
-            unit: 'g',
-            calories: 130,
-            proteinGrams: 2.7,
+      : _meal = Meal(
+          id: 'meal-1',
+          title: 'Chicken and rice',
+          occurredAt: DateTime.now(),
+          nutrition: const NutritionSnapshot(
+            calories: 295,
+            proteinGrams: 33.7,
             carbsGrams: 28,
-            fatGrams: 0.3,
-            source: 'test_fixture',
+            fatGrams: 3.9,
           ),
-        ],
-      ),
-      super(apiClient: _unusedApiClient());
+          items: const [
+            MealItem(
+              name: 'Chicken breast',
+              quantity: 100,
+              unit: 'g',
+              calories: 165,
+              proteinGrams: 31,
+              carbsGrams: 0,
+              fatGrams: 3.6,
+              source: 'test_fixture',
+            ),
+            MealItem(
+              name: 'Cooked rice',
+              quantity: 100,
+              unit: 'g',
+              calories: 130,
+              proteinGrams: 2.7,
+              carbsGrams: 28,
+              fatGrams: 0.3,
+              source: 'test_fixture',
+            ),
+          ],
+        ),
+        super(apiClient: _unusedApiClient());
 
   List<MealItem>? lastCorrectedItems;
   Meal _meal;
@@ -289,9 +290,8 @@ class _FakeNutritionRepository extends NutritionRepository {
   @override
   Future<DailySummary> getDailySummary({String? date}) async {
     final requestedDate = date ?? _formatDateOnly(DateTime.now());
-    final meals = requestedDate == _formatDateOnly(_meal.occurredAt)
-        ? [_meal]
-        : <Meal>[];
+    final meals =
+        requestedDate == _formatDateOnly(_meal.occurredAt) ? [_meal] : <Meal>[];
     final consumed = _sumMealNutrition(meals);
     return DailySummary(
       date: requestedDate,

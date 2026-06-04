@@ -9,6 +9,7 @@ import 'package:cal_tracker_mobile/data/services/secure_token_storage.dart';
 import 'package:cal_tracker_mobile/domain/models/nutrition_models.dart';
 import 'package:cal_tracker_mobile/generated/api/cal_tracker_api.dart';
 import 'package:cal_tracker_mobile/l10n/generated/app_localizations.dart';
+import 'package:cal_tracker_mobile/ui/core/design_system.dart';
 import 'package:cal_tracker_mobile/ui/features/meal_templates/view_models/meal_templates_view_model.dart';
 import 'package:cal_tracker_mobile/ui/features/meal_templates/views/meal_templates_screen.dart';
 import 'package:cal_tracker_mobile/ui/features/meal_templates/views/usual_food_editor_screen.dart';
@@ -39,6 +40,40 @@ void main() {
       ),
       findsOneWidget,
     );
+  });
+
+  testWidgets('usuals explanation and add action use dark palette', (
+    tester,
+  ) async {
+    await _pumpScreen(
+      tester,
+      _FakeNutritionRepository(),
+      themeMode: ThemeMode.dark,
+    );
+
+    var addButton = _addActionButton(tester);
+
+    expect(
+      find.text('Usual meals are trusted meals you can log quickly.'),
+      findsOneWidget,
+    );
+    expect(
+        find.byKey(const ValueKey('usuals_section_explanation')), findsNothing);
+    expect(find.byKey(const ValueKey('usuals_explainer_card')), findsNothing);
+    expect(addButton.backgroundColor, FreshPalette.dark.lime);
+
+    await tester.tap(find.text('Ingredients').hitTestable());
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'Usual ingredients are foods you enter manually so they appear first in search and meal logging.',
+      ),
+      findsOneWidget,
+    );
+    addButton = _addActionButton(tester);
+
+    expect(addButton.backgroundColor, FreshPalette.dark.lime);
   });
 
   testWidgets('usual ingredient form validates required fields', (
@@ -89,6 +124,8 @@ void main() {
 
     expect(find.text('New usual ingredient'), findsOneWidget);
     expect(find.byType(AlertDialog), findsNothing);
+    expect(
+        find.byKey(const ValueKey('usual_food_canonical_field')), findsNothing);
   });
 
   testWidgets(
@@ -98,6 +135,7 @@ void main() {
         draft: const UsualFoodDraft(
           name: 'AI rice',
           brand: 'Draft brand',
+          canonicalName: 'rice',
           servingGrams: 100,
           calories: 360,
           proteinGrams: 7,
@@ -166,9 +204,53 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(repository.createdInputs.single.name, 'AI rice');
+      expect(repository.createdInputs.single.canonicalName, 'rice');
       expect(repository.createdInputs.single.nutrients['saltGrams'], 0.01);
     },
   );
+
+  testWidgets('usual ingredient voice transcript uses dark surface', (
+    tester,
+  ) async {
+    final repository = _FakeNutritionRepository(
+      draft: const UsualFoodDraft(
+        name: 'AI rice',
+        servingGrams: 100,
+        calories: 360,
+        proteinGrams: 7,
+        carbsGrams: 79,
+        fatGrams: 1,
+      ),
+      transcript: 'My rice has 360 kcal per 100 g.',
+    );
+    final recorder = _FakeAudioRecorderService();
+    await _pumpEditor(
+      tester,
+      repository,
+      audioRecorderService: recorder,
+      themeMode: ThemeMode.dark,
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.byKey(const ValueKey('usual_food_voice_draft_button')),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    await tester.tap(
+      find.byKey(const ValueKey('usual_food_voice_draft_button')),
+    );
+    await tester.pumpAndSettle();
+
+    final transcriptCard = tester.widget<DecoratedBox>(
+      find.byKey(const ValueKey('usual_food_transcript_card')),
+    );
+    final decoration = transcriptCard.decoration as BoxDecoration;
+
+    expect(decoration.color, FreshPalette.dark.surfaceMuted);
+    expect(decoration.color, isNot(FreshColors.limeSoft));
+    expect(find.text('Transcript'), findsOneWidget);
+  });
 
   testWidgets('blocks usual ingredient form while voice draft is pending', (
     tester,
@@ -256,6 +338,46 @@ void main() {
     expect(find.text('Public rice'), findsOneWidget);
   });
 
+  testWidgets('usual meal cards match ingredient card structure in dark mode', (
+    tester,
+  ) async {
+    final repository = _FakeNutritionRepository(
+      templates: [
+        const MealTemplate(
+          id: 'template-1',
+          title: 'Usual lunch',
+          trustedAutoCommitEnabled: false,
+          nutrition: NutritionSnapshot(
+            calories: 130,
+            proteinGrams: 2.7,
+            carbsGrams: 28,
+            fatGrams: 0.3,
+          ),
+          items: [_publicRice],
+          aliases: ['lunch shortcut'],
+        ),
+      ],
+    );
+    await _pumpScreen(tester, repository, themeMode: ThemeMode.dark);
+
+    expect(find.text('Usual lunch'), findsOneWidget);
+    expect(find.text('lunch shortcut'), findsOneWidget);
+    expect(find.byIcon(Icons.restaurant_menu_rounded), findsOneWidget);
+    expect(find.byType(FreshFoodStack), findsNothing);
+    expect(
+      find.byKey(const ValueKey('meal_template_edit_template-1')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('meal_template_delete_template-1')),
+      findsOneWidget,
+    );
+    expect(find.text('130 Kcal'), findsOneWidget);
+    expect(find.text('2.7 g'), findsOneWidget);
+    expect(find.text('28 g'), findsOneWidget);
+    expect(find.text('0.3 g'), findsOneWidget);
+  });
+
   testWidgets('edits a usual ingredient', (tester) async {
     final repository = _FakeNutritionRepository(
       usualFoods: [_usualFood(id: 'food-1', name: 'Original ingredient')],
@@ -308,13 +430,12 @@ void main() {
 }
 
 Future<void> _pumpScreen(
-  WidgetTester tester,
-  _FakeNutritionRepository repository,
-) async {
+    WidgetTester tester, _FakeNutritionRepository repository,
+    {ThemeMode themeMode = ThemeMode.light}) async {
   await tester.pumpWidget(
     ChangeNotifierProvider(
       create: (_) => MealTemplatesViewModel(nutritionRepository: repository),
-      child: const _TestApp(),
+      child: _TestApp(themeMode: themeMode),
     ),
   );
   await tester.pumpAndSettle();
@@ -323,6 +444,12 @@ Future<void> _pumpScreen(
 Future<void> _openIngredientsTab(WidgetTester tester) async {
   await tester.tap(find.text('Ingredients').hitTestable());
   await tester.pumpAndSettle();
+}
+
+FreshIconButton _addActionButton(WidgetTester tester) {
+  return tester
+      .widgetList<FreshIconButton>(find.byType(FreshIconButton))
+      .singleWhere((button) => button.icon == Icons.add_rounded);
 }
 
 Future<void> _fillRequiredIngredientFields(
@@ -356,7 +483,9 @@ Future<void> _fillRequiredIngredientFields(
 }
 
 class _TestApp extends StatelessWidget {
-  const _TestApp();
+  const _TestApp({this.themeMode = ThemeMode.light});
+
+  final ThemeMode themeMode;
 
   @override
   Widget build(BuildContext context) {
@@ -402,6 +531,8 @@ class _TestApp extends StatelessWidget {
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       theme: buildLightTheme(),
+      darkTheme: buildDarkTheme(),
+      themeMode: themeMode,
       routerConfig: router,
     );
   }
@@ -412,6 +543,7 @@ Future<void> _pumpEditor(
   _FakeNutritionRepository repository, {
   AudioRecorderService? audioRecorderService,
   String? foodId,
+  ThemeMode themeMode = ThemeMode.light,
 }) async {
   await tester.pumpWidget(
     ChangeNotifierProvider(
@@ -420,6 +552,8 @@ Future<void> _pumpEditor(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         theme: buildLightTheme(),
+        darkTheme: buildDarkTheme(),
+        themeMode: themeMode,
         routerConfig: GoRouter(
           initialLocation: '/editor',
           routes: [

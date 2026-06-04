@@ -59,8 +59,9 @@ class _AuthScreenState extends State<AuthScreen> {
     final viewModel = context.watch<AuthViewModel>();
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     final l10n = context.l10n;
+    final palette = context.freshPalette;
     return Scaffold(
-      backgroundColor: FreshColors.screen,
+      backgroundColor: palette.screen,
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -162,7 +163,7 @@ class _AuthScreenState extends State<AuthScreen> {
                             icon: Icons.error_outline_rounded,
                             title: _authErrorTitle(l10n, viewModel.errorSource),
                             message: viewModel.error!,
-                            color: FreshColors.coral,
+                            color: palette.coral,
                           ),
                         ],
                       ],
@@ -452,17 +453,18 @@ class _LoginHeroCarouselState extends State<_LoginHeroCarousel>
     final height = MediaQuery.of(context).size.height < 740 ? 318.0 : 372.0;
     final staticMode =
         MediaQuery.of(context).disableAnimations || widget.assets.length == 1;
+    final palette = context.freshPalette;
     return SizedBox(
       key: const ValueKey('login_hero_carousel'),
       height: height,
       child: DecoratedBox(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(FreshRadii.xl),
-          boxShadow: const [
+          boxShadow: [
             BoxShadow(
-              color: Color(0x1f080907),
+              color: palette.ink.withValues(alpha: 0.12),
               blurRadius: 28,
-              offset: Offset(0, 16),
+              offset: const Offset(0, 16),
             ),
           ],
         ),

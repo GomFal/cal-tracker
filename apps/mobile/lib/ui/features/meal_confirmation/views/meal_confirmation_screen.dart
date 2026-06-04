@@ -8,8 +8,9 @@ class MealConfirmationScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.freshPalette;
     return Scaffold(
-      backgroundColor: FreshColors.screen,
+      backgroundColor: palette.screen,
       body: SafeArea(
         child: Center(
           child: Padding(
@@ -18,9 +19,9 @@ class MealConfirmationScreen extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const FreshIconChip(
+                  FreshIconChip(
                     icon: Icons.check_rounded,
-                    color: FreshColors.limeDeep,
+                    color: palette.limeDeep,
                   ),
                   const SizedBox(height: FreshSpacing.md),
                   Text(context.l10n.mealConfirmationEmbedded),

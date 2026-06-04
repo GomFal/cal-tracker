@@ -325,6 +325,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsLanguageSpanish => 'Español';
 
   @override
+  String get settingsThemeTitle => 'Appearance';
+
+  @override
+  String get settingsThemeSheetTitle => 'Choose appearance';
+
+  @override
+  String get settingsThemeSystem => 'Device default';
+
+  @override
+  String get settingsThemeLight => 'Light';
+
+  @override
+  String get settingsThemeDark => 'Dark';
+
+  @override
   String get settingsDataSourcesTitle => 'Data sources';
 
   @override

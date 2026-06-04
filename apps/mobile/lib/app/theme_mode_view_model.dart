@@ -8,7 +8,7 @@ class ThemeModeViewModel extends ChangeNotifier {
 
   final AppPreferencesRepository _preferencesRepository;
 
-  ThemeMode _themeMode = ThemeMode.light;
+  ThemeMode _themeMode = ThemeMode.system;
 
   ThemeMode get themeMode => _themeMode;
 
@@ -21,11 +21,14 @@ class ThemeModeViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> setDarkMode(bool enabled) async {
-    final nextThemeMode = enabled ? ThemeMode.dark : ThemeMode.light;
-    if (nextThemeMode == _themeMode) return;
-    _themeMode = nextThemeMode;
+  Future<void> setThemeMode(ThemeMode mode) async {
+    if (mode == _themeMode) return;
+    _themeMode = mode;
     notifyListeners();
-    await _preferencesRepository.saveThemeMode(nextThemeMode);
+    await _preferencesRepository.saveThemeMode(mode);
+  }
+
+  Future<void> setDarkMode(bool enabled) {
+    return setThemeMode(enabled ? ThemeMode.dark : ThemeMode.light);
   }
 }

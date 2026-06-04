@@ -81,11 +81,11 @@ class _VoiceActionButtonChromeState extends State<VoiceActionButtonChrome>
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.freshPalette;
     final reduceMotion =
         MediaQuery.maybeOf(context)?.disableAnimations ?? false;
     final scale = widget.isRecording ? widget.recordingScale : 1.0;
-    final shadowColor =
-        widget.isRecording ? FreshColors.coral : FreshColors.lime;
+    final shadowColor = widget.isRecording ? palette.coral : palette.lime;
 
     return SizedBox.square(
       dimension: widget.dimension,
@@ -189,6 +189,7 @@ class _PulseRing extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.freshPalette;
     return IgnorePointer(
       child: SizedBox.square(
         dimension: size,
@@ -196,10 +197,10 @@ class _PulseRing extends StatelessWidget {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             border: Border.all(
-              color: FreshColors.coral.withValues(alpha: opacity),
+              color: palette.coral.withValues(alpha: opacity),
               width: 2,
             ),
-            color: FreshColors.coral.withValues(alpha: opacity * 0.28),
+            color: palette.coral.withValues(alpha: opacity * 0.28),
           ),
         ),
       ),

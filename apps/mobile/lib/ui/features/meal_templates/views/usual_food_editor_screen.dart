@@ -50,7 +50,6 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
   late final bool _ownsAudioRecorderService;
   late final TextEditingController _nameController;
   late final TextEditingController _brandController;
-  late final TextEditingController _canonicalController;
   late final TextEditingController _barcodeController;
   late final TextEditingController _aliasesController;
   late final TextEditingController _servingGramsController;
@@ -66,6 +65,7 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
   bool _loadComplete = false;
   bool _initializedFromFood = false;
   bool _isSaving = false;
+  String? _canonicalName;
   _VoiceDraftPhase _voicePhase = _VoiceDraftPhase.idle;
   String? _transcript;
   String? _voiceStatus;
@@ -86,7 +86,6 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
     _ownsAudioRecorderService = widget.audioRecorderService == null;
     _nameController = TextEditingController();
     _brandController = TextEditingController();
-    _canonicalController = TextEditingController();
     _barcodeController = TextEditingController();
     _aliasesController = TextEditingController();
     _servingGramsController = TextEditingController();
@@ -116,7 +115,6 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
     }
     _nameController.dispose();
     _brandController.dispose();
-    _canonicalController.dispose();
     _barcodeController.dispose();
     _aliasesController.dispose();
     _servingGramsController.dispose();
@@ -195,6 +193,7 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
 
   Widget _buildForm(MealTemplatesViewModel viewModel, UsualFood? food) {
     final l10n = context.l10n;
+    final palette = context.freshPalette;
     final form = SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 10, 20, 112),
       child: Form(
@@ -224,21 +223,11 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
                     textInputAction: TextInputAction.next,
                     autofocus: !_isEditing,
                   ),
-                  _TwoColumnFields(
-                    children: [
-                      _textField(
-                        key: 'usual_food_brand_field',
-                        controller: _brandController,
-                        label: l10n.usualFoodsBrandLabel,
-                        textInputAction: TextInputAction.next,
-                      ),
-                      _textField(
-                        key: 'usual_food_canonical_field',
-                        controller: _canonicalController,
-                        label: l10n.usualFoodsCanonicalNameLabel,
-                        textInputAction: TextInputAction.next,
-                      ),
-                    ],
+                  _textField(
+                    key: 'usual_food_brand_field',
+                    controller: _brandController,
+                    label: l10n.usualFoodsBrandLabel,
+                    textInputAction: TextInputAction.next,
                   ),
                 ],
               ),
@@ -374,7 +363,7 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
                 icon: Icons.error_outline_rounded,
                 title: l10n.usualFoodsSaveFailedTitle,
                 message: viewModel.error,
-                color: FreshColors.coral,
+                color: palette.coral,
               ),
             ],
           ],
@@ -430,7 +419,7 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
     _initializedFromFood = true;
     _nameController.text = food.name;
     _brandController.text = food.brand ?? '';
-    _canonicalController.text = food.canonicalName ?? '';
+    _canonicalName = food.canonicalName;
     _barcodeController.text = food.barcode ?? '';
     _aliasesController.text = food.aliases.join(', ');
     _servingGramsController.text = _formatQuantity(food.servingGrams);
@@ -566,7 +555,9 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
   void _applyDraft(UsualFoodDraft draft) {
     _setTextIfPresent(_nameController, draft.name);
     _setTextIfPresent(_brandController, draft.brand);
-    _setTextIfPresent(_canonicalController, draft.canonicalName);
+    if (draft.canonicalName != null && draft.canonicalName!.trim().isNotEmpty) {
+      _canonicalName = draft.canonicalName!.trim();
+    }
     _setTextIfPresent(_barcodeController, draft.barcode);
     if (draft.aliases.isNotEmpty) {
       _aliasesController.text = draft.aliases.join(', ');
@@ -597,7 +588,7 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
     final input = UsualFoodInput(
       name: _nameController.text.trim(),
       brand: _optionalTrimmed(_brandController.text),
-      canonicalName: _optionalTrimmed(_canonicalController.text),
+      canonicalName: _canonicalName,
       barcode: _optionalTrimmed(_barcodeController.text),
       aliases: _aliasesController.text
           .split(',')
@@ -710,12 +701,17 @@ class _VoiceDraftCard extends StatelessWidget {
     final l10n = context.l10n;
     final palette = context.freshPalette;
     final isRecording = phase == _VoiceDraftPhase.recording;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final isBusy = phase == _VoiceDraftPhase.requestingPermission ||
         phase == _VoiceDraftPhase.stopping ||
         phase == _VoiceDraftPhase.transcribing ||
         phase == _VoiceDraftPhase.drafting;
     return FreshCard(
-      color: isRecording ? FreshColors.limeSoft : palette.surface,
+      color: isRecording
+          ? isDark
+              ? palette.limeWash
+              : palette.limeSoft
+          : palette.surface,
       radius: FreshRadii.xl,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -724,9 +720,9 @@ class _VoiceDraftCard extends StatelessWidget {
             children: [
               FreshIconChip(
                 icon: isRecording ? Icons.stop_rounded : Icons.mic_rounded,
-                color: isRecording ? FreshColors.coral : FreshColors.limeDeep,
+                color: isRecording ? palette.coral : palette.limeDeep,
                 backgroundColor:
-                    isRecording ? FreshColors.surface : FreshColors.limeWash,
+                    isRecording ? palette.surface : palette.limeWash,
               ),
               const SizedBox(width: FreshSpacing.md),
               Expanded(
@@ -780,9 +776,11 @@ class _VoiceDraftCard extends StatelessWidget {
           if (transcript != null && transcript!.trim().isNotEmpty) ...[
             const SizedBox(height: FreshSpacing.md),
             DecoratedBox(
+              key: const ValueKey('usual_food_transcript_card'),
               decoration: BoxDecoration(
-                color: palette.surfaceSoft,
+                color: isDark ? palette.surfaceMuted : palette.surfaceSoft,
                 borderRadius: BorderRadius.circular(FreshRadii.md),
+                border: Border.all(color: palette.ruleSoft),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(FreshSpacing.md),
@@ -799,6 +797,10 @@ class _VoiceDraftCard extends StatelessWidget {
                     SelectableText(
                       transcript!,
                       key: const ValueKey('usual_food_transcript_text'),
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyMedium
+                          ?.copyWith(color: palette.inkSoft),
                     ),
                   ],
                 ),
@@ -862,6 +864,7 @@ class _EditorSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.freshPalette;
     return FreshCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -870,8 +873,8 @@ class _EditorSection extends StatelessWidget {
             children: [
               FreshIconChip(
                 icon: icon,
-                color: FreshColors.leaf,
-                backgroundColor: FreshColors.limeWash,
+                color: palette.leaf,
+                backgroundColor: palette.limeWash,
               ),
               const SizedBox(width: FreshSpacing.md),
               Text(title, style: Theme.of(context).textTheme.titleMedium),
@@ -904,10 +907,10 @@ class _OptionalNutrientsSection extends StatelessWidget {
             vertical: FreshSpacing.sm,
           ),
           childrenPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-          leading: const FreshIconChip(
+          leading: FreshIconChip(
             icon: Icons.tune_rounded,
-            color: FreshColors.orange,
-            backgroundColor: FreshColors.yellow,
+            color: palette.orange,
+            backgroundColor: palette.yellow,
           ),
           title: Text(
             context.l10n.usualFoodsOptionalSectionTitle,
@@ -997,11 +1000,11 @@ class _BottomSaveBar extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: palette.screen,
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: Color(0x16080907),
+            color: palette.ink.withValues(alpha: 0.10),
             blurRadius: 24,
-            offset: Offset(0, -8),
+            offset: const Offset(0, -8),
           ),
         ],
       ),

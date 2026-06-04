@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:cal_tracker_mobile/app/dark_mode_toggle.dart';
 import 'package:cal_tracker_mobile/app/theme.dart';
 import 'package:cal_tracker_mobile/app/theme_mode_view_model.dart';
 import 'package:cal_tracker_mobile/data/repositories/auth_repository.dart';
@@ -26,7 +25,7 @@ import 'package:provider/provider.dart';
 
 void main() {
   testWidgets(
-    'dashboard exposes dark mode toggle and cleaned up Home surface',
+    'dashboard keeps cleaned up Home surface without theme toggle',
     (tester) async {
       final preferencesRepository = _FakePreferencesRepository();
       final themeModeViewModel = ThemeModeViewModel(
@@ -55,7 +54,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.byKey(DarkModeToggle.toggleKey), findsOneWidget);
+      expect(find.byKey(const ValueKey('dark_mode_toggle')), findsNothing);
       expect(
         find.byKey(const ValueKey('dashboard_progress_card')),
         findsOneWidget,
@@ -84,11 +83,8 @@ void main() {
       expect(find.byIcon(Icons.notifications_none_rounded), findsNothing);
       expect(find.byIcon(Icons.bolt_rounded), findsNothing);
 
-      await tester.tap(find.byKey(DarkModeToggle.toggleKey));
-      await tester.pumpAndSettle();
-
-      expect(themeModeViewModel.themeMode, ThemeMode.dark);
-      expect(preferencesRepository.savedModes, [ThemeMode.dark]);
+      expect(themeModeViewModel.themeMode, ThemeMode.system);
+      expect(preferencesRepository.savedModes, isEmpty);
     },
   );
 
@@ -134,6 +130,57 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('0 / 2.5 L'), findsOneWidget);
+  });
+
+  testWidgets('dashboard water widget uses contained dark-mode shadows', (
+    tester,
+  ) async {
+    final nutritionRepository = _FakeNutritionRepository(
+      dailySummary: _summaryWithWaterGoal,
+    );
+    final authViewModel = AuthViewModel(authRepository: _FakeAuthRepository())
+      ..setUser(_testUser);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<AuthViewModel>.value(value: authViewModel),
+          ChangeNotifierProvider(
+            create: (_) => ThemeModeViewModel(
+              preferencesRepository: _FakePreferencesRepository(),
+            ),
+          ),
+          ChangeNotifierProvider(
+            create: (_) =>
+                DashboardViewModel(nutritionRepository: nutritionRepository),
+          ),
+        ],
+        child: _testApp(
+          const DashboardScreen(),
+          themeMode: ThemeMode.dark,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final card = tester.widget<Container>(
+      find.byKey(const ValueKey('dashboard_water_intake_card')),
+    );
+    final decoration = card.decoration! as BoxDecoration;
+    final shadows = decoration.boxShadow!;
+
+    expect(decoration.color, const Color(0xff18343a));
+    expect(
+      shadows.any((shadow) => shadow.color == const Color(0x14f3f7ee)),
+      isFalse,
+    );
+    expect(
+      shadows.any((shadow) =>
+          _channel(shadow.color.r) > 220 &&
+          _channel(shadow.color.g) > 220 &&
+          _channel(shadow.color.b) > 220),
+      isFalse,
+    );
   });
 
   testWidgets(
@@ -619,15 +666,18 @@ void main() {
   });
 }
 
-Widget _testApp(Widget child) {
+Widget _testApp(Widget child, {ThemeMode themeMode = ThemeMode.light}) {
   return MaterialApp(
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     theme: buildLightTheme(),
     darkTheme: buildDarkTheme(),
+    themeMode: themeMode,
     home: Scaffold(body: child),
   );
 }
+
+int _channel(double value) => (value * 255).round().clamp(0, 255);
 
 class _FakeNutritionRepository extends NutritionRepository {
   _FakeNutritionRepository({
@@ -855,7 +905,7 @@ class _MemoryTokenStorage implements TokenStorage {
 }
 
 class _FakePreferencesRepository implements AppPreferencesRepository {
-  ThemeMode savedThemeMode = ThemeMode.light;
+  ThemeMode savedThemeMode = ThemeMode.system;
   String? savedLocaleCode;
   final List<ThemeMode> savedModes = [];
   int nextHeroIndex = 0;

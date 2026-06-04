@@ -33,9 +33,12 @@ class _MealTemplatesScreenState extends State<MealTemplatesScreen> {
   Widget build(BuildContext context) {
     final viewModel = context.watch<MealTemplatesViewModel>();
     final l10n = context.l10n;
+    final palette = context.freshPalette;
     return ContentFrame(
       title: l10n.templatesTitle,
-      subtitle: l10n.templatesSubtitle,
+      subtitle: _selectedSection == _UsualSection.meals
+          ? l10n.templatesExplainer
+          : l10n.usualFoodsExplainer,
       actions: [
         FreshIconButton(
           onPressed: () => viewModel.load(forceRefresh: true),
@@ -48,14 +51,13 @@ class _MealTemplatesScreenState extends State<MealTemplatesScreen> {
           tooltip: _selectedSection == _UsualSection.meals
               ? l10n.templatesAddTooltip
               : l10n.usualFoodsAddTooltip,
-          backgroundColor: FreshColors.lime,
+          backgroundColor: palette.lime,
+          foregroundColor: Theme.of(context).colorScheme.onPrimary,
         ),
       ],
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _UsualsExplainer(selectedSection: _selectedSection),
-          const SizedBox(height: FreshSpacing.lg),
           SegmentedButton<_UsualSection>(
             key: const ValueKey('usuals_section_tabs'),
             segments: [
@@ -85,7 +87,7 @@ class _MealTemplatesScreenState extends State<MealTemplatesScreen> {
               icon: Icons.error_outline_rounded,
               title: l10n.usualsCouldNotLoad,
               message: viewModel.error!,
-              color: FreshColors.coral,
+              color: palette.coral,
             ),
             const SizedBox(height: FreshSpacing.md),
           ],
@@ -108,42 +110,6 @@ class _MealTemplatesScreenState extends State<MealTemplatesScreen> {
 }
 
 enum _UsualSection { meals, ingredients }
-
-class _UsualsExplainer extends StatelessWidget {
-  const _UsualsExplainer({required this.selectedSection});
-
-  final _UsualSection selectedSection;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    final limeCardTextColor = FreshPalette.dark.limeWash;
-    return FreshCard(
-      color: FreshColors.limeSoft,
-      radius: FreshRadii.xl,
-      child: Row(
-        children: [
-          const FreshIconChip(
-            icon: Icons.star_rounded,
-            color: FreshColors.limeDeep,
-            backgroundColor: FreshColors.surface,
-          ),
-          const SizedBox(width: FreshSpacing.md),
-          Expanded(
-            child: Text(
-              selectedSection == _UsualSection.meals
-                  ? l10n.templatesExplainer
-                  : l10n.usualFoodsExplainer,
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(color: limeCardTextColor),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _MealsSection extends StatelessWidget {
   const _MealsSection({required this.viewModel});
@@ -283,6 +249,7 @@ class _UsualFoodCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final l10n = context.l10n;
+    final palette = context.freshPalette;
     return FreshCard(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -290,10 +257,10 @@ class _UsualFoodCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const FreshIconChip(
+              FreshIconChip(
                 icon: Icons.shopping_basket_rounded,
-                color: FreshColors.leaf,
-                backgroundColor: FreshColors.limeWash,
+                color: palette.leaf,
+                backgroundColor: palette.limeWash,
               ),
               const SizedBox(width: FreshSpacing.md),
               Expanded(
@@ -310,7 +277,7 @@ class _UsualFoodCard extends StatelessWidget {
                         l10n.usualFoodsManualSource,
                       ].join(' · '),
                       style: textTheme.bodyMedium?.copyWith(
-                        color: FreshColors.inkMuted,
+                        color: palette.inkMuted,
                       ),
                     ),
                   ],
@@ -339,25 +306,25 @@ class _UsualFoodCard extends StatelessWidget {
                 label: l10n.commonCalories,
                 value: '${food.nutrition.calories}',
                 unit: l10n.commonKcal,
-                color: FreshColors.lime,
+                color: palette.lime,
               ),
               _NutritionChip(
                 label: l10n.commonProtein,
                 value: _formatQuantity(food.nutrition.proteinGrams),
                 unit: 'g',
-                color: FreshColors.mint,
+                color: palette.mint,
               ),
               _NutritionChip(
                 label: l10n.commonCarbs,
                 value: _formatQuantity(food.nutrition.carbsGrams),
                 unit: 'g',
-                color: FreshColors.water,
+                color: palette.water,
               ),
               _NutritionChip(
                 label: l10n.commonFat,
                 value: _formatQuantity(food.nutrition.fatGrams),
                 unit: 'g',
-                color: FreshColors.orange,
+                color: palette.orange,
               ),
             ],
           ),
@@ -384,6 +351,7 @@ class _TemplateCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final l10n = context.l10n;
+    final palette = context.freshPalette;
     return FreshCard(
       padding: const EdgeInsets.all(16),
       onTap: onLog,
@@ -391,10 +359,10 @@ class _TemplateCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const FreshIconChip(
-                icon: Icons.local_fire_department_rounded,
-                color: FreshColors.orange,
-                backgroundColor: FreshColors.yellow,
+              FreshIconChip(
+                icon: Icons.restaurant_menu_rounded,
+                color: palette.leaf,
+                backgroundColor: palette.limeWash,
               ),
               const SizedBox(width: FreshSpacing.md),
               Expanded(
@@ -407,109 +375,55 @@ class _TemplateCard extends StatelessWidget {
                           ? l10n.templatesNoAliasesYet
                           : template.aliases.join(', '),
                       style: textTheme.bodyMedium?.copyWith(
-                        color: FreshColors.inkMuted,
+                        color: palette.inkMuted,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
               ),
-              const FreshFoodStack(
-                assets: [
-                  'assets/images/meal_breakfast.webp',
-                  'assets/images/meal_lunch.webp',
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: FreshSpacing.md),
-          Row(
-            children: [
-              Expanded(
-                child: _NutritionPill(
-                  label: l10n.commonCalories,
-                  value: '${template.nutrition.calories}',
-                  unit: l10n.commonKcal,
-                  color: FreshColors.lime,
-                ),
-              ),
-              const SizedBox(width: FreshSpacing.sm),
-              Expanded(
-                child: _NutritionPill(
-                  label: l10n.commonProtein,
-                  value: _formatQuantity(template.nutrition.proteinGrams),
-                  unit: 'g',
-                  color: FreshColors.mint,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: FreshSpacing.md),
-          Row(
-            children: [
-              TextButton.icon(
+              IconButton(
                 key: ValueKey('meal_template_edit_${template.id}'),
+                tooltip: l10n.commonEditIngredients,
                 onPressed: onEdit,
                 icon: const Icon(Icons.edit_rounded),
-                label: Text(l10n.commonEditIngredients),
               ),
-              const Spacer(),
-              TextButton.icon(
+              IconButton(
+                key: ValueKey('meal_template_delete_${template.id}'),
+                tooltip: l10n.commonDelete,
                 onPressed: onDelete,
-                icon: const Icon(
-                  Icons.delete_outline_rounded,
-                  color: FreshColors.coral,
-                ),
-                label: Text(l10n.commonDelete),
+                icon: const Icon(Icons.delete_outline_rounded),
               ),
             ],
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _NutritionPill extends StatelessWidget {
-  const _NutritionPill({
-    required this.label,
-    required this.value,
-    required this.unit,
-    required this.color,
-  });
-
-  final String label;
-  final String value;
-  final String unit;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.13),
-        borderRadius: BorderRadius.circular(FreshRadii.md),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: textTheme.labelMedium),
-          const SizedBox(height: FreshSpacing.xs),
+          const SizedBox(height: FreshSpacing.md),
           Wrap(
-            crossAxisAlignment: WrapCrossAlignment.end,
-            spacing: 4,
+            spacing: FreshSpacing.sm,
+            runSpacing: FreshSpacing.sm,
             children: [
-              Text(
-                value,
-                style: textTheme.titleLarge?.copyWith(
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
+              _NutritionChip(
+                label: l10n.commonCalories,
+                value: '${template.nutrition.calories}',
+                unit: l10n.commonKcal,
+                color: palette.lime,
               ),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 3),
-                child: Text(unit, style: textTheme.bodyMedium),
+              _NutritionChip(
+                label: l10n.commonProtein,
+                value: _formatQuantity(template.nutrition.proteinGrams),
+                unit: 'g',
+                color: palette.mint,
+              ),
+              _NutritionChip(
+                label: l10n.commonCarbs,
+                value: _formatQuantity(template.nutrition.carbsGrams),
+                unit: 'g',
+                color: palette.water,
+              ),
+              _NutritionChip(
+                label: l10n.commonFat,
+                value: _formatQuantity(template.nutrition.fatGrams),
+                unit: 'g',
+                color: palette.orange,
               ),
             ],
           ),

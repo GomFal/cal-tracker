@@ -86,7 +86,7 @@ class _MealItemEditorSheetState extends State<MealItemEditorSheet> {
                   icon: Icons.error_outline_rounded,
                   title: l10n.commonCheckIngredientDetails,
                   message: _error!,
-                  color: FreshColors.coral,
+                  color: palette.coral,
                 ),
                 const SizedBox(height: FreshSpacing.md),
               ],
@@ -345,7 +345,7 @@ class _IngredientEditorCard extends StatelessWidget {
               Text(
                 l10n.mealEditorMacroCaloriesShort(macroCalories),
                 style: textTheme.labelSmall?.copyWith(
-                  color: FreshColors.coral,
+                  color: palette.coral,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -864,7 +864,7 @@ class _NutritionDetailsSheetState extends State<_NutritionDetailsSheet> {
                 icon: Icons.error_outline_rounded,
                 title: l10n.commonCheckIngredientDetails,
                 message: _error!,
-                color: FreshColors.coral,
+                color: palette.coral,
               ),
               const SizedBox(height: FreshSpacing.md),
             ],
@@ -1226,11 +1226,12 @@ TextStyle _macroFieldStyle(BuildContext context, _MacroKind kind) {
       );
 }
 
-Color _macroColor(BuildContext _, _MacroKind kind) {
+Color _macroColor(BuildContext context, _MacroKind kind) {
+  final palette = context.freshPalette;
   return switch (kind) {
-    _MacroKind.protein => const Color(0xffc95a5a),
-    _MacroKind.carbs => const Color(0xffb88758),
-    _MacroKind.fat => const Color(0xffe0b93b),
+    _MacroKind.protein => palette.coral,
+    _MacroKind.carbs => palette.orange,
+    _MacroKind.fat => palette.yellow,
   };
 }
 

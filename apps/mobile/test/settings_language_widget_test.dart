@@ -1,5 +1,6 @@
 import 'package:cal_tracker_mobile/app/locale_view_model.dart';
 import 'package:cal_tracker_mobile/app/theme.dart';
+import 'package:cal_tracker_mobile/app/theme_mode_view_model.dart';
 import 'package:cal_tracker_mobile/data/repositories/auth_repository.dart';
 import 'package:cal_tracker_mobile/data/repositories/nutrition_repository.dart';
 import 'package:cal_tracker_mobile/data/services/api_config.dart';
@@ -46,6 +47,56 @@ void main() {
     expect(find.text('Idioma'), findsOneWidget);
     expect(find.text('Fuentes de datos'), findsOneWidget);
     expect(preferencesRepository.savedLocaleCode, 'es');
+  });
+
+  testWidgets('Menu theme row defaults to device and persists choices',
+      (tester) async {
+    final preferencesRepository = _FakePreferencesRepository();
+    final themeModeViewModel = ThemeModeViewModel(
+      preferencesRepository: preferencesRepository,
+    );
+    await _pumpSettings(
+      tester,
+      preferencesRepository: preferencesRepository,
+      themeModeViewModel: themeModeViewModel,
+    );
+
+    expect(find.text('Appearance'), findsOneWidget);
+    expect(find.text('Device default'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('theme_settings_row')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Choose appearance'), findsOneWidget);
+    expect(find.byKey(const ValueKey('theme_option_system')), findsOneWidget);
+    expect(find.byKey(const ValueKey('theme_option_light')), findsOneWidget);
+    expect(find.byKey(const ValueKey('theme_option_dark')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('theme_option_system')),
+        matching: find.byIcon(Icons.check_rounded),
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('theme_option_dark')));
+    await tester.pumpAndSettle();
+
+    expect(themeModeViewModel.themeMode, ThemeMode.dark);
+    expect(preferencesRepository.savedModes, [ThemeMode.dark]);
+    expect(find.text('Dark'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('theme_settings_row')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('theme_option_light')));
+    await tester.pumpAndSettle();
+
+    expect(themeModeViewModel.themeMode, ThemeMode.light);
+    expect(preferencesRepository.savedModes, [
+      ThemeMode.dark,
+      ThemeMode.light,
+    ]);
+    expect(find.text('Light'), findsOneWidget);
   });
 
   testWidgets('Menu hydration sheet uses localized copy and saves liters',
@@ -223,13 +274,20 @@ void main() {
 
 Future<void> _pumpSettings(
   WidgetTester tester, {
+  _FakePreferencesRepository? preferencesRepository,
   _FakeNutritionRepository? nutritionRepository,
   LocaleViewModel? localeViewModel,
+  ThemeModeViewModel? themeModeViewModel,
 }) async {
-  final preferencesRepository = _FakePreferencesRepository();
+  final effectivePreferencesRepository =
+      preferencesRepository ?? _FakePreferencesRepository();
   final effectiveLocaleViewModel = localeViewModel ??
       LocaleViewModel(
-        preferencesRepository: preferencesRepository,
+        preferencesRepository: effectivePreferencesRepository,
+      );
+  final effectiveThemeModeViewModel = themeModeViewModel ??
+      ThemeModeViewModel(
+        preferencesRepository: effectivePreferencesRepository,
       );
   final effectiveNutritionRepository =
       nutritionRepository ?? _FakeNutritionRepository();
@@ -243,6 +301,9 @@ Future<void> _pumpSettings(
         ChangeNotifierProvider<AuthViewModel>.value(value: authViewModel),
         ChangeNotifierProvider<LocaleViewModel>.value(
           value: effectiveLocaleViewModel,
+        ),
+        ChangeNotifierProvider<ThemeModeViewModel>.value(
+          value: effectiveThemeModeViewModel,
         ),
         ChangeNotifierProvider(
           create: (_) => DashboardViewModel(
@@ -273,18 +334,23 @@ class _SettingsTestApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final locale = context.watch<LocaleViewModel>().locale;
+    final themeMode = context.watch<ThemeModeViewModel>().themeMode;
     return MaterialApp(
       locale: locale,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       theme: buildLightTheme(),
+      darkTheme: buildDarkTheme(),
+      themeMode: themeMode,
       home: const Scaffold(body: SettingsScreen()),
     );
   }
 }
 
 class _FakePreferencesRepository implements AppPreferencesRepository {
+  ThemeMode savedThemeMode = ThemeMode.system;
   String? savedLocaleCode;
+  final List<ThemeMode> savedModes = [];
 
   @override
   Future<String?> loadLocaleCode() async => savedLocaleCode;
@@ -295,10 +361,13 @@ class _FakePreferencesRepository implements AppPreferencesRepository {
   }
 
   @override
-  Future<ThemeMode> loadThemeMode() async => ThemeMode.light;
+  Future<ThemeMode> loadThemeMode() async => savedThemeMode;
 
   @override
-  Future<void> saveThemeMode(ThemeMode mode) async {}
+  Future<void> saveThemeMode(ThemeMode mode) async {
+    savedThemeMode = mode;
+    savedModes.add(mode);
+  }
 
   @override
   Future<int> nextAuthHeroIndex({int count = 5}) async => 0;

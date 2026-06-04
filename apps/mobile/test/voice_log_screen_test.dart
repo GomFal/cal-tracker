@@ -6,6 +6,7 @@ import 'package:cal_tracker_mobile/data/repositories/nutrition_repository.dart';
 import 'package:cal_tracker_mobile/data/services/audio_recorder_service.dart';
 import 'package:cal_tracker_mobile/domain/models/nutrition_models.dart';
 import 'package:cal_tracker_mobile/l10n/generated/app_localizations.dart';
+import 'package:cal_tracker_mobile/ui/core/design_system.dart';
 import 'package:cal_tracker_mobile/ui/features/voice_log/view_models/voice_log_view_model.dart';
 import 'package:cal_tracker_mobile/ui/features/voice_log/views/voice_log_screen.dart';
 import 'package:flutter/material.dart';
@@ -115,7 +116,9 @@ void main() {
             child: MaterialApp(
               localizationsDelegates: AppLocalizations.localizationsDelegates,
               supportedLocales: AppLocalizations.supportedLocales,
-              theme: buildTheme(),
+              theme: buildLightTheme(),
+              darkTheme: buildDarkTheme(),
+              themeMode: ThemeMode.dark,
               home: const MealCreateScreen(),
             ),
           ),
@@ -148,6 +151,14 @@ void main() {
           find.byKey(const ValueKey('voice_transcript_card')),
           findsOneWidget,
         );
+        final transcriptCard = tester.widget<FreshCard>(
+          find.byKey(const ValueKey('voice_transcript_card')),
+        );
+        final micButton = tester.widget<IconButton>(
+          find.byKey(const ValueKey('mic_button')),
+        );
+        expect(transcriptCard.color, FreshPalette.dark.limeWash);
+        expect(micButton.color, buildDarkTheme().colorScheme.onPrimary);
         expect(find.text('I heard:'), findsOneWidget);
         expect(find.text('chicken and rice'), findsOneWidget);
         expect(

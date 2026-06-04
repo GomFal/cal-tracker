@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../../../app/dark_mode_toggle.dart';
 import '../../../../domain/models/macro_distribution.dart';
 import '../../../../domain/models/nutrition_models.dart';
 import '../../../../l10n/app_localizations_context.dart';
@@ -39,6 +38,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final viewModel = context.watch<DashboardViewModel>();
     final user = context.watch<AuthViewModel>().user;
     final l10n = context.l10n;
+    final palette = context.freshPalette;
     final summary = viewModel.summary;
     final displayName = user?.displayName.trim().isNotEmpty == true
         ? user!.displayName
@@ -47,7 +47,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       title: displayName,
       subtitle: dashboardGreeting(DateTime.now(), l10n),
       leading: const _Avatar(),
-      actions: const [DarkModeToggle()],
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -60,7 +59,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               icon: Icons.error_outline_rounded,
               title: l10n.dashboardCouldNotLoadToday,
               message: viewModel.error!,
-              color: FreshColors.coral,
+              color: palette.coral,
               action: TextButton.icon(
                 onPressed: () => viewModel.load(forceRefresh: true),
                 icon: const Icon(Icons.refresh_rounded),
@@ -407,7 +406,7 @@ class _CalorieSetupProgressCard extends StatelessWidget {
             borderRadius: radius,
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.055),
+                color: palette.ink.withValues(alpha: 0.055),
                 blurRadius: 32,
                 offset: const Offset(0, 18),
               ),
@@ -551,6 +550,7 @@ class _MacroSummaryRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.freshPalette;
     final l10n = context.l10n;
     final consumedNutrition = summary?.consumed ?? _emptyNutrition;
     final targetNutrition = summary?.target ?? _emptyNutrition;
@@ -568,7 +568,7 @@ class _MacroSummaryRow extends StatelessWidget {
                     targetNutrition.carbsGrams,
                   )
                 : '',
-            color: FreshColors.orange,
+            color: palette.orange,
           ),
         ),
         const SizedBox(width: FreshSpacing.sm),
@@ -583,7 +583,7 @@ class _MacroSummaryRow extends StatelessWidget {
                     targetNutrition.proteinGrams,
                   )
                 : '',
-            color: FreshColors.mint,
+            color: palette.mint,
           ),
         ),
         const SizedBox(width: FreshSpacing.sm),
@@ -598,7 +598,7 @@ class _MacroSummaryRow extends StatelessWidget {
                     targetNutrition.fatGrams,
                   )
                 : '',
-            color: FreshColors.yellow,
+            color: palette.yellow,
           ),
         ),
       ],
@@ -712,28 +712,43 @@ class _WaterIntakeCard extends StatelessWidget {
     final goal = roundHydrationLiters(summary?.hydrationGoalLiters ?? 0);
     final canDecrease = enabled && consumed > 0;
     final canIncrease = enabled && goal > 0 && consumed < goal;
-    final waterCardColor = Theme.of(context).brightness == Brightness.dark
-        ? const Color(0xff203940)
-        : const Color(0xffd5f2f8);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final waterCardColor =
+        isDark ? const Color(0xff18343a) : const Color(0xffd5f2f8);
+    final shadows = isDark
+        ? [
+            BoxShadow(
+              color: palette.appBg.withValues(alpha: 0.55),
+              blurRadius: 22,
+              offset: const Offset(0, 12),
+            ),
+            BoxShadow(
+              color: palette.water.withValues(alpha: 0.08),
+              blurRadius: 16,
+              spreadRadius: -3,
+              offset: const Offset(0, 6),
+            ),
+          ]
+        : [
+            BoxShadow(
+              color: palette.water.withValues(alpha: 0.16),
+              blurRadius: 18,
+              spreadRadius: 1,
+              offset: const Offset(0, 8),
+            ),
+            BoxShadow(
+              color: palette.ink.withValues(alpha: 0.08),
+              blurRadius: 24,
+              offset: const Offset(0, 12),
+            ),
+          ];
     return Container(
       key: const ValueKey('dashboard_water_intake_card'),
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
       decoration: BoxDecoration(
         color: waterCardColor,
         borderRadius: BorderRadius.circular(26),
-        boxShadow: [
-          BoxShadow(
-            color: palette.water.withValues(alpha: 0.16),
-            blurRadius: 18,
-            spreadRadius: 1,
-            offset: const Offset(0, 8),
-          ),
-          BoxShadow(
-            color: palette.ink.withValues(alpha: 0.08),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
-          ),
-        ],
+        boxShadow: shadows,
       ),
       child: Row(
         children: [
@@ -924,24 +939,24 @@ class _DashboardEmptyMealsCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: palette.surface,
           borderRadius: BorderRadius.circular(FreshRadii.xl),
-          boxShadow: const [
+          boxShadow: [
             BoxShadow(
-              color: Color(0x1f080907),
+              color: palette.ink.withValues(alpha: 0.12),
               blurRadius: 30,
-              offset: Offset(0, 16),
+              offset: const Offset(0, 16),
             ),
             BoxShadow(
-              color: Color(0x0f080907),
+              color: palette.ink.withValues(alpha: 0.06),
               blurRadius: 10,
-              offset: Offset(0, 4),
+              offset: const Offset(0, 4),
             ),
           ],
         ),
         child: Column(
           children: [
-            const FreshIconChip(
+            FreshIconChip(
               icon: Icons.restaurant_menu_rounded,
-              color: FreshColors.limeDeep,
+              color: palette.limeDeep,
             ),
             const SizedBox(height: FreshSpacing.md),
             Text(

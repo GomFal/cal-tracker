@@ -41,9 +41,10 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
   Widget build(BuildContext context) {
     final viewModel = context.watch<VoiceLogViewModel>();
     final canStartOver = _canStartOver(viewModel);
+    final palette = context.freshPalette;
 
     return Scaffold(
-      backgroundColor: FreshColors.screen,
+      backgroundColor: palette.screen,
       floatingActionButton: _MealCreateVoiceActionButton(viewModel: viewModel),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       body: KeyedSubtree(
@@ -76,11 +77,11 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
                 const SizedBox(height: FreshSpacing.md),
               ],
               if (viewModel.state == VoiceLogState.transcribing) ...[
-                const FreshStatusBanner(
+                FreshStatusBanner(
                   icon: Icons.graphic_eq_rounded,
                   title: 'Transcribing...',
                   message: 'Listening back and preparing the text.',
-                  color: FreshColors.water,
+                  color: palette.water,
                 ),
                 const SizedBox(height: FreshSpacing.md),
               ],
@@ -121,7 +122,7 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
                   title: 'Needs a little more detail',
                   message: viewModel.message ??
                       'I am not sure what you would like to do. Could you rephrase?',
-                  color: FreshColors.orange,
+                  color: palette.orange,
                 ),
                 const SizedBox(height: FreshSpacing.md),
               ],
@@ -257,6 +258,7 @@ class _VoiceTranscriptCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.freshPalette;
     final textTheme = Theme.of(context).textTheme;
 
     return FreshCard(
@@ -266,14 +268,15 @@ class _VoiceTranscriptCard extends StatelessWidget {
         vertical: FreshSpacing.sm,
       ),
       radius: FreshRadii.md,
-      color: FreshColors.surfaceSoft,
+      color: palette.limeWash,
+      shadow: false,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             context.l10n.voiceTranscriptHeardLabel,
             style: textTheme.labelLarge?.copyWith(
-              color: FreshColors.inkMuted,
+              color: palette.inkMuted,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -282,7 +285,7 @@ class _VoiceTranscriptCard extends StatelessWidget {
             child: Text(
               transcript,
               style: textTheme.bodySmall?.copyWith(
-                color: FreshColors.inkSoft,
+                color: palette.inkSoft,
                 height: 1.25,
                 letterSpacing: 0,
               ),
@@ -319,6 +322,7 @@ class _ManualFoodSearchPanelState extends State<_ManualFoodSearchPanel> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final palette = context.freshPalette;
     return FreshCard(
       key: const ValueKey('manual_food_search_panel'),
       child: Column(
@@ -326,10 +330,10 @@ class _ManualFoodSearchPanelState extends State<_ManualFoodSearchPanel> {
         children: [
           Row(
             children: [
-              const FreshIconChip(
+              FreshIconChip(
                 icon: Icons.search_rounded,
-                color: FreshColors.limeDeep,
-                backgroundColor: FreshColors.limeWash,
+                color: palette.limeDeep,
+                backgroundColor: palette.limeWash,
               ),
               const SizedBox(width: FreshSpacing.md),
               Expanded(
@@ -360,7 +364,7 @@ class _ManualFoodSearchPanelState extends State<_ManualFoodSearchPanel> {
             Text(
               context.l10n.foodSearchSelectedFoods,
               style: textTheme.labelLarge?.copyWith(
-                color: FreshColors.inkMuted,
+                color: palette.inkMuted,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0,
               ),
@@ -611,9 +615,10 @@ class _ProposalChangeSuccessToast extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final palette = context.freshPalette;
     return FreshCard(
       key: const ValueKey('proposal_change_success_toast'),
-      color: FreshColors.limeWash,
+      color: palette.limeWash,
       radius: FreshRadii.lg,
       padding: const EdgeInsets.symmetric(
         horizontal: FreshSpacing.lg,
@@ -623,9 +628,9 @@ class _ProposalChangeSuccessToast extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
+          Icon(
             Icons.check_rounded,
-            color: FreshColors.limeDeep,
+            color: palette.limeDeep,
             size: 20,
           ),
           const SizedBox(width: FreshSpacing.sm),
@@ -634,7 +639,7 @@ class _ProposalChangeSuccessToast extends StatelessWidget {
               context.l10n.voiceChangesApplied,
               style: textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w700,
-                color: FreshColors.ink,
+                color: palette.ink,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -674,6 +679,7 @@ class _ResolverClarificationCardState
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final palette = context.freshPalette;
     return FreshCard(
       key: const ValueKey('resolver_clarification_card'),
       child: Column(
@@ -712,7 +718,7 @@ class _ResolverClarificationCardState
               Text(
                 context.l10n.voiceNoDatabaseMatch,
                 style: textTheme.bodyMedium?.copyWith(
-                  color: FreshColors.inkMuted,
+                  color: palette.inkMuted,
                 ),
               )
             else
@@ -888,6 +894,7 @@ class _FoodSearchBoxState extends State<_FoodSearchBox> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final palette = context.freshPalette;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -925,7 +932,7 @@ class _FoodSearchBoxState extends State<_FoodSearchBox> {
                 child: Text(
                   _error!,
                   style: textTheme.bodySmall?.copyWith(
-                    color: FreshColors.coral,
+                    color: palette.coral,
                     letterSpacing: 0,
                   ),
                 ),
@@ -947,7 +954,7 @@ class _FoodSearchBoxState extends State<_FoodSearchBox> {
             context.l10n.foodSearchEmpty,
             key: ValueKey('${widget.keyPrefix}_empty'),
             style: textTheme.bodySmall?.copyWith(
-              color: FreshColors.inkMuted,
+              color: palette.inkMuted,
               letterSpacing: 0,
             ),
           ),
@@ -1055,6 +1062,7 @@ class _FoodSearchResultLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final palette = context.freshPalette;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -1075,7 +1083,7 @@ class _FoodSearchResultLine extends StatelessWidget {
               Text(
                 _foodSearchItemSubtitle(item),
                 style: textTheme.labelMedium?.copyWith(
-                  color: FreshColors.inkMuted,
+                  color: palette.inkMuted,
                   letterSpacing: 0,
                 ),
                 maxLines: 1,
@@ -1155,6 +1163,7 @@ class _FoodCandidateStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.freshPalette;
     final textTheme = Theme.of(context).textTheme;
     final visibleCandidates = candidates.take(_candidateDisplayLimit).toList();
     final visibleIndexes = _visibleCandidateIndexes(visibleCandidates);
@@ -1165,7 +1174,7 @@ class _FoodCandidateStrip extends StatelessWidget {
         if (label != null) ...[
           Text(
             label!,
-            style: textTheme.labelMedium?.copyWith(color: FreshColors.inkMuted),
+            style: textTheme.labelMedium?.copyWith(color: palette.inkMuted),
           ),
           const SizedBox(height: FreshSpacing.xs),
         ],
@@ -1240,13 +1249,14 @@ class _CandidateMealLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final palette = context.freshPalette;
     final metadata = _candidateMetadata(candidate);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Material(
         color: selected
-            ? FreshColors.lime.withValues(alpha: 0.16)
-            : FreshColors.surfaceSoft,
+            ? palette.lime.withValues(alpha: 0.16)
+            : palette.surfaceSoft,
         borderRadius: BorderRadius.circular(FreshRadii.md),
         child: InkWell(
           borderRadius: BorderRadius.circular(FreshRadii.md),
@@ -1260,9 +1270,9 @@ class _CandidateMealLine extends StatelessWidget {
                   icon: selected
                       ? Icons.check_circle_rounded
                       : Icons.radio_button_unchecked_rounded,
-                  color: selected ? FreshColors.limeDeep : FreshColors.inkMuted,
+                  color: selected ? palette.limeDeep : palette.inkMuted,
                   backgroundColor:
-                      selected ? FreshColors.limeSoft : FreshColors.surface,
+                      selected ? palette.limeSoft : palette.surface,
                   size: 36,
                 ),
                 const SizedBox(width: FreshSpacing.md),
@@ -1286,7 +1296,7 @@ class _CandidateMealLine extends StatelessWidget {
                               Text(
                                 item,
                                 style: textTheme.labelMedium?.copyWith(
-                                  color: FreshColors.inkMuted,
+                                  color: palette.inkMuted,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -1319,7 +1329,7 @@ class _CandidateMealLine extends StatelessWidget {
                         Text(
                           '${(candidate.confidence! * 100).round()}%',
                           style: textTheme.labelSmall?.copyWith(
-                            color: FreshColors.limeDeep,
+                            color: palette.limeDeep,
                             fontFeatures: const [FontFeature.tabularFigures()],
                           ),
                         ),
@@ -1392,6 +1402,7 @@ class _MealCreateVoiceActionButton extends StatelessWidget {
         viewModel.state == VoiceLogState.agentRunning;
     final isCorrection = viewModel.proposal != null;
     final hasError = viewModel.state == VoiceLogState.error;
+    final colorScheme = Theme.of(context).colorScheme;
     final tooltip = isRecording
         ? 'Stop and submit voice'
         : isDisabled
@@ -1400,9 +1411,9 @@ class _MealCreateVoiceActionButton extends StatelessWidget {
                 ? 'Record correction'
                 : 'Record meal';
     final backgroundColor = isRecording
-        ? FreshColors.coral
+        ? palette.coral
         : hasError
-            ? FreshColors.yellow
+            ? palette.yellow
             : isDisabled
                 ? palette.surfaceMuted
                 : palette.lime;
@@ -1430,7 +1441,11 @@ class _MealCreateVoiceActionButton extends StatelessWidget {
               tooltip: tooltip,
               onPressed: isDisabled ? null : () => _handleTap(viewModel),
               icon: Icon(icon),
-              color: palette.ink,
+              color: isRecording
+                  ? colorScheme.onError
+                  : hasError
+                      ? palette.ink
+                      : colorScheme.onPrimary,
               disabledColor: palette.inkMuted,
               iconSize: 32,
               style: IconButton.styleFrom(
@@ -1471,7 +1486,7 @@ class _InfoBanner extends StatelessWidget {
       icon: Icons.info_outline_rounded,
       title: 'Update',
       message: message,
-      color: FreshColors.water,
+      color: context.freshPalette.water,
     );
   }
 }
@@ -1489,7 +1504,7 @@ class _RecordingIndicator extends StatelessWidget {
       icon: Icons.fiber_manual_record_rounded,
       title: '$minutes:$seconds',
       message: 'Recording voice input from the emulator microphone.',
-      color: FreshColors.coral,
+      color: context.freshPalette.coral,
     );
   }
 }
@@ -1506,7 +1521,7 @@ class _ErrorBanner extends StatelessWidget {
       icon: Icons.error_outline_rounded,
       title: 'Something went wrong',
       message: message,
-      color: FreshColors.coral,
+      color: context.freshPalette.coral,
       action: TextButton.icon(
         onPressed: onRetry,
         icon: const Icon(Icons.refresh_rounded),
@@ -1527,7 +1542,7 @@ class _LoggedMealBanner extends StatelessWidget {
       icon: Icons.check_rounded,
       title: title,
       message: 'Logged. You can correct it from history.',
-      color: FreshColors.limeDeep,
+      color: context.freshPalette.limeDeep,
     );
   }
 }
@@ -1539,6 +1554,7 @@ class _SummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.freshPalette;
     return FreshCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1552,7 +1568,7 @@ class _SummaryCard extends StatelessWidget {
                   label: 'Consumed',
                   value: '${summary.consumed.calories}',
                   unit: 'Kcal',
-                  color: FreshColors.lime,
+                  color: palette.lime,
                 ),
               ),
               const SizedBox(width: FreshSpacing.md),
@@ -1561,7 +1577,7 @@ class _SummaryCard extends StatelessWidget {
                   label: 'Remaining',
                   value: '${summary.remaining.calories}',
                   unit: 'Kcal',
-                  color: FreshColors.water,
+                  color: palette.water,
                 ),
               ),
             ],
@@ -1661,6 +1677,7 @@ class _RemainingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.freshPalette;
     return FreshCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1674,7 +1691,7 @@ class _RemainingCard extends StatelessWidget {
                   label: 'Calories',
                   value: '${remaining.calories}',
                   unit: 'Kcal',
-                  color: FreshColors.lime,
+                  color: palette.lime,
                 ),
               ),
               const SizedBox(width: FreshSpacing.md),
@@ -1683,7 +1700,7 @@ class _RemainingCard extends StatelessWidget {
                   label: 'Protein',
                   value: _formatQuantity(remaining.proteinGrams),
                   unit: 'g',
-                  color: FreshColors.orange,
+                  color: palette.orange,
                 ),
               ),
             ],
@@ -1730,6 +1747,7 @@ class _MealLabelSheetState extends State<_MealLabelSheet> {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    final palette = context.freshPalette;
     return Padding(
       padding: EdgeInsets.fromLTRB(20, 16, 20, 20 + bottomInset),
       child: Column(
@@ -1742,7 +1760,7 @@ class _MealLabelSheetState extends State<_MealLabelSheet> {
               width: 44,
               height: 5,
               decoration: BoxDecoration(
-                color: FreshColors.rule,
+                color: palette.rule,
                 borderRadius: BorderRadius.circular(999),
               ),
             ),
@@ -1755,7 +1773,7 @@ class _MealLabelSheetState extends State<_MealLabelSheet> {
           const SizedBox(height: FreshSpacing.sm),
           Text(
             'This helps your Home screen make today easier to scan.',
-            style: textTheme.bodyMedium?.copyWith(color: FreshColors.inkMuted),
+            style: textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
           ),
           const SizedBox(height: FreshSpacing.lg),
           Wrap(
@@ -1842,6 +1860,7 @@ class _ProposalCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final palette = context.freshPalette;
     return FreshCard(
       radius: FreshRadii.xl,
       child: Column(
@@ -1849,10 +1868,10 @@ class _ProposalCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const FreshIconChip(
+              FreshIconChip(
                 icon: Icons.local_fire_department_rounded,
-                color: FreshColors.orange,
-                backgroundColor: FreshColors.yellow,
+                color: palette.orange,
+                backgroundColor: palette.yellow,
               ),
               const SizedBox(width: FreshSpacing.md),
               Expanded(
@@ -1863,7 +1882,7 @@ class _ProposalCard extends StatelessWidget {
                     Text(
                       'Ready to log',
                       style: textTheme.bodyMedium?.copyWith(
-                        color: FreshColors.inkMuted,
+                        color: palette.inkMuted,
                       ),
                     ),
                   ],
@@ -1882,7 +1901,7 @@ class _ProposalCard extends StatelessWidget {
             label: 'Calories',
             value: '${proposal.nutrition.calories}',
             unit: 'Kcal',
-            color: FreshColors.lime,
+            color: palette.lime,
           ),
           const SizedBox(height: FreshSpacing.md),
           for (final item in proposal.items)
@@ -1955,6 +1974,7 @@ class _ProposalEditorSheetState extends State<_ProposalEditorSheet> {
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     final textTheme = Theme.of(context).textTheme;
+    final palette = context.freshPalette;
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.fromLTRB(18, 12, 18, bottomInset + 18),
@@ -1968,7 +1988,7 @@ class _ProposalEditorSheetState extends State<_ProposalEditorSheet> {
                   width: 44,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: FreshColors.rule,
+                    color: palette.rule,
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
@@ -2558,7 +2578,7 @@ class _NutritionEditorSheetState extends State<_NutritionEditorSheet> {
                 width: 44,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: FreshColors.rule,
+                  color: palette.rule,
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),
@@ -2580,7 +2600,7 @@ class _NutritionEditorSheetState extends State<_NutritionEditorSheet> {
                 icon: Icons.error_outline_rounded,
                 title: 'Check nutrition',
                 message: _error!,
-                color: FreshColors.coral,
+                color: palette.coral,
               ),
               const SizedBox(height: FreshSpacing.md),
             ],
@@ -2833,7 +2853,7 @@ Color _macroColor(BuildContext context, _MacroKind kind) {
   final palette = context.freshPalette;
   return switch (kind) {
     _MacroKind.protein => palette.coral,
-    _MacroKind.carbs => const Color(0xffc9941a),
+    _MacroKind.carbs => palette.orange,
     _MacroKind.fat => palette.leaf,
   };
 }
@@ -3073,14 +3093,15 @@ class _MealLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final palette = context.freshPalette;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          const FreshIconChip(
+          FreshIconChip(
             icon: Icons.local_fire_department_rounded,
-            color: FreshColors.orange,
-            backgroundColor: FreshColors.yellow,
+            color: palette.orange,
+            backgroundColor: palette.yellow,
             size: 36,
           ),
           const SizedBox(width: FreshSpacing.md),
@@ -3093,7 +3114,7 @@ class _MealLine extends StatelessWidget {
                   Text(
                     subtitle,
                     style: textTheme.bodyMedium?.copyWith(
-                      color: FreshColors.inkMuted,
+                      color: palette.inkMuted,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),

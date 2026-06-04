@@ -465,7 +465,7 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
                   icon: Icons.error_outline_rounded,
                   title: l10n.calorieWizardCheckDetailsTitle,
                   message: _error!,
-                  color: FreshColors.coral,
+                  color: palette.coral,
                 ),
               ],
               const SizedBox(height: FreshSpacing.md),
@@ -1181,13 +1181,16 @@ List<_WizardOption> _activityOptions(AppLocalizations l10n) => [
       ),
     ];
 
-const _calorieWizardCardShadow = [
-  BoxShadow(
-    color: Color(0x08080907),
-    blurRadius: 20,
-    offset: Offset(0, 7),
-  ),
-];
+List<BoxShadow> _calorieWizardCardShadow(BuildContext context) {
+  final palette = context.freshPalette;
+  return [
+    BoxShadow(
+      color: palette.ink.withValues(alpha: 0.05),
+      blurRadius: 20,
+      offset: const Offset(0, 7),
+    ),
+  ];
+}
 
 List<_WizardOption> _goalOptions(AppLocalizations l10n) => [
       _WizardOption(
@@ -1424,7 +1427,7 @@ class _WizardChoiceCard extends StatelessWidget {
               color: selected ? palette.lime : palette.ruleSoft,
               width: selected ? 2 : 1,
             ),
-            boxShadow: _calorieWizardCardShadow,
+            boxShadow: _calorieWizardCardShadow(context),
           ),
           child: Row(
             children: [
@@ -1745,11 +1748,11 @@ class _CompactUnitSegment extends StatelessWidget {
             ),
             boxShadow: selected
                 ? const []
-                : const [
+                : [
                     BoxShadow(
-                      color: Color(0x14080907),
+                      color: palette.ink.withValues(alpha: 0.08),
                       blurRadius: 16,
-                      offset: Offset(0, 8),
+                      offset: const Offset(0, 8),
                     ),
                   ],
           ),
@@ -2156,7 +2159,7 @@ class _ResultPlanStep extends StatelessWidget {
             decoration: BoxDecoration(
               color: palette.surface,
               borderRadius: BorderRadius.circular(FreshRadii.lg),
-              boxShadow: _calorieWizardCardShadow,
+              boxShadow: _calorieWizardCardShadow(context),
             ),
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -2194,7 +2197,7 @@ class _ResultPlanStep extends StatelessWidget {
                   icon: Icons.info_outline_rounded,
                   title: l10n.calorieWizardEstimateNoteTitle,
                   message: warning,
-                  color: FreshColors.orange,
+                  color: palette.orange,
                 ),
               ),
           ],
@@ -2240,7 +2243,7 @@ class _ProgressRing extends StatelessWidget {
             size: Size.square(size),
             painter: _ProgressRingPainter(
               progress: progress,
-              backgroundColor: Colors.white,
+              backgroundColor: palette.surfaceMuted,
               foregroundColor: palette.lime,
               innerColor: palette.limeWash,
             ),

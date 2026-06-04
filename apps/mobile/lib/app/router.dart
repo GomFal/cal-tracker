@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../domain/models/nutrition_models.dart';
 import '../l10n/app_localizations_context.dart';
-import '../ui/core/design_system.dart';
 import '../ui/core/app_shell.dart';
 import '../ui/core/shell_modal_lock.dart';
 import '../ui/features/auth/view_models/auth_view_model.dart';
@@ -16,7 +14,6 @@ import '../ui/features/meal_templates/views/meal_templates_screen.dart';
 import '../ui/features/meal_templates/views/usual_food_editor_screen.dart';
 import '../ui/features/settings/views/settings_screen.dart';
 import '../ui/features/voice_log/views/voice_log_screen.dart';
-import 'theme.dart';
 
 GoRouter buildRouter(
   AuthViewModel authViewModel, {
@@ -47,7 +44,7 @@ GoRouter buildRouter(
     routes: [
       GoRoute(
         path: '/auth',
-        builder: (context, state) => const _LightOnlyAuthRoute(),
+        builder: (context, state) => const AuthScreen(),
       ),
       GoRoute(
         path: '/meal/create',
@@ -230,24 +227,4 @@ class _AuthRestoreGate extends StatelessWidget {
 
 Page<void> _tabPage(GoRouterState state, Widget child) {
   return NoTransitionPage<void>(key: state.pageKey, child: child);
-}
-
-class _LightOnlyAuthRoute extends StatelessWidget {
-  const _LightOnlyAuthRoute();
-
-  static const _overlayStyle = SystemUiOverlayStyle(
-    statusBarColor: FreshColors.screen,
-    statusBarIconBrightness: Brightness.dark,
-    statusBarBrightness: Brightness.light,
-    systemNavigationBarColor: FreshColors.screen,
-    systemNavigationBarIconBrightness: Brightness.dark,
-  );
-
-  @override
-  Widget build(BuildContext context) {
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: _overlayStyle,
-      child: Theme(data: buildLightTheme(), child: const AuthScreen()),
-    );
-  }
 }

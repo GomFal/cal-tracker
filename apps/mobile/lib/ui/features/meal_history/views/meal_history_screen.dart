@@ -52,7 +52,7 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
               icon: Icons.error_outline_rounded,
               title: l10n.historyCouldNotLoadHistory,
               message: viewModel.error!,
-              color: FreshColors.coral,
+              color: palette.coral,
             ),
             const SizedBox(height: FreshSpacing.md),
           ],
@@ -99,6 +99,7 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
     Meal meal,
   ) async {
     final l10n = context.l10n;
+    final palette = context.freshPalette;
     final action = await showModalBottomSheet<String>(
       context: context,
       builder: (context) => SafeArea(
@@ -125,7 +126,7 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
               _SheetAction(
                 icon: Icons.delete_outline_rounded,
                 title: l10n.commonDelete,
-                color: FreshColors.coral,
+                color: palette.coral,
                 onTap: () => Navigator.of(context).pop('delete'),
               ),
             ],
@@ -380,10 +381,10 @@ class _HistoryMealCard extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       child: Row(
         children: [
-          const FreshIconChip(
+          FreshIconChip(
             icon: Icons.local_fire_department_rounded,
-            color: FreshColors.orange,
-            backgroundColor: FreshColors.yellow,
+            color: palette.orange,
+            backgroundColor: palette.yellow,
           ),
           const SizedBox(width: FreshSpacing.md),
           Expanded(
@@ -416,23 +417,24 @@ class _SheetAction extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.onTap,
-    this.color = FreshColors.limeDeep,
+    this.color,
   });
 
   final IconData icon;
   final String title;
   final VoidCallback onTap;
-  final Color color;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.freshPalette;
     return FreshCard(
       onTap: onTap,
       padding: const EdgeInsets.all(16),
       shadow: false,
       child: Row(
         children: [
-          FreshIconChip(icon: icon, color: color),
+          FreshIconChip(icon: icon, color: color ?? palette.limeDeep),
           const SizedBox(width: FreshSpacing.md),
           Expanded(
             child: Text(title, style: Theme.of(context).textTheme.titleMedium),

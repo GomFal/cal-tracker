@@ -9,6 +9,8 @@ import 'package:cal_tracker_mobile/data/services/secure_token_storage.dart';
 import 'package:cal_tracker_mobile/domain/models/nutrition_models.dart';
 import 'package:cal_tracker_mobile/generated/api/cal_tracker_api.dart';
 import 'package:cal_tracker_mobile/l10n/generated/app_localizations.dart';
+import 'package:cal_tracker_mobile/ui/core/design_system.dart';
+import 'package:cal_tracker_mobile/ui/core/voice_action_button.dart';
 import 'package:cal_tracker_mobile/ui/features/meal_templates/view_models/meal_templates_view_model.dart';
 import 'package:cal_tracker_mobile/ui/features/meal_templates/views/meal_template_editor_screen.dart';
 import 'package:cal_tracker_mobile/ui/features/meal_templates/views/meal_templates_screen.dart';
@@ -167,6 +169,47 @@ void main() {
     expect(find.text('Public rice'), findsOneWidget);
   });
 
+  testWidgets('usual meal editor adapts draft and save surfaces in dark mode', (
+    tester,
+  ) async {
+    final repository = _FakeNutritionRepository();
+    await _pumpEditor(
+      tester,
+      repository,
+      initialDraft: const UsualMealDraft(
+        title: 'Voice breakfast',
+        aliases: ['my breakfast'],
+        items: [_usualOats],
+      ),
+      themeMode: ThemeMode.dark,
+    );
+
+    final draftCard = tester.widget<FreshCard>(
+      find.byKey(const ValueKey('meal_template_draft_card')),
+    );
+    final transcriptField = tester.widget<TextField>(
+      find.byKey(const ValueKey('meal_template_voice_transcript_field')),
+    );
+    final voiceChrome = tester.widget<VoiceActionButtonChrome>(
+      find.byType(VoiceActionButtonChrome),
+    );
+    final saveBar = tester.widget<FreshCard>(
+      find.byKey(const ValueKey('meal_template_save_bar')),
+    );
+    final nutritionSummary = tester.widget<DecoratedBox>(
+      find.byKey(const ValueKey('meal_template_total_nutrition_summary')),
+    );
+    final nutritionDecoration = nutritionSummary.decoration as BoxDecoration;
+
+    expect(draftCard.color, FreshPalette.dark.surface);
+    expect(draftCard.color, isNot(FreshColors.limeWash));
+    expect(
+        transcriptField.decoration?.fillColor, FreshPalette.dark.surfaceMuted);
+    expect(voiceChrome.backgroundColor, FreshPalette.dark.lime);
+    expect(saveBar.color, FreshPalette.dark.surface);
+    expect(nutritionDecoration.color, FreshPalette.dark.surfaceMuted);
+  });
+
   testWidgets('blocks usual meal editor while voice draft is pending', (
     tester,
   ) async {
@@ -263,6 +306,7 @@ Future<void> _pumpEditor(
   String? templateId,
   UsualMealDraft? initialDraft,
   AudioRecorderService? audioRecorderService,
+  ThemeMode themeMode = ThemeMode.light,
 }) async {
   await tester.pumpWidget(
     ChangeNotifierProvider(
@@ -271,6 +315,8 @@ Future<void> _pumpEditor(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         theme: buildLightTheme(),
+        darkTheme: buildDarkTheme(),
+        themeMode: themeMode,
         home: Scaffold(
           body: MealTemplateEditorScreen(
             templateId: templateId,

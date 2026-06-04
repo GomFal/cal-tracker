@@ -20,7 +20,7 @@ class AppPreferencesRepository {
     return switch (value) {
       _themeModeDark => ThemeMode.dark,
       _themeModeSystem => ThemeMode.system,
-      _ => ThemeMode.light,
+      _ => ThemeMode.system,
     };
   }
 

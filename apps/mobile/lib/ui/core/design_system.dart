@@ -85,14 +85,14 @@ class FreshPalette extends ThemeExtension<FreshPalette> {
     inkMuted: Color(0xffa2ac98),
     rule: Color(0xff3d4734),
     ruleSoft: Color(0xff2d3527),
-    lime: Color(0xffa7d84d),
-    limeDeep: Color(0xffb7e06b),
-    limeSoft: Color(0xff445d26),
-    limeWash: Color(0xff28381b),
-    leaf: Color(0xff86c75b),
-    water: Color(0xff6fcde2),
+    lime: Color(0xff8fbd3a),
+    limeDeep: Color(0xff9cc94b),
+    limeSoft: Color(0xff354b21),
+    limeWash: Color(0xff243318),
+    leaf: Color(0xff6fb24a),
+    water: Color(0xff56b7ca),
     orange: Color(0xffe4a15d),
-    mint: Color(0xff73d4a4),
+    mint: Color(0xff58bd8a),
     coral: Color(0xffff7f8c),
     yellow: Color(0xff5c4d25),
   );
@@ -219,7 +219,7 @@ class FreshRadii {
   static const xl = 32.0;
 }
 
-const _softShadow = [
+const _lightSoftShadow = [
   BoxShadow(
     color: Color(0x1f080907),
     blurRadius: 30,
@@ -229,6 +229,19 @@ const _softShadow = [
     color: Color(0x0f080907),
     blurRadius: 10,
     offset: Offset(0, 4),
+  ),
+];
+
+const _darkSoftShadow = [
+  BoxShadow(
+    color: Color(0x66080b07),
+    blurRadius: 24,
+    offset: Offset(0, 14),
+  ),
+  BoxShadow(
+    color: Color(0x3310140d),
+    blurRadius: 8,
+    offset: Offset(0, 3),
   ),
 ];
 
@@ -363,7 +376,11 @@ class FreshCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: color ?? palette.surface,
         borderRadius: borderRadius,
-        boxShadow: shadow ? _softShadow : null,
+        boxShadow: shadow
+            ? Theme.of(context).brightness == Brightness.dark
+                ? _darkSoftShadow
+                : _lightSoftShadow
+            : null,
       ),
       child: Padding(padding: padding, child: child),
     );

@@ -70,8 +70,7 @@ void main() {
     );
   });
 
-  testWidgets('keeps auth screen light when saved theme mode is dark',
-      (tester) async {
+  testWidgets('auth screen follows saved dark theme mode', (tester) async {
     await _pumpAuthApp(
       tester,
       _FakePreferencesRepository(ThemeMode.dark),
@@ -80,8 +79,10 @@ void main() {
     final emailFieldContext =
         tester.element(find.byKey(const ValueKey('email_field')));
 
-    expect(Theme.of(emailFieldContext).brightness, Brightness.light);
-    expect(emailFieldContext.freshPalette, FreshPalette.light);
+    expect(Theme.of(emailFieldContext).brightness, Brightness.dark);
+    expect(emailFieldContext.freshPalette.screen, FreshPalette.dark.screen);
+    expect(emailFieldContext.freshPalette.surface, FreshPalette.dark.surface);
+    expect(emailFieldContext.freshPalette.ink, FreshPalette.dark.ink);
   });
 }
 
@@ -97,7 +98,7 @@ Future<void> _pumpAuthApp(
     ),
   );
   await tester.pump();
-  await tester.pump(const Duration(milliseconds: 100));
+  await tester.pump(const Duration(milliseconds: 500));
 }
 
 class _FakeAuthRepository extends AuthRepository {

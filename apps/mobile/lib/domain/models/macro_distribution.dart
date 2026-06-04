@@ -3,6 +3,8 @@ const carbsKcalPerGram = 4;
 const fatKcalPerGram = 9;
 const maxMacroGramTarget = 2000;
 const blockingMacroCalorieDeltaKcal = 25;
+const macroCalorieWarningNoneThresholdKcal = 50;
+const macroCalorieWarningSoftThresholdKcal = 100;
 
 enum MacroMode {
   percentage('percentage'),
@@ -222,8 +224,12 @@ bool isBlockingMacroCalorieDelta(int calorieDeltaKcal) {
 
 MacroCalorieWarningLevel macroWarningLevel(int calorieDeltaKcal) {
   final absoluteDelta = calorieDeltaKcal.abs();
-  if (absoluteDelta <= 50) return MacroCalorieWarningLevel.none;
-  if (absoluteDelta <= 100) return MacroCalorieWarningLevel.soft;
+  if (absoluteDelta <= macroCalorieWarningNoneThresholdKcal) {
+    return MacroCalorieWarningLevel.none;
+  }
+  if (absoluteDelta <= macroCalorieWarningSoftThresholdKcal) {
+    return MacroCalorieWarningLevel.soft;
+  }
   return MacroCalorieWarningLevel.clear;
 }
 

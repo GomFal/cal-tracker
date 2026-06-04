@@ -2,7 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../../domain/models/macro_distribution.dart';
+import '../../domain/models/nutrition_edit.dart';
 import '../../domain/models/nutrition_models.dart';
 import '../../l10n/app_localizations_context.dart';
 import '../core/design_system.dart';
@@ -222,7 +222,7 @@ class _MealTotalSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final total = _NutritionEdit.sum([
+    final total = NutritionEdit.sum([
       for (final item in items) item.currentNutrition(),
     ]);
     final palette = context.freshPalette;
@@ -497,7 +497,7 @@ class _IngredientEditorCard extends StatelessWidget {
                   child: TextButton.icon(
                     key: ValueKey('${keyPrefix}_item_edit_details_$index'),
                     onPressed: () async {
-                      final edited = await showModalBottomSheet<_NutritionEdit>(
+                      final edited = await showModalBottomSheet<NutritionEdit>(
                         context: context,
                         isScrollControlled: true,
                         useSafeArea: true,
@@ -629,7 +629,7 @@ enum _MacroKind { protein, carbs, fat }
 class _MacroSummaryText extends StatelessWidget {
   const _MacroSummaryText({required this.nutrition});
 
-  final _NutritionEdit? nutrition;
+  final NutritionEdit? nutrition;
 
   @override
   Widget build(BuildContext context) {
@@ -987,7 +987,7 @@ class _NutritionDetailsSheetState extends State<_NutritionDetailsSheet> {
     );
   }
 
-  _NutritionEdit? _previewNutrition() {
+  NutritionEdit? _previewNutrition() {
     final calories = int.tryParse(_caloriesController.text.trim());
     final protein = double.tryParse(_proteinController.text.trim());
     final carbs = double.tryParse(_carbsController.text.trim());
@@ -995,11 +995,11 @@ class _NutritionDetailsSheetState extends State<_NutritionDetailsSheet> {
     if (calories == null || protein == null || carbs == null || fat == null) {
       return null;
     }
-    return _NutritionEdit(
+    return NutritionEdit(
       calories: calories,
-      proteinGrams: _roundMacro(protein),
-      carbsGrams: _roundMacro(carbs),
-      fatGrams: _roundMacro(fat),
+      proteinGrams: roundMacroToTenth(protein),
+      carbsGrams: roundMacroToTenth(carbs),
+      fatGrams: roundMacroToTenth(fat),
     );
   }
 
@@ -1057,7 +1057,7 @@ class _EditableMealItem {
 
   final MealItem original;
   final bool isNew;
-  _NutritionEdit? _nutritionOverride;
+  NutritionEdit? _nutritionOverride;
   double? _nutritionOverrideQuantity;
   late final TextEditingController nameController;
   late final TextEditingController quantityController;
@@ -1075,14 +1075,14 @@ class _EditableMealItem {
     quantityController.text = _formatQuantity(value);
   }
 
-  void setNutritionOverride(_NutritionEdit value) {
+  void setNutritionOverride(NutritionEdit value) {
     _nutritionOverride = value;
     _nutritionOverrideQuantity = double.tryParse(
       quantityController.text.trim(),
     );
   }
 
-  _NutritionEdit currentNutrition() {
+  NutritionEdit currentNutrition() {
     final quantity = double.tryParse(quantityController.text.trim());
     final override = _nutritionOverride;
     if (override != null) {
@@ -1098,11 +1098,11 @@ class _EditableMealItem {
     final factor = original.quantity > 0 && quantity != null && quantity > 0
         ? quantity / original.quantity
         : 1.0;
-    return _NutritionEdit(
+    return NutritionEdit(
       calories: (original.calories * factor).round(),
-      proteinGrams: _roundMacro(original.proteinGrams * factor),
-      carbsGrams: _roundMacro(original.carbsGrams * factor),
-      fatGrams: _roundMacro(original.fatGrams * factor),
+      proteinGrams: roundMacroToTenth(original.proteinGrams * factor),
+      carbsGrams: roundMacroToTenth(original.carbsGrams * factor),
+      fatGrams: roundMacroToTenth(original.fatGrams * factor),
     );
   }
 
@@ -1142,61 +1142,9 @@ class _EditableMealItem {
   }
 }
 
-const kCalorieMismatchTolerance = 50;
 
-class _NutritionEdit {
-  const _NutritionEdit({
-    required this.calories,
-    required this.proteinGrams,
-    required this.carbsGrams,
-    required this.fatGrams,
-  });
 
-  final int calories;
-  final double proteinGrams;
-  final double carbsGrams;
-  final double fatGrams;
-
-  int get macroCalories => macroCaloriesFromGrams(
-        MacroGrams(
-          proteinGrams: proteinGrams,
-          carbsGrams: carbsGrams,
-          fatGrams: fatGrams,
-        ),
-      );
-
-  bool get hasCalorieMismatch => (calories - macroCalories).abs() >= kCalorieMismatchTolerance;
-
-  _NutritionEdit scaled(double factor) {
-    return _NutritionEdit(
-      calories: (calories * factor).round(),
-      proteinGrams: _roundMacro(proteinGrams * factor),
-      carbsGrams: _roundMacro(carbsGrams * factor),
-      fatGrams: _roundMacro(fatGrams * factor),
-    );
-  }
-
-  static _NutritionEdit sum(Iterable<_NutritionEdit> values) {
-    var calories = 0;
-    var protein = 0.0;
-    var carbs = 0.0;
-    var fat = 0.0;
-    for (final value in values) {
-      calories += value.calories;
-      protein += value.proteinGrams;
-      carbs += value.carbsGrams;
-      fat += value.fatGrams;
-    }
-    return _NutritionEdit(
-      calories: calories,
-      proteinGrams: _roundMacro(protein),
-      carbsGrams: _roundMacro(carbs),
-      fatGrams: _roundMacro(fat),
-    );
-  }
-}
-
-String _macroSummary(BuildContext context, _NutritionEdit nutrition) {
+String _macroSummary(BuildContext context, NutritionEdit nutrition) {
   final l10n = context.l10n;
   return '${l10n.commonProtein} ${_formatMacro(nutrition.proteinGrams)}g · '
       '${l10n.commonCarbs} ${_formatMacro(nutrition.carbsGrams)}g · '
@@ -1263,4 +1211,4 @@ String _formatMacro(double value) {
 
 String _normalizedText(String value) => value.trim().toLowerCase();
 
-double _roundMacro(double value) => (value * 10).round() / 10;
+

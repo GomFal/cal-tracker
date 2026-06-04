@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../../../../domain/models/macro_distribution.dart';
+import '../../../../domain/models/nutrition_edit.dart';
 import '../../../../domain/models/nutrition_models.dart';
 import '../../../../l10n/app_localizations_context.dart';
 import '../../../core/content_frame.dart';
@@ -400,7 +400,7 @@ class _ManualFoodSearchPanelState extends State<_ManualFoodSearchPanel> {
   }
 
   Future<void> _editNutrition(int index) async {
-    final edited = await showModalBottomSheet<_NutritionEdit>(
+    final edited = await showModalBottomSheet<NutritionEdit>(
       context: context,
       isScrollControlled: true,
       builder: (context) => _NutritionEditorSheet(
@@ -2069,7 +2069,7 @@ class _ProposalEditorSheetState extends State<_ProposalEditorSheet> {
   }
 
   Future<void> _editNutrition(int index) async {
-    final edited = await showModalBottomSheet<_NutritionEdit>(
+    final edited = await showModalBottomSheet<NutritionEdit>(
       context: context,
       isScrollControlled: true,
       builder: (context) => _NutritionEditorSheet(
@@ -2379,7 +2379,7 @@ enum _MacroKind { protein, carbs, fat }
 class _MacroSummaryText extends StatelessWidget {
   const _MacroSummaryText({required this.nutrition});
 
-  final _NutritionEdit? nutrition;
+  final NutritionEdit? nutrition;
 
   @override
   Widget build(BuildContext context) {
@@ -2720,7 +2720,7 @@ class _NutritionEditorSheetState extends State<_NutritionEditorSheet> {
     );
   }
 
-  _NutritionEdit? _previewNutrition() {
+  NutritionEdit? _previewNutrition() {
     final calories = int.tryParse(_caloriesController.text.trim());
     final protein = double.tryParse(_proteinController.text.trim());
     final carbs = double.tryParse(_carbsController.text.trim());
@@ -2728,11 +2728,11 @@ class _NutritionEditorSheetState extends State<_NutritionEditorSheet> {
     if (calories == null || protein == null || carbs == null || fat == null) {
       return null;
     }
-    return _NutritionEdit(
+    return NutritionEdit(
       calories: calories,
-      proteinGrams: _roundMacro(protein),
-      carbsGrams: _roundMacro(carbs),
-      fatGrams: _roundMacro(fat),
+      proteinGrams: roundMacroToTenth(protein),
+      carbsGrams: roundMacroToTenth(carbs),
+      fatGrams: roundMacroToTenth(fat),
     );
   }
 
@@ -2760,40 +2760,7 @@ class _NutritionEditorSheetState extends State<_NutritionEditorSheet> {
   }
 }
 
-const kCalorieMismatchTolerance = 50;
 
-class _NutritionEdit {
-  const _NutritionEdit({
-    required this.calories,
-    required this.proteinGrams,
-    required this.carbsGrams,
-    required this.fatGrams,
-  });
-
-  final int calories;
-  final double proteinGrams;
-  final double carbsGrams;
-  final double fatGrams;
-
-  int get macroCalories => macroCaloriesFromGrams(
-        MacroGrams(
-          proteinGrams: proteinGrams,
-          carbsGrams: carbsGrams,
-          fatGrams: fatGrams,
-        ),
-      );
-
-  bool get hasCalorieMismatch => (calories - macroCalories).abs() >= kCalorieMismatchTolerance;
-
-  _NutritionEdit scaled(double factor) {
-    return _NutritionEdit(
-      calories: (calories * factor).round(),
-      proteinGrams: _roundMacro(proteinGrams * factor),
-      carbsGrams: _roundMacro(carbsGrams * factor),
-      fatGrams: _roundMacro(fatGrams * factor),
-    );
-  }
-}
 
 MealItem _candidateWithMentionQuantity(
   MealItem candidate,
@@ -2821,18 +2788,18 @@ MealItem _candidateWithQuantity(
     quantity: quantity,
     unit: unit,
     calories: (candidate.calories * factor).round(),
-    proteinGrams: _roundMacro(candidate.proteinGrams * factor),
-    carbsGrams: _roundMacro(candidate.carbsGrams * factor),
-    fatGrams: _roundMacro(candidate.fatGrams * factor),
+    proteinGrams: roundMacroToTenth(candidate.proteinGrams * factor),
+    carbsGrams: roundMacroToTenth(candidate.carbsGrams * factor),
+    fatGrams: roundMacroToTenth(candidate.fatGrams * factor),
   );
 }
 
 String _foodSearchItemSubtitle(MealItem item) {
   return '${_formatQuantity(item.quantity)} ${item.unit} · '
-      '${_nutritionLabel(_NutritionEdit(calories: item.calories, proteinGrams: item.proteinGrams, carbsGrams: item.carbsGrams, fatGrams: item.fatGrams))}';
+      '${_nutritionLabel(NutritionEdit(calories: item.calories, proteinGrams: item.proteinGrams, carbsGrams: item.carbsGrams, fatGrams: item.fatGrams))}';
 }
 
-String _nutritionLabel(_NutritionEdit nutrition) {
+String _nutritionLabel(NutritionEdit nutrition) {
   return '${nutrition.calories} Kcal · '
       '${_formatMacro(nutrition.proteinGrams)}P · '
       '${_formatMacro(nutrition.carbsGrams)}C · '
@@ -2900,7 +2867,7 @@ class _EditableMealItem {
   }
 
   MealItem original;
-  _NutritionEdit? _nutritionOverride;
+  NutritionEdit? _nutritionOverride;
   double? _nutritionOverrideQuantity;
   late final TextEditingController nameController;
   late final TextEditingController quantityController;
@@ -2916,7 +2883,7 @@ class _EditableMealItem {
     unitController.text = item.unit;
   }
 
-  void setNutritionOverride(_NutritionEdit value) {
+  void setNutritionOverride(NutritionEdit value) {
     _nutritionOverride = value;
     _nutritionOverrideQuantity = double.tryParse(
       quantityController.text.trim(),
@@ -2933,7 +2900,7 @@ class _EditableMealItem {
     quantityController.text = _formatQuantity(value);
   }
 
-  _NutritionEdit currentNutrition() {
+  NutritionEdit currentNutrition() {
     final override = _nutritionOverride;
     final quantity = double.tryParse(quantityController.text.trim());
     if (override != null) {
@@ -2949,11 +2916,11 @@ class _EditableMealItem {
     final factor = original.quantity > 0 && quantity != null && quantity > 0
         ? quantity / original.quantity
         : 1.0;
-    return _NutritionEdit(
+    return NutritionEdit(
       calories: (original.calories * factor).round(),
-      proteinGrams: _roundMacro(original.proteinGrams * factor),
-      carbsGrams: _roundMacro(original.carbsGrams * factor),
-      fatGrams: _roundMacro(original.fatGrams * factor),
+      proteinGrams: roundMacroToTenth(original.proteinGrams * factor),
+      carbsGrams: roundMacroToTenth(original.carbsGrams * factor),
+      fatGrams: roundMacroToTenth(original.fatGrams * factor),
     );
   }
 
@@ -3147,8 +3114,6 @@ String _formatMacro(double value) {
   if (value == value.roundToDouble()) return value.toInt().toString();
   return value.toStringAsFixed(1);
 }
-
-double _roundMacro(double value) => (value * 10).roundToDouble() / 10;
 
 String _stateLabel(VoiceLogState state) {
   return switch (state) {

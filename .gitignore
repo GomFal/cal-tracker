@@ -30,6 +30,8 @@ data/bedca/
 data/food-quality/
 data/food-normalization/
 data/food-search-benchmarks/
+data/meal-proposal-search-benchmarks/
+tools/benchmarks/
 __pycache__/
 *.pyc
 .pytest_cache/

@@ -11,6 +11,16 @@ import '../../../core/design_system.dart';
 import '../../../core/user_visible_error.dart';
 import 'macro_distribution_sheet.dart';
 
+// Validation range constants
+const int kMinDailyCalories = 800;
+const int kMaxDailyCalories = 10000;
+const int kMinAgeYears = 18;
+const int kMaxAgeYears = 100;
+const int kMinHeightCm = 120;
+const int kMaxHeightCm = 230;
+const int kMinWeightKg = 35;
+const int kMaxWeightKg = 250;
+
 class CalorieTargetSelection {
   const CalorieTargetSelection({
     required this.calories,
@@ -162,7 +172,7 @@ class _CalorieTargetSheetState extends State<CalorieTargetSheet> {
   void _step(int delta) {
     final current =
         int.tryParse(_controller.text.trim()) ?? widget.initialValue;
-    final next = (current + delta).clamp(800, 10000).toInt();
+    final next = (current + delta).clamp(kMinDailyCalories, kMaxDailyCalories).toInt();
     setState(() {
       _source = 'manual';
       _error = null;
@@ -202,10 +212,10 @@ class _CalorieTargetSheetState extends State<CalorieTargetSheet> {
 
   void _submit() {
     final value = int.tryParse(_controller.text.trim());
-    if (value == null || value < 800 || value > 10000) {
+    if (value == null || value < kMinDailyCalories || value > kMaxDailyCalories) {
       setState(() => _error = context.l10n.calorieTargetRangeValidationError(
-            800,
-            10000,
+            kMinDailyCalories,
+            kMaxDailyCalories,
           ));
       return;
     }
@@ -576,12 +586,12 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
 
   DateTime _youngestAllowedBirthDate() {
     final today = _today();
-    return DateTime(today.year - 18, today.month, today.day);
+    return DateTime(today.year - kMinAgeYears, today.month, today.day);
   }
 
   DateTime _oldestAllowedBirthDate() {
     final today = _today();
-    return DateTime(today.year - 100, today.month, today.day);
+    return DateTime(today.year - kMaxAgeYears, today.month, today.day);
   }
 
   DateTime _defaultBirthDate() {
@@ -664,7 +674,7 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
   void _setHeightFromRuler(double value) {
     setState(() {
       if (_heightMetric) {
-        final heightCm = value.clamp(120, 230).toDouble();
+        final heightCm = value.clamp(kMinHeightCm, kMaxHeightCm).toDouble();
         _setControllerText(_heightController, heightCm.round().toString());
       } else {
         final totalInches = value.round().clamp(48, 90);
@@ -680,7 +690,7 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
   void _setWeightFromRuler(double value) {
     setState(() {
       if (_weightMetric) {
-        final weightKg = value.clamp(35, 250).toDouble();
+        final weightKg = value.clamp(kMinWeightKg, kMaxWeightKg).toDouble();
         _setControllerText(_weightController, _formatCompactNumber(weightKg));
       } else {
         final pounds = value.round().clamp(78, 551);
@@ -815,8 +825,8 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
         _SlidingRulerScale(
           key: const ValueKey('calorie_wizard_height_ruler'),
           value: value,
-          min: _heightMetric ? 120 : 48,
-          max: _heightMetric ? 230 : 90,
+          min: _heightMetric ? kMinHeightCm.toDouble() : 48,
+          max: _heightMetric ? kMaxHeightCm.toDouble() : 90,
           valueStep: 1,
           tickStep: 1,
           visibleHalfRange: _heightMetric ? 15 : 6,
@@ -862,8 +872,8 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
         _SlidingRulerScale(
           key: const ValueKey('calorie_wizard_weight_ruler'),
           value: value,
-          min: _weightMetric ? 35 : 78,
-          max: _weightMetric ? 250 : 551,
+          min: _weightMetric ? kMinWeightKg.toDouble() : 78,
+          max: _weightMetric ? kMaxWeightKg.toDouble() : 551,
           valueStep: _weightMetric ? 0.5 : 1,
           tickStep: 1,
           visibleHalfRange: _weightMetric ? 15 : 30,
@@ -1012,7 +1022,7 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
     switch (step) {
       case _WizardStep.age:
         final age = _ageFromBirthDate(_birthDate);
-        if (age < 18 || age > 100) {
+        if (age < kMinAgeYears || age > kMaxAgeYears) {
           setState(
               () => _error = context.l10n.calorieWizardBirthdayValidationError);
           return false;
@@ -1022,7 +1032,7 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
         final heightCm = _heightMetric
             ? double.tryParse(_heightController.text.trim())
             : _heightInCm();
-        if (heightCm == null || heightCm < 120 || heightCm > 230) {
+        if (heightCm == null || heightCm < kMinHeightCm || heightCm > kMaxHeightCm) {
           setState(
               () => _error = context.l10n.calorieWizardHeightValidationError);
           return false;
@@ -1032,7 +1042,7 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
         final weightKg = _weightMetric
             ? double.tryParse(_weightController.text.trim())
             : _weightInKg();
-        if (weightKg == null || weightKg < 35 || weightKg > 250) {
+        if (weightKg == null || weightKg < kMinWeightKg || weightKg > kMaxWeightKg) {
           setState(
               () => _error = context.l10n.calorieWizardWeightValidationError);
           return false;
@@ -1095,14 +1105,14 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
     final weightKg = _weightMetric
         ? double.tryParse(_weightController.text.trim())
         : _weightInKg();
-    if (age < 18 ||
-        age > 100 ||
+    if (age < kMinAgeYears ||
+        age > kMaxAgeYears ||
         heightCm == null ||
-        heightCm < 120 ||
-        heightCm > 230 ||
+        heightCm < kMinHeightCm ||
+        heightCm > kMaxHeightCm ||
         weightKg == null ||
-        weightKg < 35 ||
-        weightKg > 250) {
+        weightKg < kMinWeightKg ||
+        weightKg > kMaxWeightKg) {
       return null;
     }
     return _ProfileValues(age: age, heightCm: heightCm, weightKg: weightKg);

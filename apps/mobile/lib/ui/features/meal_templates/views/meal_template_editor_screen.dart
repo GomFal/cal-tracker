@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../data/services/audio_recorder_service.dart';
+import '../../../../domain/models/nutrition_edit.dart';
 import '../../../../domain/models/nutrition_models.dart';
 import '../../../../l10n/app_localizations_context.dart';
 import '../../../core/content_frame.dart';
@@ -474,9 +475,9 @@ class _MealTemplateEditorScreenState extends State<MealTemplateEditorScreen> {
     }
     return NutritionSnapshot(
       calories: calories,
-      proteinGrams: _roundMacro(protein),
-      carbsGrams: _roundMacro(carbs),
-      fatGrams: _roundMacro(fat),
+      proteinGrams: roundMacroToTenth(protein),
+      carbsGrams: roundMacroToTenth(carbs),
+      fatGrams: roundMacroToTenth(fat),
     );
   }
 }
@@ -1211,9 +1212,9 @@ class _TemplateMealItemController {
     }
     return NutritionSnapshot(
       calories: calories,
-      proteinGrams: _roundMacro(protein),
-      carbsGrams: _roundMacro(carbs),
-      fatGrams: _roundMacro(fat),
+      proteinGrams: roundMacroToTenth(protein),
+      carbsGrams: roundMacroToTenth(carbs),
+      fatGrams: roundMacroToTenth(fat),
     );
   }
 
@@ -1280,9 +1281,9 @@ class _TemplateMealItemController {
       quantity: quantity,
       unit: unit,
       calories: calories,
-      proteinGrams: _roundMacro(protein),
-      carbsGrams: _roundMacro(carbs),
-      fatGrams: _roundMacro(fat),
+      proteinGrams: roundMacroToTenth(protein),
+      carbsGrams: roundMacroToTenth(carbs),
+      fatGrams: roundMacroToTenth(fat),
       source: source,
       originalText: originalText,
       canonicalName: canonicalName,
@@ -1324,9 +1325,9 @@ MealItem _candidateWithMentionQuantity(
     quantity: mention.quantity,
     unit: mention.unit,
     calories: (candidate.calories * factor).round(),
-    proteinGrams: _roundMacro(candidate.proteinGrams * factor),
-    carbsGrams: _roundMacro(candidate.carbsGrams * factor),
-    fatGrams: _roundMacro(candidate.fatGrams * factor),
+    proteinGrams: roundMacroToTenth(candidate.proteinGrams * factor),
+    carbsGrams: roundMacroToTenth(candidate.carbsGrams * factor),
+    fatGrams: roundMacroToTenth(candidate.fatGrams * factor),
   );
 }
 
@@ -1342,8 +1343,6 @@ double? _parseDouble(String? value) {
   final normalized = (value ?? '').trim().replaceAll(',', '.');
   return double.tryParse(normalized);
 }
-
-double _roundMacro(double value) => (value * 10).roundToDouble() / 10;
 
 Set<String> _normalizedValues(List<String?> values) {
   return values

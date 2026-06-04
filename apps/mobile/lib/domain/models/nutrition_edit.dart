@@ -1,6 +1,6 @@
 import 'macro_distribution.dart';
 
-const int kCalorieMismatchToleranceKcal = 50;
+const int kCalorieMismatchToleranceKcal = macroCalorieWarningNoneThresholdKcal;
 
 class NutritionEdit {
   const NutritionEdit({

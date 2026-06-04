@@ -14,6 +14,26 @@ Do not hardcode ingredients, ingredient translations, meal names, meal proposal 
 
 Always do development work on the `develop` branch. Before making code or documentation changes, switch to `develop` and update it from the remote when possible. Use `main` only when explicitly asked to sync, release, or inspect production-aligned history.
 
+## Worktree Convention
+
+Create and keep new Git worktrees under the top-level `.worktrees/` directory in this repository unless the user explicitly asks for a different location. Prefer reusing that directory for parallel branch work instead of creating sibling worktrees next to the repo root.
+
+---
+
+## Mobile Caching and Optimistic UI Rules
+
+Flutter features that render server-backed user data must prefer a cache-first, stale-while-revalidate interaction model. If the app has any cached or already visible data for a screen, render it immediately and refresh from the backend in the background. Do not show a blocking progress bar just because the user changed tabs, reopened a screen, or triggered a non-destructive refresh.
+
+Keep caching in the data layer. Repository/services should own persistent cache reads, writes, user scoping, in-flight request deduplication, refresh cooldowns, and write-through updates after successful backend responses. ViewModels should consume cache-aware repository methods and expose presentation state; they should not serialize JSON manually or duplicate cache storage logic.
+
+Use separate UI state for visible data, background refresh, and saving. `isLoading` should mean there is no usable data to display yet. Use an explicit refresh/saving state for background network work or mutations, and keep old data visible when a background refresh fails.
+
+For deterministic CRUD-style actions, update the local ViewModel state and cache optimistically, then reconcile with the backend response. If the backend rejects the mutation, roll back to the previous snapshot, restore the cache, and surface the existing user-facing save error. Do not use optimistic updates for LLM/STT, food search, proposal generation, drafts, or other flows where the backend result is the actual computation, unless the backend response includes final data that can safely refresh the cache.
+
+Backend health checks are only a confidence/connectivity signal. Do not add per-mutation health preflights that delay the UI; the mutation response remains the source of truth for reconciliation and rollback.
+
+When changing cached server-backed UI, add or update tests for the cache store/repository behavior, ViewModel stale-while-revalidate behavior, optimistic rollback, and widget-level absence of blocking loaders when cached data exists. Prefer `flutter test` coverage for these flows; use Patrol only when native/device behavior is actually part of the acceptance criteria.
+
 ---
 
 ## Deployed Environment URLs

@@ -22,11 +22,9 @@ void main() {
     final restore = Completer<AuthUser?>();
     final authRepository = _MockAuthRepository();
     final nutritionRepository = _MockNutritionRepository();
+    _stubNutritionRepository(nutritionRepository);
     when(() => authRepository.restoreSession()).thenAnswer(
       (_) => restore.future,
-    );
-    when(() => nutritionRepository.getDailySummary()).thenAnswer(
-      (_) async => _summary,
     );
 
     await tester.pumpWidget(
@@ -40,7 +38,12 @@ void main() {
 
     expect(find.byKey(const ValueKey('auth_restore_gate')), findsOneWidget);
     expect(find.byKey(const ValueKey('auth_submit_button')), findsNothing);
-    verifyNever(() => nutritionRepository.getDailySummary());
+    verifyNever(
+      () => nutritionRepository.refreshDailySummary(
+        date: any(named: 'date'),
+        force: any(named: 'force'),
+      ),
+    );
 
     restore.complete(_user);
     await tester.pump();
@@ -50,7 +53,12 @@ void main() {
     expect(find.byKey(const ValueKey('auth_submit_button')), findsNothing);
     expect(
         find.byKey(const ValueKey('dashboard_progress_card')), findsOneWidget);
-    verify(() => nutritionRepository.getDailySummary()).called(1);
+    verify(
+      () => nutritionRepository.refreshDailySummary(
+        date: any(named: 'date'),
+        force: any(named: 'force'),
+      ),
+    ).called(greaterThan(0));
   });
 
   testWidgets('redirects to auth only after saved session validation fails',
@@ -58,6 +66,7 @@ void main() {
     final restore = Completer<AuthUser?>();
     final authRepository = _MockAuthRepository();
     final nutritionRepository = _MockNutritionRepository();
+    _stubNutritionRepository(nutritionRepository);
     when(() => authRepository.restoreSession()).thenAnswer(
       (_) => restore.future,
     );
@@ -80,18 +89,21 @@ void main() {
 
     expect(find.byKey(const ValueKey('auth_restore_gate')), findsNothing);
     expect(find.byKey(const ValueKey('auth_submit_button')), findsOneWidget);
-    verifyNever(() => nutritionRepository.getDailySummary());
+    verifyNever(
+      () => nutritionRepository.refreshDailySummary(
+        date: any(named: 'date'),
+        force: any(named: 'force'),
+      ),
+    );
   });
 
   testWidgets('redirects authenticated users away from auth route',
       (tester) async {
     final authRepository = _MockAuthRepository();
     final nutritionRepository = _MockNutritionRepository();
+    _stubNutritionRepository(nutritionRepository);
     when(() => authRepository.restoreSession()).thenAnswer(
       (_) async => _user,
-    );
-    when(() => nutritionRepository.getDailySummary()).thenAnswer(
-      (_) async => _summary,
     );
 
     await tester.pumpWidget(
@@ -116,6 +128,33 @@ void main() {
     expect(
         find.byKey(const ValueKey('dashboard_progress_card')), findsOneWidget);
   });
+}
+
+void _stubNutritionRepository(_MockNutritionRepository nutritionRepository) {
+  when(
+    () => nutritionRepository.cachedDailySummary(date: any(named: 'date')),
+  ).thenAnswer((_) async => null);
+  when(
+    () => nutritionRepository.refreshDailySummary(
+      date: any(named: 'date'),
+      force: any(named: 'force'),
+    ),
+  ).thenAnswer((_) async => _summary);
+  when(
+    () => nutritionRepository.cachedTemplates(),
+  ).thenAnswer((_) async => null);
+  when(
+    () => nutritionRepository.refreshTemplates(force: any(named: 'force')),
+  ).thenAnswer((_) async => const []);
+  when(
+    () => nutritionRepository.cachedUsualFoods(),
+  ).thenAnswer((_) async => null);
+  when(
+    () => nutritionRepository.refreshUsualFoods(force: any(named: 'force')),
+  ).thenAnswer((_) async => const []);
+  when(
+    () => nutritionRepository.checkBackendHealth(),
+  ).thenAnswer((_) async => true);
 }
 
 class _FakePreferencesRepository implements AppPreferencesRepository {

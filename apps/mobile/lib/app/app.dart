@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +12,7 @@ import '../data/services/app_preferences_storage.dart';
 import '../data/services/api_config.dart';
 import '../data/services/audio_recorder_service.dart';
 import '../data/services/mobile_update_service.dart';
+import '../data/services/nutrition_cache_store.dart';
 import '../data/services/secure_token_storage.dart';
 import '../generated/api/cal_tracker_api.dart';
 import '../l10n/generated/app_localizations.dart';
@@ -27,10 +30,7 @@ import 'theme.dart';
 import 'theme_mode_view_model.dart';
 
 typedef CalTrackerAppWrapperBuilder = Widget Function(
-  BuildContext context,
-  Widget child,
-  GoRouter router,
-);
+    BuildContext context, Widget child, GoRouter router);
 
 class CalTrackerBootstrap extends StatelessWidget {
   const CalTrackerBootstrap({
@@ -65,12 +65,13 @@ class CalTrackerBootstrap extends StatelessWidget {
     );
     final authRepository = this.authRepository ??
         AuthRepository(apiClient: apiClient, tokenStorage: tokenStorage);
-    final nutritionRepository =
-        this.nutritionRepository ?? NutritionRepository(apiClient: apiClient);
-    final preferencesRepository = this.preferencesRepository ??
-        AppPreferencesRepository(
-          storage: AppPreferencesStorage(),
+    final nutritionRepository = this.nutritionRepository ??
+        NutritionRepository(
+          apiClient: apiClient,
+          cacheStore: NutritionCacheStore(storage: AppPreferencesStorage()),
         );
+    final preferencesRepository = this.preferencesRepository ??
+        AppPreferencesRepository(storage: AppPreferencesStorage());
     final mobileUpdateService =
         this.mobileUpdateService ?? MobileUpdateService(apiConfig: apiConfig);
     final audioRecorderService =
@@ -81,9 +82,7 @@ class CalTrackerBootstrap extends StatelessWidget {
         Provider<AuthRepository>.value(value: authRepository),
         Provider<NutritionRepository>.value(value: nutritionRepository),
         Provider<AudioRecorderService>.value(value: audioRecorderService),
-        Provider<AppPreferencesRepository>.value(
-          value: preferencesRepository,
-        ),
+        Provider<AppPreferencesRepository>.value(value: preferencesRepository),
         ChangeNotifierProvider(
           create: (_) {
             final viewModel = MobileUpdateViewModel(
@@ -96,37 +95,43 @@ class CalTrackerBootstrap extends StatelessWidget {
           },
         ),
         ChangeNotifierProvider(
-          create: (_) => ThemeModeViewModel(
-            preferencesRepository: preferencesRepository,
-          )..load(),
+          create: (_) =>
+              ThemeModeViewModel(preferencesRepository: preferencesRepository)
+                ..load(),
         ),
         ChangeNotifierProvider(
-          create: (_) => LocaleViewModel(
-            preferencesRepository: preferencesRepository,
-          )..load(),
+          create: (_) =>
+              LocaleViewModel(preferencesRepository: preferencesRepository)
+                ..load(),
         ),
         ChangeNotifierProvider(
-            create: (_) => AuthViewModel(authRepository: authRepository)
-              ..restoreSession()),
+          create: (_) =>
+              AuthViewModel(authRepository: authRepository)..restoreSession(),
+        ),
         ChangeNotifierProvider(
-            create: (_) => VoiceLogViewModel(
-                  nutritionRepository: nutritionRepository,
-                  audioRecorderService: audioRecorderService,
-                )),
+          create: (_) => VoiceLogViewModel(
+            nutritionRepository: nutritionRepository,
+            audioRecorderService: audioRecorderService,
+          ),
+        ),
         ChangeNotifierProvider(
-            create: (_) =>
-                DashboardViewModel(nutritionRepository: nutritionRepository)),
+          create: (_) =>
+              DashboardViewModel(nutritionRepository: nutritionRepository),
+        ),
         ChangeNotifierProvider(
-            create: (_) =>
-                MealHistoryViewModel(nutritionRepository: nutritionRepository)),
+          create: (_) =>
+              MealHistoryViewModel(nutritionRepository: nutritionRepository),
+        ),
         ChangeNotifierProvider(
-            create: (_) => MealTemplatesViewModel(
-                nutritionRepository: nutritionRepository)),
+          create: (_) =>
+              MealTemplatesViewModel(nutritionRepository: nutritionRepository),
+        ),
         ChangeNotifierProvider(
-            create: (_) => SettingsViewModel(
-                  authRepository: authRepository,
-                  nutritionRepository: nutritionRepository,
-                )),
+          create: (_) => SettingsViewModel(
+            authRepository: authRepository,
+            nutritionRepository: nutritionRepository,
+          ),
+        ),
       ],
       child: _CalTrackerApp(appWrapperBuilder: appWrapperBuilder),
     );
@@ -187,8 +192,103 @@ class _CalTrackerAppState extends State<_CalTrackerApp> {
           navigatorKey: _navigatorKey,
           child: child ?? const SizedBox.shrink(),
         );
-        return widget.appWrapperBuilder?.call(context, app, _router!) ?? app;
+        final preloadedApp = _AuthenticatedDataPreloader(child: app);
+        return widget.appWrapperBuilder?.call(
+              context,
+              preloadedApp,
+              _router!,
+            ) ??
+            preloadedApp;
       },
     );
+  }
+}
+
+class _AuthenticatedDataPreloader extends StatefulWidget {
+  const _AuthenticatedDataPreloader({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_AuthenticatedDataPreloader> createState() =>
+      _AuthenticatedDataPreloaderState();
+}
+
+class _AuthenticatedDataPreloaderState
+    extends State<_AuthenticatedDataPreloader> {
+  AuthViewModel? _authViewModel;
+  String? _activeUserId;
+  bool _preloadScheduled = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final authViewModel = context.read<AuthViewModel>();
+    if (_authViewModel == authViewModel) return;
+    _authViewModel?.removeListener(_handleAuthChanged);
+    _authViewModel = authViewModel;
+    _authViewModel?.addListener(_handleAuthChanged);
+    _handleAuthChanged();
+  }
+
+  @override
+  void dispose() {
+    _authViewModel?.removeListener(_handleAuthChanged);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+
+  void _handleAuthChanged() {
+    final authViewModel = _authViewModel;
+    if (authViewModel == null || !mounted) return;
+    final repository = context.read<NutritionRepository>();
+    if (authViewModel.hasSession) {
+      final userId = authViewModel.user!.id;
+      if (_activeUserId == userId) return;
+      _activeUserId = userId;
+      repository.activateCacheForUser(userId);
+      _schedulePreload();
+      return;
+    }
+
+    if (authViewModel.isRestoring || _activeUserId == null) return;
+    _activeUserId = null;
+    context.read<DashboardViewModel>().reset();
+    context.read<MealHistoryViewModel>().reset();
+    context.read<MealTemplatesViewModel>().reset();
+    context.read<SettingsViewModel>().reset();
+    unawaited(repository.clearActiveUserCache());
+  }
+
+  void _schedulePreload() {
+    if (_preloadScheduled) return;
+    _preloadScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _preloadScheduled = false;
+      unawaited(_preloadAuthenticatedData());
+    });
+  }
+
+  Future<void> _preloadAuthenticatedData() async {
+    await Future.wait([
+      _ignorePreloadError(() => context.read<DashboardViewModel>().load()),
+      _ignorePreloadError(() => context.read<MealHistoryViewModel>().load()),
+      _ignorePreloadError(() => context.read<MealTemplatesViewModel>().load()),
+      _ignorePreloadError(() => context.read<SettingsViewModel>().load()),
+      _ignorePreloadError(() async {
+        await context.read<NutritionRepository>().checkBackendHealth();
+      }),
+    ]);
+  }
+
+  Future<void> _ignorePreloadError(Future<void> Function() operation) async {
+    try {
+      await operation();
+    } on Object {
+      // Preloading is opportunistic; screens still handle their own load state.
+    }
   }
 }

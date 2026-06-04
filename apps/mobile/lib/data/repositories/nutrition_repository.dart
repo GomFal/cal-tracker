@@ -2,7 +2,10 @@ import 'dart:io';
 
 import '../../domain/models/macro_distribution.dart';
 import '../../domain/models/nutrition_models.dart';
+import '../../domain/models/nutrition_summary_updates.dart';
 import '../../generated/api/cal_tracker_api.dart';
+import '../services/backend_health_monitor.dart';
+import '../services/nutrition_cache_store.dart';
 
 class AgentRunResult {
   const AgentRunResult({
@@ -70,10 +73,185 @@ class FoodSearchResult {
 }
 
 class NutritionRepository {
-  NutritionRepository({required CalTrackerApiClient apiClient})
-      : _apiClient = apiClient;
+  NutritionRepository({
+    required CalTrackerApiClient apiClient,
+    NutritionCacheStore? cacheStore,
+    BackendHealthMonitor? healthMonitor,
+    Duration backgroundRefreshCooldown = const Duration(seconds: 15),
+    DateTime Function()? now,
+  }) : _apiClient = apiClient,
+       _cacheStore = cacheStore,
+       _healthMonitor = healthMonitor ?? BackendHealthMonitor(now: now),
+       _backgroundRefreshCooldown = backgroundRefreshCooldown,
+       _now = now ?? DateTime.now;
 
   final CalTrackerApiClient _apiClient;
+  final NutritionCacheStore? _cacheStore;
+  final BackendHealthMonitor _healthMonitor;
+  final Duration _backgroundRefreshCooldown;
+  final DateTime Function() _now;
+  final Map<String, Future<DailySummary>> _dailySummaryRefreshes = {};
+  final Map<String, DateTime> _dailySummaryRefreshStartedAt = {};
+  Future<List<MealTemplate>>? _templatesRefresh;
+  Future<List<UsualFood>>? _usualFoodsRefresh;
+  DateTime? _templatesRefreshStartedAt;
+  DateTime? _usualFoodsRefreshStartedAt;
+
+  bool get isBackendLikelyHealthy => _healthMonitor.isLikelyHealthy;
+
+  void activateCacheForUser(String userId) {
+    _cacheStore?.activateUser(userId);
+  }
+
+  void deactivateCache() {
+    _cacheStore?.deactivateUser();
+  }
+
+  Future<void> clearActiveUserCache() async {
+    await _cacheStore?.clearActiveUserCache();
+  }
+
+  Future<bool> checkBackendHealth() {
+    return _healthMonitor.check(() async {
+      final json = await _apiClient.getHealth();
+      if (json['ok'] == false) {
+        throw const ApiException(503, 'Backend is not healthy');
+      }
+    });
+  }
+
+  Future<CachedNutritionValue<DailySummary>?> cachedDailySummary({
+    String? date,
+  }) {
+    final cacheStore = _cacheStore;
+    if (cacheStore == null) {
+      return Future.value();
+    }
+    return cacheStore.readDailySummary(_dateOnly(date));
+  }
+
+  Future<void> putCachedDailySummary(DailySummary summary) async {
+    try {
+      await _cacheStore?.writeDailySummary(summary);
+    } on Object {
+      // Cache failures must never break the interactive app state.
+    }
+  }
+
+  Future<DailySummary> refreshDailySummary({String? date, bool force = false}) {
+    final cacheStore = _cacheStore;
+    final normalizedDate = _dateOnly(date);
+    if (cacheStore == null) {
+      return getDailySummary(date: normalizedDate);
+    }
+
+    final existing = _dailySummaryRefreshes[normalizedDate];
+    if (existing != null) return existing;
+
+    final startedAt = _dailySummaryRefreshStartedAt[normalizedDate];
+    if (!force && startedAt != null) {
+      final isCoolingDown =
+          _now().difference(startedAt) < _backgroundRefreshCooldown;
+      if (isCoolingDown) {
+        return cachedDailySummary(date: normalizedDate).then(
+          (cached) =>
+              cached?.value ?? _refreshDailySummaryFromBackend(normalizedDate),
+        );
+      }
+    }
+
+    final refresh = _refreshDailySummaryFromBackend(normalizedDate);
+    _dailySummaryRefreshStartedAt[normalizedDate] = _now();
+    _dailySummaryRefreshes[normalizedDate] = refresh;
+    refresh.whenComplete(() {
+      _dailySummaryRefreshes.remove(normalizedDate);
+    });
+    return refresh;
+  }
+
+  Future<CachedNutritionValue<List<MealTemplate>>?> cachedTemplates() {
+    final cacheStore = _cacheStore;
+    if (cacheStore == null) {
+      return Future.value();
+    }
+    return cacheStore.readMealTemplates();
+  }
+
+  Future<void> putCachedTemplates(List<MealTemplate> templates) async {
+    try {
+      await _cacheStore?.writeMealTemplates(templates);
+    } on Object {
+      // Cache failures must never break the interactive app state.
+    }
+  }
+
+  Future<List<MealTemplate>> refreshTemplates({bool force = false}) {
+    final cacheStore = _cacheStore;
+    if (cacheStore == null) return getTemplates();
+
+    final existing = _templatesRefresh;
+    if (existing != null) return existing;
+    final startedAt = _templatesRefreshStartedAt;
+    if (!force && startedAt != null) {
+      final isCoolingDown =
+          _now().difference(startedAt) < _backgroundRefreshCooldown;
+      if (isCoolingDown) {
+        return cachedTemplates().then(
+          (cached) => cached?.value ?? _refreshTemplatesFromBackend(),
+        );
+      }
+    }
+
+    final refresh = _refreshTemplatesFromBackend();
+    _templatesRefreshStartedAt = _now();
+    _templatesRefresh = refresh;
+    refresh.whenComplete(() {
+      _templatesRefresh = null;
+    });
+    return refresh;
+  }
+
+  Future<CachedNutritionValue<List<UsualFood>>?> cachedUsualFoods() {
+    final cacheStore = _cacheStore;
+    if (cacheStore == null) {
+      return Future.value();
+    }
+    return cacheStore.readUsualFoods();
+  }
+
+  Future<void> putCachedUsualFoods(List<UsualFood> foods) async {
+    try {
+      await _cacheStore?.writeUsualFoods(foods);
+    } on Object {
+      // Cache failures must never break the interactive app state.
+    }
+  }
+
+  Future<List<UsualFood>> refreshUsualFoods({bool force = false}) {
+    final cacheStore = _cacheStore;
+    if (cacheStore == null) return getUsualFoods();
+
+    final existing = _usualFoodsRefresh;
+    if (existing != null) return existing;
+    final startedAt = _usualFoodsRefreshStartedAt;
+    if (!force && startedAt != null) {
+      final isCoolingDown =
+          _now().difference(startedAt) < _backgroundRefreshCooldown;
+      if (isCoolingDown) {
+        return cachedUsualFoods().then(
+          (cached) => cached?.value ?? _refreshUsualFoodsFromBackend(),
+        );
+      }
+    }
+
+    final refresh = _refreshUsualFoodsFromBackend();
+    _usualFoodsRefreshStartedAt = _now();
+    _usualFoodsRefresh = refresh;
+    refresh.whenComplete(() {
+      _usualFoodsRefresh = null;
+    });
+    return refresh;
+  }
 
   Future<AgentRunResult> logText(
     String text, {
@@ -82,7 +260,10 @@ class NutritionRepository {
     final json = activeProposalId == null
         ? await _apiClient.runAgent(text)
         : await _apiClient.runAgent(text, activeProposalId: activeProposalId);
-    return _parseAgentRunResult(json);
+    _healthMonitor.recordSuccess();
+    final result = _parseAgentRunResult(json);
+    await _cacheAgentResult(result);
+    return result;
   }
 
   Future<VoiceMealRunResult> logAudio(
@@ -96,12 +277,15 @@ class NutritionRepository {
             source: 'flutter',
             activeProposalId: activeProposalId,
           );
+    _healthMonitor.recordSuccess();
+    final result = _parseAgentRunResult(json['result'] as Map<String, Object?>);
+    await _cacheAgentResult(result);
     return VoiceMealRunResult(
       transcript: json['transcript'] as String,
       provider: json['provider'] as String,
       model: json['model'] as String,
       traceId: json['traceId'] as String,
-      result: _parseAgentRunResult(json['result'] as Map<String, Object?>),
+      result: result,
     );
   }
 
@@ -115,6 +299,7 @@ class NutritionRepository {
       barcode: barcode,
       limit: limit,
     );
+    _healthMonitor.recordSuccess();
     return FoodSearchResult(
       items: (json['items'] as List<Object?>? ?? const [])
           .cast<Map<String, Object?>>()
@@ -146,35 +331,36 @@ class NutritionRepository {
       meals: json['meals'] == null
           ? null
           : (json['meals'] as List<Object?>)
-              .cast<Map<String, Object?>>()
-              .map(Meal.fromJson)
-              .toList(),
+                .cast<Map<String, Object?>>()
+                .map(Meal.fromJson)
+                .toList(),
       items: json['items'] == null
           ? null
           : (json['items'] as List<Object?>)
-              .cast<Map<String, Object?>>()
-              .map(MealItem.fromJson)
-              .toList(),
+                .cast<Map<String, Object?>>()
+                .map(MealItem.fromJson)
+                .toList(),
       templates: json['templates'] == null
           ? null
           : (json['templates'] as List<Object?>)
-              .cast<Map<String, Object?>>()
-              .map(MealTemplate.fromJson)
-              .toList(),
+                .cast<Map<String, Object?>>()
+                .map(MealTemplate.fromJson)
+                .toList(),
       template: json['template'] == null
           ? null
           : MealTemplate.fromJson(json['template'] as Map<String, Object?>),
       resolvedItems: json['resolvedItems'] == null
           ? null
           : (json['resolvedItems'] as List<Object?>)
-              .cast<Map<String, Object?>>()
-              .map(MealItem.fromJson)
-              .toList(),
+                .cast<Map<String, Object?>>()
+                .map(MealItem.fromJson)
+                .toList(),
       deleted: json['deleted'] as bool?,
       actionId: json['actionId'] as String?,
       input: json['input'],
       clarificationOptions: _parseCandidateGroups(json['options']),
-      candidateGroups: _parseCandidateGroups(json['candidateGroups']) ??
+      candidateGroups:
+          _parseCandidateGroups(json['candidateGroups']) ??
           _parseCandidateGroups(json['options']),
       usualFoodDraft: json['usualFoodDraft'] == null
           ? _parseTopLevelUsualFoodDraft(json)
@@ -194,8 +380,11 @@ class NutritionRepository {
       proposalId,
       mealLabel: mealLabel,
     );
+    _healthMonitor.recordSuccess();
     final output = json['output'] as Map<String, Object?>;
-    return Meal.fromJson(output['meal'] as Map<String, Object?>);
+    final meal = Meal.fromJson(output['meal'] as Map<String, Object?>);
+    await _mergeMealIntoCachedSummary(meal);
+    return meal;
   }
 
   Future<Meal> correctMealItems(String mealId, List<MealItem> items) async {
@@ -203,8 +392,11 @@ class NutritionRepository {
       mealId,
       items.map((item) => item.toJson()).toList(),
     );
+    _healthMonitor.recordSuccess();
     final output = json['output'] as Map<String, Object?>;
-    return Meal.fromJson(output['meal'] as Map<String, Object?>);
+    final meal = Meal.fromJson(output['meal'] as Map<String, Object?>);
+    await _mergeMealIntoCachedSummary(meal);
+    return meal;
   }
 
   Future<MealProposal> updateProposalItems(
@@ -215,6 +407,7 @@ class NutritionRepository {
       proposalId: proposalId,
       items: items.map((item) => item.toJson()).toList(),
     );
+    _healthMonitor.recordSuccess();
     final output = json['output'] as Map<String, Object?>;
     return MealProposal.fromJson(output['proposal'] as Map<String, Object?>);
   }
@@ -224,26 +417,37 @@ class NutritionRepository {
     required List<MealItem> items,
     String? title,
   }) async {
-    final json =
-        await _apiClient.executeAction('create_meal_proposal_from_items', {
-      'phrase': phrase,
-      if (title != null) 'title': title,
-      'items': items.map((item) => item.toJson()).toList(),
-    });
+    final json = await _apiClient
+        .executeAction('create_meal_proposal_from_items', {
+          'phrase': phrase,
+          if (title != null) 'title': title,
+          'items': items.map((item) => item.toJson()).toList(),
+        });
+    _healthMonitor.recordSuccess();
     final output = json['output'] as Map<String, Object?>;
     return MealProposal.fromJson(output['proposal'] as Map<String, Object?>);
   }
 
   Future<bool> deleteMeal(String mealId, {bool confirmed = false}) async {
     final json = await _apiClient.deleteMeal(mealId, confirmed: confirmed);
+    _healthMonitor.recordSuccess();
     final output = json['output'] as Map<String, Object?>;
     return output['deleted'] as bool? ?? false;
   }
 
   Future<DailySummary> getDailySummary({String? date}) async {
-    final json = await _apiClient.getDailySummary(
-      date: date ?? DateTime.now().toIso8601String().substring(0, 10),
-    );
+    return _fetchDailySummaryFromBackend(_dateOnly(date));
+  }
+
+  Future<DailySummary> _refreshDailySummaryFromBackend(String date) async {
+    final summary = await _fetchDailySummaryFromBackend(date);
+    await putCachedDailySummary(summary);
+    return summary;
+  }
+
+  Future<DailySummary> _fetchDailySummaryFromBackend(String date) async {
+    final json = await _apiClient.getDailySummary(date: date);
+    _healthMonitor.recordSuccess();
     final output = json['output'] as Map<String, Object?>;
     return DailySummary.fromJson(output['summary'] as Map<String, Object?>);
   }
@@ -263,13 +467,16 @@ class NutritionRepository {
       throw ArgumentError('Invalid macro configuration');
     }
     final json = await _apiClient.updateDailyGoals(
-      date: date ?? DateTime.now().toIso8601String().substring(0, 10),
+      date: _dateOnly(date),
       calories: calories,
       hydrationGoalLiters: hydrationGoalLiters,
       calorieTargetSource: calorieTargetSource,
       macroFields: macroConfig?.toApiJson(calories: macroTargetCalories),
     );
-    return DailyGoals.fromJson(json['goals'] as Map<String, Object?>);
+    _healthMonitor.recordSuccess();
+    final goals = DailyGoals.fromJson(json['goals'] as Map<String, Object?>);
+    await _mergeGoalsIntoCachedSummary(goals);
+    return goals;
   }
 
   Future<DailySummary> updateDailyHydration({
@@ -277,10 +484,15 @@ class NutritionRepository {
     required double waterConsumedLiters,
   }) async {
     final json = await _apiClient.updateDailyHydration(
-      date: date ?? DateTime.now().toIso8601String().substring(0, 10),
+      date: _dateOnly(date),
       waterConsumedLiters: waterConsumedLiters,
     );
-    return DailySummary.fromJson(json['summary'] as Map<String, Object?>);
+    _healthMonitor.recordSuccess();
+    final summary = DailySummary.fromJson(
+      json['summary'] as Map<String, Object?>,
+    );
+    await putCachedDailySummary(summary);
+    return summary;
   }
 
   Future<CalorieEstimate> estimateCalories({
@@ -301,11 +513,13 @@ class NutritionRepository {
       'goal': goal,
       if (pace != null) 'pace': pace,
     });
+    _healthMonitor.recordSuccess();
     return CalorieEstimate.fromJson(json);
   }
 
   Future<List<Meal>> getMealHistory() async {
     final json = await _apiClient.getMealHistory();
+    _healthMonitor.recordSuccess();
     final output = json['output'] as Map<String, Object?>;
     return (output['meals'] as List<Object?>)
         .cast<Map<String, Object?>>()
@@ -314,7 +528,18 @@ class NutritionRepository {
   }
 
   Future<List<MealTemplate>> getTemplates() async {
+    return _fetchTemplatesFromBackend();
+  }
+
+  Future<List<MealTemplate>> _refreshTemplatesFromBackend() async {
+    final templates = await _fetchTemplatesFromBackend();
+    await putCachedTemplates(templates);
+    return templates;
+  }
+
+  Future<List<MealTemplate>> _fetchTemplatesFromBackend() async {
     final json = await _apiClient.getTemplates();
+    _healthMonitor.recordSuccess();
     final output = json['output'] as Map<String, Object?>;
     return (output['templates'] as List<Object?>)
         .cast<Map<String, Object?>>()
@@ -323,7 +548,18 @@ class NutritionRepository {
   }
 
   Future<List<UsualFood>> getUsualFoods() async {
+    return _fetchUsualFoodsFromBackend();
+  }
+
+  Future<List<UsualFood>> _refreshUsualFoodsFromBackend() async {
+    final foods = await _fetchUsualFoodsFromBackend();
+    await putCachedUsualFoods(foods);
+    return foods;
+  }
+
+  Future<List<UsualFood>> _fetchUsualFoodsFromBackend() async {
     final json = await _apiClient.getUsualFoods();
+    _healthMonitor.recordSuccess();
     final output = _responseOutput(json);
     final foods = output['usualFoods'] ?? output['foods'] ?? output['items'];
     return (foods as List<Object?>? ?? const [])
@@ -339,8 +575,13 @@ class NutritionRepository {
     final body = template.toUpdateJson()
       ..['trustedAutoCommitEnabled'] = enabled;
     final json = await _apiClient.updateTemplate(template.id, body);
+    _healthMonitor.recordSuccess();
     final output = json['output'] as Map<String, Object?>;
-    return MealTemplate.fromJson(output['template'] as Map<String, Object?>);
+    final updated = MealTemplate.fromJson(
+      output['template'] as Map<String, Object?>,
+    );
+    await _replaceCachedTemplate(updated);
+    return updated;
   }
 
   Future<MealTemplate> createTemplate({
@@ -355,8 +596,13 @@ class NutritionRepository {
       'items': items.map((item) => item.toJson()).toList(),
       'aliases': aliases,
     });
+    _healthMonitor.recordSuccess();
     final output = json['output'] as Map<String, Object?>;
-    return MealTemplate.fromJson(output['template'] as Map<String, Object?>);
+    final template = MealTemplate.fromJson(
+      output['template'] as Map<String, Object?>,
+    );
+    await _appendCachedTemplate(template);
+    return template;
   }
 
   Future<MealTemplate> updateTemplate({
@@ -372,8 +618,13 @@ class NutritionRepository {
       'items': items.map((item) => item.toJson()).toList(),
       'aliases': aliases,
     });
+    _healthMonitor.recordSuccess();
     final output = json['output'] as Map<String, Object?>;
-    return MealTemplate.fromJson(output['template'] as Map<String, Object?>);
+    final template = MealTemplate.fromJson(
+      output['template'] as Map<String, Object?>,
+    );
+    await _replaceCachedTemplate(template);
+    return template;
   }
 
   Future<UsualMealDraft> draftUsualMeal(String text) async {
@@ -384,16 +635,18 @@ class NutritionRepository {
       if (error.statusCode != 404 && error.code != 'unimplemented_action') {
         rethrow;
       }
-      json = await _apiClient.executeAction('draft_usual_meal', {
-        'text': text,
-      });
+      json = await _apiClient.executeAction('draft_usual_meal', {'text': text});
     }
+    _healthMonitor.recordSuccess();
     return UsualMealDraft.fromJson(_responseOutput(json));
   }
 
   Future<UsualFood> createUsualFood(UsualFoodInput input) async {
     final json = await _apiClient.createUsualFood(input.toJson());
-    return _parseUsualFoodResponse(json);
+    _healthMonitor.recordSuccess();
+    final food = _parseUsualFoodResponse(json);
+    await _appendCachedUsualFood(food);
+    return food;
   }
 
   Future<UsualFood> updateUsualFood(String foodId, UsualFoodInput input) async {
@@ -401,30 +654,145 @@ class NutritionRepository {
       foodId,
       input.toJson(includeEmptyOptional: true),
     );
-    return _parseUsualFoodResponse(json);
+    _healthMonitor.recordSuccess();
+    final food = _parseUsualFoodResponse(json);
+    await _replaceCachedUsualFood(food);
+    return food;
   }
 
   Future<bool> deleteUsualFood(String foodId) async {
     final json = await _apiClient.deleteUsualFood(foodId);
+    _healthMonitor.recordSuccess();
     final output = _responseOutput(json);
-    return output['deleted'] as bool? ?? true;
+    final deleted = output['deleted'] as bool? ?? true;
+    if (deleted) {
+      await _removeCachedUsualFood(foodId);
+    }
+    return deleted;
   }
 
   Future<UsualFoodDraft> draftUsualFood(String text) async {
     final json = await _apiClient.draftUsualFood(text);
+    _healthMonitor.recordSuccess();
     final output = _responseOutput(json);
     return UsualFoodDraft.fromJson(output['draft'] as Map<String, Object?>);
   }
 
   Future<bool> deleteTemplate(String templateId) async {
     final json = await _apiClient.deleteTemplate(templateId);
+    _healthMonitor.recordSuccess();
     final output = json['output'] as Map<String, Object?>;
-    return output['deleted'] as bool? ?? false;
+    final deleted = output['deleted'] as bool? ?? false;
+    if (deleted) {
+      await _removeCachedTemplate(templateId);
+    }
+    return deleted;
   }
 
   Future<String> transcribeAudio(File audioFile) async {
     final json = await _apiClient.transcribeAudio(audioFile, source: 'flutter');
+    _healthMonitor.recordSuccess();
     return json['transcript'] as String;
+  }
+
+  Future<void> _cacheAgentResult(AgentRunResult result) async {
+    final summary = result.summary;
+    if (summary != null) {
+      await putCachedDailySummary(summary);
+    }
+    final meal = result.meal;
+    if (meal != null) {
+      await _mergeMealIntoCachedSummary(meal);
+    }
+    final meals = result.meals;
+    if (meals != null) {
+      for (final meal in meals) {
+        await _mergeMealIntoCachedSummary(meal);
+      }
+    }
+    final templates = result.templates;
+    if (templates != null) {
+      await putCachedTemplates(templates);
+    }
+    final template = result.template;
+    if (template != null) {
+      await _replaceCachedTemplate(template);
+    }
+  }
+
+  Future<void> _mergeMealIntoCachedSummary(Meal meal) async {
+    final cached = await cachedDailySummary(
+      date: _dateFromDateTime(meal.occurredAt),
+    );
+    if (cached == null) return;
+    final existingMeals = cached.value.meals;
+    final hasMeal = existingMeals.any((item) => item.id == meal.id);
+    final meals = hasMeal
+        ? existingMeals.map((item) => item.id == meal.id ? meal : item).toList()
+        : [...existingMeals, meal];
+    await putCachedDailySummary(dailySummaryWithMeals(cached.value, meals));
+  }
+
+  Future<void> _mergeGoalsIntoCachedSummary(DailyGoals goals) async {
+    final cached = await cachedDailySummary(date: goals.date);
+    if (cached == null) return;
+    await putCachedDailySummary(dailySummaryWithGoals(cached.value, goals));
+  }
+
+  Future<void> _appendCachedTemplate(MealTemplate template) async {
+    final cached = await cachedTemplates();
+    if (cached == null) return;
+    await putCachedTemplates([...cached.value, template]);
+  }
+
+  Future<void> _replaceCachedTemplate(MealTemplate template) async {
+    final cached = await cachedTemplates();
+    if (cached == null) return;
+    final hasTemplate = cached.value.any((item) => item.id == template.id);
+    final templates = hasTemplate
+        ? cached.value
+              .map((item) => item.id == template.id ? template : item)
+              .toList()
+        : [...cached.value, template];
+    await putCachedTemplates(templates);
+  }
+
+  Future<void> _removeCachedTemplate(String templateId) async {
+    final cached = await cachedTemplates();
+    if (cached == null) return;
+    await putCachedTemplates(
+      cached.value.where((item) => item.id != templateId).toList(),
+    );
+  }
+
+  Future<void> _appendCachedUsualFood(UsualFood food) async {
+    final cached = await cachedUsualFoods();
+    if (cached == null) return;
+    await putCachedUsualFoods([...cached.value, food]);
+  }
+
+  Future<void> _replaceCachedUsualFood(UsualFood food) async {
+    final cached = await cachedUsualFoods();
+    if (cached == null) return;
+    final hasFood = cached.value.any((item) => item.id == food.id);
+    final foods = hasFood
+        ? cached.value.map((item) => item.id == food.id ? food : item).toList()
+        : [...cached.value, food];
+    await putCachedUsualFoods(foods);
+  }
+
+  Future<void> _removeCachedUsualFood(String foodId) async {
+    final cached = await cachedUsualFoods();
+    if (cached == null) return;
+    await putCachedUsualFoods(
+      cached.value.where((item) => item.id != foodId).toList(),
+    );
+  }
+
+  String _dateOnly(String? date) => date ?? _dateFromDateTime(_now());
+
+  String _dateFromDateTime(DateTime date) {
+    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
 }
 

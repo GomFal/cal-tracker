@@ -2,7 +2,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class AppPreferencesStorage {
   AppPreferencesStorage({SharedPreferencesAsync? preferences})
-      : _preferences = preferences ?? SharedPreferencesAsync();
+    : _preferences = preferences ?? SharedPreferencesAsync();
 
   final SharedPreferencesAsync _preferences;
 
@@ -16,5 +16,16 @@ class AppPreferencesStorage {
 
   Future<void> remove(String key) {
     return _preferences.remove(key);
+  }
+
+  Future<Set<String>> readKeys() {
+    return _preferences.getKeys();
+  }
+
+  Future<void> removeWhere(bool Function(String key) test) async {
+    final keys = await readKeys();
+    for (final key in keys.where(test)) {
+      await remove(key);
+    }
   }
 }

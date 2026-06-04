@@ -79,17 +79,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     children: [
                       Text(
                         user?.displayName ?? l10n.fallbackUserName,
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.copyWith(color: limeCardTextColor),
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: limeCardTextColor,
+                        ),
                       ),
                       if (user != null)
                         Text(
                           user.email,
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodyMedium
+                          style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(color: limeCardTextColor),
                         ),
                     ],
@@ -120,7 +117,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: l10n.settingsHydrationGoalSubtitle(
               formatHydrationLiters(goals?.hydrationGoalLiters ?? 0),
             ),
-            onTap: settings.isLoading
+            onTap: settings.isLoading || settings.isSaving
                 ? null
                 : () => _showHydrationGoalSheet(context, goals: goals),
           ),
@@ -135,7 +132,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     goals?.target.calories ?? 2200,
                   )
                 : l10n.settingsNotSet,
-            onTap: settings.isLoading
+            onTap: settings.isLoading || settings.isSaving
                 ? null
                 : () => _showCalorieTargetSheet(context, goals),
           ),
@@ -146,7 +143,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             color: FreshColors.leaf,
             title: 'Macro distribution',
             subtitle: _macroDistributionSubtitle(l10n, goals),
-            onTap: settings.isLoading
+            onTap: settings.isLoading || settings.isSaving
                 ? null
                 : () => _showMacroDistributionEntry(context, goals),
           ),
@@ -187,14 +184,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (context) => HydrationGoalSheet(
-        initialLiters: goals?.hydrationGoalLiters ?? 0,
-      ),
+      builder: (context) =>
+          HydrationGoalSheet(initialLiters: goals?.hydrationGoalLiters ?? 0),
     );
     if (!context.mounted || value == null) return;
-    final updated = await context
-        .read<SettingsViewModel>()
-        .updateGoals(hydrationGoalLiters: value);
+    final updated = await context.read<SettingsViewModel>().updateGoals(
+      hydrationGoalLiters: value,
+    );
     if (!context.mounted || updated == null) return;
     await _refreshGoalConsumers(context, forceDashboardRefresh: true);
   }
@@ -214,11 +210,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     if (!context.mounted || selection == null) return;
     final updated = await context.read<SettingsViewModel>().updateGoals(
-          calories: selection.calories,
-          calorieTargetSource: selection.source,
-          macroConfig: selection.macroConfig,
-          macroCalorieTarget: selection.calories,
-        );
+      calories: selection.calories,
+      calorieTargetSource: selection.source,
+      macroConfig: selection.macroConfig,
+      macroCalorieTarget: selection.calories,
+    );
     if (!context.mounted || updated == null) return;
     await _refreshGoalConsumers(context, forceDashboardRefresh: true);
     if (!context.mounted ||
@@ -226,12 +222,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         selection.macroConfig != null) {
       return;
     }
-    final shouldConfigure = await showModalBottomSheet<bool>(
+    final shouldConfigure =
+        await showModalBottomSheet<bool>(
           context: context,
           useSafeArea: true,
-          builder: (context) => PostCalorieSaveMacroPrompt(
-            calories: selection.calories,
-          ),
+          builder: (context) =>
+              PostCalorieSaveMacroPrompt(calories: selection.calories),
         ) ??
         false;
     if (!context.mounted || !shouldConfigure) return;
@@ -250,7 +246,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await _showMacroDistributionSheet(context, goals);
       return;
     }
-    final shouldSetCalories = await showModalBottomSheet<bool>(
+    final shouldSetCalories =
+        await showModalBottomSheet<bool>(
           context: context,
           useSafeArea: true,
           builder: (context) => const _MacroRequiresCaloriesSheet(),
@@ -261,23 +258,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _showMacroDistributionSheet(
-      BuildContext context, DailyGoals? goals,
-      {int? caloriesOverride}) async {
+    BuildContext context,
+    DailyGoals? goals, {
+    int? caloriesOverride,
+  }) async {
     final calories = caloriesOverride ?? goals?.target.calories ?? 2200;
     final macroConfig = await showModalBottomSheet<MacroDistributionConfig>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (context) => MacroDistributionSheet(
-        calories: calories,
-        initialGoals: goals,
-      ),
+      builder: (context) =>
+          MacroDistributionSheet(calories: calories, initialGoals: goals),
     );
     if (!context.mounted || macroConfig == null) return;
     final updated = await context.read<SettingsViewModel>().updateGoals(
-          macroConfig: macroConfig,
-          macroCalorieTarget: calories,
-        );
+      macroConfig: macroConfig,
+      macroCalorieTarget: calories,
+    );
     if (!context.mounted || updated == null) return;
     await _refreshGoalConsumers(context, forceDashboardRefresh: true);
   }
@@ -288,8 +285,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }) {
     return Future.wait([
       context.read<DashboardViewModel>().load(
-            forceRefresh: forceDashboardRefresh,
-          ),
+        forceRefresh: forceDashboardRefresh,
+      ),
       context.read<SettingsViewModel>().load(),
       context.read<MealHistoryViewModel>().load(),
     ]);
@@ -539,10 +536,7 @@ class _SettingsGoalRow extends StatelessWidget {
       onTap: onTap,
       child: Row(
         children: [
-          FreshIconChip(
-            icon: icon,
-            color: color,
-          ),
+          FreshIconChip(icon: icon, color: color),
           const SizedBox(width: FreshSpacing.md),
           Expanded(
             child: Column(
@@ -551,10 +545,9 @@ class _SettingsGoalRow extends StatelessWidget {
                 Text(title, style: Theme.of(context).textTheme.titleMedium),
                 Text(
                   subtitle,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(color: FreshColors.inkMuted),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: FreshColors.inkMuted),
                 ),
               ],
             ),

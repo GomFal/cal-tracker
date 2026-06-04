@@ -32,50 +32,40 @@ class CalTrackerApiClient {
   final TokenStorage tokenStorage;
   final http.Client _httpClient;
 
+  Future<Map<String, Object?>> getHealth() => _get('/v1/health');
+
   Future<Map<String, Object?>> register({
     required String email,
     required String password,
     required String displayName,
   }) {
-    return _post(
-        '/v1/auth/register',
-        {
-          'email': email,
-          'password': password,
-          'displayName': displayName,
-        },
-        authenticated: false);
+    return _post('/v1/auth/register', {
+      'email': email,
+      'password': password,
+      'displayName': displayName,
+    }, authenticated: false);
   }
 
   Future<Map<String, Object?>> login({
     required String email,
     required String password,
   }) {
-    return _post(
-        '/v1/auth/login',
-        {
-          'email': email,
-          'password': password,
-        },
-        authenticated: false);
+    return _post('/v1/auth/login', {
+      'email': email,
+      'password': password,
+    }, authenticated: false);
   }
 
   Future<Map<String, Object?>> loginWithGoogle({required String idToken}) {
-    return _post(
-        '/v1/auth/google/login',
-        {
-          'idToken': idToken,
-        },
-        authenticated: false);
+    return _post('/v1/auth/google/login', {
+      'idToken': idToken,
+    }, authenticated: false);
   }
 
   Future<Map<String, Object?>> refresh(String refreshToken) {
-    return _post(
-        '/v1/auth/refresh',
-        {
-          'refreshToken': refreshToken,
-        },
-        authenticated: false);
+    return _post('/v1/auth/refresh', {
+      'refreshToken': refreshToken,
+    }, authenticated: false);
   }
 
   Future<Map<String, Object?>> getMe() => _get('/v1/auth/me');

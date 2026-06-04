@@ -1,5 +1,6 @@
 import 'package:cal_tracker_mobile/app/app.dart';
 import 'package:cal_tracker_mobile/data/repositories/auth_repository.dart';
+import 'package:cal_tracker_mobile/data/repositories/nutrition_repository.dart';
 import 'package:cal_tracker_mobile/data/services/app_preferences_repository.dart';
 import 'package:cal_tracker_mobile/data/services/api_config.dart';
 import 'package:cal_tracker_mobile/data/services/secure_token_storage.dart';
@@ -92,6 +93,7 @@ Future<void> _pumpAuthApp(
     CalTrackerBootstrap(
       preferencesRepository: preferencesRepository,
       authRepository: _FakeAuthRepository(),
+      nutritionRepository: _FakeNutritionRepository(),
     ),
   );
   await tester.pump();
@@ -107,6 +109,10 @@ class _FakeAuthRepository extends AuthRepository {
 
   @override
   Future<AuthUser?> restoreSession() async => null;
+}
+
+class _FakeNutritionRepository extends NutritionRepository {
+  _FakeNutritionRepository() : super(apiClient: _unusedApiClient());
 }
 
 class _FakePreferencesRepository implements AppPreferencesRepository {

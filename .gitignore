@@ -4,6 +4,7 @@ node_modules/
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
+apps/mobile/devtools_options.yaml
 build/
 coverage/
 dist/

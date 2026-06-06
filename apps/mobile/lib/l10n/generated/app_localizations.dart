@@ -1916,77 +1916,11 @@ abstract class AppLocalizations {
   /// **'Comma-separated phrases you use by voice'**
   String get mealTemplateEditorAliasesHint;
 
-  /// No description provided for @mealTemplateEditorDraftSection.
+  /// No description provided for @bottomMicFillEditorHint.
   ///
   /// In en, this message translates to:
-  /// **'Fill from voice'**
-  String get mealTemplateEditorDraftSection;
-
-  /// No description provided for @mealTemplateEditorDraftHelper.
-  ///
-  /// In en, this message translates to:
-  /// **'Describe the usual meal by voice. Review ingredients, matches, and quantities before saving.'**
-  String get mealTemplateEditorDraftHelper;
-
-  /// No description provided for @mealTemplateEditorDraftLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Transcript'**
-  String get mealTemplateEditorDraftLabel;
-
-  /// No description provided for @mealTemplateEditorDraftHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Record the usual meal to fill this transcript.'**
-  String get mealTemplateEditorDraftHint;
-
-  /// No description provided for @mealTemplateEditorDraftButton.
-  ///
-  /// In en, this message translates to:
-  /// **'Build draft'**
-  String get mealTemplateEditorDraftButton;
-
-  /// No description provided for @mealTemplateEditorVoiceTooltip.
-  ///
-  /// In en, this message translates to:
-  /// **'Record usual meal'**
-  String get mealTemplateEditorVoiceTooltip;
-
-  /// No description provided for @mealTemplateEditorStopVoiceTooltip.
-  ///
-  /// In en, this message translates to:
-  /// **'Stop and build draft'**
-  String get mealTemplateEditorStopVoiceTooltip;
-
-  /// No description provided for @mealTemplateEditorVoiceRecording.
-  ///
-  /// In en, this message translates to:
-  /// **'Recording. Stop when you finish describing the meal.'**
-  String get mealTemplateEditorVoiceRecording;
-
-  /// No description provided for @mealTemplateEditorVoiceTranscribing.
-  ///
-  /// In en, this message translates to:
-  /// **'Transcribing recording.'**
-  String get mealTemplateEditorVoiceTranscribing;
-
-  /// No description provided for @mealTemplateEditorDraftEmptyError.
-  ///
-  /// In en, this message translates to:
-  /// **'Record the meal before building a draft.'**
-  String get mealTemplateEditorDraftEmptyError;
-
-  /// No description provided for @mealTemplateEditorDraftApplied.
-  ///
-  /// In en, this message translates to:
-  /// **'Draft applied. Review and edit before saving.'**
-  String get mealTemplateEditorDraftApplied;
-
-  /// No description provided for @mealTemplateEditorDraftNeedsItems.
-  ///
-  /// In en, this message translates to:
-  /// **'Draft returned no ingredients yet. Add foods manually or clarify by voice.'**
-  String get mealTemplateEditorDraftNeedsItems;
+  /// **'Use this mic to fill this screen'**
+  String get bottomMicFillEditorHint;
 
   /// No description provided for @mealTemplateEditorCandidatesSection.
   ///
@@ -2023,6 +1957,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Add a meal title before saving.'**
   String get mealTemplateEditorTitleRequired;
+
+  /// No description provided for @mealTemplateEditorSaveFailedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save usual meal'**
+  String get mealTemplateEditorSaveFailedTitle;
+
+  /// No description provided for @mealTemplateEditorSaveFailedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Please try again.'**
+  String get mealTemplateEditorSaveFailedMessage;
 
   /// No description provided for @usualsMealsTab.
   ///
@@ -2102,24 +2048,6 @@ abstract class AppLocalizations {
   /// **'Enter label text before filling fields.'**
   String get usualFoodsDraftEmptyError;
 
-  /// No description provided for @usualFoodsDraftApplied.
-  ///
-  /// In en, this message translates to:
-  /// **'Draft applied. Review the fields before saving.'**
-  String get usualFoodsDraftApplied;
-
-  /// No description provided for @usualFoodsDraftMissingFields.
-  ///
-  /// In en, this message translates to:
-  /// **'Draft applied. Complete the empty required fields before saving.'**
-  String get usualFoodsDraftMissingFields;
-
-  /// No description provided for @usualFoodsDraftFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'Could not fill the draft. Enter the values manually or try again.'**
-  String get usualFoodsDraftFailed;
-
   /// No description provided for @usualFoodsEditorSubtitle.
   ///
   /// In en, this message translates to:
@@ -2155,72 +2083,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Add label details only when you have them.'**
   String get usualFoodsOptionalSectionSubtitle;
-
-  /// No description provided for @usualFoodsVoiceDraftTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Fill faster with voice'**
-  String get usualFoodsVoiceDraftTitle;
-
-  /// No description provided for @usualFoodsVoiceDraftMessage.
-  ///
-  /// In en, this message translates to:
-  /// **'Dictate the nutrition label. The transcript is read-only, fields stay editable, and nothing is saved until you confirm.'**
-  String get usualFoodsVoiceDraftMessage;
-
-  /// No description provided for @usualFoodsVoiceRecordButton.
-  ///
-  /// In en, this message translates to:
-  /// **'Record label'**
-  String get usualFoodsVoiceRecordButton;
-
-  /// No description provided for @usualFoodsVoiceStopButton.
-  ///
-  /// In en, this message translates to:
-  /// **'Stop and fill'**
-  String get usualFoodsVoiceStopButton;
-
-  /// No description provided for @usualFoodsVoicePermissionStatus.
-  ///
-  /// In en, this message translates to:
-  /// **'Requesting microphone permission...'**
-  String get usualFoodsVoicePermissionStatus;
-
-  /// No description provided for @usualFoodsVoiceRecordingStatus.
-  ///
-  /// In en, this message translates to:
-  /// **'Recording. Say the serving size, calories, protein, carbs, fat, and any optional label values.'**
-  String get usualFoodsVoiceRecordingStatus;
-
-  /// No description provided for @usualFoodsVoiceStoppingStatus.
-  ///
-  /// In en, this message translates to:
-  /// **'Saving audio...'**
-  String get usualFoodsVoiceStoppingStatus;
-
-  /// No description provided for @usualFoodsVoiceTranscribingStatus.
-  ///
-  /// In en, this message translates to:
-  /// **'Transcribing label...'**
-  String get usualFoodsVoiceTranscribingStatus;
-
-  /// No description provided for @usualFoodsVoiceDraftingStatus.
-  ///
-  /// In en, this message translates to:
-  /// **'Filling fields from transcript...'**
-  String get usualFoodsVoiceDraftingStatus;
-
-  /// No description provided for @usualFoodsVoicePermissionError.
-  ///
-  /// In en, this message translates to:
-  /// **'Microphone permission is required to fill from voice.'**
-  String get usualFoodsVoicePermissionError;
-
-  /// No description provided for @usualFoodsTranscriptLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Transcript'**
-  String get usualFoodsTranscriptLabel;
 
   /// No description provided for @usualFoodsSaveFailedTitle.
   ///

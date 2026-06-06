@@ -245,10 +245,6 @@ class MealTemplatesViewModel extends ChangeNotifier {
     return _nutritionRepository.transcribeAudio(audioFile);
   }
 
-  Future<String> transcribeUsualFoodAudio(File audioFile) {
-    return transcribeAudio(audioFile);
-  }
-
   Future<void> createUsualFood(UsualFoodInput input) async {
     final temporary = _usualFoodFromInput(_temporaryId('usual-food'), input);
     _usualFoods = [..._usualFoods, temporary];

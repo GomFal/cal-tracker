@@ -58,6 +58,55 @@ void main() {
     expect(find.byKey(voiceActionRecordingPulseKey), findsNothing);
     expect(find.byKey(voiceActionRecordingStaticRingKey), findsOneWidget);
   });
+
+  testWidgets('shows processing spinner when isProcessing is true',
+      (tester) async {
+    await tester.pumpWidget(
+      _buildHarness(isProcessing: true, isRecording: false),
+    );
+
+    expect(find.byKey(voiceActionProcessingSpinnerKey), findsOneWidget);
+    expect(find.byKey(voiceActionProcessingStaticRingKey), findsNothing);
+  });
+
+  testWidgets('hides processing spinner when isProcessing is false',
+      (tester) async {
+    await tester.pumpWidget(
+      _buildHarness(isProcessing: false, isRecording: false),
+    );
+
+    expect(find.byKey(voiceActionProcessingSpinnerKey), findsNothing);
+    expect(find.byKey(voiceActionProcessingStaticRingKey), findsNothing);
+  });
+
+  testWidgets(
+      'shows static processing ring when animations are disabled',
+      (tester) async {
+    await tester.pumpWidget(
+      _buildHarness(
+        isProcessing: true,
+        isRecording: false,
+        disableAnimations: true,
+      ),
+    );
+
+    expect(find.byKey(voiceActionProcessingSpinnerKey), findsNothing);
+    expect(find.byKey(voiceActionProcessingStaticRingKey), findsOneWidget);
+  });
+
+  testWidgets(
+      'processing spinner is hidden when recording (recording has priority)',
+      (tester) async {
+    await tester.pumpWidget(
+      _buildHarness(isProcessing: true, isRecording: true),
+    );
+
+    // Recording pulse is shown
+    expect(find.byKey(voiceActionRecordingPulseKey), findsOneWidget);
+    // Processing spinner is hidden (recording has priority)
+    expect(find.byKey(voiceActionProcessingSpinnerKey), findsNothing);
+    expect(find.byKey(voiceActionProcessingStaticRingKey), findsNothing);
+  });
 }
 
 const _buttonKey = ValueKey('voice_action_test_button');
@@ -65,6 +114,7 @@ const _rightKey = ValueKey('voice_action_test_right');
 
 Widget _buildHarness({
   required bool isRecording,
+  bool isProcessing = false,
   bool disableAnimations = false,
 }) {
   return MaterialApp(
@@ -82,6 +132,7 @@ Widget _buildHarness({
                 dimension: 62,
                 backgroundColor:
                     isRecording ? FreshColors.coral : FreshColors.lime,
+                isProcessing: isProcessing,
                 isRecording: isRecording,
                 child: const Icon(Icons.mic_rounded),
               ),

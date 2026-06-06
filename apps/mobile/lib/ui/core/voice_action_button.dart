@@ -8,6 +8,10 @@ import 'design_system.dart';
 const voiceActionRecordingPulseKey = ValueKey('voice_action_recording_pulse');
 const voiceActionRecordingStaticRingKey =
     ValueKey('voice_action_recording_static_ring');
+const voiceActionProcessingSpinnerKey =
+    ValueKey('voice_action_processing_spinner');
+const voiceActionProcessingStaticRingKey =
+    ValueKey('voice_action_processing_static_ring');
 
 class VoiceActionHaptics {
   const VoiceActionHaptics._();
@@ -29,6 +33,7 @@ class VoiceActionButtonChrome extends StatefulWidget {
     required this.isRecording,
     required this.child,
     this.recordingScale = 1.1,
+    this.isProcessing = false,
   });
 
   final double dimension;
@@ -36,6 +41,7 @@ class VoiceActionButtonChrome extends StatefulWidget {
   final bool isRecording;
   final Widget child;
   final double recordingScale;
+  final bool isProcessing;
 
   @override
   State<VoiceActionButtonChrome> createState() =>
@@ -93,6 +99,11 @@ class _VoiceActionButtonChromeState extends State<VoiceActionButtonChrome>
         clipBehavior: Clip.none,
         alignment: Alignment.center,
         children: [
+          if (widget.isProcessing && !widget.isRecording)
+            _ProcessingSpinner(
+              dimension: widget.dimension,
+              reduceMotion: reduceMotion,
+            ),
           if (widget.isRecording)
             _RecordingPulse(
               controller: _pulseController,
@@ -202,6 +213,54 @@ class _PulseRing extends StatelessWidget {
             ),
             color: palette.coral.withValues(alpha: opacity * 0.28),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProcessingSpinner extends StatelessWidget {
+  const _ProcessingSpinner({
+    required this.dimension,
+    required this.reduceMotion,
+  });
+
+  final double dimension;
+  final bool reduceMotion;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.freshPalette;
+    final size = dimension + 12;
+
+    if (reduceMotion) {
+      return ExcludeSemantics(
+        child: IgnorePointer(
+          child: SizedBox.square(
+            key: voiceActionProcessingStaticRingKey,
+            dimension: size,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: palette.water.withValues(alpha: 0.28),
+                  width: 2.5,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return ExcludeSemantics(
+      child: SizedBox.square(
+        key: voiceActionProcessingSpinnerKey,
+        dimension: size,
+        child: CircularProgressIndicator(
+          strokeWidth: 2.5,
+          color: palette.water,
+          backgroundColor: Colors.transparent,
         ),
       ),
     );

@@ -376,6 +376,63 @@ class _CenterVoiceButton extends StatefulWidget {
 
 class _CenterVoiceButtonState extends State<_CenterVoiceButton> {
   bool _longPressRecording = false;
+  Timer? _bubbleTimer;
+  bool _showBubble = false;
+  bool _bubbleUserDismissed = false;
+
+  static const _bubbleCreateRoutes = <String>{
+    '/templates/meals/new',
+    '/templates/ingredients/new',
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _initBubbleTimer();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _initBubbleTimer();
+  }
+
+  @override
+  void dispose() {
+    _bubbleTimer?.cancel();
+    super.dispose();
+  }
+
+  void _initBubbleTimer() {
+    final location = _currentLocation();
+    final shouldShow = _bubbleCreateRoutes.contains(location) &&
+        !_bubbleUserDismissed;
+    if (shouldShow == _showBubble) return;
+    _bubbleTimer?.cancel();
+    if (shouldShow) {
+      setState(() => _showBubble = true);
+      _bubbleTimer = Timer(const Duration(seconds: 6), () {
+        if (mounted) setState(() => _showBubble = false);
+      });
+    } else {
+      setState(() => _showBubble = false);
+    }
+  }
+
+  String _currentLocation() {
+    try {
+      return GoRouterState.of(context).uri.toString();
+    } catch (_) {
+      return '';
+    }
+  }
+
+  void _dismissBubble() {
+    if (!_showBubble) return;
+    _bubbleTimer?.cancel();
+    _bubbleUserDismissed = true;
+    setState(() => _showBubble = false);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -407,7 +464,7 @@ class _CenterVoiceButtonState extends State<_CenterVoiceButton> {
             ? 'Processing voice'
             : 'Record meal';
 
-    return Semantics(
+    final micButton = Semantics(
       key: const ValueKey('bottom_voice_action_button'),
       button: true,
       label: tooltip,
@@ -415,7 +472,12 @@ class _CenterVoiceButtonState extends State<_CenterVoiceButton> {
         message: tooltip,
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: isBusy ? null : () => unawaited(_handleTap()),
+          onTap: isBusy
+              ? null
+              : () {
+                  _dismissBubble();
+                  unawaited(_handleTap());
+                },
           onLongPressStart: isBusy
               ? null
               : (details) => unawaited(_handleLongPressStart(details)),
@@ -431,6 +493,27 @@ class _CenterVoiceButtonState extends State<_CenterVoiceButton> {
             child: Icon(icon, color: palette.ink, size: 28),
           ),
         ),
+      ),
+    );
+
+    if (!_showBubble) return micButton;
+
+    return SizedBox(
+      width: 62,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          micButton,
+          Positioned(
+            bottom: 68,
+            left: 0,
+            right: 0,
+            child: _BubbleTip(
+              message: context.l10n.bottomMicFillEditorHint,
+              onDismiss: _dismissBubble,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -487,6 +570,86 @@ class _CenterVoiceButtonState extends State<_CenterVoiceButton> {
     if (destination != null) {
       context.go(destination.location, extra: destination.extra);
     }
+  }
+}
+
+class _BubbleTip extends StatelessWidget {
+  const _BubbleTip({
+    required this.message,
+    required this.onDismiss,
+  });
+
+  final String message;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.freshPalette;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return GestureDetector(
+      onTap: onDismiss,
+      child: Semantics(
+        label: message,
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 4),
+          child: CustomPaint(
+            painter: _BubblePainter(
+              bubbleColor: isDark ? palette.surfaceMuted : palette.ink,
+            ),
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 200),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 8,
+              ),
+              decoration: BoxDecoration(
+                color: isDark ? palette.surfaceMuted : palette.ink,
+                borderRadius: BorderRadius.circular(FreshRadii.sm),
+              ),
+              child: Text(
+                message,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: isDark ? palette.ink : palette.surfaceSoft,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BubblePainter extends CustomPainter {
+  _BubblePainter({required this.bubbleColor});
+
+  final Color bubbleColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = bubbleColor
+      ..style = PaintingStyle.fill;
+
+    final bubbleRect = Rect.fromLTWH(0, 0, size.width, size.height - 8);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(bubbleRect, const Radius.circular(8)),
+      paint,
+    );
+
+    // Draw the pointing-down arrow/triangle
+    final path = Path()
+      ..moveTo(size.width / 2 - 6, size.height - 8)
+      ..lineTo(size.width / 2, size.height)
+      ..lineTo(size.width / 2 + 6, size.height - 8)
+      ..close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(_BubblePainter oldDelegate) {
+    return oldDelegate.bubbleColor != bubbleColor;
   }
 }
 

@@ -1,18 +1,12 @@
-import 'dart:async';
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../../../../data/services/audio_recorder_service.dart';
 import '../../../../domain/models/nutrition_edit.dart';
 import '../../../../domain/models/nutrition_models.dart';
 import '../../../../l10n/app_localizations_context.dart';
 import '../../../core/content_frame.dart';
 import '../../../core/design_system.dart';
-import '../../../core/user_visible_error.dart';
-import '../../../core/voice_action_button.dart';
 import '../../../shared/food_search_panel.dart';
 import '../view_models/meal_templates_view_model.dart';
 
@@ -21,7 +15,6 @@ class MealTemplateEditorScreen extends StatefulWidget {
     super.key,
     this.templateId,
     this.initialDraft,
-    this.audioRecorderService,
   });
 
   static const newRoute = '/templates/meals/new';
@@ -31,7 +24,6 @@ class MealTemplateEditorScreen extends StatefulWidget {
 
   final String? templateId;
   final UsualMealDraft? initialDraft;
-  final AudioRecorderService? audioRecorderService;
 
   @override
   State<MealTemplateEditorScreen> createState() =>
@@ -41,27 +33,17 @@ class MealTemplateEditorScreen extends StatefulWidget {
 class _MealTemplateEditorScreenState extends State<MealTemplateEditorScreen> {
   final _titleController = TextEditingController();
   final _aliasesController = TextEditingController();
-  final _draftController = TextEditingController();
   final _items = <_TemplateMealItemController>[];
   List<FoodCandidateGroup> _candidateGroups = const [];
   bool _hydrated = false;
   bool _loadRequested = false;
-  bool _isDrafting = false;
-  bool _isRecording = false;
-  bool _isTranscribing = false;
-  String? _status;
-  bool _statusIsError = false;
-  late final AudioRecorderService _audioRecorderService;
-  late final bool _ownsAudioRecorderService;
+  String? _validationError;
 
   bool get _isEditing => widget.templateId != null;
 
   @override
   void initState() {
     super.initState();
-    _audioRecorderService =
-        widget.audioRecorderService ?? AudioRecorderService();
-    _ownsAudioRecorderService = widget.audioRecorderService == null;
     if (!_isEditing) {
       _items.add(_TemplateMealItemController.empty());
       _hydrated = true;
@@ -77,15 +59,8 @@ class _MealTemplateEditorScreenState extends State<MealTemplateEditorScreen> {
 
   @override
   void dispose() {
-    if (_isRecording) {
-      unawaited(_audioRecorderService.cancel());
-    }
-    if (_ownsAudioRecorderService) {
-      unawaited(_audioRecorderService.dispose());
-    }
     _titleController.dispose();
     _aliasesController.dispose();
-    _draftController.dispose();
     for (final item in _items) {
       item.dispose();
     }
@@ -106,7 +81,6 @@ class _MealTemplateEditorScreenState extends State<MealTemplateEditorScreen> {
     final l10n = context.l10n;
     final isMissingTemplate =
         _isEditing && viewModel.hasLoaded && template == null;
-    final isVoiceProcessing = _isDrafting || _isTranscribing;
     final palette = context.freshPalette;
     return ContentFrame(
       title: _isEditing
@@ -127,80 +101,74 @@ class _MealTemplateEditorScreenState extends State<MealTemplateEditorScreen> {
               message: l10n.mealTemplateEditorMissingTemplateMessage,
               color: palette.coral,
             )
-          : Stack(
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                AbsorbPointer(
-                  absorbing: isVoiceProcessing,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (viewModel.isLoading && !_hydrated) ...[
-                        const LinearProgressIndicator(minHeight: 3),
-                        const SizedBox(height: FreshSpacing.md),
-                      ],
-                      _MealTemplateBasicsCard(
-                        titleController: _titleController,
-                        aliasesController: _aliasesController,
-                      ),
-                      const SizedBox(height: FreshSpacing.md),
-                      _DraftBuilderCard(
-                        controller: _draftController,
-                        isDrafting: _isDrafting,
-                        isRecording: _isRecording,
-                        isTranscribing: _isTranscribing,
-                        status: _status,
-                        statusIsError: _statusIsError,
-                        onVoiceToggle: _toggleVoiceDraft,
-                      ),
-                      if (_candidateGroups.isNotEmpty) ...[
-                        const SizedBox(height: FreshSpacing.md),
-                        _CandidateGroupsCard(
-                          groups: _candidateGroups,
-                          onSelected: _applyCandidate,
-                        ),
-                      ],
-                      const SizedBox(height: FreshSpacing.md),
-                      _TemplateItemsSection(
-                        items: _items,
-                        onAddBlank: () {
-                          setState(() {
-                            _items.add(_TemplateMealItemController.empty());
-                          });
-                        },
-                        onAddFood: (item) {
-                          setState(() {
-                            _items.add(
-                              _TemplateMealItemController.fromMealItem(item),
-                            );
-                          });
-                        },
-                        onDelete: (index) {
-                          setState(() {
-                            _items.removeAt(index).dispose();
-                            if (_items.isEmpty) {
-                              _items.add(_TemplateMealItemController.empty());
-                            }
-                          });
-                        },
-                      ),
-                      const SizedBox(height: FreshSpacing.lg),
-                      _SaveBar(
-                        isSaving: viewModel.isSaving || isVoiceProcessing,
-                        nutrition: _totalNutrition(),
-                        onSave: template == null && _isEditing
-                            ? null
-                            : () => _save(viewModel, template),
-                      ),
-                    ],
-                  ),
+                if (viewModel.isLoading && !_hydrated) ...[
+                  const LinearProgressIndicator(minHeight: 3),
+                  const SizedBox(height: FreshSpacing.md),
+                ],
+                _MealTemplateBasicsCard(
+                  titleController: _titleController,
+                  aliasesController: _aliasesController,
                 ),
-                if (isVoiceProcessing)
-                  Positioned.fill(
-                    child: _MealTemplateBlockingOverlay(
-                      message:
-                          _status ?? l10n.mealTemplateEditorVoiceTranscribing,
-                    ),
+                if (_candidateGroups.isNotEmpty) ...[
+                  const SizedBox(height: FreshSpacing.md),
+                  _CandidateGroupsCard(
+                    groups: _candidateGroups,
+                    onSelected: _applyCandidate,
                   ),
+                ],
+                const SizedBox(height: FreshSpacing.md),
+                _TemplateItemsSection(
+                  items: _items,
+                  onAddBlank: () {
+                    setState(() {
+                      _items.add(_TemplateMealItemController.empty());
+                    });
+                  },
+                  onAddFood: (item) {
+                    setState(() {
+                      _items.add(
+                        _TemplateMealItemController.fromMealItem(item),
+                      );
+                    });
+                  },
+                  onDelete: (index) {
+                    setState(() {
+                      _items.removeAt(index).dispose();
+                      if (_items.isEmpty) {
+                        _items.add(_TemplateMealItemController.empty());
+                      }
+                    });
+                  },
+                ),
+                if (_validationError != null) ...[
+                  const SizedBox(height: FreshSpacing.md),
+                  FreshStatusBanner(
+                    icon: Icons.error_outline_rounded,
+                    title: _validationError!,
+                    message: null,
+                    color: palette.coral,
+                  ),
+                ],
+                if (viewModel.error != null) ...[
+                  const SizedBox(height: FreshSpacing.md),
+                  FreshStatusBanner(
+                    icon: Icons.error_outline_rounded,
+                    title: context.l10n.mealTemplateEditorSaveFailedTitle,
+                    message: viewModel.error,
+                    color: palette.coral,
+                  ),
+                ],
+                const SizedBox(height: FreshSpacing.lg),
+                _SaveBar(
+                  isSaving: viewModel.isSaving,
+                  nutrition: _totalNutrition(),
+                  onSave: template == null && _isEditing
+                      ? null
+                      : () => _save(viewModel, template),
+                ),
               ],
             ),
     );
@@ -230,40 +198,8 @@ class _MealTemplateEditorScreenState extends State<MealTemplateEditorScreen> {
     _hydrated = true;
   }
 
-  Future<void> _applyDraftFromText() async {
-    final text = _draftController.text.trim();
-    if (text.isEmpty) {
-      setState(() {
-        _status = context.l10n.mealTemplateEditorDraftEmptyError;
-        _statusIsError = true;
-      });
-      return;
-    }
-    setState(() {
-      _isDrafting = true;
-      _status = null;
-      _statusIsError = false;
-    });
-    try {
-      final draft = await context.read<MealTemplatesViewModel>().draftUsualMeal(
-        text,
-      );
-      if (!mounted) return;
-      setState(() => _applyDraft(draft));
-    } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _status = userVisibleErrorMessage(error);
-        _statusIsError = true;
-      });
-    } finally {
-      if (mounted) {
-        setState(() => _isDrafting = false);
-      }
-    }
-  }
-
   void _applyDraft(UsualMealDraft draft) {
+    _validationError = null;
     if (draft.title != null && draft.title!.trim().isNotEmpty) {
       _titleController.text = draft.title!.trim();
     }
@@ -279,101 +215,8 @@ class _MealTemplateEditorScreenState extends State<MealTemplateEditorScreen> {
         ..addAll(draft.items.map(_TemplateMealItemController.fromMealItem));
     }
     _candidateGroups = draft.candidateGroups;
-    _status = draft.items.isEmpty && draft.candidateGroups.isEmpty
-        ? context.l10n.mealTemplateEditorDraftNeedsItems
-        : context.l10n.mealTemplateEditorDraftApplied;
-    _statusIsError = false;
-  }
-
-  Future<void> _toggleVoiceDraft() async {
-    if (_isDrafting || _isTranscribing) return;
-    if (_isRecording) {
-      await _stopVoiceDraft();
-      return;
-    }
-    try {
-      await _audioRecorderService.start();
-      VoiceActionHaptics.recordingStarted();
-      if (!mounted) return;
-      setState(() {
-        _isRecording = true;
-        _status = context.l10n.mealTemplateEditorVoiceRecording;
-        _statusIsError = false;
-      });
-    } on RecorderException catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _status =
-            error.message ??
-            userVisibleErrorMessage(
-              error,
-              context: UserErrorContext.voiceRecording,
-            );
-        _statusIsError = true;
-      });
-    } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _status = userVisibleErrorMessage(
-          error,
-          context: UserErrorContext.voiceRecording,
-        );
-        _statusIsError = true;
-      });
-    }
-  }
-
-  Future<void> _stopVoiceDraft() async {
-    setState(() {
-      _isRecording = false;
-      _isTranscribing = true;
-      _status = context.l10n.mealTemplateEditorVoiceTranscribing;
-      _statusIsError = false;
-    });
-    VoiceActionHaptics.recordingStopped();
-    String? path;
-    final viewModel = context.read<MealTemplatesViewModel>();
-    try {
-      final audio = await _audioRecorderService.stop();
-      path = audio?.path;
-      if (path == null) {
-        throw const RecorderException(
-          'missing_file',
-          'No audio file was created.',
-        );
-      }
-      final transcript = await viewModel.transcribeAudio(File(path));
-      if (!mounted) return;
-      _draftController.text = transcript;
-      await _applyDraftFromText();
-    } on RecorderException catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _status =
-            error.message ??
-            userVisibleErrorMessage(
-              error,
-              context: UserErrorContext.voiceRecording,
-            );
-        _statusIsError = true;
-      });
-    } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _status = userVisibleErrorMessage(
-          error,
-          context: UserErrorContext.voiceTranscription,
-        );
-        _statusIsError = true;
-      });
-    } finally {
-      if (path != null) {
-        unawaited(_deleteTemporaryAudio(path));
-      }
-      if (mounted) {
-        setState(() => _isTranscribing = false);
-      }
-    }
+    // Draft was applied (status is no longer shown in UI)
+    // Candidate groups are handled by the calling method via _candidateGroups
   }
 
   void _applyCandidate(FoodCandidateGroup group, MealItem candidate) {
@@ -392,27 +235,19 @@ class _MealTemplateEditorScreenState extends State<MealTemplateEditorScreen> {
     MealTemplatesViewModel viewModel,
     MealTemplate? template,
   ) async {
+    setState(() => _validationError = null);
     final title = _titleController.text.trim();
     if (title.isEmpty) {
-      setState(() {
-        _status = context.l10n.mealTemplateEditorTitleRequired;
-        _statusIsError = true;
-      });
+      setState(() => _validationError = context.l10n.mealTemplateEditorTitleRequired);
       return;
     }
     final items = _validItems();
-    if (items == null) {
-      setState(() {
-        _status = context.l10n.commonIngredientDetailsError;
-        _statusIsError = true;
-      });
-      return;
-    }
-    if (items.isEmpty) {
-      setState(() {
-        _status = context.l10n.commonAddAtLeastOneIngredient;
-        _statusIsError = true;
-      });
+    if (items == null || items.isEmpty) {
+      setState(
+        () => _validationError = items == null
+            ? context.l10n.commonIngredientDetailsError
+            : context.l10n.commonAddAtLeastOneIngredient,
+      );
       return;
     }
     final aliases = _aliasesController.text
@@ -437,14 +272,7 @@ class _MealTemplateEditorScreenState extends State<MealTemplateEditorScreen> {
       if (!mounted) return;
       _closeEditor(context, saved);
     } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _status = userVisibleErrorMessage(
-          error,
-          context: UserErrorContext.mealTemplatesSave,
-        );
-        _statusIsError = true;
-      });
+      // Error is surfaced through the viewModel and displayed in build()
     }
   }
 
@@ -549,137 +377,6 @@ class _MealTemplateBasicsCard extends StatelessWidget {
   }
 }
 
-class _DraftBuilderCard extends StatelessWidget {
-  const _DraftBuilderCard({
-    required this.controller,
-    required this.isDrafting,
-    required this.isRecording,
-    required this.isTranscribing,
-    required this.status,
-    required this.statusIsError,
-    required this.onVoiceToggle,
-  });
-
-  final TextEditingController controller;
-  final bool isDrafting;
-  final bool isRecording;
-  final bool isTranscribing;
-  final String? status;
-  final bool statusIsError;
-  final VoidCallback onVoiceToggle;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    final palette = context.freshPalette;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final transcriptBorder = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(FreshRadii.md),
-      borderSide: BorderSide(color: palette.ruleSoft),
-    );
-    final busy = isDrafting || isTranscribing;
-    return FreshCard(
-      key: const ValueKey('meal_template_draft_card'),
-      radius: FreshRadii.xl,
-      color: isDark ? palette.surface : palette.limeWash,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            l10n.mealTemplateEditorDraftSection,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: FreshSpacing.xs),
-          Text(
-            l10n.mealTemplateEditorDraftHelper,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
-          ),
-          const SizedBox(height: FreshSpacing.md),
-          TextField(
-            key: const ValueKey('meal_template_voice_transcript_field'),
-            controller: controller,
-            readOnly: true,
-            minLines: 2,
-            maxLines: 5,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: palette.inkSoft),
-            decoration: InputDecoration(
-              labelText: l10n.mealTemplateEditorDraftLabel,
-              hintText: l10n.mealTemplateEditorDraftHint,
-              filled: true,
-              fillColor: isDark ? palette.surfaceMuted : palette.surfaceSoft,
-              labelStyle: Theme.of(
-                context,
-              ).textTheme.labelLarge?.copyWith(color: palette.inkMuted),
-              hintStyle: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
-              enabledBorder: transcriptBorder,
-              focusedBorder: transcriptBorder.copyWith(
-                borderSide: BorderSide(color: palette.lime, width: 2),
-              ),
-              disabledBorder: transcriptBorder,
-            ),
-          ),
-          const SizedBox(height: FreshSpacing.md),
-          Wrap(
-            spacing: FreshSpacing.md,
-            runSpacing: FreshSpacing.sm,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Semantics(
-                button: true,
-                label: isRecording
-                    ? l10n.mealTemplateEditorStopVoiceTooltip
-                    : l10n.mealTemplateEditorVoiceTooltip,
-                child: VoiceActionButtonChrome(
-                  dimension: 48,
-                  backgroundColor: isRecording ? palette.coral : palette.lime,
-                  isRecording: isRecording,
-                  child: IconButton(
-                    key: const ValueKey('meal_template_voice_button'),
-                    onPressed: busy ? null : onVoiceToggle,
-                    style: IconButton.styleFrom(
-                      backgroundColor: Colors.transparent,
-                      foregroundColor: isRecording
-                          ? Theme.of(context).colorScheme.onError
-                          : Theme.of(context).colorScheme.onPrimary,
-                      disabledBackgroundColor: Colors.transparent,
-                      disabledForegroundColor: palette.inkMuted,
-                    ),
-                    tooltip: isRecording
-                        ? l10n.mealTemplateEditorStopVoiceTooltip
-                        : l10n.mealTemplateEditorVoiceTooltip,
-                    icon: Icon(
-                      isRecording ? Icons.stop_rounded : Icons.mic_rounded,
-                      color: isRecording
-                          ? Theme.of(context).colorScheme.onError
-                          : Theme.of(context).colorScheme.onPrimary,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          if (status != null) ...[
-            const SizedBox(height: FreshSpacing.md),
-            Text(
-              status!,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: statusIsError ? palette.coral : palette.inkSoft,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
 class _CandidateGroupsCard extends StatelessWidget {
   const _CandidateGroupsCard({required this.groups, required this.onSelected});
 
@@ -737,44 +434,6 @@ class _CandidateGroupsCard extends StatelessWidget {
             const SizedBox(height: FreshSpacing.md),
           ],
         ],
-      ),
-    );
-  }
-}
-
-class _MealTemplateBlockingOverlay extends StatelessWidget {
-  const _MealTemplateBlockingOverlay({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return ColoredBox(
-      color: context.freshPalette.screen.withValues(alpha: 0.72),
-      child: Center(
-        child: FreshCard(
-          padding: const EdgeInsets.all(18),
-          radius: FreshRadii.xl,
-          shadow: true,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox.square(
-                dimension: 22,
-                child: CircularProgressIndicator(strokeWidth: 2.4),
-              ),
-              const SizedBox(width: FreshSpacing.md),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 260),
-                child: Text(
-                  message,
-                  key: const ValueKey('meal_template_voice_blocking_message'),
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -1350,14 +1009,6 @@ Set<String> _normalizedValues(List<String?> values) {
       .whereType<String>()
       .where((value) => value.isNotEmpty)
       .toSet();
-}
-
-Future<void> _deleteTemporaryAudio(String path) async {
-  try {
-    await File(path).delete();
-  } catch (_) {
-    // Ignore cleanup errors for temporary recordings.
-  }
 }
 
 String _formatQuantity(double value) {

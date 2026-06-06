@@ -111,6 +111,89 @@ void main() {
       expect(result.result.proposal?.title, 'Bread');
     });
 
+    test('parses user-custom usual food item from search results', () async {
+      final apiClient = MockCalTrackerApiClient();
+      final repository = NutritionRepository(apiClient: apiClient);
+      when(
+        () => apiClient.searchFoods(query: 'rice', limit: 10),
+      ).thenAnswer(
+        (_) async => {
+          'items': [
+            {
+              'name': 'House rice',
+              'quantity': 100,
+              'unit': 'g',
+              'calories': 360,
+              'proteinGrams': 7,
+              'carbsGrams': 79,
+              'fatGrams': 1,
+              'source': 'user_custom',
+              'externalSource': 'user_custom',
+              'externalId': '550e8400-e29b-41d4-a716-446655440000',
+              'canonicalName': 'rice',
+              'originalText': 'rice',
+              'confidence': 0.95,
+            },
+            {
+              'name': 'Cooked rice',
+              'quantity': 100,
+              'unit': 'g',
+              'calories': 130,
+              'proteinGrams': 2.7,
+              'carbsGrams': 28,
+              'fatGrams': 0.3,
+              'source': 'test_fixture',
+              'externalId': 'cooked_rice_1',
+            },
+          ],
+          'candidateGroups': [
+            {
+              'mention': {
+                'originalText': 'rice',
+                'canonicalName': 'rice',
+                'canonicalEnglishName': 'rice',
+                'quantity': 100,
+                'unit': 'g',
+                'confidence': 0.95,
+                'marketProduct': false,
+              },
+              'candidates': [
+                {
+                  'name': 'House rice',
+                  'quantity': 100,
+                  'unit': 'g',
+                  'calories': 360,
+                  'proteinGrams': 7,
+                  'carbsGrams': 79,
+                  'fatGrams': 1,
+                  'source': 'user_custom',
+                  'externalSource': 'user_custom',
+                  'externalId': '550e8400-e29b-41d4-a716-446655440000',
+                },
+              ],
+            },
+          ],
+        },
+      );
+
+      final result = await repository.searchFoods('rice');
+
+      expect(result.items, hasLength(2));
+      expect(result.items.first.name, 'House rice');
+      expect(result.items.first.source, 'user_custom');
+      expect(result.items.first.externalSource, 'user_custom');
+      expect(
+        result.items.first.externalId,
+        '550e8400-e29b-41d4-a716-446655440000',
+      );
+      expect(result.items.first.canonicalName, 'rice');
+      expect(result.candidateGroups, hasLength(1));
+      expect(
+        result.candidateGroups!.single.candidates.single.source,
+        'user_custom',
+      );
+    });
+
     test('searches foods and parses candidate groups', () async {
       final apiClient = MockCalTrackerApiClient();
       final repository = NutritionRepository(apiClient: apiClient);

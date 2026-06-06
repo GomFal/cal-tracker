@@ -3,9 +3,11 @@ import type {
   FoodMention,
   FoodPortionChoice,
   MealItem,
+  UsualFood,
 } from "@cal-tracker/contracts";
 import { withSpan } from "../observability/profiler.js";
 import type { AppRepository, FoodItemRecord, FoodPortionRecord, FoodSearchCandidate } from "../repository/types.js";
+import { lexicalFoodScore } from "../repository/foodSearchScoring.js";
 import { normalizeText } from "../utils/normalize.js";
 import { scaleFood } from "../utils/nutrition.js";
 
@@ -348,6 +350,46 @@ export class LocalFoodDataProvider implements FoodDataProvider {
       scoringMention = searchMention;
       if (compatibleFoods.length > 0) break;
     }
+
+    // Inject user usual foods as additional search candidates
+    if (userId) {
+      let usualFoods: UsualFood[] = [];
+      try {
+        usualFoods = await this.repository.listUsualFoods(userId);
+      } catch {
+        // Repository does not support listUsualFoods; skip usual-food injection
+      }
+      if (usualFoods.length > 0) {
+        const existingIds = new Set(compatibleFoods.map((f) => f.id));
+        const query = canonicalNameForMention(scoringMention);
+        const normalizedQuery = normalizeText(query);
+        for (const uf of usualFoods) {
+          if (existingIds.has(uf.id)) continue;
+          const foodRecord = usualFoodToFoodItemRecord(uf);
+          const lexicalScore = lexicalFoodScore(foodRecord, normalizedQuery);
+          if (lexicalScore >= 0.40) {
+            compatibleFoods.push({
+              ...foodRecord,
+              userId,
+              lexicalScore,
+              finalScore: clampScore(
+                lexicalScore * 0.95 + 0.15,
+              ),
+              preferenceScore: 0.3,
+            });
+          }
+        }
+        if (usualFoods.length > 0) {
+          compatibleFoods.sort(
+            (a, b) =>
+              (b.finalScore ?? 0) - (a.finalScore ?? 0) ||
+              localFoodPriority(a, scoringMention) -
+                localFoodPriority(b, scoringMention),
+          );
+        }
+      }
+    }
+
     const items: MealItem[] = [];
     let reason: FoodCandidateGroup["reason"] | undefined;
     let portionOptions: FoodPortionChoice[] | undefined;
@@ -1719,6 +1761,30 @@ function roundOne(value: number): number {
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function clampScore(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
+function usualFoodToFoodItemRecord(uf: UsualFood): FoodItemRecord {
+  return {
+    id: uf.id,
+    name: uf.name,
+    normalizedName: normalizeText(uf.canonicalName ?? uf.name),
+    canonicalName: uf.canonicalName,
+    brand: uf.brand,
+    barcode: uf.barcode,
+    source: "user_custom",
+    servingGrams: uf.servingGrams,
+    calories: uf.nutrition.calories,
+    proteinGrams: uf.nutrition.proteinGrams,
+    carbsGrams: uf.nutrition.carbsGrams,
+    fatGrams: uf.nutrition.fatGrams,
+    nutrients: uf.nutrients,
+    createdAt: uf.createdAt,
+    updatedAt: uf.updatedAt,
+  };
 }
 
 function isNumber(value: unknown): value is number {

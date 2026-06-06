@@ -57,7 +57,7 @@ export function createApp(input: {
   const resolvedAgentProvider = agentProvider ?? new RemoteChatAgentProvider(
     config.OPENROUTER_API_KEY,
     "https://openrouter.ai/api/v1",
-    10000,
+    30000,
     {
       sort: config.OPENROUTER_PROVIDER_SORT,
       preferred_max_latency: {

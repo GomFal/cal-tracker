@@ -1043,47 +1043,8 @@ class AppLocalizationsEs extends AppLocalizations {
       'Frases separadas por coma que usas por voz';
 
   @override
-  String get mealTemplateEditorDraftSection => 'Rellenar por voz';
-
-  @override
-  String get mealTemplateEditorDraftHelper =>
-      'Describe la comida habitual por voz. Revisa ingredientes, coincidencias y cantidades antes de guardar.';
-
-  @override
-  String get mealTemplateEditorDraftLabel => 'Transcripción';
-
-  @override
-  String get mealTemplateEditorDraftHint =>
-      'Graba la comida habitual para rellenar esta transcripción.';
-
-  @override
-  String get mealTemplateEditorDraftButton => 'Crear borrador';
-
-  @override
-  String get mealTemplateEditorVoiceTooltip => 'Grabar comida habitual';
-
-  @override
-  String get mealTemplateEditorStopVoiceTooltip => 'Parar y crear borrador';
-
-  @override
-  String get mealTemplateEditorVoiceRecording =>
-      'Grabando. Para cuando termines de describir la comida.';
-
-  @override
-  String get mealTemplateEditorVoiceTranscribing =>
-      'Transcribiendo la grabación.';
-
-  @override
-  String get mealTemplateEditorDraftEmptyError =>
-      'Graba la comida antes de crear un borrador.';
-
-  @override
-  String get mealTemplateEditorDraftApplied =>
-      'Borrador aplicado. Revisa y edita antes de guardar.';
-
-  @override
-  String get mealTemplateEditorDraftNeedsItems =>
-      'El borrador no devolvió ingredientes todavía. Añade alimentos manualmente o aclara por voz.';
+  String get bottomMicFillEditorHint =>
+      'Usa este micrófono para rellenar esta pantalla';
 
   @override
   String get mealTemplateEditorCandidatesSection =>
@@ -1106,6 +1067,13 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get mealTemplateEditorTitleRequired =>
       'Añade un título antes de guardar.';
+
+  @override
+  String get mealTemplateEditorSaveFailedTitle =>
+      'No se pudo guardar la comida habitual';
+
+  @override
+  String get mealTemplateEditorSaveFailedMessage => 'Inténtalo de nuevo.';
 
   @override
   String get usualsMealsTab => 'Platos';
@@ -1151,18 +1119,6 @@ class AppLocalizationsEs extends AppLocalizations {
       'Introduce el texto de la etiqueta antes de rellenar los campos.';
 
   @override
-  String get usualFoodsDraftApplied =>
-      'Borrador aplicado. Revisa los campos antes de guardar.';
-
-  @override
-  String get usualFoodsDraftMissingFields =>
-      'Borrador aplicado. Completa los campos obligatorios vacíos antes de guardar.';
-
-  @override
-  String get usualFoodsDraftFailed =>
-      'No se pudo rellenar el borrador. Introduce los valores manualmente o inténtalo de nuevo.';
-
-  @override
   String get usualFoodsEditorSubtitle =>
       'Revisa los valores de la etiqueta antes de guardar.';
 
@@ -1181,44 +1137,6 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get usualFoodsOptionalSectionSubtitle =>
       'Añade detalles de etiqueta solo cuando los tengas.';
-
-  @override
-  String get usualFoodsVoiceDraftTitle => 'Rellena más rápido con voz';
-
-  @override
-  String get usualFoodsVoiceDraftMessage =>
-      'Dicta la etiqueta nutricional. La transcripción queda en solo lectura, los campos siguen editables y no se guarda nada hasta que confirmes.';
-
-  @override
-  String get usualFoodsVoiceRecordButton => 'Grabar etiqueta';
-
-  @override
-  String get usualFoodsVoiceStopButton => 'Detener y rellenar';
-
-  @override
-  String get usualFoodsVoicePermissionStatus =>
-      'Solicitando permiso de micrófono...';
-
-  @override
-  String get usualFoodsVoiceRecordingStatus =>
-      'Grabando. Di la ración, calorías, proteína, carbohidratos, grasa y cualquier valor opcional de la etiqueta.';
-
-  @override
-  String get usualFoodsVoiceStoppingStatus => 'Guardando audio...';
-
-  @override
-  String get usualFoodsVoiceTranscribingStatus => 'Transcribiendo etiqueta...';
-
-  @override
-  String get usualFoodsVoiceDraftingStatus =>
-      'Rellenando campos desde la transcripción...';
-
-  @override
-  String get usualFoodsVoicePermissionError =>
-      'Se necesita permiso de micrófono para rellenar con voz.';
-
-  @override
-  String get usualFoodsTranscriptLabel => 'Transcripción';
 
   @override
   String get usualFoodsSaveFailedTitle => 'No se pudo guardar el ingrediente';

@@ -535,7 +535,7 @@ describe("AgentService", () => {
       error: { code: string; message: string };
     };
     expect(body.error.code).toBe("agent_provider_unavailable");
-    expect(body.error.message).toBe("An error ocurred. Please, try again.");
+    expect(body.error.message).toBe("An error occurred. Please, try again.");
   });
 
   it("maps calories left to get_remaining_targets", async () => {
@@ -1262,7 +1262,7 @@ describe("AgentService", () => {
       error: { code: string; message: string };
     };
     expect(body.error.code).toBe("agent_provider_unavailable");
-    expect(body.error.message).toBe("An error ocurred. Please, try again.");
+    expect(body.error.message).toBe("An error occurred. Please, try again.");
   });
 
   it("asks for clarification without changing the active proposal when the model returns no tool call", async () => {
@@ -1331,7 +1331,7 @@ describe("AgentService", () => {
       error: { code: string; message: string };
     };
     expect(body.error.code).toBe("agent_provider_unavailable");
-    expect(body.error.message).toBe("An error ocurred. Please, try again.");
+    expect(body.error.message).toBe("An error occurred. Please, try again.");
   });
 
   it("returns a provider unavailable error for ambiguous corrections when the provider fails", async () => {
@@ -1361,7 +1361,7 @@ describe("AgentService", () => {
       error: { code: string; message: string };
     };
     expect(body.error.code).toBe("agent_provider_unavailable");
-    expect(body.error.message).toBe("An error ocurred. Please, try again.");
+    expect(body.error.message).toBe("An error occurred. Please, try again.");
   });
 
   it("rejects unknown model-selected actions", async () => {

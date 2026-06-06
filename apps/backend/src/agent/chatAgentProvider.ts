@@ -88,7 +88,7 @@ export class RemoteChatAgentProvider implements ChatAgentProvider {
   constructor(
     private readonly apiKey: string,
     private readonly baseUrl: string = "https://openrouter.ai/api/v1",
-    private readonly timeoutMs = 10000,
+    private readonly timeoutMs = 30000,
     private readonly providerRouting: OpenRouterProviderRouting = defaultOpenRouterProviderRouting(),
   ) {}
 

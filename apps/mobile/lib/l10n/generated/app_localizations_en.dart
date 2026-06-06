@@ -1032,46 +1032,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Comma-separated phrases you use by voice';
 
   @override
-  String get mealTemplateEditorDraftSection => 'Fill from voice';
-
-  @override
-  String get mealTemplateEditorDraftHelper =>
-      'Describe the usual meal by voice. Review ingredients, matches, and quantities before saving.';
-
-  @override
-  String get mealTemplateEditorDraftLabel => 'Transcript';
-
-  @override
-  String get mealTemplateEditorDraftHint =>
-      'Record the usual meal to fill this transcript.';
-
-  @override
-  String get mealTemplateEditorDraftButton => 'Build draft';
-
-  @override
-  String get mealTemplateEditorVoiceTooltip => 'Record usual meal';
-
-  @override
-  String get mealTemplateEditorStopVoiceTooltip => 'Stop and build draft';
-
-  @override
-  String get mealTemplateEditorVoiceRecording =>
-      'Recording. Stop when you finish describing the meal.';
-
-  @override
-  String get mealTemplateEditorVoiceTranscribing => 'Transcribing recording.';
-
-  @override
-  String get mealTemplateEditorDraftEmptyError =>
-      'Record the meal before building a draft.';
-
-  @override
-  String get mealTemplateEditorDraftApplied =>
-      'Draft applied. Review and edit before saving.';
-
-  @override
-  String get mealTemplateEditorDraftNeedsItems =>
-      'Draft returned no ingredients yet. Add foods manually or clarify by voice.';
+  String get bottomMicFillEditorHint => 'Use this mic to fill this screen';
 
   @override
   String get mealTemplateEditorCandidatesSection => 'Food matches';
@@ -1093,6 +1054,12 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get mealTemplateEditorTitleRequired =>
       'Add a meal title before saving.';
+
+  @override
+  String get mealTemplateEditorSaveFailedTitle => 'Could not save usual meal';
+
+  @override
+  String get mealTemplateEditorSaveFailedMessage => 'Please try again.';
 
   @override
   String get usualsMealsTab => 'Meals';
@@ -1138,18 +1105,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Enter label text before filling fields.';
 
   @override
-  String get usualFoodsDraftApplied =>
-      'Draft applied. Review the fields before saving.';
-
-  @override
-  String get usualFoodsDraftMissingFields =>
-      'Draft applied. Complete the empty required fields before saving.';
-
-  @override
-  String get usualFoodsDraftFailed =>
-      'Could not fill the draft. Enter the values manually or try again.';
-
-  @override
   String get usualFoodsEditorSubtitle =>
       'Review the label values before saving.';
 
@@ -1168,44 +1123,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get usualFoodsOptionalSectionSubtitle =>
       'Add label details only when you have them.';
-
-  @override
-  String get usualFoodsVoiceDraftTitle => 'Fill faster with voice';
-
-  @override
-  String get usualFoodsVoiceDraftMessage =>
-      'Dictate the nutrition label. The transcript is read-only, fields stay editable, and nothing is saved until you confirm.';
-
-  @override
-  String get usualFoodsVoiceRecordButton => 'Record label';
-
-  @override
-  String get usualFoodsVoiceStopButton => 'Stop and fill';
-
-  @override
-  String get usualFoodsVoicePermissionStatus =>
-      'Requesting microphone permission...';
-
-  @override
-  String get usualFoodsVoiceRecordingStatus =>
-      'Recording. Say the serving size, calories, protein, carbs, fat, and any optional label values.';
-
-  @override
-  String get usualFoodsVoiceStoppingStatus => 'Saving audio...';
-
-  @override
-  String get usualFoodsVoiceTranscribingStatus => 'Transcribing label...';
-
-  @override
-  String get usualFoodsVoiceDraftingStatus =>
-      'Filling fields from transcript...';
-
-  @override
-  String get usualFoodsVoicePermissionError =>
-      'Microphone permission is required to fill from voice.';
-
-  @override
-  String get usualFoodsTranscriptLabel => 'Transcript';
 
   @override
   String get usualFoodsSaveFailedTitle => 'Could not save ingredient';

@@ -52,6 +52,70 @@ void main() {
     },
   );
 
+  test(
+    'agent_provider_unavailable shows contextual message for voiceAgent context',
+    () async {
+      final client = CalTrackerApiClient(
+        config: const ApiConfig(baseUrl: 'http://localhost'),
+        tokenStorage: _MemoryTokenStorage(),
+        httpClient: MockClient(
+          (_) async => http.Response(
+            jsonEncode({
+              'error': {
+                'code': 'agent_provider_unavailable',
+                'message': 'An error occurred. Please, try again.',
+              },
+            }),
+            503,
+            headers: {'content-type': 'application/json'},
+          ),
+        ),
+      );
+
+      final error = await _captureApiException(
+        client.login(email: 'test@example.com', password: 'password123'),
+      );
+
+      expect(error.code, 'agent_provider_unavailable');
+      expect(
+        userVisibleErrorMessage(error, context: UserErrorContext.voiceAgent),
+        'We could not understand that meal yet. Try adding a little more detail.',
+      );
+    },
+  );
+
+  test(
+    'agent_provider_unavailable shows generic message for non-voice contexts',
+    () async {
+      final client = CalTrackerApiClient(
+        config: const ApiConfig(baseUrl: 'http://localhost'),
+        tokenStorage: _MemoryTokenStorage(),
+        httpClient: MockClient(
+          (_) async => http.Response(
+            jsonEncode({
+              'error': {
+                'code': 'agent_provider_unavailable',
+                'message': 'An error occurred. Please, try again.',
+              },
+            }),
+            503,
+            headers: {'content-type': 'application/json'},
+          ),
+        ),
+      );
+
+      final error = await _captureApiException(
+        client.login(email: 'test@example.com', password: 'password123'),
+      );
+
+      expect(error.code, 'agent_provider_unavailable');
+      expect(
+        userVisibleErrorMessage(error, context: UserErrorContext.generic),
+        'The nutrition assistant is taking longer than expected. Try again or use a shorter description.',
+      );
+    },
+  );
+
   test('non-json server errors become generic safe API exceptions', () async {
     final client = CalTrackerApiClient(
       config: const ApiConfig(baseUrl: 'http://localhost'),

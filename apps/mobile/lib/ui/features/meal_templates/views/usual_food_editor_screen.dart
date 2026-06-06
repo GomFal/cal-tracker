@@ -1,16 +1,11 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../../../../data/services/audio_recorder_service.dart';
 import '../../../../domain/models/nutrition_models.dart';
 import '../../../../l10n/app_localizations_context.dart';
 import '../../../../l10n/generated/app_localizations.dart';
 import '../../../core/design_system.dart';
-import '../../../core/user_visible_error.dart';
 import '../view_models/meal_templates_view_model.dart';
 
 class UsualFoodEditorScreen extends StatefulWidget {
@@ -18,7 +13,6 @@ class UsualFoodEditorScreen extends StatefulWidget {
     super.key,
     this.foodId,
     this.initialDraft,
-    this.audioRecorderService,
   });
 
   static const newRoute = '/templates/ingredients/new';
@@ -28,26 +22,13 @@ class UsualFoodEditorScreen extends StatefulWidget {
 
   final String? foodId;
   final UsualFoodDraft? initialDraft;
-  final AudioRecorderService? audioRecorderService;
 
   @override
   State<UsualFoodEditorScreen> createState() => _UsualFoodEditorScreenState();
 }
 
-enum _VoiceDraftPhase {
-  idle,
-  requestingPermission,
-  recording,
-  stopping,
-  transcribing,
-  drafting,
-  error,
-}
-
 class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
   final _formKey = GlobalKey<FormState>();
-  late final AudioRecorderService _audioRecorderService;
-  late final bool _ownsAudioRecorderService;
   late final TextEditingController _nameController;
   late final TextEditingController _brandController;
   late final TextEditingController _barcodeController;
@@ -66,24 +47,12 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
   bool _initializedFromFood = false;
   bool _isSaving = false;
   String? _canonicalName;
-  _VoiceDraftPhase _voicePhase = _VoiceDraftPhase.idle;
-  String? _transcript;
-  String? _voiceStatus;
-  bool _voiceStatusIsError = false;
 
   bool get _isEditing => widget.foodId != null;
-  bool get _isVoiceBusy =>
-      _voicePhase == _VoiceDraftPhase.requestingPermission ||
-      _voicePhase == _VoiceDraftPhase.stopping ||
-      _voicePhase == _VoiceDraftPhase.transcribing ||
-      _voicePhase == _VoiceDraftPhase.drafting;
 
   @override
   void initState() {
     super.initState();
-    _audioRecorderService =
-        widget.audioRecorderService ?? AudioRecorderService();
-    _ownsAudioRecorderService = widget.audioRecorderService == null;
     _nameController = TextEditingController();
     _brandController = TextEditingController();
     _barcodeController = TextEditingController();
@@ -107,12 +76,6 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
 
   @override
   void dispose() {
-    if (_voicePhase == _VoiceDraftPhase.recording) {
-      _audioRecorderService.cancel();
-    }
-    if (_ownsAudioRecorderService) {
-      _audioRecorderService.dispose();
-    }
     _nameController.dispose();
     _brandController.dispose();
     _barcodeController.dispose();
@@ -178,7 +141,7 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
                 ),
                 if (!isWaitingForEditFood && (food != null || !_isEditing))
                   _BottomSaveBar(
-                    isSaving: _isSaving || _isVoiceBusy,
+                    isSaving: _isSaving,
                     isEditing: _isEditing,
                     onCancel: _leaveEditor,
                     onSave: () => _submit(viewModel, food),
@@ -194,22 +157,14 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
   Widget _buildForm(MealTemplatesViewModel viewModel, UsualFood? food) {
     final l10n = context.l10n;
     final palette = context.freshPalette;
-    final form = SingleChildScrollView(
+    return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 10, 20, 112),
       child: Form(
         key: _formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _VoiceDraftCard(
-              phase: _voicePhase,
-              transcript: _transcript,
-              status: _voiceStatus,
-              statusIsError: _voiceStatusIsError,
-              onPressed:
-                  _isVoiceBusy ? null : () => _toggleVoiceDraft(viewModel),
-            ),
-            const SizedBox(height: FreshSpacing.lg),
+            const SizedBox(height: FreshSpacing.sm),
             _EditorSection(
               title: l10n.usualFoodsIdentitySectionTitle,
               icon: Icons.badge_outlined,
@@ -370,17 +325,6 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
         ),
       ),
     );
-    if (!_isVoiceBusy) return form;
-    return Stack(
-      children: [
-        AbsorbPointer(absorbing: true, child: form),
-        Positioned.fill(
-          child: _VoiceDraftBlockingOverlay(
-            message: _voiceStatus ?? l10n.usualFoodsVoiceDraftingStatus,
-          ),
-        ),
-      ],
-    );
   }
 
   Widget _textField({
@@ -433,123 +377,6 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
     _sugarsController.text = _formatOptionalNutrient(food, 'sugarsGrams');
     _servingDescriptionController.text =
         food.nutrients['servingDescription']?.toString() ?? '';
-  }
-
-  Future<void> _toggleVoiceDraft(MealTemplatesViewModel viewModel) async {
-    if (_voicePhase == _VoiceDraftPhase.recording) {
-      await _stopAndDraft(viewModel);
-      return;
-    }
-    await _startRecording();
-  }
-
-  Future<void> _startRecording() async {
-    setState(() {
-      _voicePhase = _VoiceDraftPhase.requestingPermission;
-      _voiceStatus = context.l10n.usualFoodsVoicePermissionStatus;
-      _voiceStatusIsError = false;
-    });
-    try {
-      await _audioRecorderService.start();
-      if (!mounted) return;
-      HapticFeedback.mediumImpact();
-      setState(() {
-        _voicePhase = _VoiceDraftPhase.recording;
-        _voiceStatus = context.l10n.usualFoodsVoiceRecordingStatus;
-      });
-    } on RecorderException catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _voicePhase = _VoiceDraftPhase.error;
-        _voiceStatus = error.code == 'permission_denied'
-            ? context.l10n.usualFoodsVoicePermissionError
-            : error.message ??
-                userVisibleErrorMessage(
-                  error,
-                  context: UserErrorContext.voiceRecording,
-                );
-        _voiceStatusIsError = true;
-      });
-    } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _voicePhase = _VoiceDraftPhase.error;
-        _voiceStatus = userVisibleErrorMessage(
-          error,
-          context: UserErrorContext.voiceRecording,
-        );
-        _voiceStatusIsError = true;
-      });
-    }
-  }
-
-  Future<void> _stopAndDraft(MealTemplatesViewModel viewModel) async {
-    setState(() {
-      _voicePhase = _VoiceDraftPhase.stopping;
-      _voiceStatus = context.l10n.usualFoodsVoiceStoppingStatus;
-      _voiceStatusIsError = false;
-    });
-    String? path;
-    try {
-      final audio = await _audioRecorderService.stop();
-      if (audio == null) {
-        throw const RecorderException(
-          'missing_file',
-          'No audio file was created.',
-        );
-      }
-      path = audio.path;
-      setState(() {
-        _voicePhase = _VoiceDraftPhase.transcribing;
-        _voiceStatus = context.l10n.usualFoodsVoiceTranscribingStatus;
-      });
-      final transcript = await viewModel.transcribeUsualFoodAudio(File(path));
-      if (!mounted) return;
-      setState(() {
-        _transcript = transcript;
-        _voicePhase = _VoiceDraftPhase.drafting;
-        _voiceStatus = context.l10n.usualFoodsVoiceDraftingStatus;
-      });
-      final draft = await viewModel.draftUsualFood(transcript);
-      if (!mounted) return;
-      setState(() {
-        _applyDraft(draft);
-        _voicePhase = _VoiceDraftPhase.idle;
-        _voiceStatus = draft.missingRequiredFields.isEmpty
-            ? context.l10n.usualFoodsDraftApplied
-            : context.l10n.usualFoodsDraftMissingFields;
-        _voiceStatusIsError = false;
-      });
-    } on RecorderException catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _voicePhase = _VoiceDraftPhase.error;
-        _voiceStatus = error.message ??
-            userVisibleErrorMessage(
-              error,
-              context: UserErrorContext.voiceRecording,
-            );
-        _voiceStatusIsError = true;
-      });
-    } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _voicePhase = _VoiceDraftPhase.error;
-        _voiceStatus = userVisibleErrorMessage(
-          error,
-          context: UserErrorContext.voiceTranscription,
-        );
-        _voiceStatusIsError = true;
-      });
-    } finally {
-      if (path != null) {
-        try {
-          await File(path).delete();
-        } catch (_) {
-          // Temporary audio cleanup is best effort.
-        }
-      }
-    }
   }
 
   void _applyDraft(UsualFoodDraft draft) {
@@ -681,175 +508,7 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
   }
 }
 
-class _VoiceDraftCard extends StatelessWidget {
-  const _VoiceDraftCard({
-    required this.phase,
-    required this.transcript,
-    required this.status,
-    required this.statusIsError,
-    required this.onPressed,
-  });
 
-  final _VoiceDraftPhase phase;
-  final String? transcript;
-  final String? status;
-  final bool statusIsError;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    final palette = context.freshPalette;
-    final isRecording = phase == _VoiceDraftPhase.recording;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isBusy = phase == _VoiceDraftPhase.requestingPermission ||
-        phase == _VoiceDraftPhase.stopping ||
-        phase == _VoiceDraftPhase.transcribing ||
-        phase == _VoiceDraftPhase.drafting;
-    return FreshCard(
-      color: isRecording
-          ? isDark
-              ? palette.limeWash
-              : palette.limeSoft
-          : palette.surface,
-      radius: FreshRadii.xl,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              FreshIconChip(
-                icon: isRecording ? Icons.stop_rounded : Icons.mic_rounded,
-                color: isRecording ? palette.coral : palette.limeDeep,
-                backgroundColor:
-                    isRecording ? palette.surface : palette.limeWash,
-              ),
-              const SizedBox(width: FreshSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      l10n.usualFoodsVoiceDraftTitle,
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: FreshSpacing.xs),
-                    Text(
-                      l10n.usualFoodsVoiceDraftMessage,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: FreshSpacing.md),
-          FilledButton.icon(
-            key: const ValueKey('usual_food_voice_draft_button'),
-            onPressed: onPressed,
-            icon: isBusy
-                ? const SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Icon(isRecording ? Icons.stop_rounded : Icons.mic_rounded),
-            label: Text(
-              isRecording
-                  ? l10n.usualFoodsVoiceStopButton
-                  : l10n.usualFoodsVoiceRecordButton,
-            ),
-          ),
-          if (status != null) ...[
-            const SizedBox(height: FreshSpacing.md),
-            Text(
-              status!,
-              key: const ValueKey('usual_food_voice_status'),
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: statusIsError
-                        ? Theme.of(context).colorScheme.error
-                        : palette.inkSoft,
-                  ),
-            ),
-          ],
-          if (transcript != null && transcript!.trim().isNotEmpty) ...[
-            const SizedBox(height: FreshSpacing.md),
-            DecoratedBox(
-              key: const ValueKey('usual_food_transcript_card'),
-              decoration: BoxDecoration(
-                color: isDark ? palette.surfaceMuted : palette.surfaceSoft,
-                borderRadius: BorderRadius.circular(FreshRadii.md),
-                border: Border.all(color: palette.ruleSoft),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(FreshSpacing.md),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      l10n.usualFoodsTranscriptLabel,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.labelLarge?.copyWith(color: palette.inkMuted),
-                    ),
-                    const SizedBox(height: FreshSpacing.xs),
-                    SelectableText(
-                      transcript!,
-                      key: const ValueKey('usual_food_transcript_text'),
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodyMedium
-                          ?.copyWith(color: palette.inkSoft),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _VoiceDraftBlockingOverlay extends StatelessWidget {
-  const _VoiceDraftBlockingOverlay({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return ColoredBox(
-      color: context.freshPalette.screen.withValues(alpha: 0.72),
-      child: Center(
-        child: FreshCard(
-          padding: const EdgeInsets.all(18),
-          radius: FreshRadii.xl,
-          shadow: true,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox.square(
-                dimension: 22,
-                child: CircularProgressIndicator(strokeWidth: 2.4),
-              ),
-              const SizedBox(width: FreshSpacing.md),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 260),
-                child: Text(
-                  message,
-                  key: const ValueKey('usual_food_voice_blocking_message'),
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class _EditorSection extends StatelessWidget {
   const _EditorSection({

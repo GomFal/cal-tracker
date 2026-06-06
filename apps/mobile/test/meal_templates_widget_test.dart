@@ -1,10 +1,6 @@
-import 'dart:async';
-import 'dart:io';
-
 import 'package:cal_tracker_mobile/app/theme.dart';
 import 'package:cal_tracker_mobile/data/repositories/nutrition_repository.dart';
 import 'package:cal_tracker_mobile/data/services/api_config.dart';
-import 'package:cal_tracker_mobile/data/services/audio_recorder_service.dart';
 import 'package:cal_tracker_mobile/data/services/secure_token_storage.dart';
 import 'package:cal_tracker_mobile/domain/models/nutrition_models.dart';
 import 'package:cal_tracker_mobile/generated/api/cal_tracker_api.dart';
@@ -126,187 +122,6 @@ void main() {
     expect(find.byType(AlertDialog), findsNothing);
     expect(
         find.byKey(const ValueKey('usual_food_canonical_field')), findsNothing);
-  });
-
-  testWidgets(
-    'fills usual ingredient fields from voice draft without auto-saving',
-    (tester) async {
-      final repository = _FakeNutritionRepository(
-        draft: const UsualFoodDraft(
-          name: 'AI rice',
-          brand: 'Draft brand',
-          canonicalName: 'rice',
-          servingGrams: 100,
-          calories: 360,
-          proteinGrams: 7,
-          carbsGrams: 79,
-          fatGrams: 1,
-          nutrients: {'saltGrams': 0.01},
-        ),
-        transcript:
-            'My rice per 100 g has 360 kcal, 79 g carbs, 7 g protein and 1 g fat.',
-      );
-      final recorder = _FakeAudioRecorderService();
-      await _pumpEditor(tester, repository, audioRecorderService: recorder);
-      await tester.pumpAndSettle();
-
-      await tester.tap(
-        find.byKey(const ValueKey('usual_food_voice_draft_button')),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(seconds: 1));
-      expect(find.textContaining('Recording'), findsOneWidget);
-
-      await tester.tap(
-        find.byKey(const ValueKey('usual_food_voice_draft_button')),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(seconds: 1));
-
-      expect(recorder.startCount, 1);
-      expect(recorder.stopCount, 1);
-      expect(repository.transcribedAudioPaths, hasLength(1));
-      expect(repository.draftTexts, [
-        'My rice per 100 g has 360 kcal, 79 g carbs, 7 g protein and 1 g fat.',
-      ]);
-      expect(repository.createdInputs, isEmpty);
-      expect(
-        find.text('Draft applied. Review the fields before saving.'),
-        findsOneWidget,
-      );
-      expect(find.text('Transcript'), findsOneWidget);
-      expect(
-        find.text(
-          'My rice per 100 g has 360 kcal, 79 g carbs, 7 g protein and 1 g fat.',
-        ),
-        findsOneWidget,
-      );
-      expect(
-        tester
-            .widget<TextFormField>(
-              find.byKey(const ValueKey('usual_food_name_field')),
-            )
-            .controller
-            ?.text,
-        'AI rice',
-      );
-      expect(
-        tester
-            .widget<TextFormField>(
-              find.byKey(const ValueKey('usual_food_calories_field')),
-            )
-            .controller
-            ?.text,
-        '360',
-      );
-
-      await tester.tap(find.byKey(const ValueKey('usual_food_save_button')));
-      await tester.pumpAndSettle();
-
-      expect(repository.createdInputs.single.name, 'AI rice');
-      expect(repository.createdInputs.single.canonicalName, 'rice');
-      expect(repository.createdInputs.single.nutrients['saltGrams'], 0.01);
-    },
-  );
-
-  testWidgets('usual ingredient voice transcript uses dark surface', (
-    tester,
-  ) async {
-    final repository = _FakeNutritionRepository(
-      draft: const UsualFoodDraft(
-        name: 'AI rice',
-        servingGrams: 100,
-        calories: 360,
-        proteinGrams: 7,
-        carbsGrams: 79,
-        fatGrams: 1,
-      ),
-      transcript: 'My rice has 360 kcal per 100 g.',
-    );
-    final recorder = _FakeAudioRecorderService();
-    await _pumpEditor(
-      tester,
-      repository,
-      audioRecorderService: recorder,
-      themeMode: ThemeMode.dark,
-    );
-    await tester.pumpAndSettle();
-
-    await tester.tap(
-      find.byKey(const ValueKey('usual_food_voice_draft_button')),
-    );
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 1));
-    await tester.tap(
-      find.byKey(const ValueKey('usual_food_voice_draft_button')),
-    );
-    await tester.pumpAndSettle();
-
-    final transcriptCard = tester.widget<DecoratedBox>(
-      find.byKey(const ValueKey('usual_food_transcript_card')),
-    );
-    final decoration = transcriptCard.decoration as BoxDecoration;
-
-    expect(decoration.color, FreshPalette.dark.surfaceMuted);
-    expect(decoration.color, isNot(FreshColors.limeSoft));
-    expect(find.text('Transcript'), findsOneWidget);
-  });
-
-  testWidgets('blocks usual ingredient form while voice draft is pending', (
-    tester,
-  ) async {
-    final draftCompleter = Completer<UsualFoodDraft>();
-    final repository = _FakeNutritionRepository(
-      transcript: 'usual rice',
-      draftCompleter: draftCompleter,
-    );
-    final recorder = _FakeAudioRecorderService();
-    await _pumpEditor(tester, repository, audioRecorderService: recorder);
-    await tester.pumpAndSettle();
-
-    await tester.tap(
-      find.byKey(const ValueKey('usual_food_voice_draft_button')),
-    );
-    await tester.pump();
-    await tester.tap(
-      find.byKey(const ValueKey('usual_food_voice_draft_button')),
-    );
-    await tester.pump();
-    await tester.pump();
-
-    expect(
-      find.byKey(const ValueKey('usual_food_voice_blocking_message')),
-      findsOneWidget,
-    );
-    expect(
-      tester
-          .widget<FilledButton>(
-            find.byKey(const ValueKey('usual_food_save_button')),
-          )
-          .onPressed,
-      isNull,
-    );
-
-    draftCompleter.complete(
-      const UsualFoodDraft(
-        name: 'Pending rice',
-        servingGrams: 100,
-        calories: 130,
-        proteinGrams: 2,
-        carbsGrams: 28,
-        fatGrams: 1,
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(
-      find.byKey(const ValueKey('usual_food_voice_blocking_message')),
-      findsNothing,
-    );
-    expect(
-      find.text('Draft applied. Review the fields before saving.'),
-      findsOneWidget,
-    );
   });
 
   testWidgets('tapping a usual meal opens create meal with template items', (
@@ -538,67 +353,19 @@ class _TestApp extends StatelessWidget {
   }
 }
 
-Future<void> _pumpEditor(
-  WidgetTester tester,
-  _FakeNutritionRepository repository, {
-  AudioRecorderService? audioRecorderService,
-  String? foodId,
-  ThemeMode themeMode = ThemeMode.light,
-}) async {
-  await tester.pumpWidget(
-    ChangeNotifierProvider(
-      create: (_) => MealTemplatesViewModel(nutritionRepository: repository),
-      child: MaterialApp.router(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        theme: buildLightTheme(),
-        darkTheme: buildDarkTheme(),
-        themeMode: themeMode,
-        routerConfig: GoRouter(
-          initialLocation: '/editor',
-          routes: [
-            GoRoute(
-              path: '/editor',
-              builder: (context, state) => UsualFoodEditorScreen(
-                foodId: foodId,
-                audioRecorderService: audioRecorderService,
-              ),
-            ),
-            GoRoute(
-              path: '/templates',
-              builder: (context, state) => const Scaffold(
-                body: MealTemplatesScreen(),
-              ),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-}
-
 class _FakeNutritionRepository extends NutritionRepository {
   _FakeNutritionRepository({
     List<MealTemplate> templates = const [],
     List<UsualFood> usualFoods = const [],
-    UsualFoodDraft? draft,
-    this.draftCompleter,
-    this.transcript = '',
   })  : templates = List.of(templates),
         usualFoods = List.of(usualFoods),
-        draft = draft ?? const UsualFoodDraft(),
         super(apiClient: _unusedApiClient());
 
   List<MealTemplate> templates;
   List<UsualFood> usualFoods;
-  UsualFoodDraft draft;
-  String transcript;
   final List<UsualFoodInput> createdInputs = [];
   final List<UsualFoodInput> updatedInputs = [];
   final List<String> deletedIds = [];
-  final List<String> draftTexts = [];
-  final List<String> transcribedAudioPaths = [];
-  final Completer<UsualFoodDraft>? draftCompleter;
 
   @override
   Future<List<MealTemplate>> getTemplates() async => templates;
@@ -633,64 +400,12 @@ class _FakeNutritionRepository extends NutritionRepository {
   }
 
   @override
-  Future<UsualFoodDraft> draftUsualFood(String text) async {
-    draftTexts.add(text);
-    if (draftCompleter != null) return draftCompleter!.future;
-    return draft;
-  }
-
-  @override
-  Future<String> transcribeAudio(File audioFile) async {
-    transcribedAudioPaths.add(audioFile.path);
-    return transcript;
-  }
-
-  @override
   Future<bool> deleteTemplate(String templateId) async {
     templates = templates
         .where((item) => item.id != templateId)
         .toList(growable: false);
     return true;
   }
-}
-
-class _FakeAudioRecorderService implements AudioRecorderService {
-  int startCount = 0;
-  int stopCount = 0;
-  String? _currentPath;
-
-  @override
-  String? get currentPath => _currentPath;
-
-  @override
-  Stream<RecorderState> get stateStream => const Stream.empty();
-
-  @override
-  Future<void> start() async {
-    startCount += 1;
-  }
-
-  @override
-  Future<RecordedAudio?> stop() async {
-    stopCount += 1;
-    final path =
-        '${Directory.systemTemp.path}/usual_food_editor_test_${DateTime.now().microsecondsSinceEpoch}.wav';
-    _currentPath = path;
-    return RecordedAudio(
-      path: path,
-      mimeType: 'audio/wav',
-      sizeBytes: 1024,
-    );
-  }
-
-  @override
-  Future<void> cancel() async {}
-
-  @override
-  Future<void> dispose() async {}
-
-  @override
-  Future<bool> hasPermission() async => true;
 }
 
 UsualFood _foodFromInput(String id, UsualFoodInput input) {

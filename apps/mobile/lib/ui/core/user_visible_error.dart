@@ -72,7 +72,10 @@ String userVisibleErrorMessage(
       return 'Too many tries. Wait a moment and try again.';
     }
     if (code == 'agent_provider_unavailable') {
-      return error.message;
+      if (context == UserErrorContext.voiceAgent) {
+        return 'We could not understand that meal yet. Try adding a little more detail.';
+      }
+      return 'The nutrition assistant is taking longer than expected. Try again or use a shorter description.';
     }
     if (code == 'validation_error' || error.statusCode == 400) {
       return _validationMessage(context);

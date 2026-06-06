@@ -26,7 +26,7 @@ export function formatErrorResponse(c: Context, error: unknown) {
     return c.json({
       error: {
         code: error.code,
-        message: "An error ocurred. Please, try again.",
+        message: "An error occurred. Please, try again.",
         traceId,
       },
     }, 503);

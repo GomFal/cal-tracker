@@ -1,16 +1,10 @@
-import 'dart:async';
-import 'dart:io';
-
 import 'package:cal_tracker_mobile/app/theme.dart';
 import 'package:cal_tracker_mobile/data/repositories/nutrition_repository.dart';
 import 'package:cal_tracker_mobile/data/services/api_config.dart';
-import 'package:cal_tracker_mobile/data/services/audio_recorder_service.dart';
 import 'package:cal_tracker_mobile/data/services/secure_token_storage.dart';
 import 'package:cal_tracker_mobile/domain/models/nutrition_models.dart';
 import 'package:cal_tracker_mobile/generated/api/cal_tracker_api.dart';
 import 'package:cal_tracker_mobile/l10n/generated/app_localizations.dart';
-import 'package:cal_tracker_mobile/ui/core/design_system.dart';
-import 'package:cal_tracker_mobile/ui/core/voice_action_button.dart';
 import 'package:cal_tracker_mobile/ui/features/meal_templates/view_models/meal_templates_view_model.dart';
 import 'package:cal_tracker_mobile/ui/features/meal_templates/views/meal_template_editor_screen.dart';
 import 'package:cal_tracker_mobile/ui/features/meal_templates/views/meal_templates_screen.dart';
@@ -95,7 +89,7 @@ void main() {
 
     expect(
       find.text('Draft applied. Review and edit before saving.'),
-      findsOneWidget,
+      findsNothing,
     );
     expect(
       tester
@@ -125,139 +119,6 @@ void main() {
     expect(created.aliases, ['my breakfast']);
     expect(created.items.single.quantity, 80);
     expect(created.items.single.calories, 300);
-  });
-
-  testWidgets('records voice, transcribes it, and applies the meal draft', (
-    tester,
-  ) async {
-    final repository = _FakeNutritionRepository(
-      transcript: 'my usual lunch with rice',
-      draft: const UsualMealDraft(
-        title: 'Voice lunch',
-        aliases: ['weekday lunch'],
-        items: [_publicRice],
-      ),
-    );
-    final recorder = _FakeAudioRecorderService();
-    await _pumpEditor(
-      tester,
-      repository,
-      audioRecorderService: recorder,
-    );
-
-    await tester.tap(find.byKey(const ValueKey('meal_template_voice_button')));
-    await tester.pump();
-    expect(recorder.startCount, 1);
-    expect(find.text('Recording. Stop when you finish describing the meal.'),
-        findsOneWidget);
-
-    await tester.tap(find.byKey(const ValueKey('meal_template_voice_button')));
-    await tester.pumpAndSettle();
-
-    expect(recorder.stopCount, 1);
-    expect(repository.transcribedAudioPaths, hasLength(1));
-    expect(repository.draftTexts, ['my usual lunch with rice']);
-    expect(
-      tester
-          .widget<TextField>(
-            find.byKey(const ValueKey('meal_template_title_field')),
-          )
-          .controller
-          ?.text,
-      'Voice lunch',
-    );
-    expect(find.text('Public rice'), findsOneWidget);
-  });
-
-  testWidgets('usual meal editor adapts draft and save surfaces in dark mode', (
-    tester,
-  ) async {
-    final repository = _FakeNutritionRepository();
-    await _pumpEditor(
-      tester,
-      repository,
-      initialDraft: const UsualMealDraft(
-        title: 'Voice breakfast',
-        aliases: ['my breakfast'],
-        items: [_usualOats],
-      ),
-      themeMode: ThemeMode.dark,
-    );
-
-    final draftCard = tester.widget<FreshCard>(
-      find.byKey(const ValueKey('meal_template_draft_card')),
-    );
-    final transcriptField = tester.widget<TextField>(
-      find.byKey(const ValueKey('meal_template_voice_transcript_field')),
-    );
-    final voiceChrome = tester.widget<VoiceActionButtonChrome>(
-      find.byType(VoiceActionButtonChrome),
-    );
-    final saveBar = tester.widget<FreshCard>(
-      find.byKey(const ValueKey('meal_template_save_bar')),
-    );
-    final nutritionSummary = tester.widget<DecoratedBox>(
-      find.byKey(const ValueKey('meal_template_total_nutrition_summary')),
-    );
-    final nutritionDecoration = nutritionSummary.decoration as BoxDecoration;
-
-    expect(draftCard.color, FreshPalette.dark.surface);
-    expect(draftCard.color, isNot(FreshColors.limeWash));
-    expect(
-        transcriptField.decoration?.fillColor, FreshPalette.dark.surfaceMuted);
-    expect(voiceChrome.backgroundColor, FreshPalette.dark.lime);
-    expect(saveBar.color, FreshPalette.dark.surface);
-    expect(nutritionDecoration.color, FreshPalette.dark.surfaceMuted);
-  });
-
-  testWidgets('blocks usual meal editor while voice draft is pending', (
-    tester,
-  ) async {
-    final draftCompleter = Completer<UsualMealDraft>();
-    final repository = _FakeNutritionRepository(
-      transcript: 'usual lunch with rice',
-      draftCompleter: draftCompleter,
-    );
-    final recorder = _FakeAudioRecorderService();
-    await _pumpEditor(
-      tester,
-      repository,
-      audioRecorderService: recorder,
-    );
-
-    await tester.tap(find.byKey(const ValueKey('meal_template_voice_button')));
-    await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('meal_template_voice_button')));
-    await tester.pump();
-    await tester.pump();
-
-    expect(
-      find.byKey(const ValueKey('meal_template_voice_blocking_message')),
-      findsOneWidget,
-    );
-    expect(
-      tester
-          .widget<FilledButton>(
-            find.byKey(const ValueKey('meal_template_save_button')),
-          )
-          .onPressed,
-      isNull,
-    );
-
-    draftCompleter.complete(
-      const UsualMealDraft(
-        title: 'Pending lunch',
-        items: [_publicRice],
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(
-      find.byKey(const ValueKey('meal_template_voice_blocking_message')),
-      findsNothing,
-    );
-    expect(find.text('Draft applied. Review and edit before saving.'),
-        findsOneWidget);
   });
 
   testWidgets('edits an existing usual meal using current items', (
@@ -298,6 +159,234 @@ void main() {
     expect(updated.items.single.name, 'Updated rice');
     expect(updated.trustedAutoCommitEnabled, isFalse);
   });
+
+  testWidgets('live total updates when editing ingredient calories and macros', (tester) async {
+    final repository = _FakeNutritionRepository();
+    await _pumpEditor(
+      tester,
+      repository,
+      initialDraft: const UsualMealDraft(
+        title: 'Breakfast',
+        items: [_usualOats],
+      ),
+    );
+
+    // Verify total shows oats nutrition (total + item preview = 2 widgets)
+    expect(
+      find.text('230 Kcal \u00b7 8g Protein \u00b7 38g Carbs \u00b7 4g Fat'),
+      findsWidgets,
+    );
+
+    // Change calories — verify live update
+    await tester.enterText(
+      find.byKey(const ValueKey('meal_template_item_calories_0')),
+      '300',
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text('300 Kcal \u00b7 8g Protein \u00b7 38g Carbs \u00b7 4g Fat'),
+      findsWidgets,
+    );
+
+    // Change protein — verify live update
+    await tester.enterText(
+      find.byKey(const ValueKey('meal_template_item_protein_0')),
+      '10',
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text('300 Kcal \u00b7 10g Protein \u00b7 38g Carbs \u00b7 4g Fat'),
+      findsWidgets,
+    );
+
+    // Change carbs — verify live update
+    await tester.enterText(
+      find.byKey(const ValueKey('meal_template_item_carbs_0')),
+      '50',
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text('300 Kcal \u00b7 10g Protein \u00b7 50g Carbs \u00b7 4g Fat'),
+      findsWidgets,
+    );
+
+    // Change fat — verify live update
+    await tester.enterText(
+      find.byKey(const ValueKey('meal_template_item_fat_0')),
+      '5',
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text('300 Kcal \u00b7 10g Protein \u00b7 50g Carbs \u00b7 5g Fat'),
+      findsWidgets,
+    );
+  });
+
+  testWidgets('live total updates when adding a food item from search', (tester) async {
+    final repository = _FakeNutritionRepository(searchItems: [_publicRice]);
+    await _pumpEditor(tester, repository);
+
+    // Initially no valid items, total should be 0 (blank item has no preview)
+    expect(
+      find.text('0 Kcal \u00b7 0g Protein \u00b7 0g Carbs \u00b7 0g Fat'),
+      findsOneWidget,
+    );
+
+    // Add rice from search
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('meal_template_add_from_search_button')),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('meal_template_food_search_field')),
+      'rice',
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('meal_template_food_search_submit')),
+    );
+    await tester.pumpAndSettle();
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('meal_template_food_search_result_0')),
+    );
+    await tester.pumpAndSettle();
+
+    // Total and item preview both show rice nutrition (130 Kcal)
+    expect(
+      find.text('130 Kcal \u00b7 2.7g Protein \u00b7 28g Carbs \u00b7 0.3g Fat'),
+      findsWidgets,
+    );
+
+    // Add another rice
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('meal_template_add_from_search_button')),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('meal_template_food_search_field')),
+      'rice',
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('meal_template_food_search_submit')),
+    );
+    await tester.pumpAndSettle();
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('meal_template_food_search_result_0')),
+    );
+    await tester.pumpAndSettle();
+
+    // Total should show doubled rice nutrition (260 Kcal), 2 item previews + total = 3 widgets
+    // Actually: first rice item shows "130 Kcal ...", second rice item shows "130 Kcal ...",
+    // total shows "260 Kcal ..." — all different texts, so findsOneWidget for the total text
+    expect(
+      find.text('260 Kcal \u00b7 5.4g Protein \u00b7 56g Carbs \u00b7 0.6g Fat'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('live total updates when deleting an item', (tester) async {
+    final repository = _FakeNutritionRepository();
+    await _pumpEditor(
+      tester,
+      repository,
+      initialDraft: const UsualMealDraft(
+        title: 'Dual meal',
+        items: [_usualOats, _publicRice],
+      ),
+    );
+
+    // Total should show sum of oats + rice (unique, only in total, not in any item preview)
+    expect(
+      find.text('360 Kcal \u00b7 10.7g Protein \u00b7 66g Carbs \u00b7 4.3g Fat'),
+      findsOneWidget,
+    );
+
+    // Delete the first item (oats, index 0)
+    await _tapVisible(
+      tester,
+      find.byKey(const ValueKey('meal_template_delete_item_0')),
+    );
+    await tester.pumpAndSettle();
+
+    // Total and item preview both show rice nutrition
+    expect(
+      find.text('130 Kcal \u00b7 2.7g Protein \u00b7 28g Carbs \u00b7 0.3g Fat'),
+      findsWidgets,
+    );
+  });
+
+  testWidgets('live total shows zero when no valid items exist', (tester) async {
+    final repository = _FakeNutritionRepository();
+    await _pumpEditor(tester, repository);
+
+    // Blank item has empty fields, total should be 0
+    expect(
+      find.text('0 Kcal \u00b7 0g Protein \u00b7 0g Carbs \u00b7 0g Fat'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('partial or invalid input does not crash total calculation', (tester) async {
+    final repository = _FakeNutritionRepository();
+    await _pumpEditor(tester, repository);
+
+    // Enter a name and calories but leave protein empty - item is invalid
+    await tester.enterText(
+      find.byKey(const ValueKey('meal_template_item_name_0')),
+      'Test food',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('meal_template_item_quantity_0')),
+      '100',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('meal_template_item_calories_0')),
+      '200',
+    );
+    await tester.pumpAndSettle();
+
+    // Protein is empty (null), so item is excluded, total stays 0
+    // Item preview also shows null (no preview) so only total shows '0 Kcal ...'
+    expect(
+      find.text('0 Kcal \u00b7 0g Protein \u00b7 0g Carbs \u00b7 0g Fat'),
+      findsOneWidget,
+    );
+
+    // Fill in protein, carbs, and fat to make item fully valid
+    await tester.enterText(
+      find.byKey(const ValueKey('meal_template_item_protein_0')),
+      '10',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('meal_template_item_carbs_0')),
+      '0',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('meal_template_item_fat_0')),
+      '0',
+    );
+    await tester.pumpAndSettle();
+    // Total and item preview both show the same nutrition
+    expect(
+      find.text('200 Kcal \u00b7 10g Protein \u00b7 0g Carbs \u00b7 0g Fat'),
+      findsWidgets,
+    );
+
+    // Enter invalid (non-numeric) carbs - item becomes invalid, total drops to 0
+    // Preview disappears again
+    await tester.enterText(
+      find.byKey(const ValueKey('meal_template_item_carbs_0')),
+      'abc',
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text('0 Kcal \u00b7 0g Protein \u00b7 0g Carbs \u00b7 0g Fat'),
+      findsOneWidget,
+    );
+  });
 }
 
 Future<void> _pumpEditor(
@@ -305,7 +394,6 @@ Future<void> _pumpEditor(
   _FakeNutritionRepository repository, {
   String? templateId,
   UsualMealDraft? initialDraft,
-  AudioRecorderService? audioRecorderService,
   ThemeMode themeMode = ThemeMode.light,
 }) async {
   await tester.pumpWidget(
@@ -321,7 +409,6 @@ Future<void> _pumpEditor(
           body: MealTemplateEditorScreen(
             templateId: templateId,
             initialDraft: initialDraft,
-            audioRecorderService: audioRecorderService,
           ),
         ),
       ),
@@ -374,41 +461,20 @@ class _FakeNutritionRepository extends NutritionRepository {
   _FakeNutritionRepository({
     List<MealTemplate> templates = const [],
     List<MealItem> searchItems = const [],
-    this.transcript = '',
-    this.draft = const UsualMealDraft(),
-    this.draftCompleter,
   })  : templates = List.of(templates),
         searchItems = List.of(searchItems),
         super(apiClient: _unusedApiClient());
 
   List<MealTemplate> templates;
   List<MealItem> searchItems;
-  final String transcript;
-  final UsualMealDraft draft;
-  final Completer<UsualMealDraft>? draftCompleter;
   final List<MealTemplate> createdTemplates = [];
   final List<MealTemplate> updatedTemplates = [];
-  final List<String> draftTexts = [];
-  final List<String> transcribedAudioPaths = [];
 
   @override
   Future<List<MealTemplate>> getTemplates() async => templates;
 
   @override
   Future<List<UsualFood>> getUsualFoods() async => const [];
-
-  @override
-  Future<UsualMealDraft> draftUsualMeal(String text) async {
-    draftTexts.add(text);
-    if (draftCompleter != null) return draftCompleter!.future;
-    return draft;
-  }
-
-  @override
-  Future<String> transcribeAudio(File audioFile) async {
-    transcribedAudioPaths.add(audioFile.path);
-    return transcript;
-  }
 
   @override
   Future<FoodSearchResult> searchFoods(
@@ -459,39 +525,6 @@ class _FakeNutritionRepository extends NutritionRepository {
         .toList(growable: false);
     return template;
   }
-}
-
-class _FakeAudioRecorderService implements AudioRecorderService {
-  int startCount = 0;
-  int stopCount = 0;
-
-  @override
-  String? get currentPath => null;
-
-  @override
-  Stream<RecorderState> get stateStream => const Stream.empty();
-
-  @override
-  Future<void> start() async {
-    startCount += 1;
-  }
-
-  @override
-  Future<RecordedAudio?> stop() async {
-    stopCount += 1;
-    final path =
-        '${Directory.systemTemp.path}/meal_template_editor_test_${DateTime.now().microsecondsSinceEpoch}.wav';
-    return RecordedAudio(path: path, mimeType: 'audio/wav', sizeBytes: 1024);
-  }
-
-  @override
-  Future<void> cancel() async {}
-
-  @override
-  Future<void> dispose() async {}
-
-  @override
-  Future<bool> hasPermission() async => true;
 }
 
 MealTemplate _template({

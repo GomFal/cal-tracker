@@ -1430,6 +1430,7 @@ class _MealCreateVoiceActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
     final isRecording = viewModel.state == VoiceLogState.recording;
+    final isProcessing = viewModel.isLoading;
     final isDisabled = viewModel.state == VoiceLogState.requestingPermission ||
         viewModel.state == VoiceLogState.stopping ||
         viewModel.state == VoiceLogState.transcribing ||
@@ -1469,6 +1470,7 @@ class _MealCreateVoiceActionButton extends StatelessWidget {
           child: VoiceActionButtonChrome(
             dimension: 72,
             backgroundColor: backgroundColor,
+            isProcessing: isProcessing,
             isRecording: isRecording,
             child: IconButton(
               key: const ValueKey('mic_button'),

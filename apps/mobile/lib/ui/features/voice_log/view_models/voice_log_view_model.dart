@@ -7,6 +7,8 @@ import '../../../../data/repositories/nutrition_repository.dart';
 import '../../../../data/services/audio_recorder_service.dart';
 import '../../../../domain/models/nutrition_models.dart';
 import '../../../core/user_visible_error.dart';
+import 'voice_log_helpers.dart';
+import 'voice_log_timers.dart';
 
 enum VoiceLogState {
   idle,
@@ -178,7 +180,13 @@ class VoiceLogViewModel extends ChangeNotifier {
     DateTime Function()? now,
   })  : _nutritionRepository = nutritionRepository,
         _audioRecorderService = audioRecorderService ?? AudioRecorderService(),
-        _now = now ?? DateTime.now;
+        _now = now ?? DateTime.now {
+    _timers = VoiceLogTimers(
+      onRecordingDurationTick: _onRecordingDurationTick,
+      onProposalChangeSuccessExpired: _onProposalChangeSuccessExpired,
+      now: _now,
+    );
+  }
 
   static const proposalChangeSuccessDuration = Duration(milliseconds: 2500);
 
@@ -202,9 +210,7 @@ class VoiceLogViewModel extends ChangeNotifier {
 
   Duration get recordingDuration => _uiState.recordingDuration;
 
-  Timer? _durationTimer;
-  Timer? _proposalChangeSuccessTimer;
-  DateTime? _recordingStartedAt;
+  late final VoiceLogTimers _timers;
 
   MealProposal? get proposal => _uiState.proposal;
 
@@ -236,7 +242,7 @@ class VoiceLogViewModel extends ChangeNotifier {
   bool get showProposalChangeSuccess => _uiState.showProposalChangeSuccess;
 
   MealItem? selectedCandidateFor(FoodCandidateGroup group) {
-    return _uiState.selectedCandidateItems[_candidateGroupKey(group)];
+    return _uiState.selectedCandidateItems[candidateGroupKey(group)];
   }
 
   bool isCandidateSelected(FoodCandidateGroup group, MealItem candidate) {
@@ -303,7 +309,7 @@ class VoiceLogViewModel extends ChangeNotifier {
 
   Future<void> _startRecording() async {
     if (!_canStartRecording) return;
-    _cancelRecordingTimer();
+    _timers.stopRecordingDuration();
     final activeProposal = _uiState.proposal;
     _setUiState(
       _uiState.copyWith(
@@ -336,19 +342,15 @@ class VoiceLogViewModel extends ChangeNotifier {
     );
     try {
       await _audioRecorderService.start();
-      _recordingStartedAt = _now();
+      _timers.startRecordingDuration(_now());
       _setUiState(
         _uiState.copyWith(
           phase: VoiceLogState.recording,
           recordingDuration: Duration.zero,
         ),
       );
-      _durationTimer = Timer.periodic(
-        const Duration(seconds: 1),
-        (_) => _syncRecordingDuration(),
-      );
     } on RecorderException catch (e) {
-      _cancelRecordingTimer();
+      _timers.stopRecordingDuration();
       if (e.code == 'permission_denied') {
         _setError('Microphone permission is required to record voice logs.');
       } else {
@@ -361,7 +363,7 @@ class VoiceLogViewModel extends ChangeNotifier {
         );
       }
     } catch (e) {
-      _cancelRecordingTimer();
+      _timers.stopRecordingDuration();
       _setError(
         userVisibleErrorMessage(e, context: UserErrorContext.voiceRecording),
       );
@@ -371,7 +373,7 @@ class VoiceLogViewModel extends ChangeNotifier {
   Future<AgentRunResult?> _stopRecording({
     bool submitAfterTranscription = false,
   }) async {
-    _cancelRecordingTimer();
+    _timers.stopRecordingDuration();
     _setState(VoiceLogState.stopping);
     try {
       final audio = await _audioRecorderService.stop();
@@ -557,7 +559,7 @@ class VoiceLogViewModel extends ChangeNotifier {
         fallbackProposal != null ||
         result.proposal != null;
     final candidateGroups = shouldPreserveCandidateGroups
-        ? _mergeCandidateGroups(
+        ? mergeCandidateGroups(
             _uiState.candidateGroups,
             incomingCandidateGroups,
           )
@@ -566,7 +568,7 @@ class VoiceLogViewModel extends ChangeNotifier {
         result.resolvedItems ?? result.proposal?.items;
     final selectedCandidateItems = {
       if (shouldPreserveCandidateGroups) ..._uiState.selectedCandidateItems,
-      ..._defaultCandidateSelections(
+      ...defaultCandidateSelections(
         groups: candidateGroups,
         resolvedItems: resolvedItemsForSelection,
       ),
@@ -607,7 +609,7 @@ class VoiceLogViewModel extends ChangeNotifier {
   Future<void> commitProposal({MealLabel? mealLabel}) async {
     final proposal = _uiState.proposal;
     if (proposal == null) return;
-    _proposalChangeSuccessTimer?.cancel();
+    _timers.clearProposalChangeSuccess();
     _setUiState(
       _uiState.copyWith(
         phase: VoiceLogState.agentRunning,
@@ -645,7 +647,7 @@ class VoiceLogViewModel extends ChangeNotifier {
         proposal.id,
         items,
       );
-      final hasChanges = !_mealProposalsMateriallyEqual(proposal, updated);
+      final hasChanges = !mealProposalsMateriallyEqual(proposal, updated);
       _setUiState(
         _uiState.copyWith(
           phase: VoiceLogState.proposalReady,
@@ -658,7 +660,7 @@ class VoiceLogViewModel extends ChangeNotifier {
       if (hasChanges) {
         _scheduleProposalChangeSuccessDismissal();
       } else {
-        _proposalChangeSuccessTimer?.cancel();
+        _timers.clearProposalChangeSuccess();
       }
     } catch (error) {
       _setError(
@@ -701,7 +703,7 @@ class VoiceLogViewModel extends ChangeNotifier {
     );
     try {
       final proposal = await _nutritionRepository.createProposalFromItems(
-        phrase: _manualFoodPhrase(items),
+        phrase: manualFoodPhrase(items),
         items: items,
       );
       _setUiState(
@@ -731,24 +733,31 @@ class VoiceLogViewModel extends ChangeNotifier {
         _uiState.clarificationOptions ?? const <FoodCandidateGroup>[];
     final previousSelection = selectedCandidateFor(group);
     final selections = Map<String, MealItem>.of(_uiState.selectedCandidateItems)
-      ..[_candidateGroupKey(group)] = candidate;
+      ..[candidateGroupKey(group)] = candidate;
     _setUiState(_uiState.copyWith(selectedCandidateItems: selections));
     if (previousSelection != null &&
-        _sameMealItem(previousSelection, candidate)) {
+        sameMealItem(previousSelection, candidate)) {
       return;
     }
 
-    final requiredGroups =
-        visibleGroups.where(_needsCandidateSelection).toList();
+    final resolvedItemsForCandidateSelection =
+        _uiState.resolvedItems ?? const <MealItem>[];
+    final requiredGroups = visibleGroups
+        .where(
+          (group) =>
+              needsCandidateSelection(group, resolvedItemsForCandidateSelection),
+        )
+        .toList();
     if (!requiredGroups.every(
-      (group) => selections.containsKey(_candidateGroupKey(group)),
+      (group) => selections.containsKey(candidateGroupKey(group)),
     )) {
       return;
     }
 
-    final selectedItems = _itemsWithCandidateSelections(
+    final selectedItems = itemsWithCandidateSelections(
       groups: groups,
       selections: selections,
+      resolvedItems: resolvedItemsForCandidateSelection,
     );
     final activeProposal = _uiState.proposal;
     _setState(VoiceLogState.agentRunning);
@@ -760,7 +769,7 @@ class VoiceLogViewModel extends ChangeNotifier {
             )
           : await _nutritionRepository.updateProposalItems(
               activeProposal.id,
-              _proposalItemsWithCandidateSelections(
+              proposalItemsWithCandidateSelections(
                 proposalItems: activeProposal.items,
                 groups: groups,
                 selections: selections,
@@ -793,7 +802,7 @@ class VoiceLogViewModel extends ChangeNotifier {
   }
 
   void clearResult() {
-    _proposalChangeSuccessTimer?.cancel();
+    _timers.clearProposalChangeSuccess();
     _setUiState(const VoiceLogUiState());
   }
 
@@ -812,7 +821,7 @@ class VoiceLogViewModel extends ChangeNotifier {
   }
 
   void _setError(String message) {
-    _proposalChangeSuccessTimer?.cancel();
+    _timers.clearProposalChangeSuccess();
     _setUiState(
       _uiState.copyWith(
         phase: VoiceLogState.error,
@@ -823,247 +832,32 @@ class VoiceLogViewModel extends ChangeNotifier {
   }
 
   void _scheduleProposalChangeSuccessDismissal() {
-    _proposalChangeSuccessTimer?.cancel();
-    _proposalChangeSuccessTimer = Timer(proposalChangeSuccessDuration, () {
-      if (!_uiState.showProposalChangeSuccess) return;
-      _setUiState(_uiState.copyWith(showProposalChangeSuccess: false));
-    });
+    _timers.showProposalChangeSuccess(proposalChangeSuccessDuration);
   }
 
   void _setUiState(VoiceLogUiState value) {
     final wasRecording = _uiState.phase == VoiceLogState.recording;
     final isRecording = value.phase == VoiceLogState.recording;
     if (wasRecording && !isRecording) {
-      _cancelRecordingTimer();
+      _timers.stopRecordingDuration();
     }
     _uiState = value;
     notifyListeners();
   }
 
-  void _syncRecordingDuration() {
-    final startedAt = _recordingStartedAt;
-    if (startedAt == null || _uiState.phase != VoiceLogState.recording) {
-      return;
-    }
-    final elapsed = _now().difference(startedAt);
-    if (elapsed.isNegative) return;
+  void _onRecordingDurationTick(Duration elapsed) {
     _setUiState(_uiState.copyWith(recordingDuration: elapsed));
   }
 
-  void _cancelRecordingTimer() {
-    _durationTimer?.cancel();
-    _durationTimer = null;
-    _recordingStartedAt = null;
-  }
-
-  Map<String, MealItem> _defaultCandidateSelections({
-    required List<FoodCandidateGroup>? groups,
-    required List<MealItem>? resolvedItems,
-  }) {
-    if (groups == null || resolvedItems == null) return const {};
-    final selections = <String, MealItem>{};
-    for (final group in groups) {
-      final resolvedItem = _resolvedItemForGroup(group, resolvedItems);
-      if (resolvedItem == null) continue;
-      final candidate = _matchingCandidateForResolvedItem(group, resolvedItem);
-      if (candidate != null) {
-        selections[_candidateGroupKey(group)] = candidate;
-      }
-    }
-    return selections;
-  }
-
-  List<MealItem> _itemsWithCandidateSelections({
-    required List<FoodCandidateGroup> groups,
-    required Map<String, MealItem> selections,
-  }) {
-    final resolvedItems = _uiState.resolvedItems ?? const <MealItem>[];
-    final selectedItems = <MealItem>[];
-    final representedGroupKeys = <String>{};
-
-    for (final item in resolvedItems) {
-      final group = _groupForResolvedItem(item, groups);
-      if (group == null) {
-        selectedItems.add(item);
-        continue;
-      }
-
-      final key = _candidateGroupKey(group);
-      representedGroupKeys.add(key);
-      selectedItems.add(selections[key] ?? item);
-    }
-
-    for (final group in groups) {
-      final key = _candidateGroupKey(group);
-      if (representedGroupKeys.contains(key)) continue;
-      final selected = selections[key];
-      if (selected != null) selectedItems.add(selected);
-    }
-
-    return selectedItems;
-  }
-
-  List<MealItem> _proposalItemsWithCandidateSelections({
-    required List<MealItem> proposalItems,
-    required List<FoodCandidateGroup> groups,
-    required Map<String, MealItem> selections,
-  }) {
-    final items = [...proposalItems];
-    for (final group in groups) {
-      final selected = selections[_candidateGroupKey(group)];
-      if (selected == null) continue;
-      final index = items.indexWhere(
-        (item) => _resolvedItemMatchesGroup(item, group),
-      );
-      if (index >= 0) {
-        items[index] = selected;
-      } else if (!items.any((item) => _sameMealItem(item, selected))) {
-        items.add(selected);
-      }
-    }
-    return items;
-  }
-
-  bool _needsCandidateSelection(FoodCandidateGroup group) {
-    if (group.candidates.isEmpty) return true;
-    return _resolvedItemForGroup(
-          group,
-          _uiState.resolvedItems ?? const <MealItem>[],
-        ) ==
-        null;
-  }
-
-  MealItem? _resolvedItemForGroup(
-    FoodCandidateGroup group,
-    List<MealItem> resolvedItems,
-  ) {
-    for (final item in resolvedItems) {
-      if (_resolvedItemMatchesGroup(item, group)) return item;
-    }
-    return null;
-  }
-
-  FoodCandidateGroup? _groupForResolvedItem(
-    MealItem item,
-    List<FoodCandidateGroup> groups,
-  ) {
-    for (final group in groups) {
-      if (_resolvedItemMatchesGroup(item, group)) return group;
-    }
-    return null;
-  }
-
-  bool _resolvedItemMatchesGroup(MealItem item, FoodCandidateGroup group) {
-    return item.canonicalName == group.mention.canonicalName &&
-        item.quantity == group.mention.quantity &&
-        item.unit == group.mention.unit;
-  }
-
-  MealItem? _matchingCandidateForResolvedItem(
-    FoodCandidateGroup group,
-    MealItem resolvedItem,
-  ) {
-    for (final candidate in group.candidates) {
-      if (_sameMealItem(candidate, resolvedItem)) return candidate;
-    }
-    return null;
-  }
-
-  bool _sameMealItem(MealItem a, MealItem b) {
-    if (a.externalId != null && b.externalId != null) {
-      return a.externalId == b.externalId &&
-          a.externalSource == b.externalSource;
-    }
-    return a.name == b.name &&
-        a.source == b.source &&
-        a.quantity == b.quantity &&
-        a.unit == b.unit;
-  }
-
-  bool _mealProposalsMateriallyEqual(MealProposal a, MealProposal b) {
-    return _normalizedText(a.title) == _normalizedText(b.title) &&
-        a.nutrition.calories == b.nutrition.calories &&
-        _sameNumber(a.nutrition.proteinGrams, b.nutrition.proteinGrams) &&
-        _sameNumber(a.nutrition.carbsGrams, b.nutrition.carbsGrams) &&
-        _sameNumber(a.nutrition.fatGrams, b.nutrition.fatGrams) &&
-        _mealItemListsMateriallyEqual(a.items, b.items);
-  }
-
-  bool _mealItemListsMateriallyEqual(List<MealItem> a, List<MealItem> b) {
-    if (a.length != b.length) return false;
-    for (var index = 0; index < a.length; index++) {
-      if (!_mealItemsMateriallyEqual(a[index], b[index])) return false;
-    }
-    return true;
-  }
-
-  bool _mealItemsMateriallyEqual(MealItem a, MealItem b) {
-    final hasExternalIdentity = a.externalId != null ||
-        b.externalId != null ||
-        a.externalSource != null ||
-        b.externalSource != null;
-    if (hasExternalIdentity &&
-        (a.externalId != b.externalId ||
-            a.externalSource != b.externalSource)) {
-      return false;
-    }
-    return _normalizedText(a.name) == _normalizedText(b.name) &&
-        _normalizedText(a.unit) == _normalizedText(b.unit) &&
-        _sameNumber(a.quantity, b.quantity) &&
-        a.calories == b.calories &&
-        _sameNumber(a.proteinGrams, b.proteinGrams) &&
-        _sameNumber(a.carbsGrams, b.carbsGrams) &&
-        _sameNumber(a.fatGrams, b.fatGrams);
-  }
-
-  String _normalizedText(String value) => value.trim().toLowerCase();
-
-  bool _sameNumber(double a, double b) => (a - b).abs() < 0.05;
-
-  String _manualFoodPhrase(List<MealItem> items) {
-    return items
-        .map(
-          (item) =>
-              '${_formatQuantityForPhrase(item.quantity)} ${item.unit} ${item.name}',
-        )
-        .join(', ');
-  }
-
-  String _formatQuantityForPhrase(double value) {
-    if (value == value.roundToDouble()) return value.toInt().toString();
-    return value.toStringAsFixed(1).replaceFirst(RegExp(r'\.0$'), '');
-  }
-
-  List<FoodCandidateGroup>? _mergeCandidateGroups(
-    List<FoodCandidateGroup>? existing,
-    List<FoodCandidateGroup>? incoming,
-  ) {
-    if (existing == null || existing.isEmpty) return incoming;
-    if (incoming == null || incoming.isEmpty) return existing;
-    final merged = <String, FoodCandidateGroup>{
-      for (final group in existing) _candidateGroupKey(group): group,
-    };
-    for (final group in incoming) {
-      merged[_candidateGroupKey(group)] = group;
-    }
-    return merged.values.toList(growable: false);
-  }
-
-  String _candidateGroupKey(FoodCandidateGroup group) {
-    final mention = group.mention;
-    return [
-      mention.originalText,
-      mention.canonicalName,
-      mention.quantity.toStringAsFixed(3),
-      mention.unit,
-    ].join('|');
+  void _onProposalChangeSuccessExpired() {
+    if (!_uiState.showProposalChangeSuccess) return;
+    _setUiState(_uiState.copyWith(showProposalChangeSuccess: false));
   }
 
   @override
   void dispose() {
     _audioRecorderService.dispose();
-    _cancelRecordingTimer();
-    _proposalChangeSuccessTimer?.cancel();
+    _timers.dispose();
     super.dispose();
   }
 }

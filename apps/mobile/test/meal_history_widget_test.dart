@@ -65,7 +65,7 @@ void main() {
 
     await tester.enterText(
       find.byKey(const ValueKey('history_item_protein_0')),
-      '90',
+      '100',
     );
     await tester.enterText(
       find.byKey(const ValueKey('history_item_carbs_0')),
@@ -83,7 +83,7 @@ void main() {
     final caloriesField = tester.widget<TextField>(
       find.byKey(const ValueKey('history_item_calories_0')),
     );
-    expect(caloriesField.controller!.text, '360');
+    expect(caloriesField.controller!.text, '400');
     await tester.tap(find.byKey(const ValueKey('history_item_save_details_0')));
     await tester.pumpAndSettle();
     await tester.ensureVisible(
@@ -99,8 +99,8 @@ void main() {
     final chicken = repository.lastCorrectedItems!.first;
     expect(chicken.name, 'Chicken breast');
     expect(chicken.quantity, 200);
-    expect(chicken.calories, 360);
-    expect(find.text('490 Kcal'), findsOneWidget);
+    expect(chicken.calories, 400);
+    expect(find.text('530 Kcal'), findsOneWidget);
   });
 
   testWidgets('measurement controls adjust quantities and wrap presets', (

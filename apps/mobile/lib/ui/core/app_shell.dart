@@ -490,6 +490,7 @@ class _CenterVoiceButtonState extends State<_CenterVoiceButton> {
             dimension: 62,
             backgroundColor: backgroundColor,
             isRecording: isRecording,
+            isProcessing: viewModel.isLoading,
             child: Icon(icon, color: palette.ink, size: 28),
           ),
         ),

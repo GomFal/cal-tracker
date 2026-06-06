@@ -23,6 +23,12 @@ The scripts write APKs and SHA-256 checksums to:
 dist/mobile/android/
 ```
 
+Before publishing an APK that should trigger the in-app automatic update prompt,
+increment `apps/mobile/pubspec.yaml`'s build number (`version: x.y.z+N`). The
+updater compares the published `latest.json` `versionCode` with the installed
+app; rebuilding or reuploading the same `versionCode` will not prompt users to
+update automatically.
+
 To override API URLs for a local build:
 
 ```bash

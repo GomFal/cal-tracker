@@ -23,6 +23,13 @@ Environment variables:
   DEV_PUBLIC_BASE_URL                Defaults to https://dev-api.bettercalories.app
   PROD_PUBLIC_BASE_URL               Defaults to https://api.bettercalories.app
   ALLOW_NON_INCREMENTAL_APK_VERSION  Set to 1 to republish the same/lower versionCode
+
+Important:
+  The in-app updater only prompts users when latest.json has a greater
+  versionCode than the installed app. Before publishing a dev/prod APK meant
+  to trigger automatic updates, increment apps/mobile/pubspec.yaml (the +N
+  build number). Rebuilding/reuploading the same versionCode will not trigger
+  the updater unless users install it manually.
 USAGE
 }
 
@@ -62,6 +69,10 @@ if [[ -z "$version_name" || -z "$version_code" || "$version_name" == "$version_c
   echo "Could not infer versionName/versionCode from apps/mobile/pubspec.yaml" >&2
   exit 1
 fi
+
+# The mobile auto-updater compares the published manifest versionCode against
+# the installed app versionCode. Bump apps/mobile/pubspec.yaml's +N build number
+# before publishing any APK that should trigger an automatic update prompt.
 
 for command in flutter ssh scp sha256sum stat curl sed find awk date; do
   require_command "$command"

@@ -393,91 +393,68 @@ class _CalorieSetupProgressCard extends StatelessWidget {
       fontWeight: FontWeight.w800,
       letterSpacing: 0,
     );
-    final radius = BorderRadius.circular(30);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        key: const ValueKey('dashboard_progress_card'),
-        borderRadius: radius,
-        onTap: onTap,
-        child: Ink(
-          decoration: BoxDecoration(
-            color: palette.limeSoft,
-            borderRadius: radius,
-            boxShadow: [
-              BoxShadow(
-                color: palette.ink.withValues(alpha: 0.055),
-                blurRadius: 32,
-                offset: const Offset(0, 18),
+    return FreshCard(
+      key: const ValueKey('dashboard_progress_card'),
+      onTap: onTap,
+      color: palette.limeSoft,
+      radius: 30,
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+      child: SizedBox(
+        height: cardHeight,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned(
+              top: 0,
+              left: 0,
+              child: _SetupDatePill(
+                label: dashboardDayMonthLabel(DateTime.now(), l10n),
               ),
-              BoxShadow(
-                color: palette.lime.withValues(alpha: 0.12),
-                blurRadius: 26,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
-            child: SizedBox(
-              height: cardHeight,
-              child: Stack(
-                clipBehavior: Clip.none,
+            ),
+            Positioned(
+              top: 78,
+              left: 0,
+              right: 0,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Positioned(
-                    top: 0,
-                    left: 0,
-                    child: _SetupDatePill(
-                      label: dashboardDayMonthLabel(DateTime.now(), l10n),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      l10n.calorieSetupHeadlinePrefix,
+                      style: titleStyle,
                     ),
                   ),
-                  Positioned(
-                    top: 78,
-                    left: 0,
-                    right: 0,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  const SizedBox(height: 8),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            l10n.calorieSetupHeadlinePrefix,
-                            style: titleStyle,
-                          ),
+                        Text(
+                          l10n.calorieSetupHeadlineMain,
+                          style: titleStyle,
                         ),
-                        const SizedBox(height: 8),
-                        FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerLeft,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Text(
-                                l10n.calorieSetupHeadlineMain,
-                                style: titleStyle,
-                              ),
-                              const SizedBox(width: 10),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 5,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: palette.limeWash.withValues(
-                                    alpha: 0.86,
-                                  ),
-                                  borderRadius: BorderRadius.circular(18),
-                                ),
-                                child: Text(
-                                  l10n.calorieSetupHeadlineBadge,
-                                  style: titleStyle?.copyWith(
-                                    color: palette.leaf,
-                                  ),
-                                ),
-                              ),
-                            ],
+                        const SizedBox(width: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: palette.limeWash.withValues(
+                              alpha: 0.86,
+                            ),
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: Text(
+                            l10n.calorieSetupHeadlineBadge,
+                            style: titleStyle?.copyWith(
+                              color: palette.leaf,
+                            ),
                           ),
                         ),
                       ],
@@ -486,7 +463,7 @@ class _CalorieSetupProgressCard extends StatelessWidget {
                 ],
               ),
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -930,47 +907,36 @@ class _DashboardEmptyMealsCard extends StatelessWidget {
         (MediaQuery.sizeOf(context).width - 40).clamp(0.0, 720.0).toDouble();
     return Align(
       alignment: Alignment.center,
-      child: Container(
+      child: SizedBox(
         width: cardWidth,
-        padding: const EdgeInsets.symmetric(
-          horizontal: FreshSpacing.xl,
-          vertical: FreshSpacing.xxl,
-        ),
-        decoration: BoxDecoration(
+        child: FreshCard(
+          key: const ValueKey('dashboard_empty_meals_card'),
           color: palette.surface,
-          borderRadius: BorderRadius.circular(FreshRadii.xl),
-          boxShadow: [
-            BoxShadow(
-              color: palette.ink.withValues(alpha: 0.12),
-              blurRadius: 30,
-              offset: const Offset(0, 16),
-            ),
-            BoxShadow(
-              color: palette.ink.withValues(alpha: 0.06),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            FreshIconChip(
-              icon: Icons.restaurant_menu_rounded,
-              color: palette.limeDeep,
-            ),
-            const SizedBox(height: FreshSpacing.md),
-            Text(
-              title,
-              style: textTheme.titleMedium,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: FreshSpacing.sm),
-            Text(
-              message,
-              style: textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
-              textAlign: TextAlign.center,
-            ),
-          ],
+          radius: FreshRadii.xl,
+          padding: const EdgeInsets.symmetric(
+            horizontal: FreshSpacing.xl,
+            vertical: FreshSpacing.xxl,
+          ),
+          child: Column(
+            children: [
+              FreshIconChip(
+                icon: Icons.restaurant_menu_rounded,
+                color: palette.limeDeep,
+              ),
+              const SizedBox(height: FreshSpacing.md),
+              Text(
+                title,
+                style: textTheme.titleMedium,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: FreshSpacing.sm),
+              Text(
+                message,
+                style: textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
         ),
       ),
     );

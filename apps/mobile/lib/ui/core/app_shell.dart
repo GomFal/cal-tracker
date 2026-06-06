@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show OverflowBoxFit;
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -509,9 +510,15 @@ class _CenterVoiceButtonState extends State<_CenterVoiceButton> {
             bottom: 68,
             left: 0,
             right: 0,
-            child: _BubbleTip(
-              message: context.l10n.bottomMicFillEditorHint,
-              onDismiss: _dismissBubble,
+            child: OverflowBox(
+              fit: OverflowBoxFit.deferToChild,
+              maxWidth: 300,
+              maxHeight: 120,
+              alignment: Alignment.topCenter,
+              child: _BubbleTip(
+                message: context.l10n.bottomMicFillEditorHint,
+                onDismiss: _dismissBubble,
+              ),
             ),
           ),
         ],
@@ -598,7 +605,7 @@ class _BubbleTip extends StatelessWidget {
               bubbleColor: isDark ? palette.surfaceMuted : palette.ink,
             ),
             child: Container(
-              constraints: const BoxConstraints(maxWidth: 200),
+              constraints: const BoxConstraints(maxWidth: 260),
               padding: const EdgeInsets.symmetric(
                 horizontal: 12,
                 vertical: 8,

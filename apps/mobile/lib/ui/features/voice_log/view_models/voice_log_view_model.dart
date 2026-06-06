@@ -854,6 +854,9 @@ class VoiceLogViewModel extends ChangeNotifier {
     _setUiState(_uiState.copyWith(showProposalChangeSuccess: false));
   }
 
+  @visibleForTesting
+  void setPhaseForTest(VoiceLogState phase) => _setState(phase);
+
   @override
   void dispose() {
     _audioRecorderService.dispose();

@@ -428,6 +428,13 @@ export class InMemoryRepository implements AppRepository {
       updatedAt: now,
     };
     this.foods.set(food.id, food);
+    // Seed initial preference score so the usual food gets an immediate ranking edge
+    void this.recordFoodFeedback({
+      userId,
+      foodItemId: food.id,
+      query: input.name,
+      action: "selected",
+    });
     return foodRecordToUsualFood(food);
   }
 

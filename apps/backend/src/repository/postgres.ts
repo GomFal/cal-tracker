@@ -352,11 +352,11 @@ export class PostgresRepository implements AppRepository {
       for (const row of rows) {
         candidateRows.set(row.id as string, { row, lexicalScore: clampScore(Number(row.search_score ?? 0)) });
       }
-      if (candidateRows.size === 0) {
-        this.setCachedFoodSearch(cacheKey, []);
-        return [];
+      if (candidateRows.size > 0) {
+        return this.rankFoodSearchRows(userId, input, normalized, limit, candidateRows, cacheKey, true);
       }
-      return this.rankFoodSearchRows(userId, input, normalized, limit, candidateRows, cacheKey, true);
+      // Fall through to legacy search path when normalized search finds nothing
+      // This ensures user-custom foods (usual foods) in food_search_documents are found
     }
 
     const includeBranded = !input.excludeBranded;
@@ -1246,6 +1246,15 @@ export class PostgresRepository implements AppRepository {
     `);
     this.foodSearchCache.clear();
     await this.upsertFoodSearchDocument(mapFood(row));
+    // Seed initial preference score so the usual food gets an immediate ranking edge
+    await this.recordFoodFeedback({
+      userId,
+      foodItemId: row.id as string,
+      query: input.name,
+      action: "selected",
+    }).catch(() => {
+      // Non-critical; preference seeding should not block usual food creation
+    });
     return foodRecordToUsualFood(mapFood(row));
   }
 

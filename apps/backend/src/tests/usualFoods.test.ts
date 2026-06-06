@@ -197,6 +197,155 @@ describe("usual foods", () => {
     );
   });
 
+  it("finds usual food by partial match on food name", async () => {
+    const { request } = buildTestApp();
+    const user = await registerAndAuth(request);
+
+    await request("http://localhost/v1/usual-foods", {
+      method: "POST",
+      headers: user.authHeader,
+      body: JSON.stringify({
+        name: "Papa cruda",
+        canonicalName: "papa cruda",
+        servingGrams: 100,
+        nutrition: { calories: 77, proteinGrams: 2, carbsGrams: 17, fatGrams: 0.1 },
+      }),
+    });
+
+    const searchResponse = await request("http://localhost/v1/foods/search", {
+      method: "POST",
+      headers: { ...user.authHeader, "accept-language": "en-US" },
+      body: JSON.stringify({ query: "cruda", limit: 5 }),
+    });
+    const search = (await searchResponse.json()) as {
+      items: Array<{ name: string; source: string }>;
+    };
+    expect(search.items.map((item) => item.name)).toContain("Papa cruda");
+    const papaItem = search.items.find((item) => item.name === "Papa cruda");
+    expect(papaItem?.source).toBe("user_custom");
+  });
+
+  it("finds usual food with Spanish locale", async () => {
+    const { request } = buildTestApp();
+    const user = await registerAndAuth(request);
+
+    await request("http://localhost/v1/usual-foods", {
+      method: "POST",
+      headers: user.authHeader,
+      body: JSON.stringify({
+        name: "Papa cruda",
+        canonicalName: "papa cruda",
+        servingGrams: 100,
+        nutrition: { calories: 77, proteinGrams: 2, carbsGrams: 17, fatGrams: 0.1 },
+      }),
+    });
+
+    const searchResponse = await request("http://localhost/v1/foods/search", {
+      method: "POST",
+      headers: { ...user.authHeader, "accept-language": "es-ES" },
+      body: JSON.stringify({ query: "papa", limit: 5 }),
+    });
+    const search = (await searchResponse.json()) as {
+      items: Array<{ name: string; source: string }>;
+    };
+    expect(search.items.map((item) => item.name)).toContain("Papa cruda");
+  });
+
+  it("finds usual food by fuzzy match", async () => {
+    const { request } = buildTestApp();
+    const user = await registerAndAuth(request);
+
+    await request("http://localhost/v1/usual-foods", {
+      method: "POST",
+      headers: user.authHeader,
+      body: JSON.stringify({
+        name: "Pollo asado",
+        canonicalName: "pollo asado",
+        servingGrams: 100,
+        nutrition: { calories: 165, proteinGrams: 25, carbsGrams: 0, fatGrams: 7 },
+      }),
+    });
+
+    const searchResponse = await request("http://localhost/v1/foods/search", {
+      method: "POST",
+      headers: { ...user.authHeader, "accept-language": "en-US" },
+      body: JSON.stringify({ query: "pollo asda", limit: 5 }),
+    });
+    const search = (await searchResponse.json()) as {
+      items: Array<{ name: string }>;
+    };
+    expect(search.items.map((item) => item.name)).toContain("Pollo asado");
+  });
+
+  it("ranks usual food above non-user food when searching", async () => {
+    const { request } = buildTestApp();
+    const user = await registerAndAuth(request);
+
+    await request("http://localhost/v1/usual-foods", {
+      method: "POST",
+      headers: user.authHeader,
+      body: JSON.stringify({
+        name: "White rice",
+        canonicalName: "rice",
+        servingGrams: 100,
+        nutrition: { calories: 130, proteinGrams: 2.7, carbsGrams: 28, fatGrams: 0.3 },
+      }),
+    });
+
+    const searchResponse = await request("http://localhost/v1/foods/search", {
+      method: "POST",
+      headers: { ...user.authHeader, "accept-language": "en-US" },
+      body: JSON.stringify({ query: "rice", limit: 5 }),
+    });
+    const search = (await searchResponse.json()) as {
+      items: Array<{ name: string; source?: string }>;
+    };
+    const usualIndex = search.items.findIndex((item) => item.name === "White rice");
+    const fixtureIndex = search.items.findIndex((item) => item.name === "Cooked rice");
+    expect(usualIndex).toBeGreaterThanOrEqual(0);
+    expect(fixtureIndex).toBeGreaterThanOrEqual(0);
+    expect(usualIndex).toBeLessThan(fixtureIndex);
+  });
+
+  it("does not find usual food after name update with old search term", async () => {
+    const { request } = buildTestApp();
+    const user = await registerAndAuth(request);
+
+    const createdResponse = await request("http://localhost/v1/usual-foods", {
+      method: "POST",
+      headers: user.authHeader,
+      body: JSON.stringify({
+        name: "Oatmeal",
+        canonicalName: "oatmeal",
+        servingGrams: 100,
+        nutrition: { calories: 389, proteinGrams: 16.9, carbsGrams: 66.3, fatGrams: 6.9 },
+      }),
+    });
+    const created = (await createdResponse.json()) as {
+      output: { usualFood: { id: string } };
+    };
+
+    await request(`http://localhost/v1/usual-foods/${created.output.usualFood.id}`, {
+      method: "PUT",
+      headers: user.authHeader,
+      body: JSON.stringify({
+        name: "Steel-cut oats",
+        canonicalName: null,
+      }),
+    });
+
+    const searchResponse = await request("http://localhost/v1/foods/search", {
+      method: "POST",
+      headers: { ...user.authHeader, "accept-language": "en-US" },
+      body: JSON.stringify({ query: "oatmeal", limit: 5 }),
+    });
+    const search = (await searchResponse.json()) as {
+      items: Array<{ name: string }>;
+    };
+    expect(search.items.map((item) => item.name)).not.toContain("Steel-cut oats");
+    // The fixture 'Oats' may still be found since it matches via normalizedName
+  });
+
   it("uses usual food provenance when resolving meal proposal items", async () => {
     const { request } = buildTestApp();
     const user = await registerAndAuth(request);

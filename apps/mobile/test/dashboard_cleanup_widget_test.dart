@@ -184,6 +184,128 @@ void main() {
   });
 
   testWidgets(
+    'dashboard empty meals card uses dark-mode shadows in dark theme',
+    (tester) async {
+      final nutritionRepository = _FakeNutritionRepository(
+        dailySummary: _summaryWithNoMeals,
+      );
+      final authViewModel = AuthViewModel(authRepository: _FakeAuthRepository())
+        ..setUser(_testUser);
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<AuthViewModel>.value(value: authViewModel),
+            ChangeNotifierProvider(
+              create: (_) => ThemeModeViewModel(
+                preferencesRepository: _FakePreferencesRepository(),
+              ),
+            ),
+            ChangeNotifierProvider(
+              create: (_) =>
+                  DashboardViewModel(nutritionRepository: nutritionRepository),
+            ),
+          ],
+          child: _testApp(
+            const DashboardScreen(),
+            themeMode: ThemeMode.dark,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('dashboard_empty_meals_card')),
+        findsOneWidget,
+      );
+
+      final host = find.byKey(const ValueKey('dashboard_empty_meals_card'));
+      final decorated = tester.widget<DecoratedBox>(
+        find.descendant(
+          of: host,
+          matching: find.byWidgetPredicate(
+            (w) =>
+                w is DecoratedBox &&
+                w.decoration is BoxDecoration &&
+                (w.decoration as BoxDecoration).boxShadow != null,
+          ),
+        ),
+      );
+      final decoration = decorated.decoration as BoxDecoration;
+      final shadows = decoration.boxShadow!;
+
+      expect(
+        shadows.any((shadow) =>
+            _channel(shadow.color.r) > 220 &&
+            _channel(shadow.color.g) > 220 &&
+            _channel(shadow.color.b) > 220),
+        isFalse,
+      );
+    },
+  );
+
+  testWidgets(
+    'dashboard calorie setup card uses dark-mode shadows in dark theme',
+    (tester) async {
+      final nutritionRepository = _FakeNutritionRepository(
+        dailySummary: _summaryWithoutConfiguredCalories,
+      );
+      final authViewModel = AuthViewModel(authRepository: _FakeAuthRepository())
+        ..setUser(_testUser);
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<AuthViewModel>.value(value: authViewModel),
+            ChangeNotifierProvider(
+              create: (_) => ThemeModeViewModel(
+                preferencesRepository: _FakePreferencesRepository(),
+              ),
+            ),
+            ChangeNotifierProvider(
+              create: (_) =>
+                  DashboardViewModel(nutritionRepository: nutritionRepository),
+            ),
+          ],
+          child: _testApp(
+            const DashboardScreen(),
+            themeMode: ThemeMode.dark,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey('dashboard_progress_card')),
+        findsOneWidget,
+      );
+
+      final host = find.byKey(const ValueKey('dashboard_progress_card'));
+      final decorated = tester.widget<DecoratedBox>(
+        find.descendant(
+          of: host,
+          matching: find.byWidgetPredicate(
+            (w) =>
+                w is DecoratedBox &&
+                w.decoration is BoxDecoration &&
+                (w.decoration as BoxDecoration).boxShadow != null,
+          ),
+        ),
+      );
+      final decoration = decorated.decoration as BoxDecoration;
+      final shadows = decoration.boxShadow!;
+
+      expect(
+        shadows.any((shadow) =>
+            _channel(shadow.color.r) > 220 &&
+            _channel(shadow.color.g) > 220 &&
+            _channel(shadow.color.b) > 220),
+        isFalse,
+      );
+    },
+  );
+
+  testWidgets(
     'dashboard water widget updates optimistically without page refresh',
     (tester) async {
       final firstSave = Completer<DailySummary>();

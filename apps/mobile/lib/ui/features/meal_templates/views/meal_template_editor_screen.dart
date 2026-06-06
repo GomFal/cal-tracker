@@ -182,6 +182,7 @@ class _MealTemplateEditorScreenState extends State<MealTemplateEditorScreen> {
                             }
                           });
                         },
+                        onItemChanged: () => setState(() {}),
                       ),
                       const SizedBox(height: FreshSpacing.lg),
                       _SaveBar(
@@ -786,12 +787,14 @@ class _TemplateItemsSection extends StatefulWidget {
     required this.onAddBlank,
     required this.onAddFood,
     required this.onDelete,
+    this.onItemChanged,
   });
 
   final List<_TemplateMealItemController> items;
   final VoidCallback onAddBlank;
   final ValueChanged<MealItem> onAddFood;
   final ValueChanged<int> onDelete;
+  final VoidCallback? onItemChanged;
 
   @override
   State<_TemplateItemsSection> createState() => _TemplateItemsSectionState();
@@ -841,6 +844,7 @@ class _TemplateItemsSectionState extends State<_TemplateItemsSection> {
             item: widget.items[index],
             index: index,
             onDelete: () => widget.onDelete(index),
+            onItemChanged: widget.onItemChanged,
           ),
           const SizedBox(height: FreshSpacing.md),
         ],
@@ -861,11 +865,13 @@ class _TemplateItemCard extends StatefulWidget {
     required this.item,
     required this.index,
     required this.onDelete,
+    this.onItemChanged,
   });
 
   final _TemplateMealItemController item;
   final int index;
   final VoidCallback onDelete;
+  final VoidCallback? onItemChanged;
 
   @override
   State<_TemplateItemCard> createState() => _TemplateItemCardState();
@@ -904,7 +910,10 @@ class _TemplateItemCardState extends State<_TemplateItemCard> {
             key: ValueKey('meal_template_item_name_${widget.index}'),
             controller: widget.item.nameController,
             decoration: InputDecoration(labelText: l10n.foodSearchName),
-            onChanged: (_) => setState(() {}),
+            onChanged: (_) {
+              setState(() {});
+              widget.onItemChanged?.call();
+            },
           ),
           const SizedBox(height: FreshSpacing.sm),
           Row(
@@ -917,7 +926,10 @@ class _TemplateItemCardState extends State<_TemplateItemCard> {
                     decimal: true,
                   ),
                   decoration: InputDecoration(labelText: l10n.commonAmount),
-                  onChanged: (_) => setState(() {}),
+                  onChanged: (_) {
+                    setState(() {});
+                    widget.onItemChanged?.call();
+                  },
                 ),
               ),
               const SizedBox(width: FreshSpacing.sm),
@@ -927,7 +939,10 @@ class _TemplateItemCardState extends State<_TemplateItemCard> {
                   key: ValueKey('meal_template_item_unit_${widget.index}'),
                   controller: widget.item.unitController,
                   decoration: InputDecoration(labelText: l10n.commonUnit),
-                  onChanged: (_) => setState(() {}),
+                  onChanged: (_) {
+                    setState(() {});
+                    widget.onItemChanged?.call();
+                  },
                 ),
               ),
             ],
@@ -938,7 +953,10 @@ class _TemplateItemCardState extends State<_TemplateItemCard> {
             controller: widget.item.caloriesController,
             keyboardType: TextInputType.number,
             decoration: InputDecoration(labelText: l10n.commonCalories),
-            onChanged: (_) => setState(() {}),
+            onChanged: (_) {
+              setState(() {});
+              widget.onItemChanged?.call();
+            },
           ),
           const SizedBox(height: FreshSpacing.sm),
           Row(
@@ -997,7 +1015,10 @@ class _TemplateItemCardState extends State<_TemplateItemCard> {
       controller: controller,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       decoration: InputDecoration(labelText: label),
-      onChanged: (_) => setState(() {}),
+      onChanged: (_) {
+        setState(() {});
+        widget.onItemChanged?.call();
+      },
     );
   }
 }

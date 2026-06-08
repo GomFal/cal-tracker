@@ -17,12 +17,17 @@ class FakeUsualFoodScanViewModel extends UsualFoodScanViewModel {
     this.overridePhase = UsualFoodScanPhase.idle,
     this.overrideErrorCode = UsualFoodScanError.none,
     this.overrideIsBusy = false,
+    this.overrideIsPreviewing = false,
+    this.overrideCapturedFilePath,
     this.overrideDraft,
   }) : super(
           nutritionRepository: _dummyRepository,
           initializeCamera: () async {},
           takePicture: () async => '',
+          pausePreview: () async {},
+          resumePreview: () async {},
           recognizeText: (_) async => '',
+          deleteCapturedFile: (_) async {},
         );
 
   static final _dummyRepository = _NutritionRepositoryStub();
@@ -30,10 +35,15 @@ class FakeUsualFoodScanViewModel extends UsualFoodScanViewModel {
   UsualFoodScanPhase overridePhase;
   UsualFoodScanError overrideErrorCode;
   bool overrideIsBusy;
+  bool overrideIsPreviewing;
+  String? overrideCapturedFilePath;
   UsualFoodDraft? overrideDraft;
 
-  int captureAndProcessCallCount = 0;
+  int captureCallCount = 0;
+  int confirmCallCount = 0;
+  int retakeCallCount = 0;
   int retryCallCount = 0;
+  int cancelCallCount = 0;
 
   @override
   UsualFoodScanPhase get phase => overridePhase;
@@ -45,25 +55,37 @@ class FakeUsualFoodScanViewModel extends UsualFoodScanViewModel {
   bool get isBusy => overrideIsBusy;
 
   @override
+  bool get isPreviewing => overrideIsPreviewing;
+
+  @override
+  String? get capturedFilePath => overrideCapturedFilePath;
+
+  @override
   UsualFoodDraft? get draft => overrideDraft;
 
   @override
-  Future<void> captureAndProcess() async {
-    captureAndProcessCallCount++;
-    // Simulate a successful scan: set phase to drafted and set a default
-    // draft so the screen's listener can pop on phase change.
-    if (overridePhase == UsualFoodScanPhase.ready) {
-      overridePhase = UsualFoodScanPhase.drafted;
-      overrideDraft ??= const UsualFoodDraft(name: 'Scanned Food');
-      notifyListeners();
-    }
+  Future<void> capture() async {
+    captureCallCount++;
   }
 
   @override
-  void retry() {
+  Future<void> confirmCapture() async {
+    confirmCallCount++;
+  }
+
+  @override
+  Future<void> retakeCapture() async {
+    retakeCallCount++;
+  }
+
+  @override
+  Future<void> retry() async {
     retryCallCount++;
-    overridePhase = UsualFoodScanPhase.ready;
-    notifyListeners();
+  }
+
+  @override
+  Future<void> cancel() async {
+    cancelCallCount++;
   }
 }
 
@@ -99,7 +121,7 @@ Widget buildAppWithVm(FakeUsualFoodScanViewModel vm) {
 
 void main() {
   group('UsualFoodScanScreen', () {
-    testWidgets('shows close button, capture button and hint on ready',
+    testWidgets('ready: shows close, capture button and viewfinder hint',
         (tester) async {
       final vm = FakeUsualFoodScanViewModel(
         overridePhase: UsualFoodScanPhase.ready,
@@ -115,12 +137,16 @@ void main() {
         findsOneWidget,
       );
       expect(
+        find.byKey(const ValueKey('usual_food_scan_confirm_button')),
+        findsNothing,
+      );
+      expect(
         find.byKey(const ValueKey('usual_food_scan_error_card')),
         findsNothing,
       );
     });
 
-    testWidgets('capture button triggers captureAndProcess', (tester) async {
+    testWidgets('capture button triggers capture()', (tester) async {
       final vm = FakeUsualFoodScanViewModel(
         overridePhase: UsualFoodScanPhase.ready,
       );
@@ -129,10 +155,86 @@ void main() {
       await tester.tap(
         find.byKey(const ValueKey('usual_food_scan_capture_button')),
       );
-      expect(vm.captureAndProcessCallCount, 1);
+      expect(vm.captureCallCount, 1);
     });
 
-    testWidgets('error phase shows card, retry and cancel buttons',
+    testWidgets(
+        'previewing: shows confirm + retake buttons, hides capture button',
+        (tester) async {
+      final vm = FakeUsualFoodScanViewModel(
+        overridePhase: UsualFoodScanPhase.previewing,
+        overrideIsPreviewing: true,
+        overrideCapturedFilePath: '/tmp/some_capture.jpg',
+      );
+      await tester.pumpWidget(buildAppWithVm(vm));
+
+      expect(
+        find.byKey(const ValueKey('usual_food_scan_confirm_button')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('usual_food_scan_retake_button')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('usual_food_scan_capture_button')),
+        findsNothing,
+      );
+      // Hint card visible
+      expect(
+        find.byKey(const ValueKey('usual_food_scan_preview_hint_card')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('previewing: confirm button triggers confirmCapture()',
+        (tester) async {
+      final vm = FakeUsualFoodScanViewModel(
+        overridePhase: UsualFoodScanPhase.previewing,
+        overrideIsPreviewing: true,
+        overrideCapturedFilePath: '/tmp/some_capture.jpg',
+      );
+      await tester.pumpWidget(buildAppWithVm(vm));
+
+      await tester.tap(
+        find.byKey(const ValueKey('usual_food_scan_confirm_button')),
+      );
+      expect(vm.confirmCallCount, 1);
+    });
+
+    testWidgets('previewing: retake button triggers retakeCapture()',
+        (tester) async {
+      final vm = FakeUsualFoodScanViewModel(
+        overridePhase: UsualFoodScanPhase.previewing,
+        overrideIsPreviewing: true,
+        overrideCapturedFilePath: '/tmp/some_capture.jpg',
+      );
+      await tester.pumpWidget(buildAppWithVm(vm));
+
+      await tester.tap(
+        find.byKey(const ValueKey('usual_food_scan_retake_button')),
+      );
+      expect(vm.retakeCallCount, 1);
+    });
+
+    testWidgets(
+        'previewing: shows still image via Image.file when capturedFilePath set',
+        (tester) async {
+      // The screen uses Image.file with that key when there's a still image.
+      final vm = FakeUsualFoodScanViewModel(
+        overridePhase: UsualFoodScanPhase.previewing,
+        overrideIsPreviewing: true,
+        overrideCapturedFilePath: '/tmp/some_capture.jpg',
+      );
+      await tester.pumpWidget(buildAppWithVm(vm));
+
+      expect(
+        find.byKey(const ValueKey('usual_food_scan_still_preview')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('error: shows card, retry and cancel buttons',
         (tester) async {
       final vm = FakeUsualFoodScanViewModel(
         overridePhase: UsualFoodScanPhase.error,
@@ -152,14 +254,13 @@ void main() {
         find.byKey(const ValueKey('usual_food_scan_cancel_error_button')),
         findsOneWidget,
       );
-      // Capture button hidden
       expect(
         find.byKey(const ValueKey('usual_food_scan_capture_button')),
         findsNothing,
       );
     });
 
-    testWidgets('retry transitions back to ready and shows capture',
+    testWidgets('error → retry triggers retry() and shows capture button',
         (tester) async {
       final vm = FakeUsualFoodScanViewModel(
         overridePhase: UsualFoodScanPhase.error,
@@ -167,23 +268,18 @@ void main() {
       );
       await tester.pumpWidget(buildAppWithVm(vm));
 
-      // Tap retry
       await tester.ensureVisible(
         find.byKey(const ValueKey('usual_food_scan_retry_button')),
       );
       await tester.tap(
         find.byKey(const ValueKey('usual_food_scan_retry_button')),
       );
-      await tester.pump(); // process VM notification
+      await tester.pump();
 
       expect(vm.retryCallCount, 1);
-      expect(
-        find.byKey(const ValueKey('usual_food_scan_capture_button')),
-        findsOneWidget,
-      );
     });
 
-    testWidgets('shows spinner and label during OCR processing',
+    testWidgets('ocrProcessing: shows spinner with Reading text label',
         (tester) async {
       final vm = FakeUsualFoodScanViewModel(
         overridePhase: UsualFoodScanPhase.ocrProcessing,
@@ -192,7 +288,6 @@ void main() {
       await tester.pumpWidget(buildAppWithVm(vm));
 
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
-      // The ARB en key contains "Reading text…" — the screen reads via l10n
       expect(find.text('Reading text…'), findsOneWidget);
       expect(
         find.byKey(const ValueKey('usual_food_scan_capture_button')),
@@ -200,7 +295,8 @@ void main() {
       );
     });
 
-    testWidgets('shows spinner and label during drafting', (tester) async {
+    testWidgets('drafting: shows spinner with Filling fields label',
+        (tester) async {
       final vm = FakeUsualFoodScanViewModel(
         overridePhase: UsualFoodScanPhase.drafting,
         overrideIsBusy: true,
@@ -211,7 +307,7 @@ void main() {
       expect(find.text('Filling fields…'), findsOneWidget);
     });
 
-    testWidgets('drafted phase hides controls', (tester) async {
+    testWidgets('drafted: hides all action controls', (tester) async {
       final vm = FakeUsualFoodScanViewModel(
         overridePhase: UsualFoodScanPhase.drafted,
       );
@@ -219,6 +315,10 @@ void main() {
 
       expect(
         find.byKey(const ValueKey('usual_food_scan_capture_button')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('usual_food_scan_confirm_button')),
         findsNothing,
       );
       expect(

@@ -2054,6 +2054,12 @@ abstract class AppLocalizations {
   /// **'Scan nutrition label'**
   String get usualFoodsScanFromPhotoTooltip;
 
+  /// No description provided for @usualFoodsScanFromPhotoButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan nutrition label'**
+  String get usualFoodsScanFromPhotoButton;
+
   /// No description provided for @usualFoodsScanTitle.
   ///
   /// In en, this message translates to:
@@ -2083,6 +2089,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Retake'**
   String get usualFoodsScanRetake;
+
+  /// No description provided for @usualFoodsScanConfirmCapture.
+  ///
+  /// In en, this message translates to:
+  /// **'Use this photo'**
+  String get usualFoodsScanConfirmCapture;
+
+  /// No description provided for @usualFoodsScanPreviewHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Is the nutrition table clearly framed?'**
+  String get usualFoodsScanPreviewHint;
 
   /// No description provided for @usualFoodsScanCloseTooltip.
   ///

@@ -1122,6 +1122,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get usualFoodsScanFromPhotoTooltip => 'Escanear etiqueta';
 
   @override
+  String get usualFoodsScanFromPhotoButton => 'Escanear etiqueta';
+
+  @override
   String get usualFoodsScanTitle => 'Escanear etiqueta nutricional';
 
   @override
@@ -1136,6 +1139,13 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get usualFoodsScanRetake => 'Reintentar';
+
+  @override
+  String get usualFoodsScanConfirmCapture => 'Usar esta foto';
+
+  @override
+  String get usualFoodsScanPreviewHint =>
+      '¿Está bien encuadrada la tabla nutricional?';
 
   @override
   String get usualFoodsScanCloseTooltip => 'Cerrar';

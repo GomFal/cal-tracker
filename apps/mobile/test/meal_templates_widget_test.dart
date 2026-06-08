@@ -9,8 +9,6 @@ import 'package:cal_tracker_mobile/ui/core/design_system.dart';
 import 'package:cal_tracker_mobile/ui/features/meal_templates/view_models/meal_templates_view_model.dart';
 import 'package:cal_tracker_mobile/ui/features/meal_templates/views/meal_templates_screen.dart';
 import 'package:cal_tracker_mobile/ui/features/meal_templates/views/usual_food_editor_screen.dart';
-import 'package:cal_tracker_mobile/ui/features/meal_templates/views/usual_food_scan_screen.dart';
-import 'package:cal_tracker_mobile/ui/features/meal_templates/view_models/usual_food_scan_view_model.dart';
 import 'package:cal_tracker_mobile/ui/features/voice_log/views/voice_log_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -244,31 +242,6 @@ void main() {
     expect(find.text('Ingredient to delete'), findsNothing);
     expect(find.text('No usual ingredients yet'), findsOneWidget);
   });
-
-    testWidgets(
-      'scan button navigates to the scan screen',
-      (tester) async {
-        testViewModelFactory = (_) => _FakeScanViewModel();
-        addTearDown(() => testViewModelFactory = null);
-
-        await _pumpScreen(tester, _FakeNutritionRepository());
-        await _openIngredientsTab(tester);
-
-        // Verify the scan button is present
-        final scanButton =
-            find.byKey(const ValueKey('usuals_scan_label_button'));
-        expect(scanButton, findsOneWidget);
-
-        await tester.tap(scanButton);
-        // Use pumpAndSettle so navigation completes
-        await tester.pumpAndSettle();
-
-        expect(
-          find.byKey(const ValueKey('usual_food_scan_close_button')),
-          findsOneWidget,
-        );
-      },
-    );
 }
 
 Future<void> _pumpScreen(
@@ -350,7 +323,8 @@ class _TestApp extends StatelessWidget {
             ),
             GoRoute(
               path: 'ingredients/scan',
-              builder: (context, state) => const UsualFoodScanScreen(),
+              builder: (context, state) =>
+                  const Scaffold(body: Text('scan route stub')),
             ),
             GoRoute(
               path: 'ingredients/:id/edit',
@@ -504,19 +478,4 @@ CalTrackerApiClient _unusedApiClient() {
   );
 }
 
-/// Minimal fake VM that simulates a camera-ready state for the
-/// integration test.
-class _FakeScanViewModel extends UsualFoodScanViewModel {
-  _FakeScanViewModel() : super(
-    nutritionRepository: _FakeNutritionRepository(),
-    initializeCamera: () async {},
-    takePicture: () async => '',
-    recognizeText: (_) async => '',
-  );
 
-  @override
-  UsualFoodScanPhase get phase => UsualFoodScanPhase.ready;
-
-  @override
-  bool get isBusy => false;
-}

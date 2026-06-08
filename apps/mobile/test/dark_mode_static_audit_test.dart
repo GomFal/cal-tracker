@@ -9,6 +9,12 @@ void main() {
     for (final entity in root.listSync(recursive: true)) {
       if (entity is! File || !entity.path.endsWith('.dart')) continue;
       if (entity.path.endsWith('core/design_system.dart')) continue;
+      // Camera overlay screens use absolute white/black for contrast over
+      // the live camera preview (not theme-controlled).
+      if (entity.path.endsWith('usual_food_scan_screen.dart') ||
+          entity.path.endsWith('scan_viewfinder_overlay.dart')) {
+        continue;
+      }
       final source = entity.readAsStringSync();
       final hasFreshColors = source.contains('FreshColors.');
       final hasHardWhiteOrBlack =

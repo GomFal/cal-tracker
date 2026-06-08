@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
@@ -6,6 +8,7 @@ import 'package:provider/provider.dart';
 
 import '../../../../data/repositories/nutrition_repository.dart';
 import '../../../../l10n/app_localizations_context.dart';
+import '../../../../l10n/generated/app_localizations.dart';
 import '../view_models/usual_food_scan_view_model.dart';
 import '../widgets/scan_viewfinder_overlay.dart';
 
@@ -29,6 +32,7 @@ class _UsualFoodScanScreenState extends State<UsualFoodScanScreen>
   CameraController? _cameraController;
   TextRecognizer? _textRecognizer;
   late UsualFoodScanViewModel _viewModel;
+  String? _capturedFilePath;
 
   @override
   void initState() {
@@ -78,9 +82,6 @@ class _UsualFoodScanScreenState extends State<UsualFoodScanScreen>
         final status = await Permission.camera.request();
         return status.isGranted;
       },
-      onDrafted: (draft) {
-        if (mounted) Navigator.of(context).pop(draft);
-      },
     );
   }
 
@@ -117,6 +118,7 @@ class _UsualFoodScanScreenState extends State<UsualFoodScanScreen>
       throw Exception('Camera not ready.');
     }
     final xfile = await controller.takePicture();
+    _capturedFilePath = xfile.path;
     return xfile.path;
   }
 
@@ -132,7 +134,28 @@ class _UsualFoodScanScreenState extends State<UsualFoodScanScreen>
 
   void _onViewModelChanged() {
     if (!mounted) return;
+    if (_viewModel.phase == UsualFoodScanPhase.error) {
+      _cleanupCapturedFile();
+    }
+    if (_viewModel.phase == UsualFoodScanPhase.drafted &&
+        _viewModel.draft != null) {
+      _cleanupCapturedFile();
+      Navigator.of(context).pop(_viewModel.draft);
+      return;
+    }
     setState(() {});
+  }
+
+  Future<void> _cleanupCapturedFile() async {
+    final path = _capturedFilePath;
+    if (path == null) return;
+    _capturedFilePath = null;
+    try {
+      final file = File(path);
+      if (await file.exists()) await file.delete();
+    } catch (_) {
+      // best-effort
+    }
   }
 
   @override
@@ -177,7 +200,7 @@ class _UsualFoodScanScreenState extends State<UsualFoodScanScreen>
     final l10n = context.l10n;
     final phase = _viewModel.phase;
     final isBusy = _viewModel.isBusy;
-    final error = _viewModel.errorMessage;
+    final errorCode = _viewModel.errorCode;
 
     return Positioned(
       left: 0,
@@ -190,7 +213,7 @@ class _UsualFoodScanScreenState extends State<UsualFoodScanScreen>
           _StateCard(
             phase: phase,
             isBusy: isBusy,
-            errorMessage: error,
+            errorCode: errorCode,
             onRetry: () => _viewModel.retry(),
             onCancel: () => Navigator.of(context).pop(),
           ),
@@ -245,16 +268,33 @@ class _StateCard extends StatelessWidget {
   const _StateCard({
     required this.phase,
     required this.isBusy,
-    this.errorMessage,
+    this.errorCode = UsualFoodScanError.none,
     this.onRetry,
     this.onCancel,
   });
 
   final UsualFoodScanPhase phase;
   final bool isBusy;
-  final String? errorMessage;
+  final UsualFoodScanError errorCode;
   final VoidCallback? onRetry;
   final VoidCallback? onCancel;
+
+  String? _localizedErrorText(AppLocalizations l10n) {
+    return switch (errorCode) {
+      UsualFoodScanError.cameraDenied => l10n.usualFoodsScanCameraDenied,
+      UsualFoodScanError.cameraUnavailable =>
+        l10n.usualFoodsScanCameraUnavailable,
+      UsualFoodScanError.cameraInitFailed =>
+        l10n.usualFoodsScanCameraUnavailable,
+      UsualFoodScanError.ocrEmpty => l10n.usualFoodsScanOcrEmpty,
+      UsualFoodScanError.ocrTooShort => l10n.usualFoodsScanOcrTooShort,
+      UsualFoodScanError.ocrFailed => l10n.usualFoodsScanFailedMessage,
+      UsualFoodScanError.captureFailed => l10n.usualFoodsScanFailedMessage,
+      UsualFoodScanError.draftFailed => l10n.usualFoodsScanFailedMessage,
+      UsualFoodScanError.unknown => l10n.usualFoodsScanFailedMessage,
+      UsualFoodScanError.none => null,
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -279,10 +319,10 @@ class _StateCard extends StatelessWidget {
                     fontSize: 15,
                   ),
                 ),
-                if (errorMessage != null && errorMessage!.isNotEmpty) ...[
+                if (errorCode != UsualFoodScanError.none) ...[
                   const SizedBox(height: 6),
                   Text(
-                    errorMessage!,
+                    _localizedErrorText(l10n) ?? '',
                     style: const TextStyle(color: Colors.white70, fontSize: 13),
                     textAlign: TextAlign.center,
                   ),
@@ -297,9 +337,9 @@ class _StateCard extends StatelessWidget {
                           'usual_food_scan_cancel_error_button',
                         ),
                         onPressed: onCancel,
-                        child: const Text(
-                          'Cancelar',
-                          style: TextStyle(color: Colors.white),
+                        child: Text(
+                          l10n.commonCancel,
+                          style: const TextStyle(color: Colors.white),
                         ),
                       ),
                     const SizedBox(width: 12),

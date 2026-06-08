@@ -15,7 +15,7 @@ import 'package:provider/provider.dart';
 class FakeUsualFoodScanViewModel extends UsualFoodScanViewModel {
   FakeUsualFoodScanViewModel({
     this.overridePhase = UsualFoodScanPhase.idle,
-    this.overrideErrorMessage,
+    this.overrideErrorCode = UsualFoodScanError.none,
     this.overrideIsBusy = false,
     this.overrideDraft,
   }) : super(
@@ -28,7 +28,7 @@ class FakeUsualFoodScanViewModel extends UsualFoodScanViewModel {
   static final _dummyRepository = _NutritionRepositoryStub();
 
   UsualFoodScanPhase overridePhase;
-  String? overrideErrorMessage;
+  UsualFoodScanError overrideErrorCode;
   bool overrideIsBusy;
   UsualFoodDraft? overrideDraft;
 
@@ -39,7 +39,7 @@ class FakeUsualFoodScanViewModel extends UsualFoodScanViewModel {
   UsualFoodScanPhase get phase => overridePhase;
 
   @override
-  String? get errorMessage => overrideErrorMessage;
+  UsualFoodScanError get errorCode => overrideErrorCode;
 
   @override
   bool get isBusy => overrideIsBusy;
@@ -50,6 +50,13 @@ class FakeUsualFoodScanViewModel extends UsualFoodScanViewModel {
   @override
   Future<void> captureAndProcess() async {
     captureAndProcessCallCount++;
+    // Simulate a successful scan: set phase to drafted and set a default
+    // draft so the screen's listener can pop on phase change.
+    if (overridePhase == UsualFoodScanPhase.ready) {
+      overridePhase = UsualFoodScanPhase.drafted;
+      overrideDraft ??= const UsualFoodDraft(name: 'Scanned Food');
+      notifyListeners();
+    }
   }
 
   @override
@@ -129,7 +136,7 @@ void main() {
         (tester) async {
       final vm = FakeUsualFoodScanViewModel(
         overridePhase: UsualFoodScanPhase.error,
-        overrideErrorMessage: 'Test camera error',
+        overrideErrorCode: UsualFoodScanError.cameraDenied,
       );
       await tester.pumpWidget(buildAppWithVm(vm));
 
@@ -156,7 +163,7 @@ void main() {
         (tester) async {
       final vm = FakeUsualFoodScanViewModel(
         overridePhase: UsualFoodScanPhase.error,
-        overrideErrorMessage: 'Something went wrong',
+        overrideErrorCode: UsualFoodScanError.cameraDenied,
       );
       await tester.pumpWidget(buildAppWithVm(vm));
 

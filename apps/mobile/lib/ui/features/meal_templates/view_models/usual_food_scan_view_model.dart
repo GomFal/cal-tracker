@@ -1,8 +1,8 @@
+import 'package:camera/camera.dart' show CameraException;
 import 'package:flutter/foundation.dart';
 
 import '../../../../data/repositories/nutrition_repository.dart';
 import '../../../../domain/models/nutrition_models.dart';
-import '../../../core/user_visible_error.dart';
 
 /// Phases of the nutrition label scan flow.
 enum UsualFoodScanPhase {
@@ -27,32 +27,43 @@ enum UsualFoodScanPhase {
   /// A UsualFoodDraft was successfully produced.
   drafted,
 
-  /// An error occurred; check [errorMessage].
+  /// An error occurred; check [errorCode].
   error,
+}
+
+/// Typed error codes emitted by [UsualFoodScanViewModel] instead of raw strings.
+///
+/// The screen maps each value to a localized user-visible message via
+/// [AppLocalizations] so the VM remains context-free.
+enum UsualFoodScanError {
+  none,
+  cameraDenied,
+  cameraUnavailable,
+  cameraInitFailed,
+  captureFailed,
+  ocrFailed,
+  ocrEmpty,
+  ocrTooShort,
+  draftFailed,
+  unknown,
 }
 
 /// Immutable UI state snapshot for [UsualFoodScanViewModel].
 class UsualFoodScanUiState {
   const UsualFoodScanUiState({
     this.phase = UsualFoodScanPhase.idle,
-    this.errorMessage,
     this.ocrText,
   });
 
   final UsualFoodScanPhase phase;
-  final String? errorMessage;
   final String? ocrText;
 
   UsualFoodScanUiState copyWith({
     UsualFoodScanPhase? phase,
-    Object? errorMessage = _unchanged,
     Object? ocrText = _unchanged,
   }) {
     return UsualFoodScanUiState(
       phase: phase ?? this.phase,
-      errorMessage: identical(errorMessage, _unchanged)
-          ? this.errorMessage
-          : errorMessage as String?,
       ocrText: identical(ocrText, _unchanged)
           ? this.ocrText
           : ocrText as String?,
@@ -94,8 +105,10 @@ class UsualFoodScanViewModel extends ChangeNotifier {
   UsualFoodScanUiState _uiState = const UsualFoodScanUiState();
 
   UsualFoodScanPhase get phase => _uiState.phase;
-  String? get errorMessage => _uiState.errorMessage;
   String? get ocrText => _uiState.ocrText;
+
+  /// The typed error code; [UsualFoodScanError.none] when no error.
+  UsualFoodScanError errorCode = UsualFoodScanError.none;
 
   /// True while an async operation is in progress.
   bool get isBusy =>
@@ -111,40 +124,46 @@ class UsualFoodScanViewModel extends ChangeNotifier {
   ///
   /// Requests runtime camera permission when [requestCameraPermission] is
   /// provided, then calls [initializeCamera]. On failure transitions to
-  /// [UsualFoodScanPhase.error] with a user-visible message.
+  /// [UsualFoodScanPhase.error] with a typed [errorCode].
   Future<void> init() async {
+    _clearError();
     _setPhase(UsualFoodScanPhase.requestingPermission);
 
     try {
       if (_requestCameraPermission != null) {
         final granted = await _requestCameraPermission();
         if (!granted) {
-          _setError(
-            'Camera access is required to scan a label. Enable it in Settings.',
-          );
+          _setErrorCode(UsualFoodScanError.cameraDenied);
           return;
         }
       }
 
       await _initializeCamera();
       _setPhase(UsualFoodScanPhase.ready);
-    } catch (e) {
-      _setError(
-        userVisibleErrorMessage(e, context: UserErrorContext.usualFoodScanOcr),
+    } on CameraException catch (e) {
+      _setErrorCode(
+        e.code == 'cameraNotAvailable'
+            ? UsualFoodScanError.cameraUnavailable
+            : UsualFoodScanError.cameraInitFailed,
       );
+    } catch (_) {
+      // The screen throws 'No camera available on this device.' when
+      // availableCameras() returns [] — treat as cameraUnavailable.
+      _setErrorCode(UsualFoodScanError.cameraUnavailable);
     }
   }
 
   /// Capture a photo, run OCR, send text to draft endpoint.
   ///
   /// Transitions: ready → capturing → ocrProcessing → drafting → drafted.
-  /// On error → error with user-visible message.
+  /// On error → error with typed [errorCode].
   Future<void> captureAndProcess() async {
     if (_uiState.phase == UsualFoodScanPhase.drafting ||
         _uiState.phase == UsualFoodScanPhase.ocrProcessing) {
       return;
     }
 
+    _clearError();
     _setPhase(UsualFoodScanPhase.capturing);
 
     String filePath;
@@ -152,9 +171,7 @@ class UsualFoodScanViewModel extends ChangeNotifier {
       filePath = await _takePicture();
       _onCaptured?.call(filePath);
     } catch (e) {
-      _setError(
-        userVisibleErrorMessage(e, context: UserErrorContext.usualFoodScanOcr),
-      );
+      _setErrorCode(UsualFoodScanError.captureFailed);
       return;
     }
 
@@ -165,25 +182,19 @@ class UsualFoodScanViewModel extends ChangeNotifier {
       text = await _recognizeText(filePath);
       _setUiState(_uiState.copyWith(ocrText: text));
     } catch (e) {
-      _setError(
-        userVisibleErrorMessage(e, context: UserErrorContext.usualFoodScanOcr),
-      );
+      _setErrorCode(UsualFoodScanError.ocrFailed);
       return;
     }
 
+    // Reject very short text — 20-char floor ensures we have at least
+    // a few nutritional fields before asking the LLM.
     if (text.trim().isEmpty) {
-      _setError(
-        'No text detected. Get closer, improve the lighting, '
-        'and try again.',
-      );
+      _setErrorCode(UsualFoodScanError.ocrEmpty);
       return;
     }
 
     if (text.trim().length < 20) {
-      _setError(
-        'The image has too little text. Make sure the whole '
-        'nutrition table is in frame.',
-      );
+      _setErrorCode(UsualFoodScanError.ocrTooShort);
       return;
     }
 
@@ -195,18 +206,14 @@ class UsualFoodScanViewModel extends ChangeNotifier {
       _setPhase(UsualFoodScanPhase.drafted);
       _onDrafted?.call(result);
     } catch (e) {
-      _setError(
-        userVisibleErrorMessage(
-          e,
-          context: UserErrorContext.usualFoodScanDraft,
-        ),
-      );
+      _setErrorCode(UsualFoodScanError.draftFailed);
     }
   }
 
   /// Go back to [UsualFoodScanPhase.ready] and allow retry.
   void retry() {
     draft = null;
+    _clearError();
     _setPhase(UsualFoodScanPhase.ready);
   }
 
@@ -218,16 +225,17 @@ class UsualFoodScanViewModel extends ChangeNotifier {
   }
 
   void _setPhase(UsualFoodScanPhase value) {
+    _clearError();
     _setUiState(_uiState.copyWith(phase: value));
   }
 
-  void _setError(String message) {
-    _setUiState(
-      _uiState.copyWith(
-        phase: UsualFoodScanPhase.error,
-        errorMessage: message,
-      ),
-    );
+  void _setErrorCode(UsualFoodScanError code) {
+    errorCode = code;
+    _setUiState(_uiState.copyWith(phase: UsualFoodScanPhase.error));
+  }
+
+  void _clearError() {
+    errorCode = UsualFoodScanError.none;
   }
 
   void _setUiState(UsualFoodScanUiState value) {

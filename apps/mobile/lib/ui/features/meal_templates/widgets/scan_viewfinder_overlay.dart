@@ -97,6 +97,47 @@ class _ViewfinderPainter extends CustomPainter {
     _drawBracket(canvas, bracketPaint, cutRect.right, cutRect.top, -1, 1);
     _drawBracket(canvas, bracketPaint, cutRect.left, cutRect.bottom, 1, -1);
     _drawBracket(canvas, bracketPaint, cutRect.right, cutRect.bottom, -1, -1);
+
+    // Label above the cutout
+    final labelPainter = TextPainter(
+      text: TextSpan(
+        text: label,
+        style: TextStyle(
+          color: bracketColor,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.4,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout(maxWidth: size.width);
+    labelPainter.paint(
+      canvas,
+      Offset(
+        (size.width - labelPainter.width) / 2,
+        cutRect.top - 28,
+      ),
+    );
+
+    // Hint below the cutout
+    final hintPainter = TextPainter(
+      text: TextSpan(
+        text: hint,
+        style: TextStyle(
+          color: Colors.white.withValues(alpha: 0.85),
+          fontSize: 13,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+      textAlign: TextAlign.center,
+    )..layout(maxWidth: cutW - 32);
+    hintPainter.paint(
+      canvas,
+      Offset(
+        (size.width - hintPainter.width) / 2,
+        cutRect.bottom + 16,
+      ),
+    );
   }
 
   void _drawBracket(

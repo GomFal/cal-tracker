@@ -71,7 +71,7 @@ void main() {
       final vm = createViewModel();
       expect(vm.phase, UsualFoodScanPhase.idle);
       expect(vm.isBusy, isFalse);
-      expect(vm.errorMessage, isNull);
+      expect(vm.errorCode, UsualFoodScanError.none);
       expect(vm.ocrText, isNull);
       expect(vm.draft, isNull);
       vm.dispose();
@@ -91,7 +91,7 @@ void main() {
       final vm = createViewModel();
       await vm.init();
       expect(vm.phase, UsualFoodScanPhase.error);
-      expect(vm.errorMessage, isNotNull);
+      expect(vm.errorCode, UsualFoodScanError.cameraDenied);
       expect(initializeCameraCalls, 0);
       vm.dispose();
     });
@@ -101,7 +101,7 @@ void main() {
       final vm = createViewModel();
       await vm.init();
       expect(vm.phase, UsualFoodScanPhase.error);
-      expect(vm.errorMessage, isNotNull);
+      expect(vm.errorCode, UsualFoodScanError.cameraUnavailable);
       vm.dispose();
     });
 
@@ -161,7 +161,7 @@ void main() {
       await vm.captureAndProcess();
 
       expect(vm.phase, UsualFoodScanPhase.error);
-      expect(vm.errorMessage, contains('No text'));
+      expect(vm.errorCode, UsualFoodScanError.ocrEmpty);
       expect(takePictureCalls, 1);
       expect(recognizeTextCalls, 1);
       // Should NOT call draft because OCR was empty
@@ -179,7 +179,7 @@ void main() {
       await vm.captureAndProcess();
 
       expect(vm.phase, UsualFoodScanPhase.error);
-      expect(vm.errorMessage, contains('too little text'));
+      expect(vm.errorCode, UsualFoodScanError.ocrTooShort);
       verifyNever(() => mockNutritionRepository.draftUsualFood(any()));
       vm.dispose();
     });
@@ -191,7 +191,7 @@ void main() {
       await vm.captureAndProcess();
 
       expect(vm.phase, UsualFoodScanPhase.error);
-      expect(vm.errorMessage, isNotNull);
+      expect(vm.errorCode, UsualFoodScanError.captureFailed);
       expect(recognizeTextCalls, 0);
       verifyNever(() => mockNutritionRepository.draftUsualFood(any()));
       vm.dispose();
@@ -220,7 +220,7 @@ void main() {
       await vm.captureAndProcess();
 
       expect(vm.phase, UsualFoodScanPhase.error);
-      expect(vm.errorMessage, isNotNull);
+      expect(vm.errorCode, UsualFoodScanError.draftFailed);
       vm.dispose();
     });
 

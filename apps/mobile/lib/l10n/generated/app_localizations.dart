@@ -2048,6 +2048,96 @@ abstract class AppLocalizations {
   /// **'Enter label text before filling fields.'**
   String get usualFoodsDraftEmptyError;
 
+  /// No description provided for @usualFoodsScanFromPhotoTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan nutrition label'**
+  String get usualFoodsScanFromPhotoTooltip;
+
+  /// No description provided for @usualFoodsScanTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan nutrition label'**
+  String get usualFoodsScanTitle;
+
+  /// No description provided for @usualFoodsScanHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Frame the nutrition table inside the box.'**
+  String get usualFoodsScanHint;
+
+  /// No description provided for @usualFoodsScanFrameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Nutrition facts'**
+  String get usualFoodsScanFrameLabel;
+
+  /// No description provided for @usualFoodsScanCapture.
+  ///
+  /// In en, this message translates to:
+  /// **'Capture'**
+  String get usualFoodsScanCapture;
+
+  /// No description provided for @usualFoodsScanRetake.
+  ///
+  /// In en, this message translates to:
+  /// **'Retake'**
+  String get usualFoodsScanRetake;
+
+  /// No description provided for @usualFoodsScanCloseTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get usualFoodsScanCloseTooltip;
+
+  /// No description provided for @usualFoodsScanProcessingOcr.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading text…'**
+  String get usualFoodsScanProcessingOcr;
+
+  /// No description provided for @usualFoodsScanProcessingDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Filling fields…'**
+  String get usualFoodsScanProcessingDraft;
+
+  /// No description provided for @usualFoodsScanOcrEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No text detected. Get closer, improve the lighting, and try again.'**
+  String get usualFoodsScanOcrEmpty;
+
+  /// No description provided for @usualFoodsScanOcrTooShort.
+  ///
+  /// In en, this message translates to:
+  /// **'The image has too little text. Make sure the whole nutrition table is in frame.'**
+  String get usualFoodsScanOcrTooShort;
+
+  /// No description provided for @usualFoodsScanCameraDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Camera access is required to scan a label. Enable it in Settings.'**
+  String get usualFoodsScanCameraDenied;
+
+  /// No description provided for @usualFoodsScanCameraUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'No camera is available on this device.'**
+  String get usualFoodsScanCameraUnavailable;
+
+  /// No description provided for @usualFoodsScanFailedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not interpret the label'**
+  String get usualFoodsScanFailedTitle;
+
+  /// No description provided for @usualFoodsScanFailedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'We could not turn that photo into a draft. Try a sharper, well-lit photo of the nutrition table.'**
+  String get usualFoodsScanFailedMessage;
+
   /// No description provided for @usualFoodsEditorSubtitle.
   ///
   /// In en, this message translates to:

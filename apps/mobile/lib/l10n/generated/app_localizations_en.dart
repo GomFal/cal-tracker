@@ -1105,6 +1105,56 @@ class AppLocalizationsEn extends AppLocalizations {
       'Enter label text before filling fields.';
 
   @override
+  String get usualFoodsScanFromPhotoTooltip => 'Scan nutrition label';
+
+  @override
+  String get usualFoodsScanTitle => 'Scan nutrition label';
+
+  @override
+  String get usualFoodsScanHint => 'Frame the nutrition table inside the box.';
+
+  @override
+  String get usualFoodsScanFrameLabel => 'Nutrition facts';
+
+  @override
+  String get usualFoodsScanCapture => 'Capture';
+
+  @override
+  String get usualFoodsScanRetake => 'Retake';
+
+  @override
+  String get usualFoodsScanCloseTooltip => 'Close';
+
+  @override
+  String get usualFoodsScanProcessingOcr => 'Reading text…';
+
+  @override
+  String get usualFoodsScanProcessingDraft => 'Filling fields…';
+
+  @override
+  String get usualFoodsScanOcrEmpty =>
+      'No text detected. Get closer, improve the lighting, and try again.';
+
+  @override
+  String get usualFoodsScanOcrTooShort =>
+      'The image has too little text. Make sure the whole nutrition table is in frame.';
+
+  @override
+  String get usualFoodsScanCameraDenied =>
+      'Camera access is required to scan a label. Enable it in Settings.';
+
+  @override
+  String get usualFoodsScanCameraUnavailable =>
+      'No camera is available on this device.';
+
+  @override
+  String get usualFoodsScanFailedTitle => 'Could not interpret the label';
+
+  @override
+  String get usualFoodsScanFailedMessage =>
+      'We could not turn that photo into a draft. Try a sharper, well-lit photo of the nutrition table.';
+
+  @override
   String get usualFoodsEditorSubtitle =>
       'Review the label values before saving.';
 

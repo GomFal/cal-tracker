@@ -1119,6 +1119,57 @@ class AppLocalizationsEs extends AppLocalizations {
       'Introduce el texto de la etiqueta antes de rellenar los campos.';
 
   @override
+  String get usualFoodsScanFromPhotoTooltip => 'Escanear etiqueta';
+
+  @override
+  String get usualFoodsScanTitle => 'Escanear etiqueta nutricional';
+
+  @override
+  String get usualFoodsScanHint =>
+      'Encuadra la tabla nutricional dentro del marco.';
+
+  @override
+  String get usualFoodsScanFrameLabel => 'Información nutricional';
+
+  @override
+  String get usualFoodsScanCapture => 'Capturar';
+
+  @override
+  String get usualFoodsScanRetake => 'Reintentar';
+
+  @override
+  String get usualFoodsScanCloseTooltip => 'Cerrar';
+
+  @override
+  String get usualFoodsScanProcessingOcr => 'Leyendo texto…';
+
+  @override
+  String get usualFoodsScanProcessingDraft => 'Rellenando campos…';
+
+  @override
+  String get usualFoodsScanOcrEmpty =>
+      'No se detectó texto. Acércate, mejora la luz y vuelve a intentarlo.';
+
+  @override
+  String get usualFoodsScanOcrTooShort =>
+      'La imagen tiene poco texto. Asegúrate de encuadrar la tabla nutricional completa.';
+
+  @override
+  String get usualFoodsScanCameraDenied =>
+      'Necesitamos acceso a la cámara. Actívalo en Ajustes.';
+
+  @override
+  String get usualFoodsScanCameraUnavailable =>
+      'No hay cámara disponible en este dispositivo.';
+
+  @override
+  String get usualFoodsScanFailedTitle => 'No se pudo interpretar la etiqueta';
+
+  @override
+  String get usualFoodsScanFailedMessage =>
+      'No pudimos convertir esa foto en un borrador. Prueba con una foto más nítida y bien iluminada de la tabla nutricional.';
+
+  @override
   String get usualFoodsEditorSubtitle =>
       'Revisa los valores de la etiqueta antes de guardar.';
 

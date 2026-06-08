@@ -12,6 +12,7 @@ import '../ui/features/meal_history/views/meal_history_screen.dart';
 import '../ui/features/meal_templates/views/meal_template_editor_screen.dart';
 import '../ui/features/meal_templates/views/meal_templates_screen.dart';
 import '../ui/features/meal_templates/views/usual_food_editor_screen.dart';
+import '../ui/features/meal_templates/views/usual_food_scan_screen.dart';
 import '../ui/features/settings/views/settings_screen.dart';
 import '../ui/features/voice_log/views/voice_log_screen.dart';
 
@@ -58,6 +59,13 @@ GoRouter buildRouter(
             ),
           );
         },
+      ),
+      GoRoute(
+        path: '/templates/ingredients/scan',
+        builder: (context, state) => _AuthRestoreGate(
+          authViewModel: authViewModel,
+          child: const UsualFoodScanScreen(),
+        ),
       ),
       StatefulShellRoute(
         builder: (context, state, navigationShell) => _AuthRestoreGate(

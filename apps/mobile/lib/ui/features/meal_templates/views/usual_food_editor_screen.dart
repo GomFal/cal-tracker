@@ -7,6 +7,7 @@ import '../../../../l10n/app_localizations_context.dart';
 import '../../../../l10n/generated/app_localizations.dart';
 import '../../../core/design_system.dart';
 import '../view_models/meal_templates_view_model.dart';
+import 'usual_food_scan_screen.dart';
 
 class UsualFoodEditorScreen extends StatefulWidget {
   const UsualFoodEditorScreen({
@@ -165,6 +166,8 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: FreshSpacing.sm),
+            if (!_isEditing) _ScanFromPhotoCta(onPressed: _openScanScreen),
+            if (!_isEditing) const SizedBox(height: FreshSpacing.lg),
             _EditorSection(
               title: l10n.usualFoodsIdentitySectionTitle,
               icon: Icons.badge_outlined,
@@ -451,6 +454,15 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
     }
   }
 
+  Future<void> _openScanScreen() async {
+    final draft = await Navigator.of(context).push<UsualFoodDraft>(
+      MaterialPageRoute(builder: (_) => const UsualFoodScanScreen()),
+    );
+    if (draft != null && mounted) {
+      setState(() => _applyDraft(draft));
+    }
+  }
+
   Map<String, Object?> _nutrientsJson() {
     final nutrients = <String, Object?>{};
     _putOptionalNumber(nutrients, 'saltGrams', _saltController.text);
@@ -716,6 +728,59 @@ class _NotFoundState extends StatelessWidget {
         icon: Icons.search_off_rounded,
         title: context.l10n.usualFoodsNotFoundTitle,
         message: context.l10n.usualFoodsNotFoundMessage,
+      ),
+    );
+  }
+}
+
+class _ScanFromPhotoCta extends StatelessWidget {
+  const _ScanFromPhotoCta({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final palette = context.freshPalette;
+    return FreshCard(
+      key: const ValueKey('usual_food_scan_from_photo_cta'),
+      child: Row(
+        children: [
+          FreshIconChip(
+            icon: Icons.document_scanner_outlined,
+            color: palette.leaf,
+            backgroundColor: palette.limeWash,
+          ),
+          const SizedBox(width: FreshSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  l10n.usualFoodsScanTitle,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  l10n.usualFoodsScanHint,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: palette.inkMuted),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: FreshSpacing.sm),
+          FilledButton(
+            onPressed: onPressed,
+            style: FilledButton.styleFrom(
+              backgroundColor: palette.lime,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
+            ),
+            child: Text(l10n.usualFoodsScanFromPhotoButton),
+          ),
+        ],
       ),
     );
   }

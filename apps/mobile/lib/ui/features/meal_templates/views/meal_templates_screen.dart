@@ -10,6 +10,7 @@ import '../../voice_log/views/voice_log_screen.dart';
 import '../view_models/meal_templates_view_model.dart';
 import 'meal_template_editor_screen.dart';
 import 'usual_food_editor_screen.dart';
+import 'usual_food_scan_screen.dart';
 
 class MealTemplatesScreen extends StatefulWidget {
   const MealTemplatesScreen({super.key});
@@ -45,6 +46,13 @@ class _MealTemplatesScreenState extends State<MealTemplatesScreen> {
           icon: Icons.refresh_rounded,
           tooltip: l10n.commonRefresh,
         ),
+        if (_selectedSection == _UsualSection.ingredients)
+          FreshIconButton(
+            key: const ValueKey('usuals_scan_label_button'),
+            onPressed: () => _startScan(context),
+            icon: Icons.qr_code_scanner_rounded,
+            tooltip: l10n.usualFoodsScanFromPhotoTooltip,
+          ),
         FreshIconButton(
           onPressed: () => _showAddAction(context),
           icon: Icons.add_rounded,
@@ -106,6 +114,15 @@ class _MealTemplatesScreenState extends State<MealTemplatesScreen> {
       return;
     }
     await context.push(UsualFoodEditorScreen.newRoute);
+  }
+
+  Future<void> _startScan(BuildContext context) async {
+    final draft = await context.push<UsualFoodDraft>(
+      UsualFoodScanScreen.route,
+    );
+    if (draft != null && context.mounted) {
+      await context.push(UsualFoodEditorScreen.newRoute, extra: draft);
+    }
   }
 }
 

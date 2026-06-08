@@ -26,6 +26,9 @@ enum UserErrorContext {
   voiceCommit,
   voiceProposalEdit,
   voiceCandidateSelection,
+  usualFoodScanCamera,
+  usualFoodScanOcr,
+  usualFoodScanDraft,
   generic,
 }
 
@@ -165,6 +168,12 @@ String _fallbackMessage(UserErrorContext context) {
       return 'We could not update that meal. Try again.';
     case UserErrorContext.voiceCandidateSelection:
       return 'We could not apply that food match. Try again.';
+    case UserErrorContext.usualFoodScanCamera:
+      return 'We could not start the camera. Try again or use a different device.';
+    case UserErrorContext.usualFoodScanOcr:
+      return 'We could not read the text on that label. Try again with a sharper photo.';
+    case UserErrorContext.usualFoodScanDraft:
+      return 'We could not turn that photo into a draft. Try again or fill the fields manually.';
     case UserErrorContext.generic:
       return 'We could not complete that request. Try again.';
   }

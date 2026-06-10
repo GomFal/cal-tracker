@@ -47,6 +47,18 @@ export type ActionContext = z.infer<typeof actionContextSchema>;
 
 const emptyInputSchema = z.object({}).default({});
 
+const optionalProposeMealOccurredAtSchema = z.preprocess((value) => {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  if (!z.string().datetime({ offset: true }).safeParse(trimmed).success) {
+    return undefined;
+  }
+  return new Date(trimmed).toISOString();
+}, z.string().datetime().optional()).describe(
+  "Optional consumed-at time. Omit unless the user clearly indicates when the food was consumed. If included, use UTC ISO 8601 with Z.",
+);
+
 export const queryFoodMemoryInputSchema = z.object({
   text: z.string().min(1),
 });
@@ -76,7 +88,7 @@ export const searchNutritionDatabaseOutputSchema = z.object({
 export const proposeMealLogInputSchema = z.object({
   text: z.string().min(1),
   mentions: z.array(foodMentionSchema).optional(),
-  occurredAt: z.string().datetime().optional(),
+  occurredAt: optionalProposeMealOccurredAtSchema,
 });
 export const proposeMealLogOutputSchema = z.object({
   proposal: mealProposalSchema.optional(),

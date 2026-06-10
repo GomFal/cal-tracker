@@ -40,3 +40,12 @@ __pycache__/
 
 # Screenshots
 design-artifacts/screens/
+
+# Graphify local/intermediate artifacts
+graphify-out/.graphify_*
+graphify-out/.needs_update
+graphify-out/cache/
+graphify-out/obsidian/
+graphify-out/cypher.txt
+graphify-out/*.graphml
+graphify-out/*.svg

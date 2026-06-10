@@ -521,6 +521,34 @@ describe("action loop", () => {
     ).toBe(true);
   });
 
+  it("ignores invalid optional occurredAt when creating a meal proposal", async () => {
+    const { request } = buildTestApp();
+    const auth = await registerAndAuth(request);
+
+    const response = await request(
+      "http://localhost/v1/actions/propose_meal_log/execute",
+      {
+        method: "POST",
+        headers: auth.authHeader,
+        body: JSON.stringify({
+          input: {
+            ...chickenRiceInput,
+            occurredAt: "not a datetime",
+          },
+          source: "flutter",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      output: { proposal: { items: Array<{ name: string }> } };
+    };
+    expect(body.output.proposal.items.map((item) => item.name)).toEqual(
+      expect.arrayContaining(["Chicken breast", "Cooked rice"]),
+    );
+  });
+
   it("updates daily goals and keeps previous day target snapshots", async () => {
     const { request } = buildTestApp();
     const auth = await registerAndAuth(request);

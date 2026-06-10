@@ -4,6 +4,7 @@ import {
   actionById,
   foodMentionSchema,
   mealItemSchema,
+  proposeMealLogInputSchema,
   searchNutritionDatabaseOutputSchema,
 } from "@cal-tracker/contracts";
 
@@ -116,5 +117,40 @@ describe("contracts", () => {
         marketProduct: false,
       }).canonicalEnglishName,
     ).toBe("bread");
+  });
+
+  it("normalizes offset occurredAt values for meal proposals", () => {
+    const parsed = proposeMealLogInputSchema.parse({
+      text: "Add rice.",
+      occurredAt: "2026-06-10T12:00:00-04:00",
+    });
+
+    expect(parsed.occurredAt).toBe("2026-06-10T16:00:00.000Z");
+  });
+
+  it("drops invalid optional occurredAt values for meal proposals", () => {
+    const parsed = proposeMealLogInputSchema.parse({
+      text: "Add rice.",
+      occurredAt: "not a datetime",
+    });
+
+    expect(parsed.occurredAt).toBeUndefined();
+  });
+
+  it("keeps required meal proposal mention fields strict", () => {
+    expect(() =>
+      proposeMealLogInputSchema.parse({
+        text: "Add rice.",
+        mentions: [
+          {
+            originalText: "rice",
+            canonicalName: "rice",
+            quantity: "100",
+            unit: "g",
+            confidence: 0.95,
+          },
+        ],
+      }),
+    ).toThrow();
   });
 });

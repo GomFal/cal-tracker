@@ -7873,7 +7873,8 @@
           },
           "occurredAt": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "description": "Optional consumed-at time. Omit unless the user clearly indicates when the food was consumed. If included, use UTC ISO 8601 with Z."
           }
         },
         "required": [

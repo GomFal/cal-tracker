@@ -29,8 +29,8 @@ import 'router.dart';
 import 'theme.dart';
 import 'theme_mode_view_model.dart';
 
-typedef CalTrackerAppWrapperBuilder = Widget Function(
-    BuildContext context, Widget child, GoRouter router);
+typedef CalTrackerAppWrapperBuilder =
+    Widget Function(BuildContext context, Widget child, GoRouter router);
 
 class CalTrackerBootstrap extends StatelessWidget {
   const CalTrackerBootstrap({
@@ -59,19 +59,26 @@ class CalTrackerBootstrap extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokenStorage = this.tokenStorage ?? const SecureTokenStorage();
+    final preferencesRepository =
+        this.preferencesRepository ??
+        AppPreferencesRepository(storage: AppPreferencesStorage());
     final apiClient = CalTrackerApiClient(
       config: apiConfig,
       tokenStorage: tokenStorage,
+      localeTagProvider: () async {
+        final savedTag = await preferencesRepository.loadLocaleCode();
+        return LocaleViewModel.normalizeLocaleTag(savedTag).toLanguageTag();
+      },
     );
-    final authRepository = this.authRepository ??
+    final authRepository =
+        this.authRepository ??
         AuthRepository(apiClient: apiClient, tokenStorage: tokenStorage);
-    final nutritionRepository = this.nutritionRepository ??
+    final nutritionRepository =
+        this.nutritionRepository ??
         NutritionRepository(
           apiClient: apiClient,
           cacheStore: NutritionCacheStore(storage: AppPreferencesStorage()),
         );
-    final preferencesRepository = this.preferencesRepository ??
-        AppPreferencesRepository(storage: AppPreferencesStorage());
     final mobileUpdateService =
         this.mobileUpdateService ?? MobileUpdateService(apiConfig: apiConfig);
     final audioRecorderService =
@@ -182,7 +189,7 @@ class _CalTrackerAppState extends State<_CalTrackerApp> {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: LocaleViewModel.supportedLocales,
+      supportedLocales: AppLocalizations.supportedLocales,
       theme: buildLightTheme(),
       darkTheme: buildDarkTheme(),
       themeMode: themeMode,

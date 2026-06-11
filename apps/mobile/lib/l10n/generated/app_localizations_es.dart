@@ -312,19 +312,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsLanguageTitle => 'Idioma';
 
   @override
-  String get settingsLanguageSubtitleEnglish => 'English';
-
-  @override
-  String get settingsLanguageSubtitleSpanish => 'Español';
+  String get settingsLanguageNativeName => 'Español';
 
   @override
   String get settingsLanguageSheetTitle => 'Elige idioma';
-
-  @override
-  String get settingsLanguageEnglish => 'English';
-
-  @override
-  String get settingsLanguageSpanish => 'Español';
 
   @override
   String get settingsThemeTitle => 'Apariencia';

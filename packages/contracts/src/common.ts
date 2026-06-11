@@ -165,11 +165,18 @@ export const mealItemSchema = z.object({
   matchReason: z.string().optional()
 });
 
+export const foodMentionFieldDescriptions = {
+  originalText: "Exact food phrase from the user's text or transcript; do not translate.",
+  canonicalName: "Normalized food name in the same language as originalText.",
+  canonicalEnglishName: "English generic food name when confidently known; omit when uncertain and do not invent translations.",
+  language: "Language code of originalText when clear; this is the food phrase language, not the app locale."
+} as const;
+
 export const foodMentionSchema = z.object({
-  originalText: z.string().min(1),
-  canonicalName: z.string().min(1).optional(),
-  canonicalEnglishName: z.string().min(1).optional(),
-  language: z.string().min(2).max(16).optional(),
+  originalText: z.string().min(1).describe(foodMentionFieldDescriptions.originalText),
+  canonicalName: z.string().min(1).optional().describe(foodMentionFieldDescriptions.canonicalName),
+  canonicalEnglishName: z.string().min(1).optional().describe(foodMentionFieldDescriptions.canonicalEnglishName),
+  language: z.string().min(2).max(16).optional().describe(foodMentionFieldDescriptions.language),
   quantity: z.number().positive(),
   unit: z.string().min(1),
   rawUnitText: z.string().min(1).optional(),

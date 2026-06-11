@@ -136,6 +136,38 @@ async function createProposalFromItems(
 }
 
 describe("AgentService", () => {
+  it("passes Accept-Language through to the LLM context locale", async () => {
+    const agentProvider = new CapturingChatAgentProvider({
+      toolCalls: [
+        {
+          id: "call_1",
+          type: "function",
+          function: {
+            name: "get_remaining_targets",
+            arguments: JSON.stringify({}),
+          },
+        },
+      ],
+      rawResponse: {},
+    });
+    const { request } = buildTestApp({ agentProvider });
+    const { authHeader } = await registerAndAuth(request);
+
+    const res = await request("http://localhost/v1/agent/runs", {
+      method: "POST",
+      headers: { ...authHeader, "accept-language": "pt-BR" },
+      body: JSON.stringify({
+        text: "how many calories do I have left",
+        source: "flutter",
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(agentProvider.messages[0]?.content).toContain(
+      "The user's locale is pt-BR",
+    );
+  });
+
   it("maps chicken and rice with quantities to propose_meal_log", async () => {
     const { request } = buildTestApp({
       agentProvider: new FakeChatAgentProvider({

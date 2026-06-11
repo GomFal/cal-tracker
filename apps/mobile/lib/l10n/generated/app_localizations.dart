@@ -63,7 +63,7 @@ import 'app_localizations_es.dart';
 /// property.
 abstract class AppLocalizations {
   AppLocalizations(String locale)
-      : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+    : localeName = intl.Intl.canonicalizedLocale(locale.toString());
 
   final String localeName;
 
@@ -86,16 +86,16 @@ abstract class AppLocalizations {
   /// of delegates is preferred or required.
   static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
       <LocalizationsDelegate<dynamic>>[
-    delegate,
-    GlobalMaterialLocalizations.delegate,
-    GlobalCupertinoLocalizations.delegate,
-    GlobalWidgetsLocalizations.delegate,
-  ];
+        delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ];
 
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
     Locale('en'),
-    Locale('es')
+    Locale('es'),
   ];
 
   /// No description provided for @appTitle.
@@ -656,35 +656,17 @@ abstract class AppLocalizations {
   /// **'Language'**
   String get settingsLanguageTitle;
 
-  /// No description provided for @settingsLanguageSubtitleEnglish.
+  /// No description provided for @settingsLanguageNativeName.
   ///
   /// In en, this message translates to:
   /// **'English'**
-  String get settingsLanguageSubtitleEnglish;
-
-  /// No description provided for @settingsLanguageSubtitleSpanish.
-  ///
-  /// In en, this message translates to:
-  /// **'Español'**
-  String get settingsLanguageSubtitleSpanish;
+  String get settingsLanguageNativeName;
 
   /// No description provided for @settingsLanguageSheetTitle.
   ///
   /// In en, this message translates to:
   /// **'Choose language'**
   String get settingsLanguageSheetTitle;
-
-  /// No description provided for @settingsLanguageEnglish.
-  ///
-  /// In en, this message translates to:
-  /// **'English'**
-  String get settingsLanguageEnglish;
-
-  /// No description provided for @settingsLanguageSpanish.
-  ///
-  /// In en, this message translates to:
-  /// **'Español'**
-  String get settingsLanguageSpanish;
 
   /// No description provided for @settingsThemeTitle.
   ///
@@ -3030,8 +3012,9 @@ AppLocalizations lookupAppLocalizations(Locale locale) {
   }
 
   throw FlutterError(
-      'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
-      'an issue with the localizations generation tool. Please file an issue '
-      'on GitHub with a reproducible sample app and the gen-l10n configuration '
-      'that was used.');
+    'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
+    'an issue with the localizations generation tool. Please file an issue '
+    'on GitHub with a reproducible sample app and the gen-l10n configuration '
+    'that was used.',
+  );
 }

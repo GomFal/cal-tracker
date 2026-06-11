@@ -157,9 +157,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             icon: Icons.translate_rounded,
             color: palette.mint,
             title: l10n.settingsLanguageTitle,
-            subtitle: locale.localeCode == 'es'
-                ? l10n.settingsLanguageSubtitleSpanish
-                : l10n.settingsLanguageSubtitleEnglish,
+            subtitle: _languageDisplayName(locale.locale),
             onTap: () => _showLanguageSheet(context),
           ),
           const SizedBox(height: FreshSpacing.md),
@@ -424,30 +422,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 style: Theme.of(sheetContext).textTheme.titleLarge,
               ),
               const SizedBox(height: FreshSpacing.md),
-              _SettingsOption(
-                key: const ValueKey('language_option_en'),
-                title: l10n.settingsLanguageEnglish,
-                selected: localeViewModel.localeCode == 'en',
-                onTap: () async {
-                  await localeViewModel.setLocaleCode('en');
-                  if (sheetContext.mounted) Navigator.of(sheetContext).pop();
-                },
-              ),
-              const SizedBox(height: FreshSpacing.sm),
-              _SettingsOption(
-                key: const ValueKey('language_option_es'),
-                title: l10n.settingsLanguageSpanish,
-                selected: localeViewModel.localeCode == 'es',
-                onTap: () async {
-                  await localeViewModel.setLocaleCode('es');
-                  if (sheetContext.mounted) Navigator.of(sheetContext).pop();
-                },
-              ),
+              for (final locale in AppLocalizations.supportedLocales) ...[
+                _SettingsOption(
+                  key: ValueKey('language_option_${locale.toLanguageTag()}'),
+                  title: _languageDisplayName(locale),
+                  selected: localeViewModel.locale == locale,
+                  onTap: () async {
+                    await localeViewModel.setLocaleTag(locale.toLanguageTag());
+                    if (sheetContext.mounted) {
+                      Navigator.of(sheetContext).pop();
+                    }
+                  },
+                ),
+                if (locale != AppLocalizations.supportedLocales.last)
+                  const SizedBox(height: FreshSpacing.sm),
+              ],
             ],
           ),
         );
       },
     );
+  }
+
+  String _languageDisplayName(Locale locale) {
+    return lookupAppLocalizations(locale).settingsLanguageNativeName;
   }
 }
 
@@ -474,10 +472,7 @@ class _DataSourcesCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          FreshIconChip(
-            icon: Icons.source_rounded,
-            color: palette.orange,
-          ),
+          FreshIconChip(icon: Icons.source_rounded, color: palette.orange),
           const SizedBox(width: FreshSpacing.md),
           Expanded(
             child: Column(
@@ -494,16 +489,12 @@ class _DataSourcesCard extends StatelessWidget {
                 const SizedBox(height: FreshSpacing.sm),
                 Text(
                   openFoodFacts,
-                  style: textTheme.bodySmall?.copyWith(
-                    color: palette.inkMuted,
-                  ),
+                  style: textTheme.bodySmall?.copyWith(color: palette.inkMuted),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   usda,
-                  style: textTheme.bodySmall?.copyWith(
-                    color: palette.inkMuted,
-                  ),
+                  style: textTheme.bodySmall?.copyWith(color: palette.inkMuted),
                 ),
               ],
             ),
@@ -633,10 +624,9 @@ class _SettingsGoalRow extends StatelessWidget {
                 Text(title, style: Theme.of(context).textTheme.titleMedium),
                 Text(
                   subtitle,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(color: palette.inkMuted),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
                 ),
               ],
             ),

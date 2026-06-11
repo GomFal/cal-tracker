@@ -26,11 +26,14 @@ class CalTrackerApiClient {
     required this.config,
     required this.tokenStorage,
     http.Client? httpClient,
-  }) : _httpClient = httpClient ?? http.Client();
+    Future<String?> Function()? localeTagProvider,
+  }) : _httpClient = httpClient ?? http.Client(),
+       _localeTagProvider = localeTagProvider;
 
   final ApiConfig config;
   final TokenStorage tokenStorage;
   final http.Client _httpClient;
+  final Future<String?> Function()? _localeTagProvider;
 
   Future<Map<String, Object?>> getHealth() => _get('/v1/health');
 
@@ -402,6 +405,10 @@ class CalTrackerApiClient {
     final headers = <String, String>{
       HttpHeaders.acceptHeader: 'application/json',
     };
+    final localeTag = (await _localeTagProvider?.call())?.trim();
+    if (localeTag != null && localeTag.isNotEmpty) {
+      headers[HttpHeaders.acceptLanguageHeader] = localeTag;
+    }
     if (includeContentType) {
       headers[HttpHeaders.contentTypeHeader] =
           'application/json; charset=UTF-8';

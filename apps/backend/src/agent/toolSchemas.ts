@@ -1,4 +1,7 @@
-import { actionDefinitions } from "@cal-tracker/contracts";
+import {
+  actionDefinitions,
+  foodMentionFieldDescriptions,
+} from "@cal-tracker/contracts";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import type { AgentToolDefinition } from "./chatAgentProvider.js";
 
@@ -10,10 +13,39 @@ export function buildToolSchemas(): AgentToolDefinition[] {
     function: {
       name: action.id,
       description: toolDescription(action),
-      parameters: zodToJsonSchema(action.inputSchema) as Record<string, unknown>,
+      parameters: toolParameters(action),
     },
   }));
   return cachedToolSchemas;
+}
+
+function toolParameters(
+  action: (typeof actionDefinitions)[number],
+): Record<string, unknown> {
+  const parameters = zodToJsonSchema(action.inputSchema) as Record<
+    string,
+    unknown
+  >;
+  if (action.id !== "propose_meal_log") return parameters;
+  const properties = objectRecord(parameters.properties);
+  const mentions = objectRecord(properties?.mentions);
+  const mentionItems = objectRecord(mentions?.items);
+  const mentionProperties = objectRecord(mentionItems?.properties);
+  if (!mentionProperties) return parameters;
+  for (const [field, description] of Object.entries(
+    foodMentionFieldDescriptions,
+  )) {
+    const property = objectRecord(mentionProperties[field]);
+    if (property) property.description = description;
+  }
+  return parameters;
+}
+
+function objectRecord(value: unknown): Record<string, unknown> | undefined {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return undefined;
+  }
+  return value as Record<string, unknown>;
 }
 
 function toolDescription(action: (typeof actionDefinitions)[number]): string {

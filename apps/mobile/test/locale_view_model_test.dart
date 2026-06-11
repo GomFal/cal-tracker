@@ -1,5 +1,6 @@
 import 'package:cal_tracker_mobile/app/locale_view_model.dart';
 import 'package:cal_tracker_mobile/data/services/app_preferences_repository.dart';
+import 'package:cal_tracker_mobile/l10n/generated/app_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -9,56 +10,63 @@ void main() {
       preferencesRepository: _FakePreferencesRepository(),
     );
 
-    expect(viewModel.locale, const Locale('en'));
-    expect(viewModel.localeCode, 'en');
-  });
-
-  test('load keeps English default without notifying when no preference exists',
-      () async {
-    final viewModel = LocaleViewModel(
-      preferencesRepository: _FakePreferencesRepository(),
+    expect(viewModel.locale, AppLocalizations.supportedLocales.first);
+    expect(
+      viewModel.localeTag,
+      AppLocalizations.supportedLocales.first.toLanguageTag(),
     );
-    var notifications = 0;
-    viewModel.addListener(() => notifications++);
-
-    await viewModel.load();
-
-    expect(viewModel.locale, const Locale('en'));
-    expect(notifications, 0);
   });
 
-  test('load applies stored Spanish preference and notifies listeners',
-      () async {
-    final repository = _FakePreferencesRepository(localeCode: 'es');
-    final viewModel = LocaleViewModel(preferencesRepository: repository);
-    var notifications = 0;
-    viewModel.addListener(() => notifications++);
+  test(
+    'load keeps English default without notifying when no preference exists',
+    () async {
+      final viewModel = LocaleViewModel(
+        preferencesRepository: _FakePreferencesRepository(),
+      );
+      var notifications = 0;
+      viewModel.addListener(() => notifications++);
 
-    await viewModel.load();
+      await viewModel.load();
 
-    expect(viewModel.locale, const Locale('es'));
-    expect(viewModel.localeCode, 'es');
-    expect(notifications, 1);
-  });
+      expect(viewModel.locale, AppLocalizations.supportedLocales.first);
+      expect(notifications, 0);
+    },
+  );
 
-  test('setLocaleCode persists, normalizes, and avoids duplicates', () async {
+  test(
+    'load applies stored Spanish preference and notifies listeners',
+    () async {
+      final repository = _FakePreferencesRepository(localeCode: 'es');
+      final viewModel = LocaleViewModel(preferencesRepository: repository);
+      var notifications = 0;
+      viewModel.addListener(() => notifications++);
+
+      await viewModel.load();
+
+      expect(viewModel.locale, const Locale('es'));
+      expect(viewModel.localeTag, 'es');
+      expect(notifications, 1);
+    },
+  );
+
+  test('setLocaleTag persists, normalizes, and avoids duplicates', () async {
     final repository = _FakePreferencesRepository();
     final viewModel = LocaleViewModel(preferencesRepository: repository);
     var notifications = 0;
     viewModel.addListener(() => notifications++);
 
-    await viewModel.setLocaleCode('es');
+    await viewModel.setLocaleTag('es');
 
     expect(viewModel.locale, const Locale('es'));
     expect(repository.savedLocaleCodes, ['es']);
     expect(notifications, 1);
 
-    await viewModel.setLocaleCode('es');
+    await viewModel.setLocaleTag('es');
 
     expect(repository.savedLocaleCodes, ['es']);
     expect(notifications, 1);
 
-    await viewModel.setLocaleCode('en-US');
+    await viewModel.setLocaleTag('en-US');
 
     expect(viewModel.locale, const Locale('en'));
     expect(repository.savedLocaleCodes, ['es', 'en']);

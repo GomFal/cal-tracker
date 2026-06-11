@@ -61,6 +61,12 @@
       "skillPath": "skills/flutter-use-http-package/SKILL.md",
       "computedHash": "ba142aa34707ede33beeb8d55084ef87deb127e1eda2ec573d99e2bffec9bf2a"
     },
+    "graphify": {
+      "source": "safishamsi/graphify",
+      "sourceType": "github",
+      "skillPath": "skills/graphify/SKILL.md",
+      "computedHash": "9c6c09f7db06bb1c5c012e2957bbbc009a82d19087ae5431d7dc14ca920c7f1c"
+    },
     "impeccable": {
       "source": "pbakaus/impeccable",
       "sourceType": "github",

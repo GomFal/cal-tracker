@@ -310,19 +310,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsLanguageTitle => 'Language';
 
   @override
-  String get settingsLanguageSubtitleEnglish => 'English';
-
-  @override
-  String get settingsLanguageSubtitleSpanish => 'Español';
+  String get settingsLanguageNativeName => 'English';
 
   @override
   String get settingsLanguageSheetTitle => 'Choose language';
-
-  @override
-  String get settingsLanguageEnglish => 'English';
-
-  @override
-  String get settingsLanguageSpanish => 'Español';
 
   @override
   String get settingsThemeTitle => 'Appearance';

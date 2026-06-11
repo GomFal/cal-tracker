@@ -83,13 +83,13 @@ class _LocalToolkitHostState extends State<_LocalToolkitHost> {
       animation: _store,
       builder: (context, child) {
         final l10n = AppLocalizations.of(context);
-        final localeCode = context.watch<LocaleViewModel>().localeCode;
+        final localeTag = context.watch<LocaleViewModel>().localeTag;
         final themeMode = context.watch<ThemeModeViewModel>().themeMode;
         return LocalToolkitOverlay(
           labels: _labels(l10n),
           activeScenario: _activeScenario,
           trustedModeEnabled: _store.user.trustedModeEnabled,
-          currentLocaleLabel: localeCode.toUpperCase(),
+          currentLocaleLabel: localeTag.toUpperCase(),
           currentThemeLabel: themeMode == ThemeMode.dark ? 'Dark' : 'Light',
           onRouteJump: _handleRouteJump,
           onScenarioSelected: _handleScenarioSelected,
@@ -243,8 +243,12 @@ class _LocalToolkitHostState extends State<_LocalToolkitHost> {
 
   void _switchLocale() {
     final localeViewModel = context.read<LocaleViewModel>();
-    final nextCode = localeViewModel.localeCode == 'en' ? 'es' : 'en';
-    unawaited(localeViewModel.setLocaleCode(nextCode));
+    final currentIndex =
+        AppLocalizations.supportedLocales.indexOf(localeViewModel.locale);
+    final nextIndex =
+        (currentIndex + 1) % AppLocalizations.supportedLocales.length;
+    final nextLocale = AppLocalizations.supportedLocales[nextIndex];
+    unawaited(localeViewModel.setLocaleTag(nextLocale.toLanguageTag()));
   }
 
   void _switchTheme() {

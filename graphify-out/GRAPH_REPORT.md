@@ -1,16 +1,16 @@
-# Graph Report - cal-tracker  (2026-06-09)
+# Graph Report - meal-proposal-language-workflow  (2026-06-11)
 
 ## Corpus Check
-- 351 files · ~826,978 words
+- 347 files · ~819,140 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 14524 nodes · 18770 edges · 571 communities (546 shown, 25 thin omitted)
+- 14480 nodes · 18643 edges · 570 communities (545 shown, 25 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 5 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `bfeb9823`
+- Built from commit: `82f8d70a`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -514,6 +514,7 @@
 - [[_COMMUNITY_Community 496|Community 496]]
 - [[_COMMUNITY_Community 498|Community 498]]
 - [[_COMMUNITY_Community 499|Community 499]]
+- [[_COMMUNITY_Community 502|Community 502]]
 - [[_COMMUNITY_Community 505|Community 505]]
 - [[_COMMUNITY_Community 506|Community 506]]
 - [[_COMMUNITY_Community 507|Community 507]]
@@ -526,7 +527,6 @@
 - [[_COMMUNITY_Community 516|Community 516]]
 - [[_COMMUNITY_Community 517|Community 517]]
 - [[_COMMUNITY_Community 518|Community 518]]
-- [[_COMMUNITY_Community 519|Community 519]]
 - [[_COMMUNITY_Community 520|Community 520]]
 - [[_COMMUNITY_Community 521|Community 521]]
 - [[_COMMUNITY_Community 522|Community 522]]
@@ -546,7 +546,6 @@
 - [[_COMMUNITY_Community 536|Community 536]]
 - [[_COMMUNITY_Community 537|Community 537]]
 - [[_COMMUNITY_Community 538|Community 538]]
-- [[_COMMUNITY_Community 539|Community 539]]
 - [[_COMMUNITY_Community 540|Community 540]]
 - [[_COMMUNITY_Community 541|Community 541]]
 - [[_COMMUNITY_Community 542|Community 542]]
@@ -582,7 +581,7 @@
 ## God Nodes (most connected - your core abstractions)
 1. `normalizeText()` - 105 edges
 2. `_` - 93 edges
-3. `PostgresRepository` - 89 edges
+3. `PostgresRepository` - 88 edges
 4. `InMemoryRepository` - 61 edges
 5. `_` - 44 edges
 6. `state` - 41 edges
@@ -592,41 +591,41 @@
 10. `str` - 29 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `isBrandOnlySegment()` --calls--> `normalizeText()`  [EXTRACTED]
-  apps/backend/scripts/food-normalization-long-name-review.ts → apps/backend/src/utils/normalize.ts
 - `isDisambiguatingHiddenDescriptor()` --calls--> `normalizeText()`  [EXTRACTED]
   apps/backend/scripts/food-normalized-search-backfill.ts → apps/backend/src/utils/normalize.ts
 - `normalizedIdentityTokenKey()` --calls--> `normalizeText()`  [EXTRACTED]
   apps/backend/src/foodData/normalization.ts → apps/backend/src/utils/normalize.ts
-- `logLocalRun()` --calls--> `summarizeError()`  [EXTRACTED]
-  apps/backend/src/http/app.ts → apps/backend/src/observability/localRunLogger.ts
+- `parseCountToken()` --calls--> `normalizeText()`  [EXTRACTED]
+  apps/backend/src/nutrition/foodResolver.ts → apps/backend/src/utils/normalize.ts
 - `MemoryRunLogger` --implements--> `LocalRunLogger`  [EXTRACTED]
   apps/backend/scripts/benchmark-agent-foods.ts → apps/backend/src/observability/localRunLogger.ts
+- `main()` --calls--> `loadConfig()`  [EXTRACTED]
+  apps/backend/scripts/benchmark-agent-foods.ts → apps/backend/src/config/env.ts
 
 ## Import Cycles
 - None detected.
 
-## Communities (571 total, 25 thin omitted)
+## Communities (570 total, 25 thin omitted)
 
 ### Community 0 - "Community 0"
 Cohesion: 0.00
-Nodes (504): app_localizations_en.dart, app_localizations_es.dart, appTitle, authContinueWithGoogleButton, authCreateAccountButton, authCreateAccountFailedTitle, authCreateAccountLink, authEmailInvalidError (+496 more)
+Nodes (505): app_localizations_en.dart, app_localizations_es.dart, appTitle, authContinueWithGoogleButton, authCreateAccountButton, authCreateAccountFailedTitle, authCreateAccountLink, authEmailInvalidError (+497 more)
 
 ### Community 1 - "Community 1"
 Cohesion: 0.00
-Nodes (493): app_localizations.dart, appTitle, authContinueWithGoogleButton, authCreateAccountButton, authCreateAccountFailedTitle, authCreateAccountLink, authEmailInvalidError, authEmailLabel (+485 more)
+Nodes (494): appTitle, authContinueWithGoogleButton, authCreateAccountButton, authCreateAccountFailedTitle, authCreateAccountLink, authEmailInvalidError, authEmailLabel, authGetStartedButton (+486 more)
 
 ### Community 2 - "Community 2"
 Cohesion: 0.00
-Nodes (493): appTitle, authContinueWithGoogleButton, authCreateAccountButton, authCreateAccountFailedTitle, authCreateAccountLink, authEmailInvalidError, authEmailLabel, authGetStartedButton (+485 more)
+Nodes (494): app_localizations.dart, appTitle, authContinueWithGoogleButton, authCreateAccountButton, authCreateAccountFailedTitle, authCreateAccountLink, authEmailInvalidError, authEmailLabel (+486 more)
 
 ### Community 3 - "Community 3"
 Cohesion: 0.01
-Nodes (195): FoodCandidateGroup, FoodPortionChoice, ../../../shared/editable_meal_item_controller.dart, ../../../shared/nutrition_edit_components.dart, ../../../shared/nutrition_edit_sheet.dart, StatelessWidget, ../view_models/voice_log_helpers.dart, ../view_models/voice_log_view_model.dart (+187 more)
+Nodes (174): FoodCandidateGroup, FoodPortionChoice, _InlineReplacementFoodSearch, ../../../shared/editable_meal_item_controller.dart, _InlineReplacementFoodSearch, _InlineReplacementFoodSearchState, ../../../shared/nutrition_edit_components.dart, ../../../shared/nutrition_edit_sheet.dart (+166 more)
 
 ### Community 4 - "Community 4"
-Cohesion: 0.01
-Nodes (211): ApiConfig, _activeUserId, apiConfig, appWrapperBuilder, audioRecorderService, _AuthenticatedDataPreloader, _AuthenticatedDataPreloaderState, authRepository (+203 more)
+Cohesion: 0.02
+Nodes (144): ApiConfig, _activeUserId, apiConfig, appWrapperBuilder, audioRecorderService, _AuthenticatedDataPreloader, _AuthenticatedDataPreloaderState, authRepository (+136 more)
 
 ### Community 5 - "Community 5"
 Cohesion: 0.01
@@ -638,15 +637,15 @@ Nodes (120): FoodMention, actionText, activityFactor, adjustmentCalories, aliase
 
 ### Community 7 - "Community 7"
 Cohesion: 0.02
-Nodes (142): ../../../core/content_frame.dart, ../../../core/voice_action_button.dart, meal_template_editor_screen.dart, MealTemplate?, MealTemplateEditorScreen.editRoute, MealTemplateEditorScreen.newRoute, UsualFoodEditorScreen.editRoute, UsualFoodEditorScreen.newRoute (+134 more)
+Nodes (97): ../../../core/voice_action_button.dart, ../../../shared/food_search_panel.dart, _aliasesController, _applyCandidate, _applyDraft, audioRecorderService, caloriesController, _candidateGroups (+89 more)
 
 ### Community 8 - "Community 8"
 Cohesion: 0.02
 Nodes (105): actionId, activateCacheForUser, AgentRunResult, _apiClient, _appendCachedTemplate, _appendCachedUsualFood, _backgroundRefreshCooldown, _cacheAgentResult (+97 more)
 
 ### Community 9 - "Community 9"
-Cohesion: 0.02
-Nodes (120): context, _fallbackMessage, _isNetworkError, _notFoundMessage, UserErrorContext, userVisibleErrorMessage, _validationMessage, dart:convert (+112 more)
+Cohesion: 0.03
+Nodes (91): dart:convert, _integrationApiConfig, main, main, package:cal_tracker_mobile/app/app.dart, package:cal_tracker_mobile/data/services/api_config.dart, package:cal_tracker_mobile/data/services/mobile_update_service.dart, package:cal_tracker_mobile/domain/models/mobile_update_models.dart (+83 more)
 
 ### Community 10 - "Community 10"
 Cohesion: 0.03
@@ -657,24 +656,24 @@ Cohesion: 0.02
 Nodes (98): @visibleForTesting, Meal? get, MealProposal, MealProposal? get, MealTemplate? get, NutritionSnapshot, NutritionSnapshot? get, UsualFoodDraft? get (+90 more)
 
 ### Community 12 - "Community 12"
-Cohesion: 0.05
-Nodes (87): canonicalNameForMention(), findProposalItemIndex(), sameUnit(), aliasesForCanonical(), aliasesFromPortionDescription(), aliasesFromPortionUnit(), baseCountUnit(), cachedFoodIsCompatible() (+79 more)
+Cohesion: 0.04
+Nodes (88): aliasesForCanonical(), aliasesFromPortionDescription(), aliasesFromPortionUnit(), annotateCandidateMetadata(), baseCountUnit(), cachedFoodIsCompatible(), canonicalEnglishSearchName(), canonicalNameForMention() (+80 more)
 
 ### Community 13 - "Community 13"
 Cohesion: 0.02
 Nodes (92): addSampleMeal, adjustment, _agentScenarios, applyEmptyDayPreset, applyGoalsNotConfiguredPreset, applyNormalDayPreset, applyOverTargetPreset, applyTemplateHeavyPreset (+84 more)
 
 ### Community 14 - "Community 14"
-Cohesion: 0.05
-Nodes (28): aliasesFromNutrients(), clamp(), clampScore(), dailyGoalKey(), foodFeedbackDelta(), foodMatchesSearchLocale(), foodMatchesSearchScope(), foodRecordToUsualFood() (+20 more)
+Cohesion: 0.03
+Nodes (53): AuthErrorStatus, AuthService, isDuplicateEmailError(), publicUser(), clampScore(), compactnessAdjustedScore(), containsTokenPhrase(), editSimilarity() (+45 more)
 
 ### Community 15 - "Community 15"
-Cohesion: 0.05
-Nodes (45): AgentRunResult, Fake, File, package:cal_tracker_mobile/data/repositories/nutrition_repository.dart, package:cal_tracker_mobile/data/services/audio_recorder_service.dart, package:cal_tracker_mobile/ui/core/app_shell.dart, package:cal_tracker_mobile/ui/features/voice_log/view_models/voice_log_view_model.dart, package:go_router/go_router.dart (+37 more)
+Cohesion: 0.04
+Nodes (64): AgentRunResult, FreshCard, dart:io, Fake, File, IconButton, package:cal_tracker_mobile/data/repositories/nutrition_repository.dart, package:cal_tracker_mobile/data/services/audio_recorder_service.dart (+56 more)
 
 ### Community 16 - "Community 16"
 Cohesion: 0.02
-Nodes (85): FormState, _aliasesController, _applyDraft, audioRecorderService, _barcodeController, _BottomSaveBar, _brandController, _buildForm (+77 more)
+Nodes (100): FormState, MealTemplateEditorScreen.editRoute, MealTemplateEditorScreen.newRoute, UsualFoodEditorScreen.editRoute, UsualFoodEditorScreen.newRoute, MealTemplatesViewModel, _applyDraftFromText, build (+92 more)
 
 ### Community 17 - "Community 17"
 Cohesion: 0.08
@@ -682,63 +681,63 @@ Nodes (64): build_load(), build_query_xml(), Context, copy_csv(), count_csv_rows
 
 ### Community 18 - "Community 18"
 Cohesion: 0.02
-Nodes (119): dart:math, ../../domain/models/nutrition_edit.dart, ../../domain/models/nutrition_models.dart, double?, editable_meal_item_controller.dart, _EditableMealItem, food_search_panel.dart, int get (+111 more)
+Nodes (82): editable_meal_item_controller.dart, _EditableMealItem, food_search_panel.dart, nutrition_edit_sheet.dart, _NutritionEdit?, _addSearchExpanded, adjustQuantity, _applyMacroCalories (+74 more)
 
 ### Community 19 - "Community 19"
 Cohesion: 0.03
 Nodes (81): _, action, actions, appBg, assets, backgroundColor, build, center (+73 more)
 
 ### Community 20 - "Community 20"
-Cohesion: 0.03
-Nodes (76): isDarkMode, load, _preferencesRepository, setDarkMode, setThemeMode, _themeMode, LocalPreferencesRepository, ../../data/services/app_preferences_repository.dart (+68 more)
+Cohesion: 0.04
+Nodes (47): _MockAuthRepository, package:cal_tracker_mobile/data/repositories/auth_repository.dart, package:cal_tracker_mobile/domain/models/auth_models.dart, package:cal_tracker_mobile/ui/features/auth/view_models/auth_view_model.dart, package:cal_tracker_mobile/ui/features/dashboard/view_models/dashboard_view_model.dart, package:cal_tracker_mobile/ui/features/settings/view_models/settings_view_model.dart, package:cal_tracker_mobile/ui/features/settings/views/settings_screen.dart, main (+39 more)
 
 ### Community 21 - "Community 21"
 Cohesion: 0.05
-Nodes (68): agentFoodBenchmarkCases, BenchmarkCase, BenchmarkLanguage, benchmarkAuthorizationHeader(), BenchmarkAuthSession, benchmarkAuthSessionFromBody(), BenchmarkCaseSet, BenchmarkRetryAttempt (+60 more)
+Nodes (69): agentFoodBenchmarkCases, BenchmarkCase, BenchmarkLanguage, benchmarkAuthorizationHeader(), BenchmarkAuthSession, benchmarkAuthSessionFromBody(), BenchmarkCaseSet, BenchmarkRetryAttempt (+61 more)
 
 ### Community 22 - "Community 22"
 Cohesion: 0.03
 Nodes (73): MacroDistributionConfig get, MacroGrams get, _adjustGramsToCalories, _adjustPercentage, build, calories, _canAdjustGrams, _canAdjustPercentage (+65 more)
 
 ### Community 23 - "Community 23"
-Cohesion: 0.05
-Nodes (31): AgentMessage, AgentToolDecision, ChatAgentProvider, ToolCallingUsualFoodDraftProvider, UsualFoodDraftProvider, UsualFoodDraftProviderUnavailableError, usualFoodDraftSystemPrompt(), ToolCallingUsualMealDraftProvider (+23 more)
+Cohesion: 0.06
+Nodes (34): Color, formatHydrationLiters, rounded, roundHydrationLiters, meal_template_editor_screen.dart, MealTemplate?, return, usual_food_editor_screen.dart (+26 more)
 
 ### Community 24 - "Community 24"
 Cohesion: 0.03
-Nodes (80): AlignmentGeometry, EdgeInsets, _handleScenarioSelected, openMealCreate, Route /meal/create, main, activeScenario, alignment (+72 more)
+Nodes (77): AlignmentGeometry, EdgeInsets, main, activeScenario, alignment, build, child, _closePanel (+69 more)
 
 ### Community 25 - "Community 25"
-Cohesion: 0.06
-Nodes (14): groupRowsByString(), jsonb(), mapActionCall(), mapAuditEvent(), mapNutrition(), mapSession(), mergeNormalizedFoodDocumentRows(), normalizedFoodSearchLimit() (+6 more)
+Cohesion: 0.04
+Nodes (65): AppDb, AppDbClient, createDbClient(), normalizedIdentityTokenKeys(), aliasesFromNutrients(), arrayOfStrings(), candidatePhraseInQuerySql(), clamp() (+57 more)
 
 ### Community 26 - "Community 26"
 Cohesion: 0.11
 Nodes (58): DataFrame, Series, bool, int, object, Path, str, attach_categories() (+50 more)
 
 ### Community 27 - "Community 27"
-Cohesion: 0.03
-Nodes (72): AnimatedScale, FreshCard, FilledButton, Icon, IconButton, Meal, MacroDistributionConfig, package:cal_tracker_mobile/app/theme.dart (+64 more)
+Cohesion: 0.04
+Nodes (44): AnimatedScale, FilledButton, Icon, Meal, MacroDistributionConfig, package:cal_tracker_mobile/app/theme.dart, package:cal_tracker_mobile/ui/core/design_system.dart, package:cal_tracker_mobile/ui/features/dashboard/views/macro_distribution_sheet.dart (+36 more)
 
 ### Community 28 - "Community 28"
 Cohesion: 0.03
-Nodes (73): checkForUpdate, _checking, _dialogHandled, _error, markDialogHandled, _opening, openUpdate, shouldShowDialog (+65 more)
+Nodes (57): _authenticate, _authHeroIndex, cancel, checkForUpdate, clear, commitProposal, correctMealItems, createLocalApiClient (+49 more)
 
 ### Community 29 - "Community 29"
 Cohesion: 0.12
 Nodes (54): DictWriter, build(), BuildStats, clean_text(), Context, copy_csv(), count_csv_rows(), database_schema() (+46 more)
 
 ### Community 30 - "Community 30"
-Cohesion: 0.18
-Nodes (14): ../../app/mobile_update_view_model.dart, MobileUpdateViewModel, build, child, createState, _dialogOpen, didChangeDependencies, didUpdateWidget (+6 more)
+Cohesion: 0.06
+Nodes (30): package:cal_tracker_mobile/data/services/app_preferences_storage.dart, package:cal_tracker_mobile/data/services/nutrition_cache_store.dart, package:cal_tracker_mobile/domain/models/nutrition_models.dart, package:cal_tracker_mobile/ui/features/dashboard/views/calorie_target_sheet.dart, age, _estimate, _EstimateInput, heightCm (+22 more)
 
 ### Community 31 - "Community 31"
 Cohesion: 0.06
-Nodes (51): appendVariantDescriptors(), applyCollisionIssueCodes(), applyDisplayCollisionIssue(), applyPrimaryEntityCategoryCoherence(), applyPrimaryEntityRepresentativeness(), applyProductCollisionIssue(), applyRowLongNameDecision(), Args (+43 more)
+Nodes (55): parseLongNameDecision(), NormalizedFoodNameParts, suggestDecision(), appendVariantDescriptors(), applyCollisionIssueCodes(), applyDisplayCollisionIssue(), applyPrimaryEntityCategoryCoherence(), applyPrimaryEntityRepresentativeness() (+47 more)
 
 ### Community 32 - "Community 32"
 Cohesion: 0.04
-Nodes (54): static final, static final AlignmentTween, TickerProviderStateMixin, ../view_models/auth_view_model.dart, _alignmentTween, _animationsEnabled, assetPath, assets (+46 more)
+Nodes (56): static final, static final AlignmentTween, TickerProviderStateMixin, ../view_models/auth_view_model.dart, _alignmentTween, _animationsEnabled, assetPath, assets (+48 more)
 
 ### Community 33 - "Community 33"
 Cohesion: 0.04
@@ -746,8 +745,8 @@ Nodes (55): FreshIconButton, package:cal_tracker_mobile/ui/features/meal_templat
   ThemeMode, _addActionButton, build, cancel, clear (+47 more)
 
 ### Community 34 - "Community 34"
-Cohesion: 0.08
-Nodes (53): longNameInputSignature(), parseLongNameDecision(), Args, boundedDecisionDisplay(), brandScore(), buildCandidatesFromPreviews(), candidateFromPreview(), candidateFromRow() (+45 more)
+Cohesion: 0.10
+Nodes (47): longNameInputSignature(), Args, boundedDecisionDisplay(), brandScore(), buildCandidatesFromPreviews(), candidateFromPreview(), candidateFromRow(), CandidateRow (+39 more)
 
 ### Community 35 - "Community 35"
 Cohesion: 0.03
@@ -763,44 +762,44 @@ Cohesion: 0.04
 Nodes (54): Container, package:cal_tracker_mobile/ui/features/dashboard/views/dashboard_screen.dart, _channel, clear, correctMealItems, _dailySummary, deletedMealIds, deleteMeal (+46 more)
 
 ### Community 38 - "Community 38"
-Cohesion: 0.09
-Nodes (28): ActionExecutor, actionInstrumentation(), buildUsualMealDraft(), buildValidatedUsualFoodDraft(), candidateGroupsForMentions(), ensureCandidateGroupsForMentions(), fixedMealLabels, foodFeedbackActionForEvent() (+20 more)
+Cohesion: 0.08
+Nodes (31): ActionExecutor, actionInstrumentation(), buildUsualMealDraft(), buildValidatedUsualFoodDraft(), candidateGroupsForMentions(), canonicalNameForMention(), ensureCandidateGroupsForMentions(), findProposalItemIndex() (+23 more)
 
 ### Community 39 - "Community 39"
-Cohesion: 0.06
-Nodes (54): AppDb, AppDbClient, aliasesFromNutrients(), arrayOfStrings(), candidatePhraseInQuerySql(), clamp(), clampScore(), compactnessPenaltySql() (+46 more)
+Cohesion: 0.02
+Nodes (90): calorie_target_sheet.dart, ../dashboard_time_labels.dart, Key, ../../../../l10n/meal_label_localizations.dart, macro_distribution_sheet.dart, MealLabel?, ../../settings/view_models/settings_view_model.dart, StatelessWidget (+82 more)
 
 ### Community 40 - "Community 40"
 Cohesion: 0.06
-Nodes (33): DateTime?, Duration, BackendHealthMonitor, check, _healthyFor, _lastSuccessAt, recordSuccess, activateUser (+25 more)
+Nodes (34): DateTime?, Duration, BackendHealthMonitor, check, _healthyFor, _lastSuccessAt, recordSuccess, activateUser (+26 more)
 
 ### Community 41 - "Community 41"
 Cohesion: 0.06
-Nodes (47): type, enum, type, maximum, minimum, type, properties, type (+39 more)
+Nodes (51): type, enum, type, maximum, minimum, type, additionalProperties, properties (+43 more)
 
 ### Community 42 - "Community 42"
 Cohesion: 0.06
-Nodes (51): type, enum, type, maximum, minimum, type, additionalProperties, properties (+43 more)
+Nodes (47): type, enum, type, maximum, minimum, type, properties, type (+39 more)
 
 ### Community 43 - "Community 43"
 Cohesion: 0.05
-Nodes (51): CalTrackerApiClient, AudioRecorderService, AuthRepository, LocalAudioRecorderService, LocalAuthRepository, LocalNutritionRepository, audioRecorderService, authRepository (+43 more)
+Nodes (50): CalTrackerApiClient, AudioRecorderService, AuthRepository, LocalAudioRecorderService, LocalAuthRepository, LocalNutritionRepository, audioRecorderService, authRepository (+42 more)
 
 ### Community 44 - "Community 44"
-Cohesion: 0.05
-Nodes (44): ../../../core/user_visible_error.dart, DailyGoals?, DailyGoals? get, DailySummary, DailySummary? get, ../../data/repositories/nutrition_repository.dart, ../../../../domain/models/macro_distribution.dart, ../../../../domain/models/nutrition_summary_updates.dart (+36 more)
+Cohesion: 0.04
+Nodes (48): DailyGoals?, DailyGoals? get, DailySummary, DailySummary? get, dart:async, ../../data/repositories/nutrition_repository.dart, ../../../../domain/models/macro_distribution.dart, ../../domain/models/nutrition_models.dart (+40 more)
 
 ### Community 45 - "Community 45"
 Cohesion: 0.04
-Nodes (45): _FakeAuthRepository, _MockAuthRepository, package:cal_tracker_mobile/data/repositories/auth_repository.dart, package:cal_tracker_mobile/domain/models/auth_models.dart, package:cal_tracker_mobile/ui/features/auth/view_models/auth_view_model.dart, package:cal_tracker_mobile/ui/features/auth/views/auth_screen.dart, _AuthTestApp, build (+37 more)
+Nodes (51): isDarkMode, load, _preferencesRepository, setDarkMode, setThemeMode, _themeMode, LocalPreferencesRepository, ../../data/services/app_preferences_repository.dart (+43 more)
 
 ### Community 46 - "Community 46"
 Cohesion: 0.07
 Nodes (42): Args, bestPrimaryRank(), CandidateReview, ConflictCandidate, evaluateQuery(), extractConflictCandidates(), extractValidationQueries(), FailureReason (+34 more)
 
 ### Community 47 - "Community 47"
-Cohesion: 0.05
-Nodes (37): dart:async, DartGroupEntry, macro_wizard_test.dart, package:patrol/src/platform/contracts/contracts.dart, package:test_api/src/backend/invoker.dart, accessToken, body, _breadItem (+29 more)
+Cohesion: 0.06
+Nodes (36): ../../app/mobile_update_view_model.dart, MobileUpdateViewModel, build, child, createState, _dialogOpen, didChangeDependencies, didUpdateWidget (+28 more)
 
 ### Community 48 - "Community 48"
 Cohesion: 0.04
@@ -811,8 +810,8 @@ Cohesion: 0.04
 Nodes (48): MacroGrams?, MacroMode, MacroPercentages?, MacroPercentages get, MacroPreset?, MacroSource?, abs, absoluteDelta (+40 more)
 
 ### Community 50 - "Community 50"
-Cohesion: 0.04
-Nodes (47): name, notNull, primaryKey, type, name, notNull, primaryKey, type (+39 more)
+Cohesion: 0.05
+Nodes (41): name, notNull, primaryKey, type, name, notNull, primaryKey, type (+33 more)
 
 ### Community 51 - "Community 51"
 Cohesion: 0.04
@@ -835,8 +834,8 @@ Cohesion: 0.04
 Nodes (47): name, notNull, primaryKey, type, name, notNull, primaryKey, type (+39 more)
 
 ### Community 56 - "Community 56"
-Cohesion: 0.05
-Nodes (41): name, notNull, primaryKey, type, name, notNull, primaryKey, type (+33 more)
+Cohesion: 0.04
+Nodes (47): name, notNull, primaryKey, type, name, notNull, primaryKey, type (+39 more)
 
 ### Community 57 - "Community 57"
 Cohesion: 0.04
@@ -859,8 +858,8 @@ Cohesion: 0.04
 Nodes (47): name, notNull, primaryKey, type, name, notNull, primaryKey, type (+39 more)
 
 ### Community 62 - "Community 62"
-Cohesion: 0.07
-Nodes (38): ActionExecutionError, AgentRunResult, buildActionContext(), inferSpeechLanguage(), logLocalRun(), MealInputMode, MealInputRunResult, parseAudioUpload() (+30 more)
+Cohesion: 0.24
+Nodes (5): GoogleIdentityClaims, GoogleTokenVerifier, RemoteGoogleTokenVerifier, AppConfig, FakeGoogleTokenVerifier
 
 ### Community 63 - "Community 63"
 Cohesion: 0.04
@@ -871,20 +870,20 @@ Cohesion: 0.04
 Nodes (45): default, name, notNull, primaryKey, type, default, name, notNull (+37 more)
 
 ### Community 65 - "Community 65"
-Cohesion: 0.05
-Nodes (44): name, notNull, primaryKey, type, default, name, notNull, primaryKey (+36 more)
+Cohesion: 0.04
+Nodes (45): default, name, notNull, primaryKey, type, default, name, notNull (+37 more)
 
 ### Community 66 - "Community 66"
-Cohesion: 0.02
-Nodes (81): Animation, AnimationController, _AuthRestoreGate, authViewModel, build, buildRouter, child, modalLockController (+73 more)
+Cohesion: 0.05
+Nodes (46): Animation, AnimationController, actions, build, child, ContentFrame, leading, subtitle (+38 more)
 
 ### Community 67 - "Community 67"
 Cohesion: 0.04
 Nodes (44): dependencies, @cal-tracker/contracts, drizzle-orm, hono, @hono/node-server, jose, @node-rs/argon2, postgres (+36 more)
 
 ### Community 68 - "Community 68"
-Cohesion: 0.07
-Nodes (24): createDbClient(), assertRequiredDatabaseName(), assertRequiredSchema(), consumeRequireDbNameArg(), client, Command, config, guardArgs (+16 more)
+Cohesion: 0.05
+Nodes (42): envSchema, loadConfig(), stringBooleanSchema, withSearchPath(), assertRequiredDatabaseName(), assertRequiredSchema(), consumeRequireDbNameArg(), client (+34 more)
 
 ### Community 69 - "Community 69"
 Cohesion: 0.05
@@ -899,32 +898,32 @@ Cohesion: 0.04
 Nodes (47): name, notNull, primaryKey, type, name, notNull, primaryKey, type (+39 more)
 
 ### Community 72 - "Community 72"
-Cohesion: 0.10
-Nodes (23): ExecuteActionResult, buildSystemMessage(), agentRunBlockedMutations, filterToolsByPolicy(), agentModelInputStats(), AgentProviderUnavailableError, AgentService, approxTokens() (+15 more)
+Cohesion: 0.08
+Nodes (27): ExecuteActionResult, buildSystemMessage(), agentRunBlockedMutations, filterToolsByPolicy(), agentModelInputStats(), AgentProviderUnavailableError, AgentService, approxTokens() (+19 more)
 
 ### Community 73 - "Community 73"
-Cohesion: 0.40
-Nodes (4): formatHydrationLiters, rounded, roundHydrationLiters, return
+Cohesion: 0.03
+Nodes (60): LocalTokenStorage, _FakeAuthRepository, package:cal_tracker_mobile/data/services/google_sign_in_service.dart, package:cal_tracker_mobile/data/services/secure_token_storage.dart, package:cal_tracker_mobile/generated/api/cal_tracker_api.dart, package:cal_tracker_mobile/ui/core/user_visible_error.dart, package:cal_tracker_mobile/ui/features/auth/views/auth_screen.dart, StoredTokens? (+52 more)
 
 ### Community 74 - "Community 74"
-Cohesion: 0.05
-Nodes (37): dashboardDayMonthLabel, dashboardGreeting, hour, months, ../../../../l10n/generated/app_localizations.dart, ../../../shared/meal_item_editor_sheet.dart, ../view_models/meal_history_view_model.dart, active (+29 more)
+Cohesion: 0.06
+Nodes (33): ../../../core/content_frame.dart, ../../../shared/meal_item_editor_sheet.dart, ../view_models/meal_history_view_model.dart, active, bar, _BarData, _CaloriesChartCard, _ChartBar (+25 more)
 
 ### Community 75 - "Community 75"
-Cohesion: 0.17
-Nodes (11): load, _locale, localeCode, _normalizeCode, _preferencesRepository, setLocaleCode, supportedLocaleCodes, supportedLocales (+3 more)
+Cohesion: 0.09
+Nodes (22): app/app.dart, data/services/api_config.dart, Future, main, setPreferredOrientations, _e2eApiConfig, main, setPreferredOrientations (+14 more)
 
 ### Community 76 - "Community 76"
 Cohesion: 0.11
-Nodes (35): aliasVariants(), brandScore(), buildBoundedSearchText(), buildNormalizedFoodSearchDocument(), buildSearchText(), clampDisplayTokens(), cleanDescriptorText(), cleanDisplayText() (+27 more)
+Nodes (34): aliasVariants(), brandScore(), buildBoundedSearchText(), buildNormalizedFoodSearchDocument(), buildSearchText(), clampDisplayTokens(), cleanDescriptorText(), cleanDisplayText() (+26 more)
 
 ### Community 77 - "Community 77"
 Cohesion: 0.06
 Nodes (38): created_at, expires_at, refresh_token_hash, revoked_at, rotated_at, scopes, user_id, default (+30 more)
 
 ### Community 78 - "Community 78"
-Cohesion: 0.06
-Nodes (38): created_at, expires_at, refresh_token_hash, revoked_at, rotated_at, scopes, user_id, default (+30 more)
+Cohesion: 0.10
+Nodes (21): expires_at, refresh_token_hash, rotated_at, user_id, name, notNull, primaryKey, type (+13 more)
 
 ### Community 79 - "Community 79"
 Cohesion: 0.05
@@ -939,16 +938,16 @@ Cohesion: 0.05
 Nodes (36): devDependencies, tsx, @types/node, typescript, name, private, scripts, build (+28 more)
 
 ### Community 82 - "Community 82"
-Cohesion: 0.08
-Nodes (23): meal_label_helpers.dart, package:patrol/patrol.dart, _chooseLanguage, _createLanguageUser, email, log, _loginFromAuthScreen, main (+15 more)
+Cohesion: 0.06
+Nodes (32): buildDarkTheme, _buildFreshTheme, buildLightTheme, buildTheme, palette, textTheme, meal_label_helpers.dart, package:flutter/material.dart (+24 more)
 
 ### Community 83 - "Community 83"
 Cohesion: 0.10
 Nodes (33): default, type, anyOf, minLength, type, anyOf, anyOf, properties (+25 more)
 
 ### Community 84 - "Community 84"
-Cohesion: 0.09
-Nodes (20): EmbeddingInput, EmbeddingResult, OpenRouterEmbeddingProvider, timeoutSignal(), UnavailableEmbeddingProvider, createApp(), createLocalRunLogger(), createBenchmarkApp() (+12 more)
+Cohesion: 0.07
+Nodes (27): _applyMacroCalories, build, _caloriesController, _carbsController, createState, dispose, _error, errorMessage (+19 more)
 
 ### Community 85 - "Community 85"
 Cohesion: 0.10
@@ -959,16 +958,17 @@ Cohesion: 0.10
 Nodes (29): NormalizedFoodSearchDocumentInput, dedupeIssues(), DEFAULT_THRESHOLDS, diverges(), evaluateNormalizationReview(), FAILURE_ISSUES, median(), normalizationMetrics() (+21 more)
 
 ### Community 87 - "Community 87"
-Cohesion: 0.03
-Nodes (63): ../core/design_system.dart, IconData, ../../l10n/app_localizations_context.dart, actionIcon, actionLabel, autofocus, build, closeKeySuffix (+55 more)
+Cohesion: 0.06
+Nodes (31): IconData, actionIcon, actionLabel, autofocus, build, closeKeySuffix, createState, didUpdateWidget (+23 more)
 
 ### Community 88 - "Community 88"
 Cohesion: 0.08
 Nodes (28): AcceptanceCheck, BASE_CASES, BenchmarkCase, BenchmarkComparisonKind, BenchmarkMode, BenchmarkReport, BenchmarkScope, BenchmarkTarget (+20 more)
 
 ### Community 89 - "Community 89"
-Cohesion: 0.06
-Nodes (31): _adjust, build, canDecrease, canIncrease, compact, createState, enabled, HydrationGoalSheet (+23 more)
+Cohesion: 0.03
+Nodes (67): build, DarkModeToggle, toggleKey, ../core/design_system.dart, ../../l10n/app_localizations_context.dart, required String text,
+  FontWeight, baseStyle, build (+59 more)
 
 ### Community 90 - "Community 90"
 Cohesion: 0.06
@@ -979,32 +979,32 @@ Cohesion: 0.07
 Nodes (29): aliasesSchema, CalorieEstimateRequest, CalorieEstimateResponse, CreateUsualFoodRequest, dashboardResponseSchema, mealHistoryResponseSchema, optionalNullableTrimmedStringSchema, templatesResponseSchema (+21 more)
 
 ### Community 92 - "Community 92"
-Cohesion: 0.06
-Nodes (32): exclusiveMinimum, type, type, exclusiveMinimum, type, additionalProperties, properties, required (+24 more)
+Cohesion: 0.07
+Nodes (29): exclusiveMinimum, type, type, exclusiveMinimum, type, additionalProperties, properties, required (+21 more)
 
 ### Community 93 - "Community 93"
 Cohesion: 0.07
 Nodes (29): enum, type, maximum, minimum, type, additionalProperties, properties, required (+21 more)
 
 ### Community 94 - "Community 94"
-Cohesion: 0.12
-Nodes (10): GoogleIdentityClaims, GoogleTokenVerifier, RemoteGoogleTokenVerifier, AuthError, AuthErrorStatus, AuthService, isDuplicateEmailError(), publicUser() (+2 more)
+Cohesion: 0.10
+Nodes (19): _AuthRestoreGate, authViewModel, build, buildRouter, child, modalLockController, modalLockObservers, _tabPage (+11 more)
 
 ### Community 95 - "Community 95"
 Cohesion: 0.07
 Nodes (29): enum, type, maximum, minimum, type, additionalProperties, properties, required (+21 more)
 
 ### Community 96 - "Community 96"
-Cohesion: 0.04
-Nodes (52): LocalTokenStorage, package:cal_tracker_mobile/data/services/google_sign_in_service.dart, package:cal_tracker_mobile/data/services/secure_token_storage.dart, package:cal_tracker_mobile/domain/models/macro_distribution.dart, package:cal_tracker_mobile/generated/api/cal_tracker_api.dart, package:cal_tracker_mobile/ui/core/user_visible_error.dart, StoredTokens?, _captureApiException (+44 more)
+Cohesion: 0.09
+Nodes (22): created_at, revoked_at, scopes, source, default, name, notNull, primaryKey (+14 more)
 
 ### Community 97 - "Community 97"
 Cohesion: 0.07
-Nodes (28): ../../../../data/services/nutrition_cache_store.dart, CachedNutritionValue, _cachedWeekSummaries, correctMealItems, deleteMeal, _error, _formatDateOnly, generate (+20 more)
+Nodes (27): ../../../../data/services/nutrition_cache_store.dart, _cachedWeekSummaries, correctMealItems, deleteMeal, _error, _formatDateOnly, generate, _hasLoaded (+19 more)
 
 ### Community 98 - "Community 98"
-Cohesion: 0.07
-Nodes (27): ../../../../domain/models/auth_models.dart, Future, GoogleSignInService, package:google_sign_in/google_sign_in.dart, _apiClient, AuthRepository, _googleSignInService, login (+19 more)
+Cohesion: 0.08
+Nodes (24): context, _fallbackMessage, _isNetworkError, _notFoundMessage, UserErrorContext, userVisibleErrorMessage, _validationMessage, ../../../../domain/models/auth_models.dart (+16 more)
 
 ### Community 99 - "Community 99"
 Cohesion: 0.07
@@ -1015,20 +1015,20 @@ Cohesion: 0.07
 Nodes (26): calories, carbs, consumed, dailySummaryWithGoals, dailySummaryWithMeals, dailySummaryWithWater, fat, goalsFromSummary (+18 more)
 
 ### Community 101 - "Community 101"
-Cohesion: 0.11
-Nodes (24): items, items, type, additionalProperties, properties, required, type, additionalProperties (+16 more)
+Cohesion: 0.10
+Nodes (27): items, items, type, additionalProperties, properties, required, type, additionalProperties (+19 more)
 
 ### Community 102 - "Community 102"
-Cohesion: 0.10
-Nodes (21): schemas, additionalProperties, required, type, additionalProperties, required, type, additionalProperties (+13 more)
-
-### Community 103 - "Community 103"
 Cohesion: 0.07
 Nodes (27): schemas, additionalProperties, required, type, additionalProperties, properties, type, additionalProperties (+19 more)
 
+### Community 103 - "Community 103"
+Cohesion: 0.10
+Nodes (21): schemas, additionalProperties, required, type, additionalProperties, required, type, additionalProperties (+13 more)
+
 ### Community 104 - "Community 104"
-Cohesion: 0.13
-Nodes (11): EmbeddingProvider, MemoryRetrievalService, AuthBindings, mapAuthIdentity(), AppRepository, AuthIdentityProvider, AuthIdentityRecord, FoodFeedbackAction (+3 more)
+Cohesion: 0.04
+Nodes (49): AgentMessage, AgentProviderTimings, AgentStreamEvent, AgentToolCall, AgentToolDecision, ChatAgentProvider, isRecord(), largestStreamGap() (+41 more)
 
 ### Community 105 - "Community 105"
 Cohesion: 0.07
@@ -1055,8 +1055,8 @@ Cohesion: 0.08
 Nodes (26): columns, concurrently, isUnique, method, name, where, with, columnsFrom (+18 more)
 
 ### Community 111 - "Community 111"
-Cohesion: 0.08
-Nodes (26): confirmation_status, error_json, latency_ms, output_json, source, name, notNull, primaryKey (+18 more)
+Cohesion: 0.10
+Nodes (21): confirmation_status, error_json, latency_ms, output_json, name, notNull, primaryKey, type (+13 more)
 
 ### Community 112 - "Community 112"
 Cohesion: 0.10
@@ -1119,8 +1119,8 @@ Cohesion: 0.08
 Nodes (25): maxLength, minLength, type, format, type, additionalProperties, properties, required (+17 more)
 
 ### Community 127 - "Community 127"
-Cohesion: 0.06
-Nodes (31): app/app.dart, AuthErrorSource? get, AuthStatus get, AuthUser? get, bool get, ../../../../data/repositories/auth_repository.dart, main, setPreferredOrientations (+23 more)
+Cohesion: 0.05
+Nodes (35): AuthErrorSource? get, AuthStatus get, AuthUser?, AuthUser? get, ../../../core/user_visible_error.dart, ../../../../data/repositories/auth_repository.dart, accessToken, AuthSession (+27 more)
 
 ### Community 128 - "Community 128"
 Cohesion: 0.08
@@ -1207,12 +1207,12 @@ Cohesion: 0.11
 Nodes (24): items, items, type, additionalProperties, properties, required, type, additionalProperties (+16 more)
 
 ### Community 149 - "Community 149"
-Cohesion: 0.16
-Nodes (8): LocalFoodDataProvider, withSpan(), cosineSimilarity(), sanitizeLimit(), sanitizeLimit(), FoodHybridSearchInput, FoodItemRecord, FoodSearchCandidate
+Cohesion: 0.15
+Nodes (11): hasMarketProductIntent(), LocalFoodDataProvider, withSpan(), foodSearchCacheKey(), foodSearchProfiles(), NormalizedFoodSearchProfile, normalizeSearchLocale(), sanitizeLimit() (+3 more)
 
 ### Community 150 - "Community 150"
-Cohesion: 0.12
-Nodes (13): AgentProviderTimings, AgentStreamEvent, AgentToolCall, AgentToolDefinition, isRecord(), largestStreamGap(), OpenRouterProviderRouting, providerTimeout() (+5 more)
+Cohesion: 0.08
+Nodes (23): dart:math, ../../domain/models/nutrition_edit.dart, double?, MealItem, nutrition_edit_components.dart, adjustQuantity, currentNutrition, dispose (+15 more)
 
 ### Community 151 - "Community 151"
 Cohesion: 0.09
@@ -1244,11 +1244,11 @@ Nodes (22): email, provider, provider_user_id, updated_at, name, notNull, primar
 
 ### Community 158 - "Community 158"
 Cohesion: 0.09
-Nodes (22): correction_text, id, meal_id, proposal_id, name, notNull, primaryKey, type (+14 more)
+Nodes (22): correction_text, created_at, meal_id, proposal_id, name, notNull, primaryKey, type (+14 more)
 
 ### Community 159 - "Community 159"
 Cohesion: 0.09
-Nodes (22): created_at, revoked_at, scopes, source, default, name, notNull, primaryKey (+14 more)
+Nodes (22): id, revoked_at, scopes, source, default, name, notNull, primaryKey (+14 more)
 
 ### Community 160 - "Community 160"
 Cohesion: 0.09
@@ -1264,7 +1264,7 @@ Nodes (22): email, provider, provider_user_id, updated_at, name, notNull, primar
 
 ### Community 163 - "Community 163"
 Cohesion: 0.09
-Nodes (22): correction_text, id, meal_id, proposal_id, name, notNull, primaryKey, type (+14 more)
+Nodes (22): correction_text, created_at, meal_id, proposal_id, name, notNull, primaryKey, type (+14 more)
 
 ### Community 164 - "Community 164"
 Cohesion: 0.10
@@ -1275,16 +1275,16 @@ Cohesion: 0.09
 Nodes (22): email, provider, provider_user_id, updated_at, name, notNull, primaryKey, type (+14 more)
 
 ### Community 166 - "Community 166"
-Cohesion: 0.10
-Nodes (21): expires_at, refresh_token_hash, rotated_at, user_id, name, notNull, primaryKey, type (+13 more)
+Cohesion: 0.09
+Nodes (22): created_at, expires_at, refresh_token_hash, rotated_at, default, name, notNull, primaryKey (+14 more)
 
 ### Community 167 - "Community 167"
 Cohesion: 0.09
 Nodes (22): email, provider, provider_user_id, updated_at, name, notNull, primaryKey, type (+14 more)
 
 ### Community 168 - "Community 168"
-Cohesion: 0.09
-Nodes (22): id, revoked_at, scopes, source, default, name, notNull, primaryKey (+14 more)
+Cohesion: 0.10
+Nodes (21): revoked_at, scopes, source, user_id, columns, name, notNull, primaryKey (+13 more)
 
 ### Community 169 - "Community 169"
 Cohesion: 0.09
@@ -1307,8 +1307,8 @@ Cohesion: 0.09
 Nodes (22): email, provider, provider_user_id, updated_at, name, notNull, primaryKey, type (+14 more)
 
 ### Community 174 - "Community 174"
-Cohesion: 0.10
-Nodes (21): revoked_at, scopes, source, user_id, columns, name, notNull, primaryKey (+13 more)
+Cohesion: 0.09
+Nodes (22): id, revoked_at, scopes, source, default, name, notNull, primaryKey (+14 more)
 
 ### Community 175 - "Community 175"
 Cohesion: 0.09
@@ -1319,40 +1319,40 @@ Cohesion: 0.09
 Nodes (22): email, provider, provider_user_id, updated_at, name, notNull, primaryKey, type (+14 more)
 
 ### Community 177 - "Community 177"
-Cohesion: 0.09
-Nodes (22): id, revoked_at, scopes, source, default, name, notNull, primaryKey (+14 more)
+Cohesion: 0.10
+Nodes (21): revoked_at, scopes, source, user_id, columns, name, notNull, primaryKey (+13 more)
 
 ### Community 178 - "Community 178"
-Cohesion: 0.10
-Nodes (21): correction_text, meal_id, proposal_id, user_id, name, notNull, primaryKey, type (+13 more)
+Cohesion: 0.09
+Nodes (22): correction_text, id, meal_id, proposal_id, name, notNull, primaryKey, type (+14 more)
 
 ### Community 179 - "Community 179"
 Cohesion: 0.09
 Nodes (22): email, provider, provider_user_id, updated_at, name, notNull, primaryKey, type (+14 more)
 
 ### Community 180 - "Community 180"
-Cohesion: 0.09
-Nodes (22): id, revoked_at, scopes, source, default, name, notNull, primaryKey (+14 more)
+Cohesion: 0.10
+Nodes (21): revoked_at, scopes, source, user_id, columns, name, notNull, primaryKey (+13 more)
 
 ### Community 181 - "Community 181"
-Cohesion: 0.10
-Nodes (21): expires_at, refresh_token_hash, rotated_at, user_id, name, notNull, primaryKey, type (+13 more)
+Cohesion: 0.09
+Nodes (22): created_at, expires_at, refresh_token_hash, rotated_at, default, name, notNull, primaryKey (+14 more)
 
 ### Community 182 - "Community 182"
 Cohesion: 0.09
 Nodes (22): email, provider, provider_user_id, updated_at, name, notNull, primaryKey, type (+14 more)
 
 ### Community 183 - "Community 183"
-Cohesion: 0.12
-Nodes (16): revoked_at, scopes, source, columns, name, notNull, primaryKey, type (+8 more)
+Cohesion: 0.10
+Nodes (21): revoked_at, scopes, source, user_id, columns, name, notNull, primaryKey (+13 more)
 
 ### Community 184 - "Community 184"
-Cohesion: 0.10
-Nodes (21): correction_text, meal_id, proposal_id, user_id, name, notNull, primaryKey, type (+13 more)
+Cohesion: 0.09
+Nodes (22): correction_text, id, meal_id, proposal_id, name, notNull, primaryKey, type (+14 more)
 
 ### Community 185 - "Community 185"
-Cohesion: 0.09
-Nodes (22): created_at, expires_at, refresh_token_hash, rotated_at, default, name, notNull, primaryKey (+14 more)
+Cohesion: 0.10
+Nodes (21): expires_at, refresh_token_hash, rotated_at, user_id, name, notNull, primaryKey, type (+13 more)
 
 ### Community 186 - "Community 186"
 Cohesion: 0.09
@@ -1367,12 +1367,12 @@ Cohesion: 0.09
 Nodes (22): email, provider, provider_user_id, updated_at, name, notNull, primaryKey, type (+14 more)
 
 ### Community 189 - "Community 189"
-Cohesion: 0.09
-Nodes (22): id, revoked_at, scopes, source, default, name, notNull, primaryKey (+14 more)
+Cohesion: 0.10
+Nodes (21): revoked_at, scopes, source, user_id, columns, name, notNull, primaryKey (+13 more)
 
 ### Community 190 - "Community 190"
 Cohesion: 0.09
-Nodes (22): created_at, expires_at, refresh_token_hash, rotated_at, default, name, notNull, primaryKey (+14 more)
+Nodes (22): expires_at, id, refresh_token_hash, rotated_at, name, notNull, primaryKey, type (+14 more)
 
 ### Community 191 - "Community 191"
 Cohesion: 0.09
@@ -1380,11 +1380,11 @@ Nodes (22): email, provider, provider_user_id, updated_at, name, notNull, primar
 
 ### Community 192 - "Community 192"
 Cohesion: 0.09
-Nodes (22): id, revoked_at, scopes, source, default, name, notNull, primaryKey (+14 more)
+Nodes (22): created_at, revoked_at, scopes, source, default, name, notNull, primaryKey (+14 more)
 
 ### Community 193 - "Community 193"
-Cohesion: 0.10
-Nodes (21): correction_text, meal_id, proposal_id, user_id, name, notNull, primaryKey, type (+13 more)
+Cohesion: 0.09
+Nodes (22): correction_text, id, meal_id, proposal_id, name, notNull, primaryKey, type (+14 more)
 
 ### Community 194 - "Community 194"
 Cohesion: 0.09
@@ -1399,8 +1399,8 @@ Cohesion: 0.10
 Nodes (21): correction_text, meal_id, proposal_id, user_id, name, notNull, primaryKey, type (+13 more)
 
 ### Community 197 - "Community 197"
-Cohesion: 0.10
-Nodes (21): expires_at, refresh_token_hash, revoked_at, rotated_at, name, notNull, primaryKey, type (+13 more)
+Cohesion: 0.09
+Nodes (22): created_at, expires_at, refresh_token_hash, rotated_at, default, name, notNull, primaryKey (+14 more)
 
 ### Community 198 - "Community 198"
 Cohesion: 0.09
@@ -1408,19 +1408,19 @@ Nodes (22): email, provider, provider_user_id, updated_at, name, notNull, primar
 
 ### Community 199 - "Community 199"
 Cohesion: 0.09
-Nodes (22): correction_text, id, meal_id, proposal_id, name, notNull, primaryKey, type (+14 more)
+Nodes (22): correction_text, created_at, meal_id, proposal_id, name, notNull, primaryKey, type (+14 more)
 
 ### Community 200 - "Community 200"
 Cohesion: 0.09
-Nodes (22): created_at, expires_at, refresh_token_hash, rotated_at, default, name, notNull, primaryKey (+14 more)
+Nodes (22): expires_at, id, refresh_token_hash, rotated_at, name, notNull, primaryKey, type (+14 more)
 
 ### Community 201 - "Community 201"
 Cohesion: 0.09
 Nodes (22): email, provider, provider_user_id, updated_at, name, notNull, primaryKey, type (+14 more)
 
 ### Community 202 - "Community 202"
-Cohesion: 0.19
-Nodes (17): applyLongNameDecision(), boundedDecisionDisplay(), boundedLongNameSearchText(), boundedNormalizedFieldText(), boundedSearchValues(), clampNormalizedTokenCount(), cleanDecisionText(), compactDecisionBrandDisplay() (+9 more)
+Cohesion: 0.23
+Nodes (16): applyLongNameDecision(), boundedDecisionDisplay(), boundedLongNameSearchText(), boundedNormalizedFieldText(), boundedSearchValues(), clampNormalizedTokenCount(), cleanDecisionText(), compactDecisionBrandDisplay() (+8 more)
 
 ### Community 203 - "Community 203"
 Cohesion: 0.10
@@ -1455,8 +1455,8 @@ Cohesion: 0.10
 Nodes (21): name, notNull, primaryKey, type, action_id, input_json, resolved_at, status (+13 more)
 
 ### Community 211 - "Community 211"
-Cohesion: 0.09
-Nodes (22): created_at, expires_at, refresh_token_hash, rotated_at, default, name, notNull, primaryKey (+14 more)
+Cohesion: 0.10
+Nodes (21): expires_at, refresh_token_hash, rotated_at, user_id, name, notNull, primaryKey, type (+13 more)
 
 ### Community 212 - "Community 212"
 Cohesion: 0.10
@@ -1468,7 +1468,7 @@ Nodes (21): confirmation_status, error_json, latency_ms, output_json, name, notN
 
 ### Community 214 - "Community 214"
 Cohesion: 0.09
-Nodes (22): correction_text, created_at, meal_id, proposal_id, name, notNull, primaryKey, type (+14 more)
+Nodes (22): correction_text, id, meal_id, proposal_id, name, notNull, primaryKey, type (+14 more)
 
 ### Community 215 - "Community 215"
 Cohesion: 0.10
@@ -1491,8 +1491,8 @@ Cohesion: 0.10
 Nodes (21): confirmation_status, error_json, latency_ms, output_json, name, notNull, primaryKey, type (+13 more)
 
 ### Community 220 - "Community 220"
-Cohesion: 0.09
-Nodes (22): correction_text, id, meal_id, proposal_id, name, notNull, primaryKey, type (+14 more)
+Cohesion: 0.10
+Nodes (21): correction_text, meal_id, proposal_id, user_id, name, notNull, primaryKey, type (+13 more)
 
 ### Community 221 - "Community 221"
 Cohesion: 0.10
@@ -1503,8 +1503,8 @@ Cohesion: 0.10
 Nodes (21): confirmation_status, error_json, latency_ms, output_json, name, notNull, primaryKey, type (+13 more)
 
 ### Community 223 - "Community 223"
-Cohesion: 0.10
-Nodes (21): correction_text, meal_id, proposal_id, user_id, name, notNull, primaryKey, type (+13 more)
+Cohesion: 0.09
+Nodes (22): correction_text, id, meal_id, proposal_id, name, notNull, primaryKey, type (+14 more)
 
 ### Community 224 - "Community 224"
 Cohesion: 0.10
@@ -1519,28 +1519,28 @@ Cohesion: 0.09
 Nodes (22): created_at, expires_at, refresh_token_hash, rotated_at, default, name, notNull, primaryKey (+14 more)
 
 ### Community 227 - "Community 227"
-Cohesion: 0.09
-Nodes (22): created_at, input_json, resolved_at, status, default, name, notNull, primaryKey (+14 more)
+Cohesion: 0.10
+Nodes (21): name, notNull, primaryKey, type, action_id, input_json, resolved_at, status (+13 more)
 
 ### Community 228 - "Community 228"
-Cohesion: 0.08
-Nodes (26): name, notNull, primaryKey, type, action_id, confirmation_status, error_json, latency_ms (+18 more)
+Cohesion: 0.10
+Nodes (21): confirmation_status, error_json, latency_ms, output_json, name, notNull, primaryKey, type (+13 more)
 
 ### Community 229 - "Community 229"
 Cohesion: 0.09
 Nodes (22): correction_text, id, meal_id, proposal_id, name, notNull, primaryKey, type (+14 more)
 
 ### Community 230 - "Community 230"
-Cohesion: 0.10
-Nodes (21): name, notNull, primaryKey, type, action_id, input_json, resolved_at, status (+13 more)
+Cohesion: 0.09
+Nodes (22): created_at, input_json, resolved_at, status, default, name, notNull, primaryKey (+14 more)
 
 ### Community 231 - "Community 231"
-Cohesion: 0.10
-Nodes (21): confirmation_status, error_json, latency_ms, output_json, name, notNull, primaryKey, type (+13 more)
+Cohesion: 0.08
+Nodes (26): name, notNull, primaryKey, type, action_id, confirmation_status, error_json, latency_ms (+18 more)
 
 ### Community 232 - "Community 232"
-Cohesion: 0.09
-Nodes (22): id, revoked_at, scopes, source, default, name, notNull, primaryKey (+14 more)
+Cohesion: 0.12
+Nodes (16): revoked_at, scopes, source, columns, name, notNull, primaryKey, type (+8 more)
 
 ### Community 233 - "Community 233"
 Cohesion: 0.10
@@ -1551,8 +1551,8 @@ Cohesion: 0.10
 Nodes (21): confirmation_status, error_json, latency_ms, output_json, name, notNull, primaryKey, type (+13 more)
 
 ### Community 235 - "Community 235"
-Cohesion: 0.10
-Nodes (21): correction_text, meal_id, proposal_id, user_id, name, notNull, primaryKey, type (+13 more)
+Cohesion: 0.09
+Nodes (22): correction_text, id, meal_id, proposal_id, name, notNull, primaryKey, type (+14 more)
 
 ### Community 236 - "Community 236"
 Cohesion: 0.10
@@ -1575,8 +1575,8 @@ Cohesion: 0.10
 Nodes (21): confirmation_status, error_json, latency_ms, output_json, name, notNull, primaryKey, type (+13 more)
 
 ### Community 241 - "Community 241"
-Cohesion: 0.09
-Nodes (22): id, revoked_at, scopes, source, default, name, notNull, primaryKey (+14 more)
+Cohesion: 0.10
+Nodes (21): revoked_at, scopes, source, user_id, columns, name, notNull, primaryKey (+13 more)
 
 ### Community 242 - "Community 242"
 Cohesion: 0.10
@@ -1587,8 +1587,8 @@ Cohesion: 0.10
 Nodes (21): confirmation_status, error_json, latency_ms, output_json, name, notNull, primaryKey, type (+13 more)
 
 ### Community 244 - "Community 244"
-Cohesion: 0.12
-Nodes (17): created_at, scopes, source, default, name, notNull, primaryKey, type (+9 more)
+Cohesion: 0.09
+Nodes (22): id, revoked_at, scopes, source, default, name, notNull, primaryKey (+14 more)
 
 ### Community 245 - "Community 245"
 Cohesion: 0.10
@@ -1607,12 +1607,12 @@ Cohesion: 0.15
 Nodes (19): aggregateSourceResultTypeMix(), Args, detectDuplicateFlood(), evaluateRunChecks(), loadResultMetadata(), ndcgAt(), percentile(), percentileSummary() (+11 more)
 
 ### Community 249 - "Community 249"
-Cohesion: 0.15
-Nodes (15): envSchema, loadConfig(), stringBooleanSchema, withSearchPath(), client, config, drizzleMigrationDir, legacyMigrationDir (+7 more)
+Cohesion: 0.20
+Nodes (10): additionalProperties, properties, type, default, input, source, ExecuteActionRequest, default (+2 more)
 
 ### Community 250 - "Community 250"
-Cohesion: 0.06
-Nodes (57): authorizationHeader(), authSessionFromBody(), BenchmarkAuthSession, BenchmarkRunMatrixEntry, benchmarkTimestamp(), buildProviderRoutingLatencyRunMatrix(), buildProviderRoutingLatencyTargets(), calculateProviderRoutingLatencyRetryDelayMs() (+49 more)
+Cohesion: 0.40
+Nodes (5): name, notNull, primaryKey, type, calorie_target_configured_at
 
 ### Community 251 - "Community 251"
 Cohesion: 0.11
@@ -1911,16 +1911,12 @@ Cohesion: 0.11
 Nodes (18): columnsFrom, columnsTo, name, onDelete, onUpdate, tableFrom, tableTo, confirmation_requests_user_id_users_id_fk (+10 more)
 
 ### Community 325 - "Community 325"
-Cohesion: 0.08
-Nodes (16): annotateCandidateMetadata(), FoodDataProvider, FoodResolutionResult, FoodResolver, languageFromLocale(), mapWithConcurrency(), mentionWithLocale(), normalizeProviderResolution() (+8 more)
+Cohesion: 0.10
+Nodes (19): accessToken, body, created, createdProposal, _createPatrolUser, email, _executeAction, false (+11 more)
 
 ### Community 326 - "Community 326"
 Cohesion: 0.04
 Nodes (47): Action Examples, Android AppFunctions, API Requirements, `app_intents` Package Position, Application Specification and Architecture, Architectural Review Corrections Applied, Authentication, Backend (+39 more)
-
-### Community 327 - "Community 327"
-Cohesion: 0.22
-Nodes (14): arbDirectories(), buildMealTitle(), capitalizeTitle(), connectorLanguageFromItems(), firstGrapheme(), languageFromLocale(), MealTitleError, MealTitleMessages (+6 more)
 
 ### Community 328 - "Community 328"
 Cohesion: 0.12
@@ -2039,8 +2035,8 @@ Cohesion: 0.12
 Nodes (17): event_type, metadata_json, trace_id, name, notNull, primaryKey, type, default (+9 more)
 
 ### Community 357 - "Community 357"
-Cohesion: 0.12
-Nodes (17): columnsFrom, columnsTo, name, onDelete, onUpdate, tableFrom, tableTo, auth_identities_user_id_users_id_fk (+9 more)
+Cohesion: 0.06
+Nodes (32): columns, concurrently, isUnique, method, name, with, columnsFrom, columnsTo (+24 more)
 
 ### Community 358 - "Community 358"
 Cohesion: 0.12
@@ -2059,24 +2055,24 @@ Cohesion: 0.12
 Nodes (17): columnsFrom, columnsTo, name, onDelete, onUpdate, tableFrom, tableTo, auth_identities_user_id_users_id_fk (+9 more)
 
 ### Community 362 - "Community 362"
-Cohesion: 0.09
-Nodes (23): event_type, id, metadata_json, trace_id, name, notNull, primaryKey, type (+15 more)
+Cohesion: 0.12
+Nodes (17): event_type, metadata_json, trace_id, name, notNull, primaryKey, type, default (+9 more)
 
 ### Community 363 - "Community 363"
-Cohesion: 0.12
-Nodes (17): columnsFrom, columnsTo, name, onDelete, onUpdate, tableFrom, tableTo, auth_identities_user_id_users_id_fk (+9 more)
+Cohesion: 0.06
+Nodes (32): columns, concurrently, isUnique, method, name, with, columnsFrom, columnsTo (+24 more)
 
 ### Community 364 - "Community 364"
 Cohesion: 0.12
 Nodes (17): event_type, metadata_json, trace_id, name, notNull, primaryKey, type, default (+9 more)
 
 ### Community 365 - "Community 365"
-Cohesion: 0.12
-Nodes (16): apkUrl, fromJson, installedVersionCode, installedVersionName, _int, manifest, MobileUpdateManifest, _nullableString (+8 more)
+Cohesion: 0.06
+Nodes (30): load, _locale, localeCode, localeTag, _normalizeCode, normalizeLocaleTag, _preferencesRepository, setLocaleCode (+22 more)
 
 ### Community 366 - "Community 366"
-Cohesion: 0.12
-Nodes (16): package:cal_tracker_mobile/data/services/app_preferences_storage.dart, package:cal_tracker_mobile/data/services/nutrition_cache_store.dart, date, false, id, main, _nutrition, readKeys (+8 more)
+Cohesion: 0.05
+Nodes (33): EmbeddingInput, EmbeddingProvider, EmbeddingResult, OpenRouterEmbeddingProvider, timeoutSignal(), UnavailableEmbeddingProvider, MemoryRetrievalService, FoodDataProvider (+25 more)
 
 ### Community 367 - "Community 367"
 Cohesion: 0.12
@@ -2087,16 +2083,16 @@ Cohesion: 0.05
 Nodes (43): age, ageFromBirthDate, birthYearValues, clampBirthDate, d, date, daysInMonth, defaultBirthDate (+35 more)
 
 ### Community 369 - "Community 369"
-Cohesion: 0.13
-Nodes (14): controller, didPop, didPush, didRemove, didReplace, _isLocked, _popupRoutes, replace (+6 more)
+Cohesion: 0.06
+Nodes (29): bool get, controller, didPop, didPush, didRemove, didReplace, _isLocked, _popupRoutes (+21 more)
 
 ### Community 370 - "Community 370"
-Cohesion: 0.10
-Nodes (21): revoked_at, scopes, source, user_id, columns, name, notNull, primaryKey (+13 more)
+Cohesion: 0.09
+Nodes (22): id, revoked_at, scopes, source, default, name, notNull, primaryKey (+14 more)
 
 ### Community 371 - "Community 371"
-Cohesion: 0.28
-Nodes (14): clampScore(), compactnessAdjustedScore(), containsTokenPhrase(), editSimilarity(), fuzzyFoodScore(), levenshteinDistance(), lexicalFoodScore(), scoreFuzzySearchText() (+6 more)
+Cohesion: 0.11
+Nodes (18): clear, loadLocaleCode, loadThemeMode, main, nextAuthHeroIndex, nextHeroIndex, pump, _pumpAuthApp (+10 more)
 
 ### Community 372 - "Community 372"
 Cohesion: 0.13
@@ -2125,10 +2121,6 @@ Nodes (15): columns, concurrently, isUnique, method, name, with, columns, concur
 ### Community 378 - "Community 378"
 Cohesion: 0.13
 Nodes (14): dialect, id, prevId, checkConstraints, compositePrimaryKeys, indexes, isRLSEnabled, name (+6 more)
-
-### Community 379 - "Community 379"
-Cohesion: 0.13
-Nodes (15): columns, concurrently, isUnique, method, name, with, columns, concurrently (+7 more)
 
 ### Community 380 - "Community 380"
 Cohesion: 0.13
@@ -2191,8 +2183,8 @@ Cohesion: 0.13
 Nodes (14): dialect, id, prevId, checkConstraints, compositePrimaryKeys, indexes, isRLSEnabled, name (+6 more)
 
 ### Community 395 - "Community 395"
-Cohesion: 0.13
-Nodes (15): columns, concurrently, isUnique, method, name, with, columns, concurrently (+7 more)
+Cohesion: 0.12
+Nodes (16): 1. Flutter Generates Supported Locales, 2. MaterialApp Uses The Generated Locale List, 3. LocaleViewModel Stores The Selected Locale, 4. Settings Language Picker Is Dynamic, 5. API Requests Send The UI Locale, 6. Backend Builds context.locale From Accept-Language, 7. LLM Prompt Receives context.locale, Adding A New App Language (+8 more)
 
 ### Community 396 - "Community 396"
 Cohesion: 0.13
@@ -2215,8 +2207,8 @@ Cohesion: 0.13
 Nodes (14): dialect, id, prevId, checkConstraints, compositePrimaryKeys, indexes, isRLSEnabled, name (+6 more)
 
 ### Community 401 - "Community 401"
-Cohesion: 0.13
-Nodes (15): columns, concurrently, isUnique, method, name, with, columns, concurrently (+7 more)
+Cohesion: 0.14
+Nodes (13): int get, macro_distribution.dart, calories, carbsGrams, fatGrams, hasCalorieMismatch, kCalorieMismatchToleranceKcal, macroCalories (+5 more)
 
 ### Community 402 - "Community 402"
 Cohesion: 0.14
@@ -2243,19 +2235,15 @@ Cohesion: 0.17
 Nodes (11): bearerFormat, scheme, type, components, securitySchemes, info, title, version (+3 more)
 
 ### Community 408 - "Community 408"
-Cohesion: 0.17
-Nodes (11): AuthUser?, accessToken, AuthSession, AuthUser, displayName, email, fromJson, id (+3 more)
+Cohesion: 0.18
+Nodes (8): foodItemEmbeddings, foodItems, batchSize, client, config, embeddingProvider, foodQuery, repository
 
 ### Community 409 - "Community 409"
 Cohesion: 0.17
 Nodes (11): bearerFormat, scheme, type, components, securitySchemes, info, title, version (+3 more)
 
-### Community 410 - "Community 410"
-Cohesion: 0.21
-Nodes (7): NoopSpeechToTextProvider, NoopSpeechToTextProvider, RemoteSpeechToTextProvider, SpeechToTextInput, SpeechToTextProvider, TranscriptionResult, FakeSpeechToTextProvider
-
 ### Community 411 - "Community 411"
-Cohesion: 0.28
+Cohesion: 0.29
 Nodes (11): applyMacroGoalUpdate(), calorieDeltaKcal(), gramsFromPercentages(), macroCaloriesFromGrams(), MacroGoalUpdateInput, MacroGrams, MacroPercentages, macroPresets (+3 more)
 
 ### Community 412 - "Community 412"
@@ -2273,10 +2261,6 @@ Nodes (11): format, type, type, additionalProperties, properties, required, type
 ### Community 415 - "Community 415"
 Cohesion: 0.18
 Nodes (11): minLength, type, additionalProperties, properties, required, type, newPassword, token (+3 more)
-
-### Community 416 - "Community 416"
-Cohesion: 0.18
-Nodes (8): foodItemEmbeddings, foodItems, batchSize, client, config, embeddingProvider, foodQuery, repository
 
 ### Community 417 - "Community 417"
 Cohesion: 0.18
@@ -2319,12 +2303,12 @@ Cohesion: 0.22
 Nodes (9): usualFood, UsualFoodResponse, additionalProperties, required, type, additionalProperties, properties, required (+1 more)
 
 ### Community 427 - "Community 427"
-Cohesion: 0.36
-Nodes (6): deploy-server-apks.sh script, publish_flavor(), publish_nginx_config(), require_command(), usage(), validate_public_download()
+Cohesion: 0.42
+Nodes (7): deploy-server-apks.sh script, deploy-server-apks.sh script, publish_flavor(), publish_nginx_config(), require_command(), usage(), validate_public_download()
 
 ### Community 428 - "Community 428"
 Cohesion: 0.08
-Nodes (24): app_preferences_storage.dart, package:shared_preferences/shared_preferences.dart, _authHeroIndexKey, loadLocaleCode, loadThemeMode, _localeCodeKey, nextAuthHeroIndex, saveLocaleCode (+16 more)
+Nodes (23): app_preferences_storage.dart, package:shared_preferences/shared_preferences.dart, _authHeroIndexKey, loadLocaleCode, loadThemeMode, _localeCodeKey, nextAuthHeroIndex, saveLocaleCode (+15 more)
 
 ### Community 429 - "Community 429"
 Cohesion: 0.25
@@ -2335,8 +2319,8 @@ Cohesion: 0.25
 Nodes (8): text, UsualFoodDraftRequest, minLength, type, additionalProperties, properties, required, type
 
 ### Community 431 - "Community 431"
-Cohesion: 0.25
-Nodes (7): AppLocalizations get, BuildContext, FreshPaletteLookup, generated/app_localizations.dart, AppLocalizationsContext, l10n, package:flutter/widgets.dart
+Cohesion: 0.12
+Nodes (16): apkUrl, fromJson, installedVersionCode, installedVersionName, _int, manifest, MobileUpdateManifest, _nullableString (+8 more)
 
 ### Community 432 - "Community 432"
 Cohesion: 0.25
@@ -2347,28 +2331,28 @@ Cohesion: 0.25
 Nodes (8): text, UsualFoodDraftRequest, minLength, type, additionalProperties, properties, required, type
 
 ### Community 434 - "Community 434"
-Cohesion: 0.25
-Nodes (8): buildCaseComparisons(), countSampledGenericCoverage(), evaluateGlobalChecks(), normalizedCaseSpeedAcceptable(), normalizedImprovesDuplicateQuality(), runBenchmark(), summarizeTargetLatency(), uniqueStrings()
+Cohesion: 0.22
+Nodes (14): arbDirectories(), buildMealTitle(), capitalizeTitle(), connectorLanguageFromItems(), firstGrapheme(), languageFromLocale(), MealTitleError, MealTitleMessages (+6 more)
 
 ### Community 435 - "Community 435"
-Cohesion: 0.29
-Nodes (7): benchmarkUserId(), normalizedSearchLocales(), planValueFromExplainRows(), profileNormalizedFallbackSearchSql(), profileNormalizedSearchSql(), profileSlowCandidateRuns(), stableHash()
+Cohesion: 0.06
+Nodes (39): ActionExecutionError, AgentRunResult, AuthError, buildActionContext(), inferSpeechLanguage(), MealInputMode, MealInputRunResult, parseAudioUpload() (+31 more)
 
 ### Community 436 - "Community 436"
 Cohesion: 0.33
 Nodes (5): compilerOptions, outDir, types, extends, include
 
 ### Community 437 - "Community 437"
-Cohesion: 0.33
-Nodes (5): handle_new_rx_page(), __lldb_init_module(), Intercept NOTIFY_DEBUGGER_ABOUT_RX_PAGES and touch the pages., SBDebugger, SBFrame
+Cohesion: 0.13
+Nodes (15): columns, concurrently, isUnique, method, name, with, columns, concurrently (+7 more)
 
 ### Community 438 - "Community 438"
 Cohesion: 0.40
 Nodes (6): AppLocalizations, _AppLocalizationsDelegate, AppLocalizationsEn, AppLocalizationsEs, of, LocalizationsDelegate
 
 ### Community 439 - "Community 439"
-Cohesion: 0.53
-Nodes (4): deploy-landing.sh script, expect_status(), require_local_command(), usage()
+Cohesion: 0.57
+Nodes (5): deploy-landing.sh script, deploy-landing.sh script, expect_status(), require_local_command(), usage()
 
 ### Community 440 - "Community 440"
 Cohesion: 0.33
@@ -2463,8 +2447,8 @@ Cohesion: 0.06
 Nodes (32): Agent Operations Guide, Android Emulator Initialization, Backend Startup, Backend Tests, Background Mode, Branch Workflow, Critical: Unset Shell Environment Variables, Deployed Environment URLs (+24 more)
 
 ### Community 463 - "Community 463"
-Cohesion: 0.40
-Nodes (5): buildBenchmarkTargets(), databaseNameFromUrl(), selectedModes(), targetDatabaseUrl(), withDefaultConnectionOptions()
+Cohesion: 0.25
+Nodes (8): buildCaseComparisons(), countSampledGenericCoverage(), evaluateGlobalChecks(), normalizedCaseSpeedAcceptable(), normalizedImprovesDuplicateQuality(), runBenchmark(), summarizeTargetLatency(), uniqueStrings()
 
 ### Community 464 - "Community 464"
 Cohesion: 0.40
@@ -2522,9 +2506,13 @@ Nodes (3): API_BASE_URL, GOOGLE_ANDROID_CLIENT_ID, GOOGLE_SERVER_CLIENT_ID
 Cohesion: 0.50
 Nodes (3): API_BASE_URL, GOOGLE_ANDROID_CLIENT_ID, GOOGLE_SERVER_CLIENT_ID
 
+### Community 478 - "Community 478"
+Cohesion: 0.25
+Nodes (7): AppLocalizations get, BuildContext, FreshPaletteLookup, generated/app_localizations.dart, AppLocalizationsContext, l10n, package:flutter/widgets.dart
+
 ### Community 479 - "Community 479"
-Cohesion: 0.83
-Nodes (3): build-android.sh script, build_flavor(), usage()
+Cohesion: 0.80
+Nodes (4): build-android.sh script, build-android.sh script, build_flavor(), usage()
 
 ### Community 480 - "Community 480"
 Cohesion: 0.50
@@ -2533,6 +2521,30 @@ Nodes (3): dialect, entries, version
 ### Community 482 - "Community 482"
 Cohesion: 0.50
 Nodes (3): ApiConfig, baseUrl, fromEnvironment
+
+### Community 484 - "Community 484"
+Cohesion: 0.33
+Nodes (5): handle_new_rx_page(), __lldb_init_module(), Intercept NOTIFY_DEBUGGER_ABOUT_RX_PAGES and touch the pages., SBDebugger, SBFrame
+
+### Community 486 - "Community 486"
+Cohesion: 0.29
+Nodes (7): benchmarkUserId(), normalizedSearchLocales(), planValueFromExplainRows(), profileNormalizedFallbackSearchSql(), profileNormalizedSearchSql(), profileSlowCandidateRuns(), stableHash()
+
+### Community 487 - "Community 487"
+Cohesion: 0.83
+Nodes (3): write_proxy_snippet(), bootstrap-server.sh script, bootstrap-server.sh script
+
+### Community 488 - "Community 488"
+Cohesion: 0.50
+Nodes (3): BACKEND_IMAGE, deploy.sh script, deploy.sh script
+
+### Community 490 - "Community 490"
+Cohesion: 0.83
+Nodes (3): publish-github-release.sh script, publish-github-release.sh script, usage()
+
+### Community 495 - "Community 495"
+Cohesion: 0.33
+Nodes (6): hydration_goal_glasses, default, name, notNull, primaryKey, type
 
 ### Community 498 - "Community 498"
 Cohesion: 0.06
@@ -2543,9 +2555,8 @@ Cohesion: 0.06
 Nodes (30): candidateGroupKey, defaultCandidateSelections, formatQuantityForPhrase, group, groupForResolvedItem, hasExternalIdentity, items, itemsWithCandidateSelections (+22 more)
 
 ### Community 515 - "Community 515"
-Cohesion: 0.07
-Nodes (27): required String text,
-  FontWeight, baseStyle, build, calories, defaultNutritionMacroColors, fontWeight, formatMacro, formatQuantity (+19 more)
+Cohesion: 0.40
+Nodes (5): buildBenchmarkTargets(), databaseNameFromUrl(), selectedModes(), targetDatabaseUrl(), withDefaultConnectionOptions()
 
 ### Community 516 - "Community 516"
 Cohesion: 0.09
@@ -2558,10 +2569,6 @@ Nodes (18): 10. Validation Criteria, 11. Related Specifications / Further Readin
 ### Community 518 - "Community 518"
 Cohesion: 0.15
 Nodes (12): Current Architecture, Current Tables, Database and Vector Architecture, Drizzle Schema, Food Search Documents, Local Database, Migration Ownership, Production Boundary (+4 more)
-
-### Community 519 - "Community 519"
-Cohesion: 0.15
-Nodes (12): Timer?, clearProposalChangeSuccess, dispose, _durationTimer, isRecording, _proposalChangeSuccessTimer, _recordingStartedAt, showProposalChangeSuccess (+4 more)
 
 ### Community 520 - "Community 520"
 Cohesion: 0.17
@@ -2578,10 +2585,6 @@ Nodes (11): 12. Existing Usual Meal Changes, 13. Permissions and Security, 15. A
 ### Community 523 - "Community 523"
 Cohesion: 0.18
 Nodes (11): 8.1 Difference thresholds, 8.2 Warning behavior, 8.3 Auto-fix options, 8. Warning system for gram mode, Case A — 0 to 25 kcal difference, Case B — 25 to 75 kcal difference, Case C — More than 75 kcal difference, Option 1 — Keep grams (+3 more)
-
-### Community 524 - "Community 524"
-Cohesion: 0.20
-Nodes (10): additionalProperties, properties, type, default, input, source, ExecuteActionRequest, default (+2 more)
 
 ### Community 525 - "Community 525"
 Cohesion: 0.20
@@ -2634,14 +2637,6 @@ Nodes (6): 6.1 Behavior, 6.2 Preset cards, 6.3 Custom percentage mode, 6.4 Perce
 ### Community 537 - "Community 537"
 Cohesion: 0.33
 Nodes (6): 11.1 Navigation, 11.2 Usual Ingredients List, 11.3 Create/Edit Form, 11.4 AI Helper Entry Point, 11.5 Manual First Implementation, 11. Flutter UX Requirements
-
-### Community 538 - "Community 538"
-Cohesion: 0.33
-Nodes (6): default, name, notNull, primaryKey, type, calorie_target_source
-
-### Community 539 - "Community 539"
-Cohesion: 0.33
-Nodes (6): hydration_goal_liters, default, name, notNull, primaryKey, type
 
 ### Community 540 - "Community 540"
 Cohesion: 0.33
@@ -2764,24 +2759,24 @@ Cohesion: 0.67
 Nodes (3): 2.1 In Scope, 2.2 Out of Scope, 2. Scope
 
 ## Knowledge Gaps
-- **10504 isolated node(s):** `PreToolUse`, `name`, `version`, `private`, `type` (+10499 more)
+- **10513 isolated node(s):** `name`, `version`, `private`, `type`, `dev` (+10508 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **25 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `_` connect `Community 66` to `Community 428`, `Community 47`?**
-  _High betweenness centrality (0.011) - this node is a cross-community bridge._
-- **Why does `AppPreferencesStorage` connect `Community 428` to `Community 40`?**
-  _High betweenness centrality (0.004) - this node is a cross-community bridge._
-- **Why does `_` connect `Community 19` to `Community 33`, `Community 66`, `Community 515`, `Community 5`, `Community 428`, `Community 431`, `Community 18`, `Community 20`, `Community 87`, `Community 27`?**
-  _High betweenness centrality (0.002) - this node is a cross-community bridge._
-- **What connects `PreToolUse`, `name`, `version` to the rest of the system?**
-  _10505 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Why does `_` connect `Community 19` to `Community 33`, `Community 66`, `Community 5`, `Community 45`, `Community 15`, `Community 82`, `Community 150`, `Community 23`, `Community 87`, `Community 89`, `Community 478`?**
+  _High betweenness centrality (0.009) - this node is a cross-community bridge._
+- **Why does `map` connect `Community 40` to `Community 6`, `Community 8`, `Community 11`, `Community 13`, `Community 84`, `Community 89`?**
+  _High betweenness centrality (0.001) - this node is a cross-community bridge._
+- **Why does `_` connect `Community 66` to `Community 75`, `Community 44`, `Community 82`, `Community 23`, `Community 89`?**
+  _High betweenness centrality (0.001) - this node is a cross-community bridge._
+- **What connects `name`, `version`, `private` to the rest of the system?**
+  _10514 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Community 0` be split into smaller, more focused modules?**
-  _Cohesion score 0.0039603960396039604 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.003952569169960474 - nodes in this community are weakly interconnected._
 - **Should `Community 1` be split into smaller, more focused modules?**
-  _Cohesion score 0.004048582995951417 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.00404040404040404 - nodes in this community are weakly interconnected._
 - **Should `Community 2` be split into smaller, more focused modules?**
-  _Cohesion score 0.004048582995951417 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.00404040404040404 - nodes in this community are weakly interconnected._

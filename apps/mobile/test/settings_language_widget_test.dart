@@ -21,8 +21,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 void main() {
-  testWidgets('Menu language row changes from Language to Idioma',
-      (tester) async {
+  testWidgets('Menu language row changes from Language to Idioma', (
+    tester,
+  ) async {
     final preferencesRepository = _FakePreferencesRepository();
     final localeViewModel = LocaleViewModel(
       preferencesRepository: preferencesRepository,
@@ -41,6 +42,21 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('language_settings_row')));
     await tester.pumpAndSettle();
+    final languageOptionFinder = find.byWidgetPredicate((widget) {
+      final key = widget.key;
+      return key is ValueKey<String> &&
+          key.value.startsWith('language_option_');
+    });
+    expect(
+      languageOptionFinder,
+      findsNWidgets(AppLocalizations.supportedLocales.length),
+    );
+    for (final locale in AppLocalizations.supportedLocales) {
+      expect(
+        find.byKey(ValueKey('language_option_${locale.toLanguageTag()}')),
+        findsOneWidget,
+      );
+    }
     await tester.tap(find.byKey(const ValueKey('language_option_es')));
     await tester.pumpAndSettle();
 
@@ -49,8 +65,9 @@ void main() {
     expect(preferencesRepository.savedLocaleCode, 'es');
   });
 
-  testWidgets('Menu theme row defaults to device and persists choices',
-      (tester) async {
+  testWidgets('Menu theme row defaults to device and persists choices', (
+    tester,
+  ) async {
     final preferencesRepository = _FakePreferencesRepository();
     final themeModeViewModel = ThemeModeViewModel(
       preferencesRepository: preferencesRepository,
@@ -92,15 +109,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(themeModeViewModel.themeMode, ThemeMode.light);
-    expect(preferencesRepository.savedModes, [
-      ThemeMode.dark,
-      ThemeMode.light,
-    ]);
+    expect(preferencesRepository.savedModes, [ThemeMode.dark, ThemeMode.light]);
     expect(find.text('Light'), findsOneWidget);
   });
 
-  testWidgets('Menu hydration sheet uses localized copy and saves liters',
-      (tester) async {
+  testWidgets('Menu hydration sheet uses localized copy and saves liters', (
+    tester,
+  ) async {
     final nutritionRepository = _FakeNutritionRepository();
     await _pumpSettings(tester, nutritionRepository: nutritionRepository);
 
@@ -110,8 +125,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Set your daily water goal'), findsOneWidget);
-    expect(find.text('Choose how much water you want to drink each day.'),
-        findsOneWidget);
+    expect(
+      find.text('Choose how much water you want to drink each day.'),
+      findsOneWidget,
+    );
     expect(find.text('Liters (L)'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('hydration_goal_cancel_button')),
@@ -126,8 +143,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('84.5'), findsOneWidget);
 
-    await tester
-        .tap(find.byKey(const ValueKey('hydration_goal_increase_button')));
+    await tester.tap(
+      find.byKey(const ValueKey('hydration_goal_increase_button')),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('save_goal_button')));
     await tester.pumpAndSettle();
@@ -139,7 +157,7 @@ void main() {
     final localeViewModel = LocaleViewModel(
       preferencesRepository: preferencesRepository,
     );
-    await localeViewModel.setLocaleCode('es');
+    await localeViewModel.setLocaleTag('es');
     await _pumpSettings(
       tester,
       nutritionRepository: _FakeNutritionRepository(),
@@ -151,7 +169,9 @@ void main() {
 
     expect(find.text('Define tu objetivo diario de agua'), findsOneWidget);
     expect(
-        find.text('Elige cuánta agua quieres beber cada día.'), findsOneWidget);
+      find.text('Elige cuánta agua quieres beber cada día.'),
+      findsOneWidget,
+    );
 
     await tester.drag(find.byType(BottomSheet), const Offset(0, 500));
     await tester.pumpAndSettle();
@@ -159,8 +179,9 @@ void main() {
     expect(find.text('Define tu objetivo diario de agua'), findsNothing);
   });
 
-  testWidgets('Menu calorie target row opens shared calorie sheet and saves',
-      (tester) async {
+  testWidgets('Menu calorie target row opens shared calorie sheet and saves', (
+    tester,
+  ) async {
     final nutritionRepository = _FakeNutritionRepository(
       dailySummary: _summaryWithoutConfiguredCalories,
     );
@@ -175,9 +196,13 @@ void main() {
       findsOneWidget,
     );
     expect(
-        find.byKey(const ValueKey('calorie_target_decrement')), findsOneWidget);
+      find.byKey(const ValueKey('calorie_target_decrement')),
+      findsOneWidget,
+    );
     expect(
-        find.byKey(const ValueKey('calorie_target_increment')), findsOneWidget);
+      find.byKey(const ValueKey('calorie_target_increment')),
+      findsOneWidget,
+    );
     expect(find.byKey(const ValueKey('calorie_target_field')), findsNothing);
 
     await tester.enterText(
@@ -202,8 +227,9 @@ void main() {
     expect(find.text('Not set'), findsOneWidget);
   });
 
-  testWidgets('Menu hides default calorie and macro previews before setup',
-      (tester) async {
+  testWidgets('Menu hides default calorie and macro previews before setup', (
+    tester,
+  ) async {
     final nutritionRepository = _FakeNutritionRepository(
       dailySummary: _summaryWithoutConfiguredCaloriesWithDefaultMacro,
     );
@@ -214,8 +240,9 @@ void main() {
     expect(find.textContaining('Balanced:'), findsNothing);
   });
 
-  testWidgets('Menu macro row requires calories before opening macros',
-      (tester) async {
+  testWidgets('Menu macro row requires calories before opening macros', (
+    tester,
+  ) async {
     final nutritionRepository = _FakeNutritionRepository(
       dailySummary: _summaryWithoutConfiguredCalories,
     );
@@ -225,8 +252,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Set calories first'), findsOneWidget);
-    expect(find.byKey(const ValueKey('macro_distribution_save_button')),
-        findsNothing);
+    expect(
+      find.byKey(const ValueKey('macro_distribution_save_button')),
+      findsNothing,
+    );
 
     await tester.tap(
       find.byKey(const ValueKey('macro_requires_calories_set_now')),
@@ -249,8 +278,9 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('macro_distribution_row')));
     await tester.pumpAndSettle();
-    await tester
-        .tap(find.byKey(const ValueKey('macro_requires_calories_skip')));
+    await tester.tap(
+      find.byKey(const ValueKey('macro_requires_calories_skip')),
+    );
     await tester.pumpAndSettle();
 
     expect(nutritionRepository.updateCalls, 0);
@@ -258,18 +288,22 @@ void main() {
     expect(find.text('Menu'), findsOneWidget);
   });
 
-  testWidgets('Menu macro row opens macro sheet after calories are configured',
-      (tester) async {
-    await _pumpSettings(tester);
+  testWidgets(
+    'Menu macro row opens macro sheet after calories are configured',
+    (tester) async {
+      await _pumpSettings(tester);
 
-    await tester.tap(find.byKey(const ValueKey('macro_distribution_row')));
-    await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('macro_distribution_row')));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Set your macros'), findsOneWidget);
-    expect(find.byKey(const ValueKey('macro_distribution_save_button')),
-        findsOneWidget);
-    expect(find.text('Set calories first'), findsNothing);
-  });
+      expect(find.text('Set your macros'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('macro_distribution_save_button')),
+        findsOneWidget,
+      );
+      expect(find.text('Set calories first'), findsNothing);
+    },
+  );
 }
 
 Future<void> _pumpSettings(
@@ -281,14 +315,12 @@ Future<void> _pumpSettings(
 }) async {
   final effectivePreferencesRepository =
       preferencesRepository ?? _FakePreferencesRepository();
-  final effectiveLocaleViewModel = localeViewModel ??
-      LocaleViewModel(
-        preferencesRepository: effectivePreferencesRepository,
-      );
-  final effectiveThemeModeViewModel = themeModeViewModel ??
-      ThemeModeViewModel(
-        preferencesRepository: effectivePreferencesRepository,
-      );
+  final effectiveLocaleViewModel =
+      localeViewModel ??
+      LocaleViewModel(preferencesRepository: effectivePreferencesRepository);
+  final effectiveThemeModeViewModel =
+      themeModeViewModel ??
+      ThemeModeViewModel(preferencesRepository: effectivePreferencesRepository);
   final effectiveNutritionRepository =
       nutritionRepository ?? _FakeNutritionRepository();
   final authRepository = _FakeAuthRepository();
@@ -375,8 +407,8 @@ class _FakePreferencesRepository implements AppPreferencesRepository {
 
 class _FakeNutritionRepository extends NutritionRepository {
   _FakeNutritionRepository({DailySummary? dailySummary})
-      : _dailySummary = dailySummary ?? _summary,
-        super(apiClient: _unusedApiClient());
+    : _dailySummary = dailySummary ?? _summary,
+      super(apiClient: _unusedApiClient());
 
   DailySummary _dailySummary;
   int updateCalls = 0;
@@ -426,8 +458,9 @@ class _FakeNutritionRepository extends NutritionRepository {
       hydrationGoalLiters:
           hydrationGoalLiters ?? _dailySummary.hydrationGoalLiters,
       waterConsumedLiters: _dailySummary.waterConsumedLiters,
-      calorieTargetConfigured:
-          calories == null ? _dailySummary.calorieTargetConfigured : true,
+      calorieTargetConfigured: calories == null
+          ? _dailySummary.calorieTargetConfigured
+          : true,
       calorieTargetSource:
           calorieTargetSource ?? _dailySummary.calorieTargetSource,
       macroMode: _dailySummary.macroMode,
@@ -483,10 +516,7 @@ class _FakeNutritionRepository extends NutritionRepository {
 
 class _FakeAuthRepository extends AuthRepository {
   _FakeAuthRepository()
-      : super(
-          apiClient: _unusedApiClient(),
-          tokenStorage: _MemoryTokenStorage(),
-        );
+    : super(apiClient: _unusedApiClient(), tokenStorage: _MemoryTokenStorage());
 }
 
 class _MemoryTokenStorage implements TokenStorage {

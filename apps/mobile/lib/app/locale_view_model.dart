@@ -3,47 +3,51 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart';
 
 import '../data/services/app_preferences_repository.dart';
+import '../l10n/generated/app_localizations.dart';
 
 class LocaleViewModel extends ChangeNotifier {
   LocaleViewModel({required AppPreferencesRepository preferencesRepository})
       : _preferencesRepository = preferencesRepository;
 
-  static const supportedLocales = [
-    Locale('en'),
-    Locale('es'),
-  ];
-
-  static const supportedLocaleCodes = {'en', 'es'};
-
   final AppPreferencesRepository _preferencesRepository;
 
-  Locale _locale = const Locale('en');
+  Locale _locale = AppLocalizations.supportedLocales.first;
 
   Locale get locale => _locale;
 
-  String get localeCode => _locale.languageCode;
+  String get localeTag => _locale.toLanguageTag();
 
   Future<void> load() async {
     final savedCode = await _preferencesRepository.loadLocaleCode();
-    final nextLocale = Locale(_normalizeCode(savedCode));
+    final nextLocale = normalizeLocaleTag(savedCode);
     if (nextLocale == _locale) return;
     _locale = nextLocale;
     notifyListeners();
   }
 
-  Future<void> setLocaleCode(String code) async {
-    final nextLocale = Locale(_normalizeCode(code));
+  Future<void> setLocaleTag(String tag) async {
+    final nextLocale = normalizeLocaleTag(tag);
     if (nextLocale == _locale) return;
     _locale = nextLocale;
     notifyListeners();
-    await _preferencesRepository.saveLocaleCode(nextLocale.languageCode);
+    await _preferencesRepository.saveLocaleCode(nextLocale.toLanguageTag());
   }
 
-  static String _normalizeCode(String? code) {
-    final normalized = code?.toLowerCase().split(RegExp('[-_]')).first;
-    if (normalized == null || !supportedLocaleCodes.contains(normalized)) {
-      return 'en';
+  static Locale normalizeLocaleTag(String? tag) {
+    final normalizedTag = tag?.trim().replaceAll('_', '-').toLowerCase();
+    if (normalizedTag == null || normalizedTag.isEmpty) {
+      return AppLocalizations.supportedLocales.first;
     }
-    return normalized;
+    for (final locale in AppLocalizations.supportedLocales) {
+      if (locale.toLanguageTag().toLowerCase() == normalizedTag) return locale;
+    }
+    final languageCode = normalizedTag.split('-').first;
+    for (final locale in AppLocalizations.supportedLocales) {
+      final supportsBareLanguage = locale.countryCode == null &&
+          locale.scriptCode == null &&
+          locale.languageCode.toLowerCase() == languageCode;
+      if (supportsBareLanguage) return locale;
+    }
+    return AppLocalizations.supportedLocales.first;
   }
 }

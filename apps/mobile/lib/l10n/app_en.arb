@@ -115,7 +115,6 @@
   "darkModeSwitchToDark": "Switch to dark mode",
   "settingsTitle": "Menu",
   "settingsSubtitle": "Account and preferences",
-  "settingsMoreTooltip": "More",
   "settingsCouldNotUpdateGoals": "Could not update goals",
   "settingsHydrationGoal": "Hydration goal",
   "settingsHydrationGoalSubtitle": "{liters} L per day",
@@ -131,6 +130,52 @@
   "@settingsCalorieTargetSubtitle": {
     "placeholders": {
       "calories": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsMacroDistributionTitle": "Macro distribution",
+  "settingsMacroPresetSubtitle": "{preset}: {protein}% protein, {carbs}% carbs, {fat}% fat",
+  "@settingsMacroPresetSubtitle": {
+    "placeholders": {
+      "preset": {
+        "type": "String"
+      },
+      "protein": {
+        "type": "int"
+      },
+      "carbs": {
+        "type": "int"
+      },
+      "fat": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsMacroPercentSubtitle": "{protein}% protein, {carbs}% carbs, {fat}% fat",
+  "@settingsMacroPercentSubtitle": {
+    "placeholders": {
+      "protein": {
+        "type": "int"
+      },
+      "carbs": {
+        "type": "int"
+      },
+      "fat": {
+        "type": "int"
+      }
+    }
+  },
+  "settingsMacroGramsSubtitle": "{protein}g protein, {carbs}g carbs, {fat}g fat",
+  "@settingsMacroGramsSubtitle": {
+    "placeholders": {
+      "protein": {
+        "type": "int"
+      },
+      "carbs": {
+        "type": "int"
+      },
+      "fat": {
         "type": "int"
       }
     }
@@ -523,7 +568,7 @@
       }
     }
   },
-  "templatesTitle": "Habituals",
+  "templatesTitle": "Usuals",
   "templatesSubtitle": "Usual meals and ingredients",
   "templatesAddTooltip": "Add usual meal",
   "templatesExplainer": "Usual meals are trusted meals you can log quickly.",
@@ -537,7 +582,7 @@
   "mealTemplateEditorEditTitle": "Edit usual meal",
   "mealTemplateEditorSubtitle": "Build a reviewed reusable meal. Nothing is logged to today.",
   "mealTemplateEditorMissingTemplateTitle": "Usual meal not found",
-  "mealTemplateEditorMissingTemplateMessage": "Refresh habituals and try opening this meal again.",
+  "mealTemplateEditorMissingTemplateMessage": "Refresh usuals and try opening this meal again.",
   "mealTemplateEditorDetailsSection": "Meal details",
   "mealTemplateEditorTitleLabel": "Meal title",
   "mealTemplateEditorTitleHint": "Gym lunch",
@@ -555,7 +600,7 @@
   "mealTemplateEditorSaveFailedMessage": "Please try again.",
   "usualsMealsTab": "Meals",
   "usualsIngredientsTab": "Ingredients",
-  "usualsCouldNotLoad": "Could not load habituals",
+  "usualsCouldNotLoad": "Could not load usuals",
   "usualFoodsAddTooltip": "Add usual ingredient",
   "usualFoodsExplainer": "Usual ingredients are foods you enter manually so they appear first in search and meal logging.",
   "usualFoodsEmptyTitle": "No usual ingredients yet",

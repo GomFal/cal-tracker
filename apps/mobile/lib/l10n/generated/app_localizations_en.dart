@@ -233,9 +233,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsSubtitle => 'Account and preferences';
 
   @override
-  String get settingsMoreTooltip => 'More';
-
-  @override
   String get settingsCouldNotUpdateGoals => 'Could not update goals';
 
   @override
@@ -252,6 +249,25 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String settingsCalorieTargetSubtitle(int calories) {
     return '$calories Kcal daily target';
+  }
+
+  @override
+  String get settingsMacroDistributionTitle => 'Macro distribution';
+
+  @override
+  String settingsMacroPresetSubtitle(
+      String preset, int protein, int carbs, int fat) {
+    return '$preset: $protein% protein, $carbs% carbs, $fat% fat';
+  }
+
+  @override
+  String settingsMacroPercentSubtitle(int protein, int carbs, int fat) {
+    return '$protein% protein, $carbs% carbs, $fat% fat';
+  }
+
+  @override
+  String settingsMacroGramsSubtitle(int protein, int carbs, int fat) {
+    return '${protein}g protein, ${carbs}g carbs, ${fat}g fat';
   }
 
   @override
@@ -957,7 +973,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get templatesTitle => 'Habituals';
+  String get templatesTitle => 'Usuals';
 
   @override
   String get templatesSubtitle => 'Usual meals and ingredients';
@@ -1004,7 +1020,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mealTemplateEditorMissingTemplateMessage =>
-      'Refresh habituals and try opening this meal again.';
+      'Refresh usuals and try opening this meal again.';
 
   @override
   String get mealTemplateEditorDetailsSection => 'Meal details';
@@ -1059,7 +1075,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get usualsIngredientsTab => 'Ingredients';
 
   @override
-  String get usualsCouldNotLoad => 'Could not load habituals';
+  String get usualsCouldNotLoad => 'Could not load usuals';
 
   @override
   String get usualFoodsAddTooltip => 'Add usual ingredient';

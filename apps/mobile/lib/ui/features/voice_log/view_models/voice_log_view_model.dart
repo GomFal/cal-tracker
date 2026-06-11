@@ -640,7 +640,10 @@ class VoiceLogViewModel extends ChangeNotifier {
 
   Future<void> updateProposalItems(List<MealItem> items) async {
     final proposal = _uiState.proposal;
-    if (proposal == null) return;
+    if (proposal == null) {
+      await createProposalFromManualItems(items);
+      return;
+    }
     _setState(VoiceLogState.agentRunning);
     try {
       final updated = await _nutritionRepository.updateProposalItems(
@@ -744,8 +747,8 @@ class VoiceLogViewModel extends ChangeNotifier {
         _uiState.resolvedItems ?? const <MealItem>[];
     final requiredGroups = visibleGroups
         .where(
-          (group) =>
-              needsCandidateSelection(group, resolvedItemsForCandidateSelection),
+          (group) => needsCandidateSelection(
+              group, resolvedItemsForCandidateSelection),
         )
         .toList();
     if (!requiredGroups.every(

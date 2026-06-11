@@ -49,12 +49,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return ContentFrame(
       title: l10n.settingsTitle,
       subtitle: l10n.settingsSubtitle,
-      actions: [
-        FreshIconButton(
-          icon: Icons.more_horiz_rounded,
-          tooltip: l10n.settingsMoreTooltip,
-        ),
-      ],
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -84,13 +78,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Text(
                         user?.displayName ?? l10n.fallbackUserName,
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: limeCardTextColor,
-                        ),
+                              color: limeCardTextColor,
+                            ),
                       ),
                       if (user != null)
                         Text(
                           user.email,
-                          style: Theme.of(context).textTheme.bodyMedium
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
                               ?.copyWith(color: limeCardTextColor),
                         ),
                     ],
@@ -145,7 +141,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             key: const ValueKey('macro_distribution_row'),
             icon: Icons.pie_chart_rounded,
             color: palette.leaf,
-            title: 'Macro distribution',
+            title: l10n.settingsMacroDistributionTitle,
             subtitle: _macroDistributionSubtitle(l10n, goals),
             onTap: settings.isLoading || settings.isSaving
                 ? null
@@ -200,8 +196,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     if (!context.mounted || value == null) return;
     final updated = await context.read<SettingsViewModel>().updateGoals(
-      hydrationGoalLiters: value,
-    );
+          hydrationGoalLiters: value,
+        );
     if (!context.mounted || updated == null) return;
     await _refreshGoalConsumers(context, forceDashboardRefresh: true);
   }
@@ -221,11 +217,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     if (!context.mounted || selection == null) return;
     final updated = await context.read<SettingsViewModel>().updateGoals(
-      calories: selection.calories,
-      calorieTargetSource: selection.source,
-      macroConfig: selection.macroConfig,
-      macroCalorieTarget: selection.calories,
-    );
+          calories: selection.calories,
+          calorieTargetSource: selection.source,
+          macroConfig: selection.macroConfig,
+          macroCalorieTarget: selection.calories,
+        );
     if (!context.mounted || updated == null) return;
     await _refreshGoalConsumers(context, forceDashboardRefresh: true);
     if (!context.mounted ||
@@ -233,8 +229,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         selection.macroConfig != null) {
       return;
     }
-    final shouldConfigure =
-        await showModalBottomSheet<bool>(
+    final shouldConfigure = await showModalBottomSheet<bool>(
           context: context,
           useSafeArea: true,
           builder: (context) =>
@@ -257,8 +252,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await _showMacroDistributionSheet(context, goals);
       return;
     }
-    final shouldSetCalories =
-        await showModalBottomSheet<bool>(
+    final shouldSetCalories = await showModalBottomSheet<bool>(
           context: context,
           useSafeArea: true,
           builder: (context) => const _MacroRequiresCaloriesSheet(),
@@ -283,9 +277,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     if (!context.mounted || macroConfig == null) return;
     final updated = await context.read<SettingsViewModel>().updateGoals(
-      macroConfig: macroConfig,
-      macroCalorieTarget: calories,
-    );
+          macroConfig: macroConfig,
+          macroCalorieTarget: calories,
+        );
     if (!context.mounted || updated == null) return;
     await _refreshGoalConsumers(context, forceDashboardRefresh: true);
   }
@@ -296,8 +290,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }) {
     return Future.wait([
       context.read<DashboardViewModel>().load(
-        forceRefresh: forceDashboardRefresh,
-      ),
+            forceRefresh: forceDashboardRefresh,
+          ),
       context.read<SettingsViewModel>().load(),
       context.read<MealHistoryViewModel>().load(),
     ]);
@@ -309,15 +303,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
     final preset = goals!.macroPreset;
     if (preset != null) {
-      return '${preset.label}: ${preset.proteinPct}% protein, ${preset.carbsPct}% carbs, ${preset.fatPct}% fat';
+      return l10n.settingsMacroPresetSubtitle(
+        _macroPresetLabel(l10n, preset),
+        preset.proteinPct,
+        preset.carbsPct,
+        preset.fatPct,
+      );
     }
     if (goals.macroMode == MacroMode.percentage &&
         goals.proteinPct != null &&
         goals.carbsPct != null &&
         goals.fatPct != null) {
-      return '${goals.proteinPct}% protein, ${goals.carbsPct}% carbs, ${goals.fatPct}% fat';
+      return l10n.settingsMacroPercentSubtitle(
+        goals.proteinPct!,
+        goals.carbsPct!,
+        goals.fatPct!,
+      );
     }
-    return '${goals.target.proteinGrams.round()}g protein, ${goals.target.carbsGrams.round()}g carbs, ${goals.target.fatGrams.round()}g fat';
+    return l10n.settingsMacroGramsSubtitle(
+      goals.target.proteinGrams.round(),
+      goals.target.carbsGrams.round(),
+      goals.target.fatGrams.round(),
+    );
+  }
+
+  String _macroPresetLabel(AppLocalizations l10n, MacroPreset preset) {
+    return switch (preset) {
+      MacroPreset.balanced => l10n.macroPresetBalanced,
+      MacroPreset.highProtein => l10n.macroPresetHighProtein,
+      MacroPreset.lowerCarb => l10n.macroPresetLowerCarb,
+    };
   }
 
   String _themeModeSubtitle(AppLocalizations l10n, ThemeMode themeMode) {

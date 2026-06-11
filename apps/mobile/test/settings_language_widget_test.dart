@@ -36,6 +36,8 @@ void main() {
     );
 
     expect(find.text('Language'), findsOneWidget);
+    expect(find.text('Macro distribution'), findsOneWidget);
+    expect(find.byIcon(Icons.more_horiz_rounded), findsNothing);
     expect(find.text('Data sources'), findsOneWidget);
     expect(find.textContaining('Open Food Facts'), findsOneWidget);
     expect(find.textContaining('USDA FoodData Central'), findsOneWidget);
@@ -61,6 +63,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Idioma'), findsOneWidget);
+    expect(find.text('Distribución de macros'), findsOneWidget);
     expect(find.text('Fuentes de datos'), findsOneWidget);
     expect(preferencesRepository.savedLocaleCode, 'es');
   });
@@ -315,11 +318,9 @@ Future<void> _pumpSettings(
 }) async {
   final effectivePreferencesRepository =
       preferencesRepository ?? _FakePreferencesRepository();
-  final effectiveLocaleViewModel =
-      localeViewModel ??
+  final effectiveLocaleViewModel = localeViewModel ??
       LocaleViewModel(preferencesRepository: effectivePreferencesRepository);
-  final effectiveThemeModeViewModel =
-      themeModeViewModel ??
+  final effectiveThemeModeViewModel = themeModeViewModel ??
       ThemeModeViewModel(preferencesRepository: effectivePreferencesRepository);
   final effectiveNutritionRepository =
       nutritionRepository ?? _FakeNutritionRepository();
@@ -407,8 +408,8 @@ class _FakePreferencesRepository implements AppPreferencesRepository {
 
 class _FakeNutritionRepository extends NutritionRepository {
   _FakeNutritionRepository({DailySummary? dailySummary})
-    : _dailySummary = dailySummary ?? _summary,
-      super(apiClient: _unusedApiClient());
+      : _dailySummary = dailySummary ?? _summary,
+        super(apiClient: _unusedApiClient());
 
   DailySummary _dailySummary;
   int updateCalls = 0;
@@ -458,9 +459,8 @@ class _FakeNutritionRepository extends NutritionRepository {
       hydrationGoalLiters:
           hydrationGoalLiters ?? _dailySummary.hydrationGoalLiters,
       waterConsumedLiters: _dailySummary.waterConsumedLiters,
-      calorieTargetConfigured: calories == null
-          ? _dailySummary.calorieTargetConfigured
-          : true,
+      calorieTargetConfigured:
+          calories == null ? _dailySummary.calorieTargetConfigured : true,
       calorieTargetSource:
           calorieTargetSource ?? _dailySummary.calorieTargetSource,
       macroMode: _dailySummary.macroMode,
@@ -516,7 +516,8 @@ class _FakeNutritionRepository extends NutritionRepository {
 
 class _FakeAuthRepository extends AuthRepository {
   _FakeAuthRepository()
-    : super(apiClient: _unusedApiClient(), tokenStorage: _MemoryTokenStorage());
+      : super(
+            apiClient: _unusedApiClient(), tokenStorage: _MemoryTokenStorage());
 }
 
 class _MemoryTokenStorage implements TokenStorage {

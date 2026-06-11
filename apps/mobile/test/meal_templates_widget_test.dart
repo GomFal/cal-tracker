@@ -22,7 +22,7 @@ void main() {
   ) async {
     await _pumpScreen(tester, _FakeNutritionRepository());
 
-    expect(find.text('Habituals'), findsOneWidget);
+    expect(find.text('Usuals'), findsOneWidget);
     expect(find.text('Meals'), findsOneWidget);
     expect(find.text('Ingredients'), findsOneWidget);
 
@@ -477,5 +477,3 @@ CalTrackerApiClient _unusedApiClient() {
     tokenStorage: _MemoryTokenStorage(),
   );
 }
-
-

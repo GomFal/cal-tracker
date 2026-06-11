@@ -364,6 +364,36 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 350));
       await tester.pumpAndSettle();
+
+      final searchField = tester.widget<TextField>(
+        find.byKey(const ValueKey('manual_food_search_field')),
+      );
+      expect(
+        searchField.decoration?.suffixIconConstraints,
+        const BoxConstraints(minWidth: 56, minHeight: 48),
+      );
+      expect(
+        find.byKey(const ValueKey('manual_food_search_clear')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('manual_food_search_clear')));
+      await tester.pumpAndSettle();
+
+      expect(
+          find.byKey(const ValueKey('manual_food_search_clear')), findsNothing);
+      expect(
+        find.byKey(const ValueKey('manual_food_search_result_button_0')),
+        findsNothing,
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('manual_food_search_field')),
+        'bread',
+      );
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pumpAndSettle();
+
       await tester.tap(
         find.byKey(const ValueKey('manual_food_search_result_button_0')),
       );
@@ -948,6 +978,111 @@ void main() {
       expect(captured.single.name, 'Bread');
       expect(captured.single.quantity, 150);
       expect(captured.single.calories, 398);
+      expect(find.text('Bread'), findsWidgets);
+      await tester.pump(VoiceLogViewModel.proposalChangeSuccessDuration);
+    });
+
+    testWidgets('adds a searched ingredient to an empty proposal editor', (
+      tester,
+    ) async {
+      final bread = _mealItem(
+        name: 'Bread',
+        calories: 265,
+        externalId: 'bread',
+      );
+      const proposal = MealProposal(
+        id: 'prop_empty',
+        title: 'Empty proposal',
+        confidence: 0.5,
+        requiresConfirmation: true,
+        trustedAutoCommitEligible: false,
+        nutrition: NutritionSnapshot(
+          calories: 0,
+          proteinGrams: 0,
+          carbsGrams: 0,
+          fatGrams: 0,
+        ),
+        items: [],
+      );
+      final updatedProposal = MealProposal(
+        id: 'prop_empty',
+        title: 'Bread',
+        confidence: 0.82,
+        requiresConfirmation: true,
+        trustedAutoCommitEligible: false,
+        nutrition: const NutritionSnapshot(
+          calories: 265,
+          proteinGrams: 7,
+          carbsGrams: 1,
+          fatGrams: 8,
+        ),
+        items: [bread],
+      );
+      when(() => nutritionRepository.logText('empty')).thenAnswer(
+        (_) async => const AgentRunResult(
+          kind: 'proposal',
+          message: 'Meal proposal created.',
+          proposal: proposal,
+        ),
+      );
+      when(
+        () => nutritionRepository.searchFoods('bread', limit: 10),
+      ).thenAnswer((_) async => FoodSearchResult(items: [bread]));
+      when(
+        () => nutritionRepository.updateProposalItems('prop_empty', any()),
+      ).thenAnswer((_) async => updatedProposal);
+
+      await tester.pumpWidget(
+        ChangeNotifierProvider<VoiceLogViewModel>.value(
+          value: viewModel,
+          child: MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            theme: buildTheme(),
+            home: const MealCreateScreen(),
+          ),
+        ),
+      );
+
+      await viewModel.submitText('empty');
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('edit_proposal_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('add_proposal_item_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('proposal_item_0_search_toggle')),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('proposal_item_0_search_field')),
+        'bread',
+      );
+      await tester.pump(const Duration(milliseconds: 350));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('proposal_item_0_search_result_button_0')),
+      );
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('save_proposal_edits_button')),
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('save_proposal_edits_button')),
+      );
+      await tester.pumpAndSettle();
+
+      final captured = verify(
+        () => nutritionRepository.updateProposalItems(
+          'prop_empty',
+          captureAny(),
+        ),
+      ).captured.single as List<MealItem>;
+      expect(captured.single.name, 'Bread');
+      expect(captured.single.quantity, 100);
+      expect(captured.single.unit, 'g');
+      expect(captured.single.calories, 265);
+      expect(captured.single.source, 'open_food_facts:manual_edit');
       expect(find.text('Bread'), findsWidgets);
       await tester.pump(VoiceLogViewModel.proposalChangeSuccessDuration);
     });

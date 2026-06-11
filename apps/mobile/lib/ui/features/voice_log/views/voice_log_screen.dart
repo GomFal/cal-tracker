@@ -579,9 +579,9 @@ class _ManualDraftIngredientRow extends StatelessWidget {
           NutritionMacroSummaryText(
             nutrition: nutrition,
             baseStyle: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: context.freshPalette.inkMuted,
-              letterSpacing: 0,
-            ),
+                  color: context.freshPalette.inkMuted,
+                  letterSpacing: 0,
+                ),
             overflow: TextOverflow.ellipsis,
             macroColors: {
               NutritionMacroKind.protein: context.freshPalette.coral,
@@ -941,13 +941,25 @@ class _FoodSearchBoxState extends State<_FoodSearchBox> {
           decoration: InputDecoration(
             hintText: widget.hintText,
             prefixIcon: const Icon(Icons.search_rounded),
+            suffixIconConstraints: const BoxConstraints(
+              minWidth: 56,
+              minHeight: 48,
+            ),
             suffixIcon: _controller.text.trim().isEmpty
                 ? null
-                : IconButton(
-                    key: ValueKey('${widget.keyPrefix}_clear'),
-                    tooltip: context.l10n.foodSearchClear,
-                    icon: const Icon(Icons.close_rounded),
-                    onPressed: _clear,
+                : Padding(
+                    padding: const EdgeInsetsDirectional.only(end: 8),
+                    child: IconButton(
+                      key: ValueKey('${widget.keyPrefix}_clear'),
+                      tooltip: context.l10n.foodSearchClear,
+                      constraints: const BoxConstraints.tightFor(
+                        width: 40,
+                        height: 40,
+                      ),
+                      padding: EdgeInsets.zero,
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: _clear,
+                    ),
                   ),
           ),
         ),
@@ -2293,9 +2305,9 @@ class _EditableIngredientRow extends StatelessWidget {
           NutritionMacroSummaryText(
             nutrition: nutrition,
             baseStyle: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: context.freshPalette.inkMuted,
-              letterSpacing: 0,
-            ),
+                  color: context.freshPalette.inkMuted,
+                  letterSpacing: 0,
+                ),
             overflow: TextOverflow.ellipsis,
             macroColors: {
               NutritionMacroKind.protein: context.freshPalette.coral,
@@ -2426,7 +2438,6 @@ class _InlineReplacementFoodSearchState
   }
 }
 
-
 MealItem _candidateWithMentionQuantity(
   MealItem candidate,
   FoodMention mention,
@@ -2470,8 +2481,6 @@ String _nutritionLabel(NutritionEdit nutrition) {
       '${formatMacro(nutrition.carbsGrams)}C · '
       '${formatMacro(nutrition.fatGrams)}F';
 }
-
-
 
 bool _itemMatchesCandidateGroup(MealItem item, FoodCandidateGroup group) {
   if (group.candidates.any((candidate) => sameMealItem(candidate, item))) {

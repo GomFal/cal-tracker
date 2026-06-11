@@ -234,9 +234,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsSubtitle => 'Cuenta y preferencias';
 
   @override
-  String get settingsMoreTooltip => 'Más';
-
-  @override
   String get settingsCouldNotUpdateGoals =>
       'No se pudieron actualizar los objetivos';
 
@@ -254,6 +251,25 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String settingsCalorieTargetSubtitle(int calories) {
     return '$calories Kcal de objetivo diario';
+  }
+
+  @override
+  String get settingsMacroDistributionTitle => 'Distribución de macros';
+
+  @override
+  String settingsMacroPresetSubtitle(
+      String preset, int protein, int carbs, int fat) {
+    return '$preset: $protein % proteína, $carbs % carbohidratos, $fat % grasa';
+  }
+
+  @override
+  String settingsMacroPercentSubtitle(int protein, int carbs, int fat) {
+    return '$protein % proteína, $carbs % carbohidratos, $fat % grasa';
+  }
+
+  @override
+  String settingsMacroGramsSubtitle(int protein, int carbs, int fat) {
+    return '$protein g proteína, $carbs g carbohidratos, $fat g grasa';
   }
 
   @override

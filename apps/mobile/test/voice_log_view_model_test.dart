@@ -958,6 +958,54 @@ void main() {
         expect(viewModel.message, isNull);
         expect(viewModel.showProposalChangeSuccess, isFalse);
       });
+
+      test('creates proposal from edited items when no proposal exists',
+          () async {
+        const bread = MealItem(
+          name: 'Bread',
+          quantity: 100,
+          unit: 'g',
+          calories: 265,
+          proteinGrams: 7,
+          carbsGrams: 1,
+          fatGrams: 8,
+          source: 'off:manual_edit',
+        );
+        const createdProposal = MealProposal(
+          id: 'manual_prop',
+          title: 'Bread',
+          confidence: 0.9,
+          requiresConfirmation: true,
+          trustedAutoCommitEligible: false,
+          nutrition: NutritionSnapshot(
+            calories: 265,
+            proteinGrams: 7,
+            carbsGrams: 1,
+            fatGrams: 8,
+          ),
+          items: [bread],
+        );
+        when(
+          () => mockNutritionRepository.createProposalFromItems(
+            phrase: any(named: 'phrase'),
+            items: any(named: 'items'),
+          ),
+        ).thenAnswer((_) async => createdProposal);
+
+        await viewModel.updateProposalItems([bread]);
+
+        expect(viewModel.state, VoiceLogState.proposalReady);
+        expect(viewModel.proposal, createdProposal);
+        final captured = verify(
+          () => mockNutritionRepository.createProposalFromItems(
+            phrase: any(named: 'phrase'),
+            items: captureAny(named: 'items'),
+          ),
+        ).captured.single as List<MealItem>;
+        expect(captured, [bread]);
+        verifyNever(
+            () => mockNutritionRepository.updateProposalItems(any(), any()));
+      });
     });
 
     group('candidate selection', () {

@@ -560,3 +560,22 @@ bun --env-file=.env scripts/test-groq-whisper.ts
 
 
 *Last updated: 2026-05-12*
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+When the user types `/graphify`, invoke the `skill` tool with `skill: "graphify"` before doing anything else.
+
+Rules:
+- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- Treat graphify as a retrieval aid and candidate generator, not as an oracle. Query output is provisional context that helps identify likely files, symbols, and relationships; it does not by itself prove behavioral conclusions.
+- For ambiguous or behavior-sensitive questions, inspect the relevant source files surfaced by graphify before answering. This includes questions about API endpoints, runtime entry points, data flow, auth behavior, persistence, caching, LLM/tool flows, and user-visible behavior.
+- Do not answer only from node labels or community names when the user's wording can map to multiple concepts. Disambiguate terms like "entry point" into process bootstrap, HTTP route, CLI script, UI screen, or test harness as appropriate, then verify against code and cite the source file.
+- Dirty graphify-out/ files are expected after hooks or incremental updates; dirty graph files are not a reason to skip graphify. Only skip graphify if the task is about stale or incorrect graph output, or the user explicitly says not to use it.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
+
+@RTK.md
+@BERRY.md

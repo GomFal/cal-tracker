@@ -47,8 +47,12 @@ import {
   registerAdminTelemetryRoutes,
   registerClientTelemetryRoutes,
 } from "./adminTelemetry.js";
-import { TelemetryService as DbTelemetryService } from "../telemetry/service.js";
 import {
+  TelemetryService as DbTelemetryService,
+  type TelemetryEventInput,
+} from "../telemetry/service.js";
+import {
+  FireAndForgetTelemetryService,
   hashQueryForTelemetry,
   type FoodSearchTelemetryEvent,
   type SttTelemetryEvent,
@@ -69,7 +73,9 @@ export function createApp(input: {
   const app = new Hono<{ Variables: { authUser: StoredUser; traceId: string } }>();
   const { config, repository, authService, actionExecutor, sttProvider, agentProvider, runLogger } = input;
   const telemetry = new DbTelemetryService(repository, { enabled: true });
-  const telemetryService: TelemetryService = input.telemetryService ?? telemetry;
+  const telemetryService: TelemetryService = new FireAndForgetTelemetryService(
+    input.telemetryService ?? telemetry,
+  );
   const adminAuthService = new AdminAuthService(config);
 
   const resolvedAgentProvider = agentProvider ?? new RemoteChatAgentProvider(
@@ -175,49 +181,55 @@ export function createApp(input: {
     try {
       await next();
       const responseStatus = c.res.status;
-      await telemetry.recordEvent({
-        traceId: getTraceId(c),
-        userId: maybeAuthUser(c)?.id,
-        eventType: "backend.api_request_completed",
-        flow: requestFlowForPath(path),
-        surface: "backend",
-        severity: severityForStatus(responseStatus),
-        status: responseStatus >= 400 ? "failure" : "success",
-        route: path,
-        method: c.req.method,
-        durationMs: Date.now() - started,
-        appVersion: c.req.header("x-app-version"),
-        appBuild: c.req.header("x-app-build"),
-        platform: c.req.header("x-client-platform"),
-        locale: c.req.header("accept-language")?.split(",")[0],
-        metadata: {
-          responseStatus,
-          userAgent: c.req.header("user-agent"),
-          clientSessionId: c.req.header("x-client-session-id"),
+      recordBackendTelemetry({
+        telemetry,
+        event: {
+          traceId: getTraceId(c),
+          userId: maybeAuthUser(c)?.id,
+          eventType: "backend.api_request_completed",
+          flow: requestFlowForPath(path),
+          surface: "backend",
+          severity: severityForStatus(responseStatus),
+          status: responseStatus >= 400 ? "failure" : "success",
+          route: path,
+          method: c.req.method,
+          durationMs: Date.now() - started,
+          appVersion: c.req.header("x-app-version"),
+          appBuild: c.req.header("x-app-build"),
+          platform: c.req.header("x-client-platform"),
+          locale: c.req.header("accept-language")?.split(",")[0],
+          metadata: {
+            responseStatus,
+            userAgent: c.req.header("user-agent"),
+            clientSessionId: c.req.header("x-client-session-id"),
+          },
         },
       });
     } catch (error) {
       const summary = summarizeError(error);
-      await telemetry.recordEvent({
-        traceId: getTraceId(c),
-        userId: maybeAuthUser(c)?.id,
-        eventType: "backend.api_request_failed",
-        flow: requestFlowForPath(path),
-        surface: "backend",
-        severity: "error",
-        status: "failure",
-        route: path,
-        method: c.req.method,
-        durationMs: Date.now() - started,
-        errorCode: error instanceof HTTPException ? httpErrorCodeForTelemetry(error.status) : undefined,
-        errorMessage: typeof summary.message === "string" ? summary.message : undefined,
-        appVersion: c.req.header("x-app-version"),
-        appBuild: c.req.header("x-app-build"),
-        platform: c.req.header("x-client-platform"),
-        locale: c.req.header("accept-language")?.split(",")[0],
-        metadata: {
-          userAgent: c.req.header("user-agent"),
-          clientSessionId: c.req.header("x-client-session-id"),
+      recordBackendTelemetry({
+        telemetry,
+        event: {
+          traceId: getTraceId(c),
+          userId: maybeAuthUser(c)?.id,
+          eventType: "backend.api_request_failed",
+          flow: requestFlowForPath(path),
+          surface: "backend",
+          severity: "error",
+          status: "failure",
+          route: path,
+          method: c.req.method,
+          durationMs: Date.now() - started,
+          errorCode: error instanceof HTTPException ? httpErrorCodeForTelemetry(error.status) : undefined,
+          errorMessage: typeof summary.message === "string" ? summary.message : undefined,
+          appVersion: c.req.header("x-app-version"),
+          appBuild: c.req.header("x-app-build"),
+          platform: c.req.header("x-client-platform"),
+          locale: c.req.header("accept-language")?.split(",")[0],
+          metadata: {
+            userAgent: c.req.header("user-agent"),
+            clientSessionId: c.req.header("x-client-session-id"),
+          },
         },
       });
       throw error;
@@ -353,14 +365,13 @@ export function createApp(input: {
       buildActionContext(c, user, "flutter"),
     );
     const limited = limitFoodSearchOutput(result.output, body.limit);
-    await recordFoodSearchTelemetry({
+    recordFoodSearchTelemetry({
       telemetryService,
       event: {
         flow: "food_search",
         surface: "backend",
         traceId,
         userId: user.id,
-        queryText: body.query,
         queryLength: body.query.length,
         queryHash: hashQueryForTelemetry(body.query),
         locale: c.req.header("accept-language")?.split(",")[0],
@@ -432,7 +443,7 @@ export function createApp(input: {
       mimeType: upload.mimeType,
       bytes: upload.buffer.byteLength,
     });
-    await recordSttTelemetry({
+    recordSttTelemetry({
       telemetryService,
       event: {
         flow: "stt",
@@ -465,7 +476,7 @@ export function createApp(input: {
         bytes: upload.buffer.byteLength,
         error: error instanceof Error ? error.message : String(error),
       });
-      await recordSttTelemetry({
+      recordSttTelemetry({
         telemetryService,
         event: {
           flow: "stt",
@@ -491,7 +502,7 @@ export function createApp(input: {
       model: result.model,
       transcriptLength: result.text.length,
     });
-    await recordSttTelemetry({
+    recordSttTelemetry({
       telemetryService,
       event: {
         flow: "stt",
@@ -533,7 +544,7 @@ export function createApp(input: {
       mimeType: upload.mimeType,
       bytes: upload.buffer.byteLength,
     });
-    await recordVoiceMealRunTelemetry({
+    recordVoiceMealRunTelemetry({
       telemetryService,
       event: {
         flow: "voice_meal",
@@ -601,7 +612,7 @@ export function createApp(input: {
           total: Date.now() - routeStarted,
         },
       });
-      await recordVoiceMealRunTelemetry({
+      recordVoiceMealRunTelemetry({
         telemetryService,
         event: {
           flow: "voice_meal",
@@ -665,7 +676,7 @@ export function createApp(input: {
         total: Date.now() - routeStarted,
       },
     });
-    await recordVoiceMealRunTelemetry({
+    recordVoiceMealRunTelemetry({
       telemetryService,
       event: {
         flow: "voice_meal",
@@ -1116,36 +1127,41 @@ function publicUser(user: StoredUser) {
   return publicValue;
 }
 
-async function recordFoodSearchTelemetry(input: {
+function recordBackendTelemetry(input: {
+  telemetry: DbTelemetryService;
+  event: TelemetryEventInput;
+}): void {
+  recordTelemetry("backend_event", () => input.telemetry.recordEvent(input.event));
+}
+
+function recordFoodSearchTelemetry(input: {
   telemetryService: TelemetryService;
   event: FoodSearchTelemetryEvent;
-}): Promise<void> {
-  try {
-    await input.telemetryService.recordFoodSearchEvent(input.event);
-  } catch (error) {
-    console.warn("telemetry.food_search.failed", summarizeError(error));
-  }
+}): void {
+  recordTelemetry("food_search", () => input.telemetryService.recordFoodSearchEvent(input.event));
 }
 
-async function recordSttTelemetry(input: {
+function recordSttTelemetry(input: {
   telemetryService: TelemetryService;
   event: SttTelemetryEvent;
-}): Promise<void> {
-  try {
-    await input.telemetryService.recordSttEvent(input.event);
-  } catch (error) {
-    console.warn("telemetry.stt.failed", summarizeError(error));
-  }
+}): void {
+  recordTelemetry("stt", () => input.telemetryService.recordSttEvent(input.event));
 }
 
-async function recordVoiceMealRunTelemetry(input: {
+function recordVoiceMealRunTelemetry(input: {
   telemetryService: TelemetryService;
   event: VoiceMealRunTelemetryEvent;
-}): Promise<void> {
+}): void {
+  recordTelemetry("voice_meal_run", () => input.telemetryService.recordVoiceMealRunEvent(input.event));
+}
+
+function recordTelemetry(label: string, emit: () => Promise<unknown>): void {
   try {
-    await input.telemetryService.recordVoiceMealRunEvent(input.event);
+    void emit().catch((error) => {
+      console.warn(`telemetry.${label}.failed`, summarizeError(error));
+    });
   } catch (error) {
-    console.warn("telemetry.voice_meal_run.failed", summarizeError(error));
+    console.warn(`telemetry.${label}.failed`, summarizeError(error));
   }
 }
 

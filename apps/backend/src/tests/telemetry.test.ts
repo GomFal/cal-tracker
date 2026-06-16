@@ -38,6 +38,13 @@ class RecordingTelemetryService implements TelemetryService {
   async recordFoodResolverEvent(event: FoodResolverTelemetryEvent) { this.foodResolver.push(event); }
 }
 
+class HangingFoodSearchTelemetryService extends RecordingTelemetryService {
+  override async recordFoodSearchEvent(event: FoodSearchTelemetryEvent): Promise<never> {
+    this.foodSearch.push(event);
+    return new Promise<never>(() => {});
+  }
+}
+
 class ThrowingChatAgentProvider implements ChatAgentProvider {
   async runWithTools(): Promise<AgentToolDecision> {
     throw new Error("provider_unavailable");
@@ -367,8 +374,35 @@ describe("HTTP route telemetry", () => {
       zeroResults: true,
       lowConfidence: false,
       queryLength: expect.any(Number),
-      queryHash: expect.any(String),
+      queryHash: expect.stringMatching(/^[a-f0-9]{32}$/),
       resultCount: 0,
     });
+  });
+
+  it("does not wait for food search telemetry before returning the response", async () => {
+    const recorder = new HangingFoodSearchTelemetryService();
+    telemetry.push(recorder);
+    const { request } = buildTestApp({ telemetryService: recorder });
+    const { authHeader } = await registerAndAuth(request);
+
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeout = setTimeout(() => {
+        reject(new Error("food search response waited for telemetry"));
+      }, 500);
+    });
+
+    const res = await Promise.race([
+      request("http://localhost/v1/foods/search", {
+        method: "POST",
+        headers: authHeader,
+        body: JSON.stringify({ query: "this food does not exist 12345 xyz" }),
+      }),
+      timeoutPromise,
+    ]);
+    if (timeout) clearTimeout(timeout);
+
+    expect(res.status).toBe(200);
+    expect(recorder.foodSearch).toHaveLength(1);
   });
 });

@@ -9,6 +9,8 @@
  * telemetry failures never affect user requests.
  */
 
+import { createHash } from "node:crypto";
+
 export type LlmTelemetryEvent = {
   flow: "llm_run";
   surface: "agent";
@@ -161,6 +163,44 @@ export class NoopTelemetryService implements TelemetryService {
   async recordFoodResolverEvent(): Promise<void> { return NOOP_PROMISE; }
 }
 
+export class FireAndForgetTelemetryService implements TelemetryService {
+  readonly enabled: boolean;
+
+  constructor(private readonly sink: TelemetryService) {
+    this.enabled = sink.enabled;
+  }
+
+  async recordLlmRun(event: LlmTelemetryEvent): Promise<void> {
+    this.schedule("llm_run", () => this.sink.recordLlmRun(event));
+  }
+
+  async recordSttEvent(event: SttTelemetryEvent): Promise<void> {
+    this.schedule("stt", () => this.sink.recordSttEvent(event));
+  }
+
+  async recordVoiceMealRunEvent(event: VoiceMealRunTelemetryEvent): Promise<void> {
+    this.schedule("voice_meal_run", () => this.sink.recordVoiceMealRunEvent(event));
+  }
+
+  async recordFoodSearchEvent(event: FoodSearchTelemetryEvent): Promise<void> {
+    this.schedule("food_search", () => this.sink.recordFoodSearchEvent(event));
+  }
+
+  async recordFoodResolverEvent(event: FoodResolverTelemetryEvent): Promise<void> {
+    this.schedule("food_resolver", () => this.sink.recordFoodResolverEvent(event));
+  }
+
+  private schedule(label: string, emit: () => Promise<unknown>): void {
+    try {
+      void emit().catch((error) => {
+        console.warn(`telemetry.${label}.failed`, describeError(error));
+      });
+    } catch (error) {
+      console.warn(`telemetry.${label}.failed`, describeError(error));
+    }
+  }
+}
+
 /**
  * Console-backed telemetry service. Used as a development default so the
  * adapter always has a visible sink without requiring the DB foundation. It
@@ -248,12 +288,5 @@ async function safeRecord(emit: () => Promise<unknown>): Promise<void> {
 export const DEFAULT_TELEMETRY_SERVICE: TelemetryService = new NoopTelemetryService();
 
 export function hashQueryForTelemetry(query: string): string {
-  // Tiny non-cryptographic hash so we can correlate search telemetry without
-  // storing raw transcripts. Best-effort; collisions are fine for telemetry.
-  let hash = 2166136261 >>> 0;
-  for (let i = 0; i < query.length; i += 1) {
-    hash ^= query.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0).toString(16).padStart(8, "0");
+  return createHash("sha256").update(query).digest("hex").slice(0, 32);
 }

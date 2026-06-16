@@ -168,7 +168,7 @@ describe("admin telemetry routes", () => {
 
 describe("client telemetry ingestion", () => {
   it("accepts a batch of client events for the authenticated user", async () => {
-    const { request } = buildTestApp();
+    const { request, telemetry } = buildTestApp();
     const { authHeader } = await registerAndAuth(request);
 
     const response = await request("http://localhost/v1/telemetry/client-events", {
@@ -208,8 +208,53 @@ describe("client telemetry ingestion", () => {
     const body = await response.json() as { accepted: number };
     expect(body.accepted).toBe(2);
 
+    const events = await telemetry.listEvents({ traceId: "trace-client-1", limit: 10 });
+    expect(events[0]).toMatchObject({
+      eventType: "mobile.api_request_failed",
+      surface: "mobile",
+    });
+
     const me = await request("http://localhost/v1/auth/me", { headers: authHeader });
     expect(me.status).toBe(200);
+  });
+
+  it("forces client telemetry to mobile surface and drops non-mobile event types", async () => {
+    const { request, telemetry } = buildTestApp();
+    const { authHeader } = await registerAndAuth(request);
+
+    const response = await request("http://localhost/v1/telemetry/client-events", {
+      method: "POST",
+      headers: authHeader,
+      body: JSON.stringify({
+        events: [
+          {
+            eventType: "mobile.api_request_failed",
+            surface: "admin",
+            severity: "warning",
+            traceId: "trace-client-forced-mobile"
+          },
+          {
+            eventType: "backend.api_request_completed",
+            surface: "backend",
+            severity: "info",
+            traceId: "trace-client-dropped-backend"
+          }
+        ]
+      })
+    });
+    expect(response.status).toBe(200);
+    const body = await response.json() as { accepted: number };
+    expect(body.accepted).toBe(1);
+
+    const accepted = await telemetry.listEvents({ traceId: "trace-client-forced-mobile", limit: 10 });
+    expect(accepted).toHaveLength(1);
+    expect(accepted[0]).toMatchObject({
+      eventType: "mobile.api_request_failed",
+      surface: "mobile"
+    });
+
+    const dropped = await telemetry.listEvents({ traceId: "trace-client-dropped-backend", limit: 10 });
+    expect(dropped).toHaveLength(0);
   });
 
   it("rejects an oversized batch with a 400", async () => {
@@ -264,15 +309,39 @@ describe("telemetry service", () => {
       errorMessage: "x".repeat(5_000),
       metadata: {
         longValue: "y".repeat(2_000),
-        nested: { deep: "z".repeat(2_000) },
+        nested: {
+          authorization: "Bearer secret",
+          deep: "z".repeat(2_000),
+          child: {
+            password: "pw",
+            transcript: "spoken meal details",
+            queryHash: "abc123",
+            queryLength: 42
+          }
+        },
+        email: "user@example.com",
+        originalText: "raw food mention",
+        promptTokens: 123,
         ok: "small"
       }
     });
     expect(result).toBeDefined();
     expect(result?.metadata.ok).toBe("small");
+    expect(result?.metadata.email).toBe("[redacted]");
+    expect(result?.metadata.originalText).toBe("[redacted]");
+    expect(result?.metadata.promptTokens).toBe(123);
+    expect(result?.metadata.nested).toMatchObject({
+      authorization: "[redacted]",
+      child: {
+        password: "[redacted]",
+        transcript: "[redacted]",
+        queryHash: "abc123",
+        queryLength: 42
+      }
+    });
   });
 
-  it("truncates stored search query text and records a hash", async () => {
+  it("does not store raw search query text and records query metrics", async () => {
     const { telemetry } = buildTestApp();
     const longQuery = "apple ".repeat(40);
     const result = await telemetry.recordFoodSearchEvent({
@@ -284,7 +353,7 @@ describe("telemetry service", () => {
       barcodePresent: false
     });
     expect(result).toBeDefined();
-    expect(result?.queryText?.length).toBeLessThanOrEqual(120);
+    expect(result?.queryText).toBeUndefined();
     expect(result?.queryLength).toBe(longQuery.length);
     expect(result?.queryHash).toMatch(/^[a-f0-9]{32}$/);
   });

@@ -11,12 +11,15 @@ import '../data/services/app_preferences_repository.dart';
 import '../data/services/app_preferences_storage.dart';
 import '../data/services/api_config.dart';
 import '../data/services/audio_recorder_service.dart';
+import '../data/services/client_metadata_provider.dart';
+import '../data/services/client_telemetry_service.dart';
 import '../data/services/mobile_update_service.dart';
 import '../data/services/nutrition_cache_store.dart';
 import '../data/services/secure_token_storage.dart';
 import '../generated/api/cal_tracker_api.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../ui/core/mobile_update_dialog_host.dart';
+import '../ui/core/performance_overlay_strip.dart';
 import '../ui/features/auth/view_models/auth_view_model.dart';
 import '../ui/features/dashboard/view_models/dashboard_view_model.dart';
 import '../ui/features/meal_history/view_models/meal_history_view_model.dart';
@@ -25,14 +28,15 @@ import '../ui/features/settings/view_models/settings_view_model.dart';
 import '../ui/features/voice_log/view_models/voice_log_view_model.dart';
 import 'locale_view_model.dart';
 import 'mobile_update_view_model.dart';
+import 'performance_overlay_view_model.dart';
 import 'router.dart';
 import 'theme.dart';
 import 'theme_mode_view_model.dart';
 
-typedef CalTrackerAppWrapperBuilder =
-    Widget Function(BuildContext context, Widget child, GoRouter router);
+typedef CalTrackerAppWrapperBuilder = Widget Function(
+    BuildContext context, Widget child, GoRouter router);
 
-class CalTrackerBootstrap extends StatelessWidget {
+class CalTrackerBootstrap extends StatefulWidget {
   const CalTrackerBootstrap({
     super.key,
     this.apiConfig = const ApiConfig.fromEnvironment(),
@@ -42,6 +46,8 @@ class CalTrackerBootstrap extends StatelessWidget {
     this.tokenStorage,
     this.mobileUpdateService,
     this.audioRecorderService,
+    this.clientTelemetryService,
+    this.clientMetadataProvider,
     this.checkForUpdates = true,
     this.appWrapperBuilder,
   });
@@ -53,39 +59,73 @@ class CalTrackerBootstrap extends StatelessWidget {
   final TokenStorage? tokenStorage;
   final MobileUpdateService? mobileUpdateService;
   final AudioRecorderService? audioRecorderService;
+  final ClientTelemetryService? clientTelemetryService;
+  final ClientMetadataProvider? clientMetadataProvider;
   final bool checkForUpdates;
   final CalTrackerAppWrapperBuilder? appWrapperBuilder;
 
   @override
+  State<CalTrackerBootstrap> createState() => _CalTrackerBootstrapState();
+}
+
+class _CalTrackerBootstrapState extends State<CalTrackerBootstrap> {
+  ClientTelemetryService? _ownedTelemetryService;
+
+  @override
+  void dispose() {
+    // If we created the telemetry service we own its lifecycle and must
+    // cancel its periodic flush timer. External services (e.g. tests that
+    // inject their own instance) are left to the caller.
+    _ownedTelemetryService?.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final tokenStorage = this.tokenStorage ?? const SecureTokenStorage();
-    final preferencesRepository =
-        this.preferencesRepository ??
+    final tokenStorage = widget.tokenStorage ?? const SecureTokenStorage();
+    final preferencesRepository = widget.preferencesRepository ??
         AppPreferencesRepository(storage: AppPreferencesStorage());
+    final metadataProvider =
+        widget.clientMetadataProvider ?? ClientMetadataProvider();
+    final telemetryService = widget.clientTelemetryService ??
+        (_ownedTelemetryService = ClientTelemetryService(
+          apiConfig: widget.apiConfig,
+          tokenStorage: tokenStorage,
+          metadataProvider: metadataProvider,
+        ));
+    // Only start the periodic flush when this widget owns the service so
+    // tests that inject their own ClientTelemetryService stay in control of
+    // its lifecycle.
+    if (widget.clientTelemetryService == null) {
+      telemetryService.start();
+    }
     final apiClient = CalTrackerApiClient(
-      config: apiConfig,
+      config: widget.apiConfig,
       tokenStorage: tokenStorage,
       localeTagProvider: () async {
         final savedTag = await preferencesRepository.loadLocaleCode();
         return LocaleViewModel.normalizeLocaleTag(savedTag).toLanguageTag();
       },
+      metadataProvider: metadataProvider,
+      telemetryService: telemetryService,
     );
-    final authRepository =
-        this.authRepository ??
+    final authRepository = widget.authRepository ??
         AuthRepository(apiClient: apiClient, tokenStorage: tokenStorage);
-    final nutritionRepository =
-        this.nutritionRepository ??
+    final nutritionRepository = widget.nutritionRepository ??
         NutritionRepository(
           apiClient: apiClient,
           cacheStore: NutritionCacheStore(storage: AppPreferencesStorage()),
+          telemetryService: telemetryService,
         );
-    final mobileUpdateService =
-        this.mobileUpdateService ?? MobileUpdateService(apiConfig: apiConfig);
+    final mobileUpdateService = widget.mobileUpdateService ??
+        MobileUpdateService(apiConfig: widget.apiConfig);
     final audioRecorderService =
-        this.audioRecorderService ?? AudioRecorderService();
+        widget.audioRecorderService ?? AudioRecorderService();
 
     return MultiProvider(
       providers: [
+        Provider<ClientTelemetryService>.value(value: telemetryService),
+        Provider<ClientMetadataProvider>.value(value: metadataProvider),
         Provider<AuthRepository>.value(value: authRepository),
         Provider<NutritionRepository>.value(value: nutritionRepository),
         Provider<AudioRecorderService>.value(value: audioRecorderService),
@@ -95,7 +135,7 @@ class CalTrackerBootstrap extends StatelessWidget {
             final viewModel = MobileUpdateViewModel(
               updateService: mobileUpdateService,
             );
-            if (checkForUpdates) {
+            if (widget.checkForUpdates) {
               viewModel.checkForUpdate();
             }
             return viewModel;
@@ -112,6 +152,9 @@ class CalTrackerBootstrap extends StatelessWidget {
                 ..load(),
         ),
         ChangeNotifierProvider(
+          create: (_) => PerformanceOverlayViewModel(),
+        ),
+        ChangeNotifierProvider(
           create: (_) =>
               AuthViewModel(authRepository: authRepository)..restoreSession(),
         ),
@@ -119,6 +162,7 @@ class CalTrackerBootstrap extends StatelessWidget {
           create: (_) => VoiceLogViewModel(
             nutritionRepository: nutritionRepository,
             audioRecorderService: audioRecorderService,
+            telemetryService: telemetryService,
           ),
         ),
         ChangeNotifierProvider(
@@ -140,7 +184,7 @@ class CalTrackerBootstrap extends StatelessWidget {
           ),
         ),
       ],
-      child: _CalTrackerApp(appWrapperBuilder: appWrapperBuilder),
+      child: _CalTrackerApp(appWrapperBuilder: widget.appWrapperBuilder),
     );
   }
 }
@@ -200,12 +244,13 @@ class _CalTrackerAppState extends State<_CalTrackerApp> {
           child: child ?? const SizedBox.shrink(),
         );
         final preloadedApp = _AuthenticatedDataPreloader(child: app);
-        return widget.appWrapperBuilder?.call(
+        final wrappedApp = widget.appWrapperBuilder?.call(
               context,
               preloadedApp,
               _router!,
             ) ??
             preloadedApp;
+        return PerformanceOverlayHost(child: wrappedApp);
       },
     );
   }

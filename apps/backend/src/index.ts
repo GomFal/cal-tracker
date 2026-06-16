@@ -22,6 +22,7 @@ import { ResolverNutritionProvider } from "./nutrition/provider.js";
 import { createLocalRunLogger } from "./observability/localRunLogger.js";
 import { PostgresRepository } from "./repository/postgres.js";
 import { RemoteSpeechToTextProvider } from "./stt/speechToTextProvider.js";
+import { TelemetryService } from "./telemetry/service.js";
 
 const config = loadConfig();
 const repository = new PostgresRepository(config.DATABASE_URL, {
@@ -30,6 +31,7 @@ const repository = new PostgresRepository(config.DATABASE_URL, {
   normalizedSearchSampleSet: config.FOOD_NORMALIZED_SEARCH_SAMPLE_SET,
 });
 const authService = new AuthService(config, repository);
+const telemetryService = new TelemetryService(repository, { enabled: true });
 const embeddingProvider = config.EMBEDDINGS_ENABLED
   ? new OpenRouterEmbeddingProvider(
       config.OPENROUTER_API_KEY,
@@ -40,6 +42,7 @@ const embeddingProvider = config.EMBEDDINGS_ENABLED
 const foodResolver = new FoodResolver(
   new LocalFoodDataProvider(repository),
   config.FOOD_RESOLVER_MIN_CONFIDENCE,
+  telemetryService,
 );
 const nutritionProvider = new ResolverNutritionProvider(foodResolver);
 const agentProvider = new RemoteChatAgentProvider(
@@ -90,6 +93,7 @@ const app = createApp({
   sttProvider,
   agentProvider,
   runLogger,
+  telemetryService,
 });
 
 serve({ fetch: app.fetch, port: config.PORT });

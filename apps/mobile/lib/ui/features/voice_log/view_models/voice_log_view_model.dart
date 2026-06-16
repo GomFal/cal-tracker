@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 
 import '../../../../data/repositories/nutrition_repository.dart';
 import '../../../../data/services/audio_recorder_service.dart';
+import '../../../../data/services/client_telemetry_service.dart';
 import '../../../../domain/models/nutrition_models.dart';
+import '../../../../generated/api/cal_tracker_api.dart';
 import '../../../core/user_visible_error.dart';
 import 'voice_log_helpers.dart';
 import 'voice_log_timers.dart';
@@ -177,9 +179,11 @@ class VoiceLogViewModel extends ChangeNotifier {
   VoiceLogViewModel({
     required NutritionRepository nutritionRepository,
     AudioRecorderService? audioRecorderService,
+    ClientTelemetryService? telemetryService,
     DateTime Function()? now,
   })  : _nutritionRepository = nutritionRepository,
         _audioRecorderService = audioRecorderService ?? AudioRecorderService(),
+        _telemetryService = telemetryService,
         _now = now ?? DateTime.now {
     _timers = VoiceLogTimers(
       onRecordingDurationTick: _onRecordingDurationTick,
@@ -192,6 +196,7 @@ class VoiceLogViewModel extends ChangeNotifier {
 
   final NutritionRepository _nutritionRepository;
   final AudioRecorderService _audioRecorderService;
+  final ClientTelemetryService? _telemetryService;
   final DateTime Function() _now;
 
   VoiceLogUiState _uiState = const VoiceLogUiState();
@@ -351,6 +356,12 @@ class VoiceLogViewModel extends ChangeNotifier {
       );
     } on RecorderException catch (e) {
       _timers.stopRecordingDuration();
+      _recordVoiceFailure(
+        kind: 'recording_start_failed',
+        error: e,
+        errorCode: e.code,
+        extra: <String, Object?>{'stage': 'start'},
+      );
       if (e.code == 'permission_denied') {
         _setError('Microphone permission is required to record voice logs.');
       } else {
@@ -364,6 +375,11 @@ class VoiceLogViewModel extends ChangeNotifier {
       }
     } catch (e) {
       _timers.stopRecordingDuration();
+      _recordVoiceFailure(
+        kind: 'recording_start_failed',
+        error: e,
+        extra: <String, Object?>{'stage': 'start'},
+      );
       _setError(
         userVisibleErrorMessage(e, context: UserErrorContext.voiceRecording),
       );
@@ -383,9 +399,21 @@ class VoiceLogViewModel extends ChangeNotifier {
           submitAfterTranscription: submitAfterTranscription,
         );
       } else {
+        _recordVoiceFailure(
+          kind: 'recording_stop_failed',
+          error: 'No audio file was created.',
+          errorCode: 'no_audio_file',
+          extra: <String, Object?>{'stage': 'stop'},
+        );
         _setError('No audio file was created.');
       }
     } on RecorderException catch (e) {
+      _recordVoiceFailure(
+        kind: 'recording_stop_failed',
+        error: e,
+        errorCode: e.code,
+        extra: <String, Object?>{'stage': 'stop'},
+      );
       _setError(
         e.message ??
             userVisibleErrorMessage(
@@ -394,6 +422,11 @@ class VoiceLogViewModel extends ChangeNotifier {
             ),
       );
     } catch (e) {
+      _recordVoiceFailure(
+        kind: 'recording_stop_failed',
+        error: e,
+        extra: <String, Object?>{'stage': 'stop'},
+      );
       _setError(
         userVisibleErrorMessage(e, context: UserErrorContext.voiceRecording),
       );
@@ -441,6 +474,16 @@ class VoiceLogViewModel extends ChangeNotifier {
         _setState(VoiceLogState.transcriptReady);
       }
     } catch (e) {
+      _recordVoiceFailure(
+        kind: submitAfterTranscription
+            ? 'meal_run_failed'
+            : 'transcription_failed',
+        error: e,
+        errorCode: e is ApiException ? e.code : null,
+        extra: <String, Object?>{
+          'stage': submitAfterTranscription ? 'meal_run' : 'transcription',
+        },
+      );
       _setError(
         submitAfterTranscription
             ? userVisibleErrorMessage(e, context: UserErrorContext.voiceMeal)
@@ -855,6 +898,28 @@ class VoiceLogViewModel extends ChangeNotifier {
   void _onProposalChangeSuccessExpired() {
     if (!_uiState.showProposalChangeSuccess) return;
     _setUiState(_uiState.copyWith(showProposalChangeSuccess: false));
+  }
+
+  void _recordVoiceFailure({
+    required String kind,
+    required Object error,
+    String? errorCode,
+    Map<String, Object?> extra = const <String, Object?>{},
+  }) {
+    final telemetry = _telemetryService;
+    if (telemetry == null) return;
+    telemetry.record(
+      ClientTelemetryEvent(
+        eventType: 'mobile.voice_$kind',
+        flow: 'voice_meal',
+        surface: 'mobile',
+        severity: 'error',
+        status: 'failure',
+        errorCode: errorCode,
+        errorMessage: error.toString(),
+        metadata: extra,
+      ),
+    );
   }
 
   @visibleForTesting

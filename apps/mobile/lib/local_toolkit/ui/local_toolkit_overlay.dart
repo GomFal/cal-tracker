@@ -207,11 +207,6 @@ class _LocalToolkitOverlayState extends State<LocalToolkitOverlay> {
     return Stack(
       children: [
         widget.child,
-        if (widget.showPerformanceOverlay) ...[
-          Positioned.fill(
-            child: PerformanceOverlay.allEnabled(),
-          ),
-        ],
         if (_isPanelOpen) ...[
           Positioned.fill(
             child: GestureDetector(
@@ -254,7 +249,8 @@ class _LocalToolkitOverlayState extends State<LocalToolkitOverlay> {
                       onSwitchLocale: widget.onSwitchLocale,
                       onSwitchTheme: widget.onSwitchTheme,
                       showPerformanceOverlay: widget.showPerformanceOverlay,
-                      onTogglePerformanceOverlay: widget.onTogglePerformanceOverlay,
+                      onTogglePerformanceOverlay:
+                          widget.onTogglePerformanceOverlay,
                     ),
                   ),
                 ),

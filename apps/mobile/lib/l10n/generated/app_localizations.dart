@@ -717,6 +717,36 @@ abstract class AppLocalizations {
   /// **'Dark'**
   String get settingsThemeDark;
 
+  /// No description provided for @settingsDeveloperMenuTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Developer tools'**
+  String get settingsDeveloperMenuTitle;
+
+  /// No description provided for @settingsPerformanceOverlayTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Performance overlay'**
+  String get settingsPerformanceOverlayTitle;
+
+  /// No description provided for @settingsPerformanceOverlaySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show Flutter frame timings in a compact top strip.'**
+  String get settingsPerformanceOverlaySubtitle;
+
+  /// No description provided for @settingsPerformanceOverlayOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Overlay on'**
+  String get settingsPerformanceOverlayOn;
+
+  /// No description provided for @settingsPerformanceOverlayOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Overlay off'**
+  String get settingsPerformanceOverlayOff;
+
   /// No description provided for @settingsDataSourcesTitle.
   ///
   /// In en, this message translates to:

@@ -535,6 +535,109 @@ export const auditEvents = pgTable("audit_events", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
 });
 
+export const telemetryEvents = pgTable("telemetry_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  traceId: text("trace_id").notNull(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  sessionId: text("session_id"),
+  eventType: text("event_type").notNull(),
+  flow: text("flow"),
+  surface: text("surface").notNull(),
+  severity: text("severity").notNull(),
+  status: text("status"),
+  route: text("route"),
+  method: text("method"),
+  actionId: text("action_id"),
+  durationMs: integer("duration_ms"),
+  errorCode: text("error_code"),
+  errorMessage: text("error_message"),
+  appVersion: text("app_version"),
+  appBuild: text("app_build"),
+  platform: text("platform"),
+  locale: text("locale"),
+  metadataJson: jsonb("metadata_json").$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+}, (table) => [
+  index("telemetry_events_created_at_idx").on(sql`${table.createdAt} DESC`),
+  index("telemetry_events_trace_id_idx").on(table.traceId),
+  index("telemetry_events_user_id_created_at_idx").on(table.userId, sql`${table.createdAt} DESC`),
+  index("telemetry_events_event_type_created_at_idx").on(table.eventType, sql`${table.createdAt} DESC`),
+  index("telemetry_events_severity_created_at_idx").on(table.severity, sql`${table.createdAt} DESC`)
+]);
+
+export const llmRuns = pgTable("llm_runs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  traceId: text("trace_id").notNull(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  source: text("source"),
+  locale: text("locale"),
+  timezone: text("timezone"),
+  model: text("model").notNull(),
+  inputMode: text("input_mode"),
+  activeProposalId: uuid("active_proposal_id"),
+  decisionSource: text("decision_source"),
+  selectedTool: text("selected_tool"),
+  executedTool: text("executed_tool"),
+  resultKind: text("result_kind"),
+  actionCallId: uuid("action_call_id"),
+  promptChars: integer("prompt_chars"),
+  toolsJsonChars: integer("tools_json_chars"),
+  messagesJsonChars: integer("messages_json_chars"),
+  requestPayloadChars: integer("request_payload_chars"),
+  promptTokens: integer("prompt_tokens"),
+  completionTokens: integer("completion_tokens"),
+  totalTokens: integer("total_tokens"),
+  reasoningTokens: integer("reasoning_tokens"),
+  firstByteMs: integer("first_byte_ms"),
+  firstToolCallMs: integer("first_tool_call_ms"),
+  largestStreamGapMs: integer("largest_stream_gap_ms"),
+  llmMs: integer("llm_ms"),
+  actionMs: integer("action_ms"),
+  totalMs: integer("total_ms"),
+  emptyToolCall: boolean("empty_tool_call").notNull().default(false),
+  invalidToolArguments: boolean("invalid_tool_arguments").notNull().default(false),
+  providerError: boolean("provider_error").notNull().default(false),
+  metadataJson: jsonb("metadata_json").$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+}, (table) => [
+  index("llm_runs_created_at_idx").on(sql`${table.createdAt} DESC`),
+  index("llm_runs_trace_id_idx").on(table.traceId),
+  index("llm_runs_user_id_created_at_idx").on(table.userId, sql`${table.createdAt} DESC`),
+  index("llm_runs_result_kind_created_at_idx").on(table.resultKind, sql`${table.createdAt} DESC`),
+  index("llm_runs_selected_tool_created_at_idx").on(table.selectedTool, sql`${table.createdAt} DESC`)
+]);
+
+export const foodSearchEvents = pgTable("food_search_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  traceId: text("trace_id").notNull(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  queryText: text("query_text"),
+  queryHash: text("query_hash"),
+  queryLength: integer("query_length").notNull().default(0),
+  locale: text("locale"),
+  barcodePresent: boolean("barcode_present").notNull().default(false),
+  normalizedSearchEnabled: boolean("normalized_search_enabled"),
+  normalizedScope: text("normalized_scope"),
+  path: text("path"),
+  resultCount: integer("result_count").notNull().default(0),
+  candidateGroupCount: integer("candidate_group_count"),
+  topScore: numeric("top_score", { precision: 8, scale: 4 }),
+  topExternalSource: text("top_external_source"),
+  topResultType: text("top_result_type"),
+  zeroResults: boolean("zero_results").notNull().default(false),
+  lowConfidence: boolean("low_confidence").notNull().default(false),
+  selectedRank: integer("selected_rank"),
+  durationMs: integer("duration_ms"),
+  metadataJson: jsonb("metadata_json").$type<Record<string, unknown>>().notNull().default(sql`'{}'::jsonb`),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+}, (table) => [
+  index("food_search_events_created_at_idx").on(sql`${table.createdAt} DESC`),
+  index("food_search_events_trace_id_idx").on(table.traceId),
+  index("food_search_events_user_id_created_at_idx").on(table.userId, sql`${table.createdAt} DESC`),
+  index("food_search_events_zero_results_created_at_idx").on(table.zeroResults, sql`${table.createdAt} DESC`),
+  index("food_search_events_low_confidence_created_at_idx").on(table.lowConfidence, sql`${table.createdAt} DESC`)
+]);
+
 export const agentConnections = pgTable("agent_connections", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -578,7 +681,10 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   templates: many(mealTemplates),
   memories: many(foodMemories),
   actionCalls: many(actionCalls),
-  auditEvents: many(auditEvents)
+  auditEvents: many(auditEvents),
+  telemetryEvents: many(telemetryEvents),
+  llmRuns: many(llmRuns),
+  foodSearchEvents: many(foodSearchEvents)
 }));
 
 export const foodItemsRelations = relations(foodItems, ({ one, many }) => ({

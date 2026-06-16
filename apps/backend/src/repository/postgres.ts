@@ -35,9 +35,16 @@ import type {
   FoodHybridSearchInput,
   FoodPortionRecord,
   FoodSearchCandidate,
+  FoodSearchEventFilter,
+  FoodSearchEventRecord,
+  LlmRunFilter,
+  LlmRunRecord,
   MemoryMatch,
   StoredSession,
   StoredUser,
+  TelemetryEventFilter,
+  TelemetryEventRecord,
+  TelemetryOverview,
   UpsertFoodItemEmbeddingInput,
   UpdateDailyGoalsInput,
   UserFoodPreference,
@@ -2021,6 +2028,248 @@ export class PostgresRepository implements AppRepository {
     return rows.map(mapAuditEvent);
   }
 
+  async createTelemetryEvent(
+    input: Omit<TelemetryEventRecord, "id" | "createdAt">,
+  ): Promise<TelemetryEventRecord> {
+    const [row] = await withSpan(
+      "PostgresRepository.createTelemetryEvent",
+      { eventType: input.eventType, surface: input.surface, severity: input.severity },
+      () =>
+        this.execute(dbSql`
+          INSERT INTO telemetry_events (
+            trace_id, user_id, session_id, event_type, flow, surface, severity, status,
+            route, method, action_id, duration_ms, error_code, error_message,
+            app_version, app_build, platform, locale, metadata_json
+          )
+          VALUES (
+            ${input.traceId}, ${input.userId ?? null}, ${input.sessionId ?? null}, ${input.eventType}, ${input.flow ?? null}, ${input.surface}, ${input.severity}, ${input.status ?? null},
+            ${input.route ?? null}, ${input.method ?? null}, ${input.actionId ?? null}, ${input.durationMs ?? null}, ${input.errorCode ?? null}, ${input.errorMessage ?? null},
+            ${input.appVersion ?? null}, ${input.appBuild ?? null}, ${input.platform ?? null}, ${input.locale ?? null}, ${jsonb(input.metadata)}
+          )
+          RETURNING *
+        `),
+    );
+    return mapTelemetryEvent(row);
+  }
+
+  async listTelemetryEvents(
+    filter: TelemetryEventFilter,
+  ): Promise<TelemetryEventRecord[]> {
+    const limit = filter.limit ?? 100;
+    const rows = await withSpan(
+      "PostgresRepository.listTelemetryEvents",
+      { limit, severity: filter.severity, eventType: filter.eventType, surface: filter.surface, traceId: filter.traceId, userId: filter.userId },
+      () =>
+        this.execute(dbSql`
+          SELECT * FROM telemetry_events
+          WHERE (${filter.severity ?? null}::text IS NULL OR severity = ${filter.severity ?? null})
+            AND (${filter.eventType ?? null}::text IS NULL OR event_type = ${filter.eventType ?? null})
+            AND (${filter.surface ?? null}::text IS NULL OR surface = ${filter.surface ?? null})
+            AND (${filter.traceId ?? null}::text IS NULL OR trace_id = ${filter.traceId ?? null})
+            AND (${filter.userId ?? null}::uuid IS NULL OR user_id = ${filter.userId ?? null})
+            AND (${filter.from ?? null}::timestamptz IS NULL OR created_at >= ${filter.from ?? null})
+            AND (${filter.to ?? null}::timestamptz IS NULL OR created_at <= ${filter.to ?? null})
+          ORDER BY created_at DESC
+          LIMIT ${limit}
+        `),
+    );
+    return rows.map(mapTelemetryEvent);
+  }
+
+  async createLlmRun(
+    input: Omit<LlmRunRecord, "id" | "createdAt">,
+  ): Promise<LlmRunRecord> {
+    const [row] = await withSpan(
+      "PostgresRepository.createLlmRun",
+      { model: input.model, resultKind: input.resultKind, selectedTool: input.selectedTool },
+      () =>
+        this.execute(dbSql`
+          INSERT INTO llm_runs (
+            trace_id, user_id, source, locale, timezone, model, input_mode,
+            active_proposal_id, decision_source, selected_tool, executed_tool, result_kind, action_call_id,
+            prompt_chars, tools_json_chars, messages_json_chars, request_payload_chars,
+            prompt_tokens, completion_tokens, total_tokens, reasoning_tokens,
+            first_byte_ms, first_tool_call_ms, largest_stream_gap_ms,
+            llm_ms, action_ms, total_ms,
+            empty_tool_call, invalid_tool_arguments, provider_error, metadata_json
+          )
+          VALUES (
+            ${input.traceId}, ${input.userId ?? null}, ${input.source ?? null}, ${input.locale ?? null}, ${input.timezone ?? null}, ${input.model}, ${input.inputMode ?? null},
+            ${input.activeProposalId ?? null}, ${input.decisionSource ?? null}, ${input.selectedTool ?? null}, ${input.executedTool ?? null}, ${input.resultKind ?? null}, ${input.actionCallId ?? null},
+            ${input.promptChars ?? null}, ${input.toolsJsonChars ?? null}, ${input.messagesJsonChars ?? null}, ${input.requestPayloadChars ?? null},
+            ${input.promptTokens ?? null}, ${input.completionTokens ?? null}, ${input.totalTokens ?? null}, ${input.reasoningTokens ?? null},
+            ${input.firstByteMs ?? null}, ${input.firstToolCallMs ?? null}, ${input.largestStreamGapMs ?? null},
+            ${input.llmMs ?? null}, ${input.actionMs ?? null}, ${input.totalMs ?? null},
+            ${input.emptyToolCall}, ${input.invalidToolArguments}, ${input.providerError}, ${jsonb(input.metadata)}
+          )
+          RETURNING *
+        `),
+    );
+    return mapLlmRun(row);
+  }
+
+  async listLlmRuns(
+    filter: LlmRunFilter,
+  ): Promise<LlmRunRecord[]> {
+    const limit = filter.limit ?? 100;
+    const rows = await withSpan(
+      "PostgresRepository.listLlmRuns",
+      { limit, resultKind: filter.resultKind, selectedTool: filter.selectedTool, traceId: filter.traceId, userId: filter.userId },
+      () =>
+        this.execute(dbSql`
+          SELECT * FROM llm_runs
+          WHERE (${filter.resultKind ?? null}::text IS NULL OR result_kind = ${filter.resultKind ?? null})
+            AND (${filter.selectedTool ?? null}::text IS NULL OR selected_tool = ${filter.selectedTool ?? null})
+            AND (${filter.executedTool ?? null}::text IS NULL OR executed_tool = ${filter.executedTool ?? null})
+            AND (${filter.traceId ?? null}::text IS NULL OR trace_id = ${filter.traceId ?? null})
+            AND (${filter.userId ?? null}::uuid IS NULL OR user_id = ${filter.userId ?? null})
+            AND (${filter.from ?? null}::timestamptz IS NULL OR created_at >= ${filter.from ?? null})
+            AND (${filter.to ?? null}::timestamptz IS NULL OR created_at <= ${filter.to ?? null})
+          ORDER BY created_at DESC
+          LIMIT ${limit}
+        `),
+    );
+    return rows.map(mapLlmRun);
+  }
+
+  async createFoodSearchEvent(
+    input: Omit<FoodSearchEventRecord, "id" | "createdAt">,
+  ): Promise<FoodSearchEventRecord> {
+    const [row] = await withSpan(
+      "PostgresRepository.createFoodSearchEvent",
+      { zeroResults: input.zeroResults, lowConfidence: input.lowConfidence, path: input.path },
+      () =>
+        this.execute(dbSql`
+          INSERT INTO food_search_events (
+            trace_id, user_id, query_text, query_hash, query_length, locale,
+            barcode_present, normalized_search_enabled, normalized_scope, path,
+            result_count, candidate_group_count, top_score, top_external_source, top_result_type,
+            zero_results, low_confidence, selected_rank, duration_ms, metadata_json
+          )
+          VALUES (
+            ${input.traceId}, ${input.userId ?? null}, ${input.queryText ?? null}, ${input.queryHash ?? null}, ${input.queryLength}, ${input.locale ?? null},
+            ${input.barcodePresent}, ${input.normalizedSearchEnabled ?? null}, ${input.normalizedScope ?? null}, ${input.path ?? null},
+            ${input.resultCount}, ${input.candidateGroupCount ?? null}, ${input.topScore ?? null}, ${input.topExternalSource ?? null}, ${input.topResultType ?? null},
+            ${input.zeroResults}, ${input.lowConfidence}, ${input.selectedRank ?? null}, ${input.durationMs ?? null}, ${jsonb(input.metadata)}
+          )
+          RETURNING *
+        `),
+    );
+    return mapFoodSearchEvent(row);
+  }
+
+  async listFoodSearchEvents(
+    filter: FoodSearchEventFilter,
+  ): Promise<FoodSearchEventRecord[]> {
+    const limit = filter.limit ?? 100;
+    const rows = await withSpan(
+      "PostgresRepository.listFoodSearchEvents",
+      { limit, zeroResults: filter.zeroResults, lowConfidence: filter.lowConfidence, path: filter.path, traceId: filter.traceId, userId: filter.userId },
+      () =>
+        this.execute(dbSql`
+          SELECT * FROM food_search_events
+          WHERE (${filter.zeroResults ?? null}::boolean IS NULL OR zero_results = ${filter.zeroResults ?? null})
+            AND (${filter.lowConfidence ?? null}::boolean IS NULL OR low_confidence = ${filter.lowConfidence ?? null})
+            AND (${filter.path ?? null}::text IS NULL OR path = ${filter.path ?? null})
+            AND (${filter.traceId ?? null}::text IS NULL OR trace_id = ${filter.traceId ?? null})
+            AND (${filter.userId ?? null}::uuid IS NULL OR user_id = ${filter.userId ?? null})
+            AND (${filter.from ?? null}::timestamptz IS NULL OR created_at >= ${filter.from ?? null})
+            AND (${filter.to ?? null}::timestamptz IS NULL OR created_at <= ${filter.to ?? null})
+          ORDER BY created_at DESC
+          LIMIT ${limit}
+        `),
+    );
+    return rows.map(mapFoodSearchEvent);
+  }
+
+  async getTelemetryOverview(input: { from: string; to: string }): Promise<TelemetryOverview> {
+    const overviewRows = await withSpan(
+      "PostgresRepository.getTelemetryOverview",
+      { from: input.from, to: input.to },
+      () =>
+        this.execute(dbSql`
+          WITH events_in_range AS (
+            SELECT * FROM telemetry_events
+            WHERE created_at >= ${input.from}::timestamptz AND created_at <= ${input.to}::timestamptz
+          ),
+          llm_in_range AS (
+            SELECT * FROM llm_runs
+            WHERE created_at >= ${input.from}::timestamptz AND created_at <= ${input.to}::timestamptz
+          ),
+          food_in_range AS (
+            SELECT * FROM food_search_events
+            WHERE created_at >= ${input.from}::timestamptz AND created_at <= ${input.to}::timestamptz
+          )
+          SELECT
+            (SELECT COUNT(*)::int FROM events_in_range) AS total_events,
+            (SELECT COUNT(*)::int FROM llm_in_range) AS total_llm_runs,
+            (SELECT COUNT(*)::int FROM food_in_range) AS total_food_search_events,
+            (SELECT COUNT(DISTINCT trace_id)::int FROM events_in_range) AS event_unique_traces,
+            (SELECT COUNT(DISTINCT trace_id)::int FROM llm_in_range) AS llm_unique_traces,
+            (SELECT COUNT(DISTINCT trace_id)::int FROM food_in_range) AS food_unique_traces,
+            (SELECT COALESCE(SUM(CASE WHEN zero_results THEN 1 ELSE 0 END), 0)::int FROM food_in_range) AS zero_results_count,
+            (SELECT COALESCE(SUM(CASE WHEN low_confidence THEN 1 ELSE 0 END), 0)::int FROM food_in_range) AS low_confidence_count,
+            (SELECT COALESCE(SUM(CASE WHEN provider_error THEN 1 ELSE 0 END), 0)::int FROM llm_in_range) AS provider_error_count
+        `),
+    );
+    const overview = overviewRows[0] ?? {};
+    const totalEvents = Number(overview.total_events ?? 0);
+    const totalLlmRuns = Number(overview.total_llm_runs ?? 0);
+    const totalFoodSearchEvents = Number(overview.total_food_search_events ?? 0);
+    const zeroResultsCount = Number(overview.zero_results_count ?? 0);
+    const lowConfidenceCount = Number(overview.low_confidence_count ?? 0);
+    const providerErrorCount = Number(overview.provider_error_count ?? 0);
+    const userIdRows = await this.execute(
+      dbSql`
+        SELECT user_id FROM telemetry_events
+        WHERE created_at >= ${input.from}::timestamptz AND created_at <= ${input.to}::timestamptz AND user_id IS NOT NULL
+        UNION
+        SELECT user_id FROM llm_runs
+        WHERE created_at >= ${input.from}::timestamptz AND created_at <= ${input.to}::timestamptz AND user_id IS NOT NULL
+        UNION
+        SELECT user_id FROM food_search_events
+        WHERE created_at >= ${input.from}::timestamptz AND created_at <= ${input.to}::timestamptz AND user_id IS NOT NULL
+      `,
+    );
+    const uniqueUsers = new Set(userIdRows.map((row) => row.user_id)).size;
+    const severityRows = await this.execute(
+      dbSql`SELECT severity, COUNT(*)::int AS count FROM telemetry_events WHERE created_at >= ${input.from}::timestamptz AND created_at <= ${input.to}::timestamptz GROUP BY severity`,
+    );
+    const eventsBySeverity: Record<string, number> = {};
+    for (const row of severityRows) {
+      eventsBySeverity[row.severity as string] = Number(row.count);
+    }
+    const surfaceRows = await this.execute(
+      dbSql`SELECT surface, COUNT(*)::int AS count FROM telemetry_events WHERE created_at >= ${input.from}::timestamptz AND created_at <= ${input.to}::timestamptz GROUP BY surface`,
+    );
+    const eventsBySurface: Record<string, number> = {};
+    for (const row of surfaceRows) {
+      eventsBySurface[row.surface as string] = Number(row.count);
+    }
+    const resultKindRows = await this.execute(
+      dbSql`SELECT result_kind, COUNT(*)::int AS count FROM llm_runs WHERE created_at >= ${input.from}::timestamptz AND created_at <= ${input.to}::timestamptz AND result_kind IS NOT NULL GROUP BY result_kind`,
+    );
+    const recentResultKinds: Record<string, number> = {};
+    for (const row of resultKindRows) {
+      recentResultKinds[row.result_kind as string] = Number(row.count);
+    }
+    return {
+      from: input.from,
+      to: input.to,
+      totalEvents,
+      totalLlmRuns,
+      totalFoodSearchEvents,
+      uniqueUsers,
+      uniqueTraces: Number(overview.event_unique_traces ?? 0) + Number(overview.llm_unique_traces ?? 0) + Number(overview.food_unique_traces ?? 0),
+      eventsBySeverity,
+      eventsBySurface,
+      recentResultKinds,
+      zeroResultRate: totalFoodSearchEvents === 0 ? 0 : zeroResultsCount / totalFoodSearchEvents,
+      lowConfidenceRate: totalFoodSearchEvents === 0 ? 0 : lowConfidenceCount / totalFoodSearchEvents,
+      providerErrorRate: totalLlmRuns === 0 ? 0 : providerErrorCount / totalLlmRuns
+    };
+  }
+
   private async mapMeals(
     rows: Record<string, unknown>[],
     dbClient: DbExecutor = this.db,
@@ -2635,6 +2884,97 @@ function mapAuditEvent(row: Record<string, unknown>): AuditEventRecord {
     eventType: row.event_type as string,
     metadata: row.metadata_json,
     traceId: row.trace_id as string,
+    createdAt: toIso(row.created_at),
+  };
+}
+
+function mapTelemetryEvent(row: Record<string, unknown>): TelemetryEventRecord {
+  return {
+    id: row.id as string,
+    traceId: row.trace_id as string,
+    userId: row.user_id as string | undefined,
+    sessionId: row.session_id as string | undefined,
+    eventType: row.event_type as string,
+    flow: row.flow as string | undefined,
+    surface: row.surface as string,
+    severity: row.severity as string,
+    status: row.status as string | undefined,
+    route: row.route as string | undefined,
+    method: row.method as string | undefined,
+    actionId: row.action_id as string | undefined,
+    durationMs: optionalNumber(row.duration_ms),
+    errorCode: row.error_code as string | undefined,
+    errorMessage: row.error_message as string | undefined,
+    appVersion: row.app_version as string | undefined,
+    appBuild: row.app_build as string | undefined,
+    platform: row.platform as string | undefined,
+    locale: row.locale as string | undefined,
+    metadata: isRecord(row.metadata_json) ? row.metadata_json : {},
+    createdAt: toIso(row.created_at),
+  };
+}
+
+function mapLlmRun(row: Record<string, unknown>): LlmRunRecord {
+  return {
+    id: row.id as string,
+    traceId: row.trace_id as string,
+    userId: row.user_id as string | undefined,
+    source: row.source as string | undefined,
+    locale: row.locale as string | undefined,
+    timezone: row.timezone as string | undefined,
+    model: row.model as string,
+    inputMode: row.input_mode as string | undefined,
+    activeProposalId: row.active_proposal_id as string | undefined,
+    decisionSource: row.decision_source as string | undefined,
+    selectedTool: row.selected_tool as string | undefined,
+    executedTool: row.executed_tool as string | undefined,
+    resultKind: row.result_kind as string | undefined,
+    actionCallId: row.action_call_id as string | undefined,
+    promptChars: optionalNumber(row.prompt_chars),
+    toolsJsonChars: optionalNumber(row.tools_json_chars),
+    messagesJsonChars: optionalNumber(row.messages_json_chars),
+    requestPayloadChars: optionalNumber(row.request_payload_chars),
+    promptTokens: optionalNumber(row.prompt_tokens),
+    completionTokens: optionalNumber(row.completion_tokens),
+    totalTokens: optionalNumber(row.total_tokens),
+    reasoningTokens: optionalNumber(row.reasoning_tokens),
+    firstByteMs: optionalNumber(row.first_byte_ms),
+    firstToolCallMs: optionalNumber(row.first_tool_call_ms),
+    largestStreamGapMs: optionalNumber(row.largest_stream_gap_ms),
+    llmMs: optionalNumber(row.llm_ms),
+    actionMs: optionalNumber(row.action_ms),
+    totalMs: optionalNumber(row.total_ms),
+    emptyToolCall: Boolean(row.empty_tool_call),
+    invalidToolArguments: Boolean(row.invalid_tool_arguments),
+    providerError: Boolean(row.provider_error),
+    metadata: isRecord(row.metadata_json) ? row.metadata_json : {},
+    createdAt: toIso(row.created_at),
+  };
+}
+
+function mapFoodSearchEvent(row: Record<string, unknown>): FoodSearchEventRecord {
+  return {
+    id: row.id as string,
+    traceId: row.trace_id as string,
+    userId: row.user_id as string | undefined,
+    queryText: row.query_text as string | undefined,
+    queryHash: row.query_hash as string | undefined,
+    queryLength: Number(row.query_length ?? 0),
+    locale: row.locale as string | undefined,
+    barcodePresent: Boolean(row.barcode_present),
+    normalizedSearchEnabled: row.normalized_search_enabled == null ? undefined : Boolean(row.normalized_search_enabled),
+    normalizedScope: row.normalized_scope as string | undefined,
+    path: row.path as string | undefined,
+    resultCount: Number(row.result_count ?? 0),
+    candidateGroupCount: optionalNumber(row.candidate_group_count),
+    topScore: row.top_score == null ? undefined : Number(row.top_score),
+    topExternalSource: row.top_external_source as string | undefined,
+    topResultType: row.top_result_type as string | undefined,
+    zeroResults: Boolean(row.zero_results),
+    lowConfidence: Boolean(row.low_confidence),
+    selectedRank: optionalNumber(row.selected_rank),
+    durationMs: optionalNumber(row.duration_ms),
+    metadata: isRecord(row.metadata_json) ? row.metadata_json : {},
     createdAt: toIso(row.created_at),
   };
 }

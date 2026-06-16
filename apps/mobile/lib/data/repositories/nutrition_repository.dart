@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import '../../domain/models/macro_distribution.dart';
@@ -5,6 +6,7 @@ import '../../domain/models/nutrition_models.dart';
 import '../../domain/models/nutrition_summary_updates.dart';
 import '../../generated/api/cal_tracker_api.dart';
 import '../services/backend_health_monitor.dart';
+import '../services/client_telemetry_service.dart';
 import '../services/nutrition_cache_store.dart';
 
 class AgentRunResult {
@@ -77,17 +79,20 @@ class NutritionRepository {
     required CalTrackerApiClient apiClient,
     NutritionCacheStore? cacheStore,
     BackendHealthMonitor? healthMonitor,
+    ClientTelemetryService? telemetryService,
     Duration backgroundRefreshCooldown = const Duration(seconds: 15),
     DateTime Function()? now,
   }) : _apiClient = apiClient,
        _cacheStore = cacheStore,
        _healthMonitor = healthMonitor ?? BackendHealthMonitor(now: now),
+       _telemetryService = telemetryService,
        _backgroundRefreshCooldown = backgroundRefreshCooldown,
        _now = now ?? DateTime.now;
 
   final CalTrackerApiClient _apiClient;
   final NutritionCacheStore? _cacheStore;
   final BackendHealthMonitor _healthMonitor;
+  final ClientTelemetryService? _telemetryService;
   final Duration _backgroundRefreshCooldown;
   final DateTime Function() _now;
   final Map<String, Future<DailySummary>> _dailySummaryRefreshes = {};
@@ -133,8 +138,12 @@ class NutritionRepository {
   Future<void> putCachedDailySummary(DailySummary summary) async {
     try {
       await _cacheStore?.writeDailySummary(summary);
-    } on Object {
-      // Cache failures must never break the interactive app state.
+    } on Object catch (error) {
+      _recordCacheWriteFailure(
+        cacheKey: 'daily_summary',
+        operation: 'writeDailySummary',
+        error: error,
+      );
     }
   }
 
@@ -180,8 +189,12 @@ class NutritionRepository {
   Future<void> putCachedTemplates(List<MealTemplate> templates) async {
     try {
       await _cacheStore?.writeMealTemplates(templates);
-    } on Object {
-      // Cache failures must never break the interactive app state.
+    } on Object catch (error) {
+      _recordCacheWriteFailure(
+        cacheKey: 'meal_templates',
+        operation: 'writeMealTemplates',
+        error: error,
+      );
     }
   }
 
@@ -222,8 +235,12 @@ class NutritionRepository {
   Future<void> putCachedUsualFoods(List<UsualFood> foods) async {
     try {
       await _cacheStore?.writeUsualFoods(foods);
-    } on Object {
-      // Cache failures must never break the interactive app state.
+    } on Object catch (error) {
+      _recordCacheWriteFailure(
+        cacheKey: 'usual_foods',
+        operation: 'writeUsualFoods',
+        error: error,
+      );
     }
   }
 
@@ -294,19 +311,47 @@ class NutritionRepository {
     int limit = 10,
     String? barcode,
   }) async {
-    final json = await _apiClient.searchFoods(
-      query: query,
-      barcode: barcode,
-      limit: limit,
-    );
-    _healthMonitor.recordSuccess();
-    return FoodSearchResult(
-      items: (json['items'] as List<Object?>? ?? const [])
-          .cast<Map<String, Object?>>()
-          .map(MealItem.fromJson)
-          .toList(),
-      candidateGroups: _parseCandidateGroups(json['candidateGroups']),
-    );
+    final stopwatch = Stopwatch()..start();
+    final requestId = _apiClient.lastRequestId;
+    try {
+      final json = await _apiClient.searchFoods(
+        query: query,
+        barcode: barcode,
+        limit: limit,
+      );
+      _healthMonitor.recordSuccess();
+      stopwatch.stop();
+      final result = FoodSearchResult(
+        items: (json['items'] as List<Object?>? ?? const [])
+            .cast<Map<String, Object?>>()
+            .map(MealItem.fromJson)
+            .toList(),
+        candidateGroups: _parseCandidateGroups(json['candidateGroups']),
+      );
+      _recordFoodSearchResult(
+        query: query,
+        barcode: barcode,
+        limit: limit,
+        result: result,
+        duration: stopwatch.elapsed,
+        requestId: _apiClient.lastRequestId ?? requestId,
+        status: 'success',
+      );
+      return result;
+    } on Object catch (error) {
+      stopwatch.stop();
+      _recordFoodSearchResult(
+        query: query,
+        barcode: barcode,
+        limit: limit,
+        result: const FoodSearchResult(items: []),
+        duration: stopwatch.elapsed,
+        requestId: _apiClient.lastRequestId ?? requestId,
+        status: 'failure',
+        error: error,
+      );
+      rethrow;
+    }
   }
 
   AgentRunResult _parseAgentRunResult(Map<String, Object?> json) {
@@ -793,6 +838,73 @@ class NutritionRepository {
 
   String _dateFromDateTime(DateTime date) {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+  }
+
+  void _recordCacheWriteFailure({
+    required String cacheKey,
+    required String operation,
+    required Object error,
+  }) {
+    final telemetry = _telemetryService;
+    if (telemetry == null) return;
+    telemetry.record(
+      ClientTelemetryEvent(
+        eventType: 'mobile.cache_write_failed',
+        flow: 'nutrition_cache',
+        surface: 'mobile',
+        severity: 'warning',
+        status: 'failure',
+        route: '/v1/nutrition/cache/$cacheKey',
+        method: 'cache_write',
+        durationMs: null,
+        errorCode: error.runtimeType.toString(),
+        errorMessage: error.toString(),
+        metadata: <String, Object?>{'cacheKey': cacheKey, 'operation': operation},
+      ),
+    );
+  }
+
+  void _recordFoodSearchResult({
+    required String query,
+    required String? barcode,
+    required int limit,
+    required FoodSearchResult result,
+    required Duration duration,
+    required String? requestId,
+    required String status,
+    Object? error,
+  }) {
+    final telemetry = _telemetryService;
+    if (telemetry == null) return;
+    final items = result.items;
+    final groups = result.candidateGroups;
+    final isZero = items.isEmpty;
+    final isApiFailure = status == 'failure';
+    telemetry.record(
+      ClientTelemetryEvent(
+        eventType: isApiFailure
+            ? 'mobile.food_search_failed'
+            : 'mobile.food_search_completed',
+        flow: 'food_search',
+        surface: 'mobile',
+        severity: isApiFailure ? 'error' : (isZero ? 'info' : 'info'),
+        status: status,
+        traceId: requestId,
+        route: '/v1/foods/search',
+        method: 'POST',
+        durationMs: duration.inMilliseconds,
+        errorCode: error is ApiException ? error.code : null,
+        errorMessage: error?.toString(),
+        metadata: <String, Object?>{
+          'queryLength': query.length,
+          'barcode': barcode,
+          'limit': limit,
+          'resultCount': items.length,
+          'candidateGroupCount': groups?.length ?? 0,
+          'zeroResults': isZero,
+        },
+      ),
+    );
   }
 }
 

@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>BetterCalories Admin · Telemetry</title>
+    <meta
+      name="description"
+      content="Local admin panel for inspecting BetterCalories telemetry, LLM runs, food search events and trace flows."
+    >
+    <meta name="robots" content="noindex,nofollow">
+    <meta name="color-scheme" content="light dark">
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%228%22%20fill%3D%22%23123b1f%22%2F%3E%3Cpath%20d%3D%22M8%2022%20L8%2010%20L12%2010%20L12%2018%20L18%2018%20L18%2022%20Z%22%20fill%3D%22%239ad32a%22%2F%3E%3Ccircle%20cx%3D%2222%22%20cy%3D%2211%22%20r%3D%223%22%20fill%3D%22%239ad32a%22%2F%3E%3C%2Fsvg%3E"
+    >
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="topbar" aria-label="Admin header">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">BC</div>
+        <div class="brand-text">
+          <strong>BetterCalories</strong>
+          <span>Admin · Telemetry</span>
+        </div>
+      </div>
+
+      <form class="config" id="config-form" autocomplete="off" novalidate>
+        <label class="field">
+          <span>API base URL</span>
+          <input
+            id="api-base"
+            name="apiBase"
+            type="url"
+            inputmode="url"
+            spellcheck="false"
+            placeholder="http://localhost:3000"
+            required
+          >
+        </label>
+        <label class="field field-admin-auth" id="admin-username-field">
+          <span>Admin username</span>
+          <input
+            id="admin-username"
+            name="username"
+            type="text"
+            spellcheck="false"
+            autocomplete="username"
+            placeholder="admin"
+          >
+        </label>
+        <label class="field field-admin-auth" id="admin-password-field">
+          <span>Admin password</span>
+          <input
+            id="admin-password"
+            name="password"
+            type="password"
+            autocomplete="current-password"
+            placeholder="deployment password"
+          >
+        </label>
+        <div class="admin-session" id="admin-session" hidden>
+          <span>Signed in as <strong id="admin-session-username">—</strong></span>
+        </div>
+        <div class="config-actions">
+          <button type="submit" id="admin-login-submit" class="btn btn-primary">Sign in</button>
+          <button type="button" id="admin-signout" class="btn btn-ghost" hidden>Sign out</button>
+        </div>
+      </form>
+    </header>
+
+    <main id="main" class="layout">
+      <section class="panel" id="panel-status" aria-live="polite">
+        <div class="status-pill" id="status-pill">Idle</div>
+        <p class="status-message" id="status-message">
+          Enter the admin username and deployment password to load telemetry.
+        </p>
+      </section>
+
+      <nav class="tabs" role="tablist" aria-label="Admin views">
+        <button
+          class="tab is-active"
+          role="tab"
+          aria-selected="true"
+          aria-controls="view-overview"
+          id="tab-overview"
+          data-target="view-overview"
+        >Overview</button>
+        <button
+          class="tab"
+          role="tab"
+          aria-selected="false"
+          aria-controls="view-events"
+          id="tab-events"
+          data-target="view-events"
+        >Events</button>
+        <button
+          class="tab"
+          role="tab"
+          aria-selected="false"
+          aria-controls="view-llm"
+          id="tab-llm"
+          data-target="view-llm"
+        >LLM runs</button>
+        <button
+          class="tab"
+          role="tab"
+          aria-selected="false"
+          aria-controls="view-food"
+          id="tab-food"
+          data-target="view-food"
+        >Food search</button>
+        <button
+          class="tab"
+          role="tab"
+          aria-selected="false"
+          aria-controls="view-trace"
+          id="tab-trace"
+          data-target="view-trace"
+        >Trace lookup</button>
+      </nav>
+
+      <!-- ============== OVERVIEW ============== -->
+      <section
+        id="view-overview"
+        class="view is-active"
+        role="tabpanel"
+        aria-labelledby="tab-overview"
+      >
+        <header class="view-header">
+          <h2>Overview</h2>
+          <form class="filters" id="overview-filters" autocomplete="off">
+            <label class="field">
+              <span>From</span>
+              <input type="datetime-local" id="overview-from" name="from">
+            </label>
+            <label class="field">
+              <span>To</span>
+              <input type="datetime-local" id="overview-to" name="to">
+            </label>
+            <div class="filters-actions">
+              <button type="submit" class="btn btn-primary">Refresh</button>
+            </div>
+          </form>
+        </header>
+
+        <div class="cards" id="overview-cards">
+          <article class="card" data-card="events_total">
+            <h3>Events</h3>
+            <p class="card-value" data-value>—</p>
+            <p class="card-foot" data-foot>total telemetry events</p>
+          </article>
+          <article class="card" data-card="errors">
+            <h3>Errors</h3>
+            <p class="card-value" data-value>—</p>
+            <p class="card-foot" data-foot>severity = error</p>
+          </article>
+          <article class="card" data-card="warnings">
+            <h3>Warnings</h3>
+            <p class="card-value" data-value>—</p>
+            <p class="card-foot" data-foot>severity = warning</p>
+          </article>
+          <article class="card" data-card="llm_runs">
+            <h3>LLM runs</h3>
+            <p class="card-value" data-value>—</p>
+            <p class="card-foot" data-foot>agent runs recorded</p>
+          </article>
+          <article class="card" data-card="food_search">
+            <h3>Food searches</h3>
+            <p class="card-value" data-value>—</p>
+            <p class="card-foot" data-foot>search invocations</p>
+          </article>
+          <article class="card" data-card="zero_results">
+            <h3>Zero-result rate</h3>
+            <p class="card-value" data-value>—</p>
+            <p class="card-foot" data-foot>fraction of searches with no result</p>
+          </article>
+        </div>
+
+        <details class="raw" id="overview-raw-wrap">
+          <summary>Raw response</summary>
+          <pre id="overview-raw">No request made yet.</pre>
+        </details>
+      </section>
+
+      <!-- ============== EVENTS ============== -->
+      <section
+        id="view-events"
+        class="view"
+        role="tabpanel"
+        aria-labelledby="tab-events"
+        hidden
+      >
+        <header class="view-header">
+          <h2>Recent events</h2>
+          <form class="filters" id="events-filters" autocomplete="off">
+            <label class="field">
+              <span>Severity</span>
+              <select id="events-severity" name="severity">
+                <option value="">any</option>
+                <option value="info">info</option>
+                <option value="warning">warning</option>
+                <option value="error">error</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Event type</span>
+              <input
+                id="events-type"
+                name="eventType"
+                type="text"
+                placeholder="e.g. api_request_failed"
+                spellcheck="false"
+              >
+            </label>
+            <label class="field">
+              <span>Trace ID</span>
+              <input
+                id="events-trace"
+                name="traceId"
+                type="text"
+                spellcheck="false"
+                placeholder="optional"
+              >
+            </label>
+            <label class="field">
+              <span>User ID</span>
+              <input
+                id="events-user"
+                name="userId"
+                type="text"
+                spellcheck="false"
+                placeholder="optional"
+              >
+            </label>
+            <label class="field field-narrow">
+              <span>Limit</span>
+              <input id="events-limit" name="limit" type="number" min="1" max="500" value="100">
+            </label>
+            <div class="filters-actions">
+              <button type="submit" class="btn btn-primary">Apply</button>
+              <button type="button" class="btn btn-ghost" data-reset="events-filters">Reset</button>
+            </div>
+          </form>
+        </header>
+
+        <div class="table-wrap">
+          <table class="data-table" id="events-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Type</th>
+                <th>Severity</th>
+                <th>Status</th>
+                <th>Surface</th>
+                <th>Route</th>
+                <th>Duration</th>
+                <th>Trace</th>
+                <th>User</th>
+                <th>Error</th>
+              </tr>
+            </thead>
+            <tbody data-body>
+              <tr class="empty"><td colspan="10">No data loaded yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============== LLM RUNS ============== -->
+      <section
+        id="view-llm"
+        class="view"
+        role="tabpanel"
+        aria-labelledby="tab-llm"
+        hidden
+      >
+        <header class="view-header">
+          <h2>LLM runs</h2>
+          <form class="filters" id="llm-filters" autocomplete="off">
+            <label class="field">
+              <span>Result kind</span>
+              <select id="llm-result" name="resultKind">
+                <option value="">any</option>
+                <option value="proposal">proposal</option>
+                <option value="clarification_required">clarification_required</option>
+                <option value="meal_committed">meal_committed</option>
+                <option value="error">error</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Selected tool</span>
+              <input
+                id="llm-tool"
+                name="selectedTool"
+                type="text"
+                spellcheck="false"
+                placeholder="e.g. search_nutrition_database"
+              >
+            </label>
+            <label class="field">
+              <span>Trace ID</span>
+              <input
+                id="llm-trace"
+                name="traceId"
+                type="text"
+                spellcheck="false"
+                placeholder="optional"
+              >
+            </label>
+            <label class="field">
+              <span>User ID</span>
+              <input
+                id="llm-user"
+                name="userId"
+                type="text"
+                spellcheck="false"
+                placeholder="optional"
+              >
+            </label>
+            <label class="field field-narrow">
+              <span>Limit</span>
+              <input id="llm-limit" name="limit" type="number" min="1" max="500" value="100">
+            </label>
+            <div class="filters-actions">
+              <button type="submit" class="btn btn-primary">Apply</button>
+              <button type="button" class="btn btn-ghost" data-reset="llm-filters">Reset</button>
+            </div>
+          </form>
+        </header>
+
+        <div class="table-wrap">
+          <table class="data-table" id="llm-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Model</th>
+                <th>Source</th>
+                <th>Result</th>
+                <th>Selected tool</th>
+                <th>Executed tool</th>
+                <th>Total ms</th>
+                <th>LLM ms</th>
+                <th>Tokens</th>
+                <th>Flags</th>
+                <th>Trace</th>
+              </tr>
+            </thead>
+            <tbody data-body>
+              <tr class="empty"><td colspan="11">No data loaded yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============== FOOD SEARCH ============== -->
+      <section
+        id="view-food"
+        class="view"
+        role="tabpanel"
+        aria-labelledby="tab-food"
+        hidden
+      >
+        <header class="view-header">
+          <h2>Food search events</h2>
+          <form class="filters" id="food-filters" autocomplete="off">
+            <label class="field">
+              <span>Zero results</span>
+              <select id="food-zero" name="zeroResults">
+                <option value="">any</option>
+                <option value="true">only zero</option>
+                <option value="false">exclude zero</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Low confidence</span>
+              <select id="food-low" name="lowConfidence">
+                <option value="">any</option>
+                <option value="true">only low</option>
+                <option value="false">exclude low</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Trace ID</span>
+              <input
+                id="food-trace"
+                name="traceId"
+                type="text"
+                spellcheck="false"
+                placeholder="optional"
+              >
+            </label>
+            <label class="field">
+              <span>User ID</span>
+              <input
+                id="food-user"
+                name="userId"
+                type="text"
+                spellcheck="false"
+                placeholder="optional"
+              >
+            </label>
+            <label class="field field-narrow">
+              <span>Limit</span>
+              <input id="food-limit" name="limit" type="number" min="1" max="500" value="100">
+            </label>
+            <div class="filters-actions">
+              <button type="submit" class="btn btn-primary">Apply</button>
+              <button type="button" class="btn btn-ghost" data-reset="food-filters">Reset</button>
+            </div>
+          </form>
+        </header>
+
+        <div class="table-wrap">
+          <table class="data-table" id="food-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Query</th>
+                <th>Path</th>
+                <th>Results</th>
+                <th>Top score</th>
+                <th>Top source</th>
+                <th>Locale</th>
+                <th>Flags</th>
+                <th>Trace</th>
+              </tr>
+            </thead>
+            <tbody data-body>
+              <tr class="empty"><td colspan="9">No data loaded yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============== TRACE LOOKUP ============== -->
+      <section
+        id="view-trace"
+        class="view"
+        role="tabpanel"
+        aria-labelledby="tab-trace"
+        hidden
+      >
+        <header class="view-header">
+          <h2>Trace lookup</h2>
+          <form class="filters" id="trace-filters" autocomplete="off">
+            <label class="field field-wide">
+              <span>Trace ID</span>
+              <input
+                id="trace-id"
+                name="traceId"
+                type="text"
+                spellcheck="false"
+                placeholder="paste a trace id from a log or error"
+                required
+              >
+            </label>
+            <div class="filters-actions">
+              <button type="submit" class="btn btn-primary">Lookup</button>
+            </div>
+          </form>
+        </header>
+
+        <div id="trace-summary" class="trace-summary" hidden>
+          <h3 id="trace-summary-title">Trace</h3>
+          <dl class="trace-meta" id="trace-meta"></dl>
+        </div>
+
+        <section class="subview">
+          <h3>Events</h3>
+          <div class="table-wrap">
+            <table class="data-table" id="trace-events-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Type</th>
+                  <th>Severity</th>
+                  <th>Status</th>
+                  <th>Route</th>
+                  <th>Duration</th>
+                  <th>Error</th>
+                </tr>
+              </thead>
+              <tbody data-body>
+                <tr class="empty"><td colspan="7">No trace loaded yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="subview">
+          <h3>LLM runs</h3>
+          <div class="table-wrap">
+            <table class="data-table" id="trace-llm-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Model</th>
+                  <th>Result</th>
+                  <th>Selected tool</th>
+                  <th>Executed tool</th>
+                  <th>Total ms</th>
+                  <th>Tokens</th>
+                </tr>
+              </thead>
+              <tbody data-body>
+                <tr class="empty"><td colspan="7">No trace loaded yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="subview">
+          <h3>Food search</h3>
+          <div class="table-wrap">
+            <table class="data-table" id="trace-food-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Query</th>
+                  <th>Path</th>
+                  <th>Results</th>
+                  <th>Top score</th>
+                  <th>Flags</th>
+                </tr>
+              </thead>
+              <tbody data-body>
+                <tr class="empty"><td colspan="6">No trace loaded yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <details class="raw" id="trace-raw-wrap">
+          <summary>Raw response</summary>
+          <pre id="trace-raw">No trace looked up yet.</pre>
+        </details>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <small>
+        Static admin panel · admin token stays in
+        <code>sessionStorage</code> · never sends the token to a third party.
+      </small>
+    </footer>
+
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

@@ -4,6 +4,7 @@ import { errors } from "jose";
 import type { AppConfig } from "../config/env.js";
 import type { AppRepository, StoredUser } from "../repository/types.js";
 import { verifyAccessToken } from "../auth/tokens.js";
+import { resolveUserScopes } from "../telemetry/authorization.js";
 
 export type AuthBindings = {
   Variables: {
@@ -22,7 +23,11 @@ export function authMiddleware(config: AppConfig, repository: AppRepository) {
       const claims = await verifyAccessToken(config, auth.slice("Bearer ".length));
       const user = await repository.findUserById(claims.sub);
       if (!user) throw new HTTPException(401, { message: "Invalid bearer token" });
-      c.set("authUser", user);
+      const mergedUser: StoredUser = {
+        ...user,
+        scopes: resolveUserScopes(user, config),
+      };
+      c.set("authUser", mergedUser);
       await next();
     } catch (error) {
       if (error instanceof errors.JWTExpired || error instanceof errors.JWTClaimValidationFailed) {

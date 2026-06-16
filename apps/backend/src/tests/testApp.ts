@@ -19,6 +19,8 @@ import type { ChatAgentProvider, AgentToolDecision } from "../agent/chatAgentPro
 import type { UsualFoodDraftProvider } from "../agent/usualFoodDraftProvider.js";
 import type { UsualMealDraftProvider } from "../agent/usualMealDraftProvider.js";
 import type { LocalRunLogger } from "../observability/localRunLogger.js";
+import { TelemetryService as DbTelemetryService } from "../telemetry/service.js";
+import type { TelemetryService } from "../telemetry/telemetryService.js";
 import { seedTestFoods } from "./foodFixtures.js";
 
 export class FakeSpeechToTextProvider implements SpeechToTextProvider {
@@ -57,6 +59,7 @@ export function buildTestApp(options?: {
   googleTokenVerifier?: GoogleTokenVerifier;
   usualFoodDraftProvider?: UsualFoodDraftProvider;
   usualMealDraftProvider?: UsualMealDraftProvider;
+  telemetryService?: TelemetryService;
 }) {
   const config = loadConfig({ NODE_ENV: "test" } as NodeJS.ProcessEnv);
   const repository = InMemoryRepository.seeded();
@@ -105,9 +108,11 @@ export function buildTestApp(options?: {
     ],
     rawResponse: {},
   });
-  const app = createApp({ config, repository, authService, actionExecutor, sttProvider, agentProvider: options?.agentProvider ?? defaultAgentProvider, runLogger: options?.runLogger });
+  const agentProvider = options?.agentProvider ?? defaultAgentProvider;
+  const app = createApp({ config, repository, authService, actionExecutor, sttProvider, agentProvider, runLogger: options?.runLogger, telemetryService: options?.telemetryService });
   const request = (input: string, init?: RequestInit) => Promise.resolve(app.request(input, init));
-  return { app, request, config, repository, authService, actionExecutor, sttProvider };
+  const telemetry = new DbTelemetryService(repository, { enabled: true });
+  return { app, request, config, repository, authService, actionExecutor, sttProvider, agentProvider, telemetry };
 }
 
 export async function createTestUsualBreakfastTemplate(
@@ -125,6 +130,19 @@ export async function createTestUsualBreakfastTemplate(
     })
   });
   return response.json() as Promise<{ output: { template: { id: string; items: MealItem[]; aliases: string[] } } }>;
+}
+
+export async function loginAdmin(request: (input: string, init?: RequestInit) => Promise<Response>) {
+  const response = await request("http://localhost/v1/admin/auth/login", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ username: "admin", password: "admin-password-123" })
+  });
+  const body = await response.json() as { accessToken: string; username: string };
+  return {
+    ...body,
+    authHeader: { authorization: `Bearer ${body.accessToken}`, "content-type": "application/json" }
+  };
 }
 
 export async function registerAndAuth(request: (input: string, init?: RequestInit) => Promise<Response>) {

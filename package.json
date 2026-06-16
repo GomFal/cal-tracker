@@ -20,6 +20,8 @@
     "landing:validate": "node apps/landing/validate.mjs",
     "landing:serve": "python3 -m http.server 4173 --directory apps/landing",
     "landing:deploy": "bash scripts/deploy-landing.sh",
+    "admin:validate": "node apps/admin/validate.mjs",
+    "admin:serve": "python3 -m http.server 4174 --directory apps/admin",
     "mobile:release:dev": "bash scripts/mobile/publish-github-release.sh dev",
     "mobile:release:prod": "bash scripts/mobile/publish-github-release.sh prod",
     "typecheck": "bun run --cwd packages/contracts typecheck && bun run build:contracts && bun run --cwd apps/backend typecheck",

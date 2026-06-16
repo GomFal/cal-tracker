@@ -29,9 +29,16 @@ import type {
   FoodItemEmbeddingRecord,
   FoodHybridSearchInput,
   FoodSearchCandidate,
+  FoodSearchEventFilter,
+  FoodSearchEventRecord,
+  LlmRunFilter,
+  LlmRunRecord,
   MemoryMatch,
   StoredSession,
   StoredUser,
+  TelemetryEventFilter,
+  TelemetryEventRecord,
+  TelemetryOverview,
   UpsertFoodItemEmbeddingInput,
   UserFoodPreference,
   UpdateDailyGoalsInput,
@@ -90,6 +97,9 @@ export class InMemoryRepository implements AppRepository {
   > = [];
   private actionCalls: ActionCallRecord[] = [];
   private auditEvents: AuditEventRecord[] = [];
+  private telemetryEvents: TelemetryEventRecord[] = [];
+  private llmRuns: LlmRunRecord[] = [];
+  private foodSearchEvents: FoodSearchEventRecord[] = [];
 
   static seeded(): InMemoryRepository {
     return new InMemoryRepository();
@@ -947,6 +957,143 @@ export class InMemoryRepository implements AppRepository {
 
   async listAuditEvents(userId: string): Promise<AuditEventRecord[]> {
     return this.auditEvents.filter((event) => event.userId === userId);
+  }
+
+  async createTelemetryEvent(
+    input: Omit<TelemetryEventRecord, "id" | "createdAt">,
+  ): Promise<TelemetryEventRecord> {
+    const record: TelemetryEventRecord = {
+      ...input,
+      id: newId(),
+      createdAt: new Date().toISOString(),
+    };
+    this.telemetryEvents.push(record);
+    return record;
+  }
+
+  async listTelemetryEvents(
+    filter: TelemetryEventFilter,
+  ): Promise<TelemetryEventRecord[]> {
+    const rows = this.telemetryEvents.filter((event) => {
+      if (filter.severity && event.severity !== filter.severity) return false;
+      if (filter.eventType && event.eventType !== filter.eventType) return false;
+      if (filter.surface && event.surface !== filter.surface) return false;
+      if (filter.traceId && event.traceId !== filter.traceId) return false;
+      if (filter.userId && event.userId !== filter.userId) return false;
+      if (filter.from && event.createdAt < filter.from) return false;
+      if (filter.to && event.createdAt > filter.to) return false;
+      return true;
+    });
+    rows.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    return filter.limit !== undefined ? rows.slice(0, filter.limit) : rows;
+  }
+
+  async createLlmRun(
+    input: Omit<LlmRunRecord, "id" | "createdAt">,
+  ): Promise<LlmRunRecord> {
+    const record: LlmRunRecord = {
+      ...input,
+      id: newId(),
+      createdAt: new Date().toISOString(),
+    };
+    this.llmRuns.push(record);
+    return record;
+  }
+
+  async listLlmRuns(
+    filter: LlmRunFilter,
+  ): Promise<LlmRunRecord[]> {
+    const rows = this.llmRuns.filter((run) => {
+      if (filter.resultKind && run.resultKind !== filter.resultKind) return false;
+      if (filter.selectedTool && run.selectedTool !== filter.selectedTool) return false;
+      if (filter.executedTool && run.executedTool !== filter.executedTool) return false;
+      if (filter.traceId && run.traceId !== filter.traceId) return false;
+      if (filter.userId && run.userId !== filter.userId) return false;
+      if (filter.from && run.createdAt < filter.from) return false;
+      if (filter.to && run.createdAt > filter.to) return false;
+      return true;
+    });
+    rows.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    return filter.limit !== undefined ? rows.slice(0, filter.limit) : rows;
+  }
+
+  async createFoodSearchEvent(
+    input: Omit<FoodSearchEventRecord, "id" | "createdAt">,
+  ): Promise<FoodSearchEventRecord> {
+    const record: FoodSearchEventRecord = {
+      ...input,
+      id: newId(),
+      createdAt: new Date().toISOString(),
+    };
+    this.foodSearchEvents.push(record);
+    return record;
+  }
+
+  async listFoodSearchEvents(
+    filter: FoodSearchEventFilter,
+  ): Promise<FoodSearchEventRecord[]> {
+    const rows = this.foodSearchEvents.filter((event) => {
+      if (filter.zeroResults !== undefined && event.zeroResults !== filter.zeroResults) return false;
+      if (filter.lowConfidence !== undefined && event.lowConfidence !== filter.lowConfidence) return false;
+      if (filter.path && event.path !== filter.path) return false;
+      if (filter.traceId && event.traceId !== filter.traceId) return false;
+      if (filter.userId && event.userId !== filter.userId) return false;
+      if (filter.from && event.createdAt < filter.from) return false;
+      if (filter.to && event.createdAt > filter.to) return false;
+      return true;
+    });
+    rows.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    return filter.limit !== undefined ? rows.slice(0, filter.limit) : rows;
+  }
+
+  async getTelemetryOverview(input: { from: string; to: string }): Promise<TelemetryOverview> {
+    const inRange = (iso: string) => iso >= input.from && iso <= input.to;
+    const events = this.telemetryEvents.filter((e) => inRange(e.createdAt));
+    const llmRuns = this.llmRuns.filter((r) => inRange(r.createdAt));
+    const foodSearches = this.foodSearchEvents.filter((s) => inRange(s.createdAt));
+    const eventsBySeverity: Record<string, number> = {};
+    const eventsBySurface: Record<string, number> = {};
+    const userIds = new Set<string>();
+    const traceIds = new Set<string>();
+    for (const event of events) {
+      eventsBySeverity[event.severity] = (eventsBySeverity[event.severity] ?? 0) + 1;
+      eventsBySurface[event.surface] = (eventsBySurface[event.surface] ?? 0) + 1;
+      traceIds.add(event.traceId);
+      if (event.userId) userIds.add(event.userId);
+    }
+    for (const run of llmRuns) {
+      traceIds.add(run.traceId);
+      if (run.userId) userIds.add(run.userId);
+    }
+    for (const search of foodSearches) {
+      traceIds.add(search.traceId);
+      if (search.userId) userIds.add(search.userId);
+    }
+    const recentResultKinds: Record<string, number> = {};
+    for (const run of llmRuns) {
+      if (!run.resultKind) continue;
+      recentResultKinds[run.resultKind] = (recentResultKinds[run.resultKind] ?? 0) + 1;
+    }
+    const denominator = foodSearches.length || 1;
+    const zeroResultCount = foodSearches.filter((s) => s.zeroResults).length;
+    const lowConfidenceCount = foodSearches.filter((s) => s.lowConfidence).length;
+    const providerErrorCount = llmRuns.filter((r) => r.providerError).length;
+    const llmDenominator = llmRuns.length || 1;
+    return {
+      from: input.from,
+      to: input.to,
+      totalEvents: events.length,
+      totalLlmRuns: llmRuns.length,
+      totalFoodSearchEvents: foodSearches.length,
+      uniqueUsers: userIds.size,
+      uniqueTraces: traceIds.size,
+      eventsBySeverity,
+      eventsBySurface,
+      recentResultKinds,
+      zeroResultRate: foodSearches.length === 0 ? 0 : zeroResultCount / denominator,
+      lowConfidenceRate: foodSearches.length === 0 ? 0 : lowConfidenceCount / denominator,
+      providerErrorRate: llmRuns.length === 0 ? 0 : providerErrorCount / llmDenominator
+    };
   }
 
   private requireUser(userId: string): StoredUser {

@@ -349,6 +349,22 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsThemeDark => 'Oscuro';
 
   @override
+  String get settingsDeveloperMenuTitle => 'Herramientas de desarrollo';
+
+  @override
+  String get settingsPerformanceOverlayTitle => 'Overlay de rendimiento';
+
+  @override
+  String get settingsPerformanceOverlaySubtitle =>
+      'Muestra los tiempos de frame de Flutter en una franja superior compacta.';
+
+  @override
+  String get settingsPerformanceOverlayOn => 'Overlay activo';
+
+  @override
+  String get settingsPerformanceOverlayOff => 'Overlay inactivo';
+
+  @override
   String get settingsDataSourcesTitle => 'Fuentes de datos';
 
   @override

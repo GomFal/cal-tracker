@@ -4,6 +4,7 @@ import { errors } from "jose";
 import { ZodError } from "zod";
 import { ActionExecutionError } from "../actions/executor.js";
 import { AgentProviderUnavailableError } from "../agent/agentService.js";
+import { AdminAuthError } from "../auth/adminService.js";
 import { AuthError } from "../auth/service.js";
 import { getTraceId } from "./requestContext.js";
 
@@ -14,6 +15,9 @@ export function formatErrorResponse(c: Context, error: unknown) {
   }
   if (error instanceof AuthError) {
     return c.json({ error: { code: error.code, message: authErrorMessage(error.code), traceId } }, error.status);
+  }
+  if (error instanceof AdminAuthError) {
+    return c.json({ error: { code: error.code, message: adminAuthErrorMessage(error.code), traceId } }, error.status);
   }
   if (error instanceof errors.JWTExpired || error instanceof errors.JWTClaimValidationFailed) {
     return c.json({ error: { code: "token_expired", message: "Token expired or invalid", traceId } }, 401);
@@ -55,6 +59,24 @@ function authErrorMessage(code: string): string {
       return "Google sign-in did not finish. Try again.";
     case "invalid_refresh_token":
       return "Sign in to continue.";
+    default:
+      return "We could not complete that request. Try again.";
+  }
+}
+
+function adminAuthErrorMessage(code: string): string {
+  switch (code) {
+    case "invalid_admin_credentials":
+      return "Invalid admin username or password.";
+    case "admin_token_required":
+    case "admin_token_invalid":
+    case "token_expired":
+      return "Sign in to continue.";
+    case "admin_scope_required":
+      return "You do not have permission to view admin telemetry.";
+    case "admin_panel_disabled":
+    case "admin_panel_misconfigured":
+      return "Admin panel authentication is not configured.";
     default:
       return "We could not complete that request. Try again.";
   }

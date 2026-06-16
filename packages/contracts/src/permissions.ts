@@ -8,8 +8,15 @@ export const PermissionScope = {
   NutritionWriteCorrect: "nutrition.write.correct",
   NutritionWriteDelete: "nutrition.write.delete",
   NutritionTemplatesWrite: "nutrition.templates.write",
-  NutritionTemplatesRead: "nutrition.templates.read"
+  NutritionTemplatesRead: "nutrition.templates.read",
+  AdminTelemetryRead: "admin.telemetry.read",
+  AdminTelemetryWrite: "admin.telemetry.write"
 } as const;
+
+export const adminTelemetryScopes: PermissionScope[] = [
+  PermissionScope.AdminTelemetryRead,
+  PermissionScope.AdminTelemetryWrite
+];
 
 export type PermissionScope = (typeof PermissionScope)[keyof typeof PermissionScope];
 

@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 
 import 'app/app.dart';
 import 'app/locale_view_model.dart';
+import 'app/performance_overlay_view_model.dart';
 import 'app/theme_mode_view_model.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'local_toolkit/data/local_toolkit_data.dart';
@@ -74,8 +75,6 @@ class _LocalToolkitHost extends StatefulWidget {
 
 class _LocalToolkitHostState extends State<_LocalToolkitHost> {
   LocalToolkitScenario _activeScenario = LocalToolkitScenario.normalDay;
-  bool _showPerformanceOverlay = false;
-
   LocalFixtureStore get _store => widget.dependencies.store;
 
   @override
@@ -86,6 +85,7 @@ class _LocalToolkitHostState extends State<_LocalToolkitHost> {
         final l10n = AppLocalizations.of(context);
         final localeTag = context.watch<LocaleViewModel>().localeTag;
         final themeMode = context.watch<ThemeModeViewModel>().themeMode;
+        final performanceOverlay = context.watch<PerformanceOverlayViewModel>();
         return LocalToolkitOverlay(
           labels: _labels(l10n),
           activeScenario: _activeScenario,
@@ -100,7 +100,7 @@ class _LocalToolkitHostState extends State<_LocalToolkitHost> {
           onToggleTrustedMode: _toggleTrustedMode,
           onSwitchLocale: _switchLocale,
           onSwitchTheme: _switchTheme,
-          showPerformanceOverlay: _showPerformanceOverlay,
+          showPerformanceOverlay: performanceOverlay.visible,
           onTogglePerformanceOverlay: _togglePerformanceOverlay,
           child: child ?? widget.child,
         );
@@ -163,8 +163,10 @@ class _LocalToolkitHostState extends State<_LocalToolkitHost> {
       return;
     }
     _ensureAuthenticated();
-    final firstTemplateId = _store.templates.isNotEmpty ? _store.templates.first.id : null;
-    final firstUsualFoodId = _store.usualFoods.isNotEmpty ? _store.usualFoods.first.id : null;
+    final firstTemplateId =
+        _store.templates.isNotEmpty ? _store.templates.first.id : null;
+    final firstUsualFoodId =
+        _store.usualFoods.isNotEmpty ? _store.usualFoods.first.id : null;
     widget.router.go(switch (route) {
       LocalToolkitRoute.auth => '/auth',
       LocalToolkitRoute.dashboard => '/dashboard',
@@ -172,11 +174,13 @@ class _LocalToolkitHostState extends State<_LocalToolkitHost> {
       LocalToolkitRoute.history => '/history',
       LocalToolkitRoute.templates => '/templates',
       LocalToolkitRoute.newUsualMeal => '/templates/meals/new',
-      LocalToolkitRoute.editFirstUsualMeal =>
-        firstTemplateId != null ? '/templates/meals/$firstTemplateId/edit' : '/templates',
+      LocalToolkitRoute.editFirstUsualMeal => firstTemplateId != null
+          ? '/templates/meals/$firstTemplateId/edit'
+          : '/templates',
       LocalToolkitRoute.newUsualFood => '/templates/ingredients/new',
-      LocalToolkitRoute.editFirstUsualFood =>
-        firstUsualFoodId != null ? '/templates/ingredients/$firstUsualFoodId/edit' : '/templates',
+      LocalToolkitRoute.editFirstUsualFood => firstUsualFoodId != null
+          ? '/templates/ingredients/$firstUsualFoodId/edit'
+          : '/templates',
       LocalToolkitRoute.scanUsualFood => '/templates/ingredients/scan',
       LocalToolkitRoute.settings => '/settings',
     });
@@ -278,7 +282,7 @@ class _LocalToolkitHostState extends State<_LocalToolkitHost> {
   }
 
   void _togglePerformanceOverlay() {
-    setState(() => _showPerformanceOverlay = !_showPerformanceOverlay);
+    context.read<PerformanceOverlayViewModel>().toggle();
   }
 
   void _ensureAuthenticated() {

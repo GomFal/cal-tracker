@@ -212,6 +212,140 @@ export type AuditEventRecord = {
   createdAt: string;
 };
 
+export type TelemetryEventRecord = {
+  id: string;
+  traceId: string;
+  userId?: string;
+  sessionId?: string;
+  eventType: string;
+  flow?: string;
+  surface: string;
+  severity: string;
+  status?: string;
+  route?: string;
+  method?: string;
+  actionId?: string;
+  durationMs?: number;
+  errorCode?: string;
+  errorMessage?: string;
+  appVersion?: string;
+  appBuild?: string;
+  platform?: string;
+  locale?: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+};
+
+export type LlmRunRecord = {
+  id: string;
+  traceId: string;
+  userId?: string;
+  source?: string;
+  locale?: string;
+  timezone?: string;
+  model: string;
+  inputMode?: string;
+  activeProposalId?: string;
+  decisionSource?: string;
+  selectedTool?: string;
+  executedTool?: string;
+  resultKind?: string;
+  actionCallId?: string;
+  promptChars?: number;
+  toolsJsonChars?: number;
+  messagesJsonChars?: number;
+  requestPayloadChars?: number;
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  reasoningTokens?: number;
+  firstByteMs?: number;
+  firstToolCallMs?: number;
+  largestStreamGapMs?: number;
+  llmMs?: number;
+  actionMs?: number;
+  totalMs?: number;
+  emptyToolCall: boolean;
+  invalidToolArguments: boolean;
+  providerError: boolean;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+};
+
+export type FoodSearchEventRecord = {
+  id: string;
+  traceId: string;
+  userId?: string;
+  queryText?: string;
+  queryHash?: string;
+  queryLength: number;
+  locale?: string;
+  barcodePresent: boolean;
+  normalizedSearchEnabled?: boolean;
+  normalizedScope?: string;
+  path?: string;
+  resultCount: number;
+  candidateGroupCount?: number;
+  topScore?: number;
+  topExternalSource?: string;
+  topResultType?: string;
+  zeroResults: boolean;
+  lowConfidence: boolean;
+  selectedRank?: number;
+  durationMs?: number;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+};
+
+export type TelemetryEventFilter = {
+  limit?: number;
+  severity?: string;
+  eventType?: string;
+  surface?: string;
+  traceId?: string;
+  userId?: string;
+  from?: string;
+  to?: string;
+};
+
+export type LlmRunFilter = {
+  limit?: number;
+  resultKind?: string;
+  selectedTool?: string;
+  executedTool?: string;
+  traceId?: string;
+  userId?: string;
+  from?: string;
+  to?: string;
+};
+
+export type FoodSearchEventFilter = {
+  limit?: number;
+  zeroResults?: boolean;
+  lowConfidence?: boolean;
+  path?: string;
+  traceId?: string;
+  userId?: string;
+  from?: string;
+  to?: string;
+};
+
+export type TelemetryOverview = {
+  from: string;
+  to: string;
+  totalEvents: number;
+  totalLlmRuns: number;
+  totalFoodSearchEvents: number;
+  uniqueUsers: number;
+  uniqueTraces: number;
+  eventsBySeverity: Record<string, number>;
+  eventsBySurface: Record<string, number>;
+  recentResultKinds: Record<string, number>;
+  zeroResultRate: number;
+  lowConfidenceRate: number;
+  providerErrorRate: number;
+};
+
 export interface AppRepository {
   createUser(input: { email: string; displayName: string; passwordHash?: string; scopes: PermissionScope[] }): Promise<StoredUser>;
   findUserByEmail(email: string): Promise<StoredUser | undefined>;
@@ -266,4 +400,12 @@ export interface AppRepository {
   recordAuditEvent(input: Omit<AuditEventRecord, "id" | "createdAt">): Promise<AuditEventRecord>;
   listActionCalls(userId: string): Promise<ActionCallRecord[]>;
   listAuditEvents(userId: string): Promise<AuditEventRecord[]>;
+
+  createTelemetryEvent(input: Omit<TelemetryEventRecord, "id" | "createdAt">): Promise<TelemetryEventRecord>;
+  listTelemetryEvents(filter: TelemetryEventFilter): Promise<TelemetryEventRecord[]>;
+  createLlmRun(input: Omit<LlmRunRecord, "id" | "createdAt">): Promise<LlmRunRecord>;
+  listLlmRuns(filter: LlmRunFilter): Promise<LlmRunRecord[]>;
+  createFoodSearchEvent(input: Omit<FoodSearchEventRecord, "id" | "createdAt">): Promise<FoodSearchEventRecord>;
+  listFoodSearchEvents(filter: FoodSearchEventFilter): Promise<FoodSearchEventRecord[]>;
+  getTelemetryOverview(input: { from: string; to: string }): Promise<TelemetryOverview>;
 }

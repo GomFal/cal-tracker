@@ -1,6 +1,10 @@
 import 'package:cal_tracker_mobile/app/app.dart';
+import 'package:cal_tracker_mobile/data/services/api_config.dart';
+import 'package:cal_tracker_mobile/data/services/client_metadata_provider.dart';
+import 'package:cal_tracker_mobile/data/services/client_telemetry_service.dart';
 import 'package:cal_tracker_mobile/local_toolkit/data/local_toolkit_data.dart';
 import 'package:cal_tracker_mobile/local_toolkit/ui/local_toolkit_overlay.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -11,6 +15,16 @@ void main() {
         now: () => DateTime(2026, 5, 28, 12),
       ),
     );
+    // Use a long flush interval so the periodic timer in ClientTelemetryService
+    // does not fire during the test. The local toolkit does not exercise
+    // telemetry, so suppressing the periodic flush is safe.
+    final telemetryService = ClientTelemetryService(
+      apiConfig: const ApiConfig(baseUrl: 'http://localhost'),
+      tokenStorage: dependencies.tokenStorage,
+      metadataProvider: ClientMetadataProvider(),
+      flushInterval: const Duration(days: 1),
+    );
+    addTearDown(telemetryService.dispose);
 
     await tester.pumpWidget(
       CalTrackerBootstrap(
@@ -20,6 +34,7 @@ void main() {
         preferencesRepository: dependencies.preferencesRepository,
         mobileUpdateService: dependencies.mobileUpdateService,
         audioRecorderService: dependencies.audioRecorderService,
+        clientTelemetryService: telemetryService,
         checkForUpdates: false,
         appWrapperBuilder: (context, child, router) {
           return LocalToolkitOverlay(
@@ -43,6 +58,11 @@ void main() {
     expect(find.byKey(LocalToolkitOverlay.panelKey), findsOneWidget);
     expect(find.text('Local toolkit'), findsOneWidget);
     expect(find.text('Dashboard'), findsOneWidget);
+
+    // Tear down the widget tree and the telemetry service so the test
+    // framework does not see a pending periodic flush timer.
+    await tester.pumpWidget(const SizedBox.expand());
+    await telemetryService.dispose();
   });
 }
 
@@ -58,6 +78,11 @@ const _labels = LocalToolkitOverlayLabels(
   routeLogMeal: 'Log Meal',
   routeHistory: 'History',
   routeTemplates: 'Templates',
+  routeNewUsualMeal: 'New usual meal',
+  routeEditFirstUsualMeal: 'Edit first usual meal',
+  routeNewUsualFood: 'New usual food',
+  routeEditFirstUsualFood: 'Edit first usual food',
+  routeScanUsualFood: 'Scan usual food',
   routeSettings: 'Settings',
   scenarioUnauthenticated: 'Unauthenticated',
   scenarioEmptyDay: 'Empty day',
@@ -74,6 +99,9 @@ const _labels = LocalToolkitOverlayLabels(
   quickToggleTrustedMode: 'Toggle trusted mode',
   quickSwitchLocale: 'Switch locale',
   quickSwitchTheme: 'Switch light/dark theme',
+  quickTogglePerformanceOverlay: 'Toggle perf overlay',
+  performanceOverlayOn: 'Overlay on',
+  performanceOverlayOff: 'Overlay off',
   trustedModeOn: 'Trusted on',
   trustedModeOff: 'Trusted off',
   closeTooltip: 'Close toolkit',

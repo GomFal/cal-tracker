@@ -1,4 +1,5 @@
 import {
+  adminLoginRequestSchema,
   agentRunRequestSchema,
   calorieEstimateRequestSchema,
   dailyHydrationUpdateSchema,
@@ -24,6 +25,7 @@ import { cors } from "hono/cors";
 import { Hono, type Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { ActionExecutor } from "../actions/executor.js";
+import { AdminAuthService } from "../auth/adminService.js";
 import { AuthService } from "../auth/service.js";
 import type { AppConfig } from "../config/env.js";
 import { authMiddleware } from "../middleware/auth.js";
@@ -41,6 +43,18 @@ import {
   summarizeError,
   type LocalRunLogger,
 } from "../observability/localRunLogger.js";
+import {
+  registerAdminTelemetryRoutes,
+  registerClientTelemetryRoutes,
+} from "./adminTelemetry.js";
+import { TelemetryService as DbTelemetryService } from "../telemetry/service.js";
+import {
+  hashQueryForTelemetry,
+  type FoodSearchTelemetryEvent,
+  type SttTelemetryEvent,
+  type TelemetryService,
+  type VoiceMealRunTelemetryEvent,
+} from "../telemetry/telemetryService.js";
 
 export function createApp(input: {
   config: AppConfig;
@@ -50,9 +64,13 @@ export function createApp(input: {
   sttProvider: SpeechToTextProvider;
   agentProvider?: ChatAgentProvider;
   runLogger?: LocalRunLogger;
+  telemetryService?: TelemetryService;
 }) {
   const app = new Hono<{ Variables: { authUser: StoredUser; traceId: string } }>();
   const { config, repository, authService, actionExecutor, sttProvider, agentProvider, runLogger } = input;
+  const telemetry = new DbTelemetryService(repository, { enabled: true });
+  const telemetryService: TelemetryService = input.telemetryService ?? telemetry;
+  const adminAuthService = new AdminAuthService(config);
 
   const resolvedAgentProvider = agentProvider ?? new RemoteChatAgentProvider(
     config.OPENROUTER_API_KEY,
@@ -73,7 +91,13 @@ export function createApp(input: {
       allow_fallbacks: config.OPENROUTER_PROVIDER_ALLOW_FALLBACKS,
     },
   );
-  const agentService = new AgentService(resolvedAgentProvider, actionExecutor, config.OPENROUTER_MODEL, runLogger);
+  const agentService = new AgentService(
+    resolvedAgentProvider,
+    actionExecutor,
+    config.OPENROUTER_MODEL,
+    runLogger,
+    telemetryService,
+  );
 
   async function runMealInput(input: {
     c: Context;
@@ -137,9 +161,68 @@ export function createApp(input: {
       if (!origin) return "";
       return config.corsAllowedOrigins.includes(origin) ? origin : "";
     },
-    allowHeaders: ["Authorization", "Content-Type", "X-Request-Id"],
+    allowHeaders: ["Authorization", "Content-Type", "X-Request-Id", "X-App-Version", "X-App-Build", "X-Client-Platform", "X-Client-Session-Id"],
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
   }));
+
+  app.use("*", async (c, next) => {
+    const path = new URL(c.req.url).pathname;
+    if (!path.startsWith("/v1/") || path === "/v1/health") {
+      await next();
+      return;
+    }
+    const started = Date.now();
+    try {
+      await next();
+      const responseStatus = c.res.status;
+      await telemetry.recordEvent({
+        traceId: getTraceId(c),
+        userId: maybeAuthUser(c)?.id,
+        eventType: "backend.api_request_completed",
+        flow: requestFlowForPath(path),
+        surface: "backend",
+        severity: severityForStatus(responseStatus),
+        status: responseStatus >= 400 ? "failure" : "success",
+        route: path,
+        method: c.req.method,
+        durationMs: Date.now() - started,
+        appVersion: c.req.header("x-app-version"),
+        appBuild: c.req.header("x-app-build"),
+        platform: c.req.header("x-client-platform"),
+        locale: c.req.header("accept-language")?.split(",")[0],
+        metadata: {
+          responseStatus,
+          userAgent: c.req.header("user-agent"),
+          clientSessionId: c.req.header("x-client-session-id"),
+        },
+      });
+    } catch (error) {
+      const summary = summarizeError(error);
+      await telemetry.recordEvent({
+        traceId: getTraceId(c),
+        userId: maybeAuthUser(c)?.id,
+        eventType: "backend.api_request_failed",
+        flow: requestFlowForPath(path),
+        surface: "backend",
+        severity: "error",
+        status: "failure",
+        route: path,
+        method: c.req.method,
+        durationMs: Date.now() - started,
+        errorCode: error instanceof HTTPException ? httpErrorCodeForTelemetry(error.status) : undefined,
+        errorMessage: typeof summary.message === "string" ? summary.message : undefined,
+        appVersion: c.req.header("x-app-version"),
+        appBuild: c.req.header("x-app-build"),
+        platform: c.req.header("x-client-platform"),
+        locale: c.req.header("accept-language")?.split(",")[0],
+        metadata: {
+          userAgent: c.req.header("user-agent"),
+          clientSessionId: c.req.header("x-client-session-id"),
+        },
+      });
+      throw error;
+    }
+  });
 
   app.onError((err, c) => {
     return formatErrorResponse(c, err);
@@ -167,10 +250,15 @@ export function createApp(input: {
     const body = passwordResetConfirmSchema.parse(await c.req.json());
     return c.json({ ok: await authService.confirmPasswordReset(body.token, body.newPassword) });
   });
+  app.post("/v1/admin/auth/login", async (c) => {
+    const body = adminLoginRequestSchema.parse(await c.req.json());
+    return c.json(await adminAuthService.login(body));
+  });
 
   app.use("/v1/*", async (c, next) => {
-    const publicPaths = ["/v1/health", "/v1/auth/register", "/v1/auth/login", "/v1/auth/google/login", "/v1/auth/refresh", "/v1/auth/logout", "/v1/auth/password-reset/request", "/v1/auth/password-reset/confirm"];
-    if (publicPaths.includes(new URL(c.req.url).pathname)) return next();
+    const path = new URL(c.req.url).pathname;
+    const publicPaths = ["/v1/health", "/v1/auth/register", "/v1/auth/login", "/v1/auth/google/login", "/v1/auth/refresh", "/v1/auth/logout", "/v1/auth/password-reset/request", "/v1/auth/password-reset/confirm", "/v1/admin/auth/login"];
+    if (publicPaths.includes(path) || path.startsWith("/v1/admin/telemetry/")) return next();
     return authMiddleware(config, repository)(c, next);
   });
 
@@ -254,6 +342,8 @@ export function createApp(input: {
   app.post("/v1/foods/search", async (c) => {
     const user = c.get("authUser");
     const body = foodSearchRequestSchema.parse(await c.req.json());
+    const traceId = getTraceId(c);
+    const startedAt = Date.now();
     const result = await actionExecutor.execute(
       "search_nutrition_database",
       {
@@ -262,7 +352,36 @@ export function createApp(input: {
       },
       buildActionContext(c, user, "flutter"),
     );
-    return c.json(limitFoodSearchOutput(result.output, body.limit));
+    const limited = limitFoodSearchOutput(result.output, body.limit);
+    await recordFoodSearchTelemetry({
+      telemetryService,
+      event: {
+        flow: "food_search",
+        surface: "backend",
+        traceId,
+        userId: user.id,
+        queryText: body.query,
+        queryLength: body.query.length,
+        queryHash: hashQueryForTelemetry(body.query),
+        locale: c.req.header("accept-language")?.split(",")[0],
+        barcode: body.barcode,
+        resultCount: limited.items.length,
+        candidateGroupCount: Array.isArray(limited.candidateGroups)
+          ? limited.candidateGroups.length
+          : 0,
+        topScore: extractTopMatchScore(limited.items),
+        topExternalSource: extractTopExternalSource(limited.items),
+        topResultType: extractTopResultType(limited.items),
+        zeroResults: limited.items.length === 0,
+        lowConfidence: isLowConfidenceSearch(limited.items, config.FOOD_RESOLVER_MIN_CONFIDENCE),
+        durationMs: Date.now() - startedAt,
+        metadata: {
+          limit: body.limit,
+          actionCallId: result.actionCallId,
+        },
+      },
+    });
+    return c.json(limited);
   });
 
   app.post("/v1/usual-foods/draft", async (c) => {
@@ -313,6 +432,20 @@ export function createApp(input: {
       mimeType: upload.mimeType,
       bytes: upload.buffer.byteLength,
     });
+    await recordSttTelemetry({
+      telemetryService,
+      event: {
+        flow: "stt",
+        surface: "stt",
+        traceId,
+        userId: user.id,
+        outcome: "started",
+        stage: "transcription",
+        filename: upload.filename,
+        mimeType: upload.mimeType,
+        bytes: upload.buffer.byteLength,
+      },
+    });
 
     let result: TranscriptionResult;
     try {
@@ -332,6 +465,22 @@ export function createApp(input: {
         bytes: upload.buffer.byteLength,
         error: error instanceof Error ? error.message : String(error),
       });
+      await recordSttTelemetry({
+        telemetryService,
+        event: {
+          flow: "stt",
+          surface: "stt",
+          traceId,
+          userId: user.id,
+          outcome: "failed",
+          stage: "transcription",
+          filename: upload.filename,
+          mimeType: upload.mimeType,
+          bytes: upload.buffer.byteLength,
+          errorCode: "stt_provider_failed",
+          errorMessage: error instanceof Error ? error.message : String(error),
+        },
+      });
       throw error;
     }
 
@@ -341,6 +490,23 @@ export function createApp(input: {
       provider: result.provider,
       model: result.model,
       transcriptLength: result.text.length,
+    });
+    await recordSttTelemetry({
+      telemetryService,
+      event: {
+        flow: "stt",
+        surface: "stt",
+        traceId,
+        userId: user.id,
+        outcome: "completed",
+        stage: "transcription",
+        filename: upload.filename,
+        mimeType: upload.mimeType,
+        bytes: upload.buffer.byteLength,
+        provider: result.provider,
+        model: result.model,
+        transcriptLength: result.text.length,
+      },
     });
 
     return c.json({
@@ -366,6 +532,24 @@ export function createApp(input: {
       filename: upload.filename,
       mimeType: upload.mimeType,
       bytes: upload.buffer.byteLength,
+    });
+    await recordVoiceMealRunTelemetry({
+      telemetryService,
+      event: {
+        flow: "voice_meal",
+        surface: "agent",
+        traceId,
+        userId: user.id,
+        outcome: "started",
+        stage: "voice_meal_run",
+        filename: upload.filename,
+        mimeType: upload.mimeType,
+        bytes: upload.buffer.byteLength,
+        source: upload.source ?? "flutter",
+        metadata: upload.activeProposalId
+          ? { hasActiveProposal: true, activeProposalId: upload.activeProposalId }
+          : undefined,
+      },
     });
 
     let transcription: TranscriptionResult;
@@ -417,6 +601,28 @@ export function createApp(input: {
           total: Date.now() - routeStarted,
         },
       });
+      await recordVoiceMealRunTelemetry({
+        telemetryService,
+        event: {
+          flow: "voice_meal",
+          surface: "agent",
+          traceId,
+          userId: user.id,
+          outcome: "failed",
+          stage: "voice_meal_run",
+          filename: upload.filename,
+          mimeType: upload.mimeType,
+          bytes: upload.buffer.byteLength,
+          source: upload.source ?? "flutter",
+          errorStage: "stt",
+          errorMessage: error instanceof Error ? error.message : String(error),
+          timingsMs: {
+            stt: Date.now() - routeStarted,
+            total: Date.now() - routeStarted,
+          },
+          metadata: { errorCode: "stt_provider_failed" },
+        },
+      });
       throw error;
     }
 
@@ -457,6 +663,30 @@ export function createApp(input: {
         stt: sttMs,
         agent: mealInput.agentMs,
         total: Date.now() - routeStarted,
+      },
+    });
+    await recordVoiceMealRunTelemetry({
+      telemetryService,
+      event: {
+        flow: "voice_meal",
+        surface: "agent",
+        traceId,
+        userId: user.id,
+        outcome: "completed",
+        stage: "voice_meal_run",
+        filename: upload.filename,
+        mimeType: upload.mimeType,
+        bytes: upload.buffer.byteLength,
+        source: upload.source ?? "flutter",
+        provider: transcription.provider,
+        model: transcription.model,
+        transcriptLength: transcript.length,
+        resultKind: mealInput.result.kind,
+        timingsMs: {
+          stt: sttMs,
+          agent: mealInput.agentMs,
+          total: Date.now() - routeStarted,
+        },
       },
     });
 
@@ -542,6 +772,9 @@ export function createApp(input: {
       buildActionContext(c, user, "flutter")
     ));
   });
+
+  registerClientTelemetryRoutes({ app, telemetry });
+  registerAdminTelemetryRoutes({ app, adminAuthService, telemetry });
 
   return app;
 }
@@ -725,6 +958,33 @@ function limitFoodCandidateGroup(group: unknown, limit: number): unknown {
   return { ...value, candidates: value.candidates.slice(0, limit) };
 }
 
+function maybeAuthUser(c: Context): StoredUser | undefined {
+  return c.get("authUser") as StoredUser | undefined;
+}
+
+function severityForStatus(status: number): "info" | "warning" | "error" {
+  if (status >= 500) return "error";
+  if (status >= 400) return "warning";
+  return "info";
+}
+
+function requestFlowForPath(path: string): string | undefined {
+  if (path.includes("/voice/")) return "voice_meal";
+  if (path.includes("/stt/")) return "stt";
+  if (path.includes("/foods/search")) return "food_search";
+  if (path.includes("/agent/")) return "llm_run";
+  if (path.includes("/telemetry")) return "telemetry";
+  if (path.includes("/auth/")) return "auth";
+  return undefined;
+}
+
+function httpErrorCodeForTelemetry(status: number): string {
+  if (status === 401) return "authentication_required";
+  if (status === 403) return "permission_denied";
+  if (status === 404) return "not_found";
+  return `http_${status}`;
+}
+
 function buildActionContext(c: Context, user: StoredUser, source: ActionSource): ActionContext {
   return {
     actorUserId: user.id,
@@ -854,4 +1114,74 @@ function speechCorrectionPrompt(language: "es" | "en"): string {
 function publicUser(user: StoredUser) {
   const { passwordHash: _passwordHash, scopes: _scopes, ...publicValue } = user;
   return publicValue;
+}
+
+async function recordFoodSearchTelemetry(input: {
+  telemetryService: TelemetryService;
+  event: FoodSearchTelemetryEvent;
+}): Promise<void> {
+  try {
+    await input.telemetryService.recordFoodSearchEvent(input.event);
+  } catch (error) {
+    console.warn("telemetry.food_search.failed", summarizeError(error));
+  }
+}
+
+async function recordSttTelemetry(input: {
+  telemetryService: TelemetryService;
+  event: SttTelemetryEvent;
+}): Promise<void> {
+  try {
+    await input.telemetryService.recordSttEvent(input.event);
+  } catch (error) {
+    console.warn("telemetry.stt.failed", summarizeError(error));
+  }
+}
+
+async function recordVoiceMealRunTelemetry(input: {
+  telemetryService: TelemetryService;
+  event: VoiceMealRunTelemetryEvent;
+}): Promise<void> {
+  try {
+    await input.telemetryService.recordVoiceMealRunEvent(input.event);
+  } catch (error) {
+    console.warn("telemetry.voice_meal_run.failed", summarizeError(error));
+  }
+}
+
+function isLowConfidenceSearch(
+  items: unknown[],
+  minConfidence: number,
+): boolean {
+  if (items.length === 0) return false;
+  const top = items[0] as { confidence?: unknown; matchScore?: unknown };
+  const confidence = typeof top.confidence === "number"
+    ? top.confidence
+    : typeof top.matchScore === "number"
+      ? top.matchScore
+      : undefined;
+  if (typeof confidence !== "number") return false;
+  return confidence < minConfidence;
+}
+
+function extractTopMatchScore(items: unknown[]): number | undefined {
+  if (items.length === 0) return undefined;
+  const top = items[0] as { confidence?: unknown; matchScore?: unknown };
+  if (typeof top.confidence === "number") return top.confidence;
+  if (typeof top.matchScore === "number") return top.matchScore;
+  return undefined;
+}
+
+function extractTopExternalSource(items: unknown[]): string | undefined {
+  if (items.length === 0) return undefined;
+  const top = items[0] as { externalSource?: unknown; source?: unknown };
+  if (typeof top.externalSource === "string") return top.externalSource;
+  if (typeof top.source === "string") return top.source;
+  return undefined;
+}
+
+function extractTopResultType(items: unknown[]): string | undefined {
+  if (items.length === 0) return undefined;
+  const top = items[0] as { resultType?: unknown };
+  return typeof top.resultType === "string" ? top.resultType : undefined;
 }

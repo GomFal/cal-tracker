@@ -12,6 +12,11 @@ export const loginRequestSchema = z.object({
   password: z.string().min(1)
 });
 
+export const adminLoginRequestSchema = z.object({
+  username: z.string().min(1).max(120),
+  password: z.string().min(1).max(512)
+});
+
 export const googleLoginRequestSchema = z.object({
   idToken: z.string().min(1)
 });
@@ -48,8 +53,18 @@ export const tokenPairSchema = z.object({
   user: authUserSchema
 });
 
+export const adminTokenResponseSchema = z.object({
+  accessToken: z.string(),
+  expiresAt: isoDateTimeSchema,
+  tokenType: z.literal("Bearer"),
+  scope: z.string(),
+  username: z.string()
+});
+
 export type RegisterRequest = z.infer<typeof registerRequestSchema>;
 export type LoginRequest = z.infer<typeof loginRequestSchema>;
+export type AdminLoginRequest = z.infer<typeof adminLoginRequestSchema>;
+export type AdminTokenResponse = z.infer<typeof adminTokenResponseSchema>;
 export type GoogleLoginRequest = z.infer<typeof googleLoginRequestSchema>;
 export type TokenPair = z.infer<typeof tokenPairSchema>;
 export type AuthUser = z.infer<typeof authUserSchema>;

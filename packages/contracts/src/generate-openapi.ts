@@ -3,6 +3,8 @@ import { dirname, resolve } from "node:path";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import {
   actionDefinitions,
+  adminLoginRequestSchema,
+  adminTokenResponseSchema,
   agentRunRequestSchema,
   agentRunResponseSchema,
   calorieEstimateRequestSchema,
@@ -78,6 +80,8 @@ const spec = {
       ErrorResponse: schema("ErrorResponse", errorResponseSchema),
       RegisterRequest: schema("RegisterRequest", registerRequestSchema),
       LoginRequest: schema("LoginRequest", loginRequestSchema),
+      AdminLoginRequest: schema("AdminLoginRequest", adminLoginRequestSchema),
+      AdminTokenResponse: schema("AdminTokenResponse", adminTokenResponseSchema),
       GoogleLoginRequest: schema("GoogleLoginRequest", googleLoginRequestSchema),
       RefreshRequest: schema("RefreshRequest", refreshRequestSchema),
       PasswordResetRequest: schema("PasswordResetRequest", passwordResetRequestSchema),
@@ -141,6 +145,18 @@ const spec = {
         },
         responses: {
           "200": { description: "Token pair", content: { "application/json": { schema: { $ref: "#/components/schemas/TokenPair" } } } }
+        }
+      }
+    },
+    "/v1/admin/auth/login": {
+      post: {
+        operationId: "adminLogin",
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/AdminLoginRequest" } } }
+        },
+        responses: {
+          "200": { description: "Admin token", content: { "application/json": { schema: { $ref: "#/components/schemas/AdminTokenResponse" } } } }
         }
       }
     },

@@ -30,6 +30,11 @@ import {
   type LocalRunLogger,
 } from "../observability/localRunLogger.js";
 import { withSpan, withSyncSpan } from "../observability/profiler.js";
+import {
+  DEFAULT_TELEMETRY_SERVICE,
+  type LlmTelemetryEvent,
+  type TelemetryService,
+} from "../telemetry/telemetryService.js";
 
 export class AgentProviderUnavailableError extends Error {
   readonly code = "agent_provider_unavailable";
@@ -114,6 +119,7 @@ export class AgentService {
     private readonly actionExecutor: ActionExecutor,
     private readonly model: string,
     private readonly runLogger?: LocalRunLogger,
+    private readonly telemetryService: TelemetryService = DEFAULT_TELEMETRY_SERVICE,
   ) {}
 
   async run(
@@ -201,11 +207,31 @@ export class AgentService {
       );
       llmMs = Date.now() - llmStarted;
     } catch (error) {
+      const errorSummary = summarizeError(error);
       await this.logRun({
         ...baseLog,
         decisionSource: "provider_error",
-        providerError: summarizeError(error),
+        providerError: errorSummary,
         timingsMs: { total: Date.now() - runStarted },
+      });
+      await this.recordLlmTelemetry({
+        flow: "llm_run",
+        surface: "agent",
+        traceId: context.traceId,
+        userId: context.actorUserId,
+        model: this.model,
+        source: context.source,
+        locale: context.locale,
+        timezone: context.timezone,
+        inputMode: options.inputMode,
+        activeProposalId,
+        outcome: "provider_error",
+        providerError: true,
+        timingsMs: { total: Date.now() - runStarted },
+        promptChars: modelInputStats.systemPromptChars,
+        toolsJsonChars: modelInputStats.toolsJsonChars,
+        messagesJsonChars: modelInputStats.messagesJsonChars,
+        errorMessage: typeof errorSummary.message === "string" ? errorSummary.message : undefined,
       });
       throw new AgentProviderUnavailableError(error);
     }
@@ -231,6 +257,28 @@ export class AgentService {
           llm: decision.timingsMs?.totalMs ?? llmMs,
           total: Date.now() - runStarted,
         },
+      });
+      await this.recordLlmTelemetry({
+        flow: "llm_run",
+        surface: "agent",
+        traceId: context.traceId,
+        userId: context.actorUserId,
+        model: this.model,
+        source: context.source,
+        locale: context.locale,
+        timezone: context.timezone,
+        inputMode: options.inputMode,
+        activeProposalId,
+        outcome: "empty_tool_call",
+        emptyToolCall: true,
+        resultKind: mapped.kind,
+        timingsMs: {
+          llm: decision.timingsMs?.totalMs ?? llmMs,
+          total: Date.now() - runStarted,
+        },
+        promptChars: modelInputStats.systemPromptChars,
+        toolsJsonChars: modelInputStats.toolsJsonChars,
+        messagesJsonChars: modelInputStats.messagesJsonChars,
       });
       return mapped;
     }
@@ -259,6 +307,28 @@ export class AgentService {
           total: Date.now() - runStarted,
         },
       });
+      await this.recordLlmTelemetry({
+        flow: "llm_run",
+        surface: "agent",
+        traceId: context.traceId,
+        userId: context.actorUserId,
+        model: this.model,
+        source: context.source,
+        locale: context.locale,
+        timezone: context.timezone,
+        inputMode: options.inputMode,
+        activeProposalId,
+        outcome: "disallowed_tool",
+        selectedTool: actionId,
+        resultKind: mapped.kind,
+        timingsMs: {
+          llm: decision.timingsMs?.totalMs ?? llmMs,
+          total: Date.now() - runStarted,
+        },
+        promptChars: modelInputStats.systemPromptChars,
+        toolsJsonChars: modelInputStats.toolsJsonChars,
+        messagesJsonChars: modelInputStats.messagesJsonChars,
+      });
       return mapped;
     }
 
@@ -272,7 +342,7 @@ export class AgentService {
         },
         () => JSON.parse(toolCall.function.arguments),
       );
-    } catch {
+    } catch (error) {
       const mapped = {
         kind: "clarification_required",
         message:
@@ -293,6 +363,30 @@ export class AgentService {
           llm: decision.timingsMs?.totalMs ?? llmMs,
           total: Date.now() - runStarted,
         },
+      });
+      await this.recordLlmTelemetry({
+        flow: "llm_run",
+        surface: "agent",
+        traceId: context.traceId,
+        userId: context.actorUserId,
+        model: this.model,
+        source: context.source,
+        locale: context.locale,
+        timezone: context.timezone,
+        inputMode: options.inputMode,
+        activeProposalId,
+        outcome: "invalid_tool_arguments",
+        selectedTool: actionId,
+        invalidToolArguments: true,
+        resultKind: mapped.kind,
+        timingsMs: {
+          llm: decision.timingsMs?.totalMs ?? llmMs,
+          total: Date.now() - runStarted,
+        },
+        promptChars: modelInputStats.systemPromptChars,
+        toolsJsonChars: modelInputStats.toolsJsonChars,
+        messagesJsonChars: modelInputStats.messagesJsonChars,
+        errorMessage: error instanceof Error ? error.message : String(error),
       });
       return mapped;
     }
@@ -345,8 +439,38 @@ export class AgentService {
           total: Date.now() - runStarted,
         },
       });
+      await this.recordLlmTelemetry({
+        flow: "llm_run",
+        surface: "agent",
+        traceId: context.traceId,
+        userId: context.actorUserId,
+        model: this.model,
+        source: context.source,
+        locale: context.locale,
+        timezone: context.timezone,
+        inputMode: options.inputMode,
+        activeProposalId,
+        outcome: "success",
+        selectedTool: originalActionId,
+        executedTool: actionId,
+        actionCallId: result.actionCallId,
+        resultKind: mapped.kind,
+        timingsMs: {
+          llm: decision.timingsMs?.totalMs ?? llmMs,
+          action: Date.now() - actionStarted,
+          total: Date.now() - runStarted,
+        },
+        promptChars: modelInputStats.systemPromptChars,
+        toolsJsonChars: modelInputStats.toolsJsonChars,
+        messagesJsonChars: modelInputStats.messagesJsonChars,
+        ...extractLlmTokenMetrics(decision.rawResponse),
+        firstByteMs: decision.timingsMs?.firstByteMs,
+        firstToolCallMs: decision.timingsMs?.firstToolCallMs,
+        largestStreamGapMs: decision.timingsMs?.largestStreamGapMs,
+      });
       return mapped;
     } catch (error) {
+      const errorSummary = summarizeError(error);
       await this.logRun({
         ...baseLog,
         decisionSource: "model",
@@ -358,12 +482,46 @@ export class AgentService {
         providerTimingsMs: decision.timingsMs,
         providerRouting: decision.providerRouting,
         modelInteraction: decision.interaction,
-        error: summarizeError(error),
+        error: errorSummary,
         timingsMs: {
           llm: decision.timingsMs?.totalMs ?? llmMs,
           action: Date.now() - actionStarted,
           total: Date.now() - runStarted,
         },
+      });
+      // The LLM call itself succeeded; the failure happened during action
+      // execution. We still surface a telemetry record for the run so the
+      // admin panel can correlate the failed outcome with a successful LLM
+      // tool-call selection.
+      await this.recordLlmTelemetry({
+        flow: "llm_run",
+        surface: "agent",
+        traceId: context.traceId,
+        userId: context.actorUserId,
+        model: this.model,
+        source: context.source,
+        locale: context.locale,
+        timezone: context.timezone,
+        inputMode: options.inputMode,
+        activeProposalId,
+        outcome: "success",
+        selectedTool: originalActionId,
+        executedTool: actionId,
+        resultKind: "action_error",
+        timingsMs: {
+          llm: decision.timingsMs?.totalMs ?? llmMs,
+          action: Date.now() - actionStarted,
+          total: Date.now() - runStarted,
+        },
+        promptChars: modelInputStats.systemPromptChars,
+        toolsJsonChars: modelInputStats.toolsJsonChars,
+        messagesJsonChars: modelInputStats.messagesJsonChars,
+        ...extractLlmTokenMetrics(decision.rawResponse),
+        firstByteMs: decision.timingsMs?.firstByteMs,
+        firstToolCallMs: decision.timingsMs?.firstToolCallMs,
+        largestStreamGapMs: decision.timingsMs?.largestStreamGapMs,
+        errorMessage:
+          typeof errorSummary.message === "string" ? errorSummary.message : undefined,
       });
       throw error;
     }
@@ -374,6 +532,14 @@ export class AgentService {
       await this.runLogger?.log(event);
     } catch (error) {
       console.warn("agent.run_log.failed", summarizeError(error));
+    }
+  }
+
+  private async recordLlmTelemetry(event: LlmTelemetryEvent): Promise<void> {
+    try {
+      await this.telemetryService.recordLlmRun(event);
+    } catch (error) {
+      console.warn("agent.telemetry.failed", summarizeError(error));
     }
   }
 
@@ -614,6 +780,30 @@ function agentModelInputStats(
 
 function approxTokens(chars: number): number {
   return Math.ceil(chars / 4);
+}
+
+function extractLlmTokenMetrics(rawResponse: unknown): {
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  reasoningTokens?: number;
+} {
+  const usage = extractTokenUsage(rawResponse);
+  if (!usage) return {};
+  const prompt = asNumber(usage.prompt_tokens);
+  const completion = asNumber(usage.completion_tokens);
+  const total = asNumber(usage.total_tokens);
+  const reasoning = extractReasoningTokens(rawResponse);
+  return {
+    ...(prompt !== undefined ? { promptTokens: prompt } : {}),
+    ...(completion !== undefined ? { completionTokens: completion } : {}),
+    ...(total !== undefined ? { totalTokens: total } : {}),
+    ...(reasoning !== undefined ? { reasoningTokens: reasoning } : {}),
+  };
+}
+
+function asNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
 function prioritizeDefaultTool<T extends { id: string }>(actions: T[]): T[] {

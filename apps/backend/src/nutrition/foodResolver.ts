@@ -6,6 +6,11 @@ import type {
   UsualFood,
 } from "@cal-tracker/contracts";
 import { withSpan } from "../observability/profiler.js";
+import {
+  DEFAULT_TELEMETRY_SERVICE,
+  type FoodResolverTelemetryEvent,
+  type TelemetryService,
+} from "../telemetry/telemetryService.js";
 import type { AppRepository, FoodItemRecord, FoodPortionRecord, FoodSearchCandidate } from "../repository/types.js";
 import { lexicalFoodScore } from "../repository/foodSearchScoring.js";
 import { normalizeText } from "../utils/normalize.js";
@@ -102,7 +107,38 @@ export class FoodResolver {
   constructor(
     private readonly provider: FoodDataProvider,
     private readonly minConfidence: number,
+    private readonly telemetryService: TelemetryService = DEFAULT_TELEMETRY_SERVICE,
   ) {}
+
+  private async recordResolverProviderError(input: {
+    userId: string;
+    mention: FoodMention;
+    error: unknown;
+  }): Promise<void> {
+    const mentionTraceId = (input.mention as { traceId?: unknown }).traceId;
+    const errorCode = input.error instanceof Error
+      ? (input.error as { code?: unknown }).code
+      : undefined;
+    const event: FoodResolverTelemetryEvent = {
+      flow: "food_resolver",
+      surface: "db",
+      traceId: typeof mentionTraceId === "string" ? mentionTraceId : "",
+      userId: input.userId,
+      outcome: "provider_error",
+      provider: this.provider.id,
+      canonicalName: canonicalNameForMention(input.mention),
+      originalText: input.mention.originalText,
+      errorCode: typeof errorCode === "string" ? errorCode : undefined,
+      errorMessage: input.error instanceof Error
+        ? input.error.message
+        : String(input.error),
+    };
+    try {
+      await this.telemetryService.recordFoodResolverEvent(event);
+    } catch (error) {
+      console.warn("food_resolver.telemetry.failed", describeResolverError(error));
+    }
+  }
 
   async resolveMealMentions(
     userId: string,
@@ -243,7 +279,12 @@ export class FoodResolver {
           () => this.provider.resolve(userId, mention),
         ),
       );
-    } catch {
+    } catch (error) {
+      // Provider errors are intentionally swallowed here so user-facing
+      // requests keep returning a well-formed response (items: []). Surface
+      // the failure to telemetry so the admin panel can distinguish this
+      // path from a true zero-result search.
+      await this.recordResolverProviderError({ userId, mention, error });
       resolved = { items: [] };
     }
     if (resolved.items.length === 0 && resolved.reason) {
@@ -1761,6 +1802,11 @@ function roundOne(value: number): number {
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function describeResolverError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
 }
 
 function clampScore(value: number): number {

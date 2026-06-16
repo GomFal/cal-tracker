@@ -7,6 +7,12 @@ const stringBooleanSchema = z.preprocess((value) => {
   return value;
 }, z.boolean());
 
+const optionalSecretSchema = z.string().default("").refine((value) => value.length === 0 || value.length >= 32, {
+  message: "Secret must be empty or at least 32 characters",
+});
+
+const TEST_ADMIN_PANEL_PASSWORD_HASH = "$argon2id$v=19$m=19456,t=2,p=1$P6DHHU0m9ReHAxn/p7Rm8g$W8oR3o0dv31YYBjJq6psrXd7M+XgnritGIGsDnQUSXA";
+
 const envSchema = z.object({
   DATABASE_URL: z.string().url(),
   JWT_ACCESS_SECRET: z.string().min(32),
@@ -38,16 +44,25 @@ const envSchema = z.object({
   FOOD_NORMALIZED_SEARCH_SCOPE: z.enum(["sample", "full"]).default("sample"),
   FOOD_NORMALIZED_SEARCH_SAMPLE_SET: z.string().min(1).default("normalized_search_v1"),
   AGENT_RUN_LOG_ENABLED: stringBooleanSchema.optional(),
+  ADMIN_EMAILS: z.string().default(""),
+  ADMIN_PANEL_USERNAME: z.string().max(120).default(""),
+  ADMIN_PANEL_PASSWORD_HASH: z.string().default(""),
+  ADMIN_PANEL_TOKEN_SECRET: optionalSecretSchema,
+  ADMIN_PANEL_TOKEN_TTL_SECONDS: z.coerce.number().int().min(60).max(86_400).default(30 * 60),
   AGENT_RUN_LOG_DIR: z.string().min(1).default("../../logs/agent-runs"),
   PORT: z.coerce.number().int().positive().default(3000),
   DATABASE_SCHEMA: z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/).default("public"),
   NODE_ENV: z.string().default("development")
 });
 
-export type AppConfig = Omit<z.infer<typeof envSchema>, "AGENT_RUN_LOG_ENABLED" | "OAUTH_GOOGLE_SECRET" | "GOOGLE_OAUTH_CLIENT_IDS"> & {
+export type AppConfig = Omit<z.infer<typeof envSchema>, "AGENT_RUN_LOG_ENABLED" | "OAUTH_GOOGLE_SECRET" | "GOOGLE_OAUTH_CLIENT_IDS" | "ADMIN_EMAILS"> & {
   AGENT_RUN_LOG_ENABLED: boolean;
   GOOGLE_OAUTH_CLIENT_IDS: string;
+  ADMIN_EMAILS: string;
   corsAllowedOrigins: string[];
+  adminEmails: string[];
+  adminPanelEnabled: boolean;
+  adminPanelUsername: string;
 };
 
 export function loadConfig(input: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -84,6 +99,11 @@ export function loadConfig(input: NodeJS.ProcessEnv = process.env): AppConfig {
         FOOD_NORMALIZED_SEARCH_SAMPLE_SET: "normalized_search_v1",
         AGENT_RUN_LOG_ENABLED: "false",
         AGENT_RUN_LOG_DIR: "../../logs/agent-runs",
+        ADMIN_EMAILS: "admin@example.com",
+        ADMIN_PANEL_USERNAME: "admin",
+        ADMIN_PANEL_PASSWORD_HASH: TEST_ADMIN_PANEL_PASSWORD_HASH,
+        ADMIN_PANEL_TOKEN_SECRET: "test-admin-panel-secret-with-more-than-32-characters",
+        ADMIN_PANEL_TOKEN_TTL_SECONDS: "1800",
         PORT: "3000",
         DATABASE_SCHEMA: "public",
         NODE_ENV: "test"
@@ -91,6 +111,17 @@ export function loadConfig(input: NodeJS.ProcessEnv = process.env): AppConfig {
     : {};
 
   const parsed = envSchema.parse({ ...defaults, ...input });
+  const adminPanelValues = [
+    parsed.ADMIN_PANEL_USERNAME,
+    parsed.ADMIN_PANEL_PASSWORD_HASH,
+    parsed.ADMIN_PANEL_TOKEN_SECRET,
+  ];
+  const adminPanelEnabled = adminPanelValues.every((value) => value.trim().length > 0);
+  if (!adminPanelEnabled && adminPanelValues.some((value) => value.trim().length > 0)) {
+    throw new Error(
+      "ADMIN_PANEL_USERNAME, ADMIN_PANEL_PASSWORD_HASH, and ADMIN_PANEL_TOKEN_SECRET must be set together.",
+    );
+  }
   const databaseUrl = withSearchPath(parsed.DATABASE_URL, parsed.DATABASE_SCHEMA);
   return {
     ...parsed,
@@ -99,7 +130,11 @@ export function loadConfig(input: NodeJS.ProcessEnv = process.env): AppConfig {
     AGENT_RUN_LOG_ENABLED:
       parsed.AGENT_RUN_LOG_ENABLED ??
       (parsed.NODE_ENV !== "test" && parsed.NODE_ENV !== "production"),
-    corsAllowedOrigins: parsed.CORS_ALLOWED_ORIGINS.split(",").map((origin) => origin.trim())
+    ADMIN_EMAILS: parsed.ADMIN_EMAILS,
+    corsAllowedOrigins: parsed.CORS_ALLOWED_ORIGINS.split(",").map((origin) => origin.trim()),
+    adminEmails: parsed.ADMIN_EMAILS.split(",").map((email) => email.trim().toLowerCase()).filter(Boolean),
+    adminPanelEnabled,
+    adminPanelUsername: parsed.ADMIN_PANEL_USERNAME.trim().toLowerCase()
   };
 }
 

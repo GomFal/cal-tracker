@@ -8,6 +8,7 @@ import {
   draftUsualMealInputSchema,
   draftUsualMealOutputSchema,
   foodCandidateSchema,
+  isoDateTimeSchema,
   macroModeSchema,
   macroPresetSchema,
   macroSourceSchema,
@@ -334,3 +335,229 @@ export const usualFoodDraftRequestSchema = draftUsualFoodInputSchema;
 export const usualFoodDraftResponseSchema = draftUsualFoodOutputSchema;
 export const usualMealDraftRequestSchema = draftUsualMealInputSchema;
 export const usualMealDraftResponseSchema = draftUsualMealOutputSchema;
+
+export const telemetrySurfaceSchema = z.enum([
+  "backend",
+  "mobile",
+  "agent",
+  "stt",
+  "db",
+  "admin"
+]);
+
+export const telemetrySeveritySchema = z.enum(["info", "warning", "error"]);
+
+export const telemetryStatusSchema = z.enum([
+  "success",
+  "failure",
+  "partial",
+  "abandoned"
+]);
+
+export const clientTelemetryEventInputSchema = z.object({
+  eventType: z.string().trim().min(1).max(120),
+  flow: z.string().trim().max(120).optional(),
+  surface: telemetrySurfaceSchema.default("mobile"),
+  severity: telemetrySeveritySchema.default("info"),
+  status: telemetryStatusSchema.optional(),
+  traceId: z.string().trim().max(120).optional(),
+  sessionId: z.string().trim().max(120).optional(),
+  route: z.string().trim().max(255).optional(),
+  method: z.string().trim().max(20).optional(),
+  actionId: z.string().trim().max(120).optional(),
+  durationMs: z.number().int().nonnegative().optional(),
+  errorCode: z.string().trim().max(120).optional(),
+  errorMessage: z.string().trim().max(2000).optional(),
+  appVersion: z.string().trim().max(60).optional(),
+  appBuild: z.string().trim().max(60).optional(),
+  platform: z.string().trim().max(60).optional(),
+  locale: z.string().trim().max(40).optional(),
+  metadata: z.record(z.unknown()).optional()
+});
+
+export const clientTelemetryIngestRequestSchema = z.object({
+  events: z.array(clientTelemetryEventInputSchema).min(1).max(50)
+});
+
+export const clientTelemetryIngestResponseSchema = z.object({
+  accepted: z.number().int().nonnegative()
+});
+
+export const telemetryEventSummarySchema = z.object({
+  id: uuidSchema,
+  traceId: z.string(),
+  userId: uuidSchema.nullable().optional(),
+  sessionId: z.string().nullable().optional(),
+  eventType: z.string(),
+  flow: z.string().nullable().optional(),
+  surface: telemetrySurfaceSchema,
+  severity: telemetrySeveritySchema,
+  status: telemetryStatusSchema.nullable().optional(),
+  route: z.string().nullable().optional(),
+  method: z.string().nullable().optional(),
+  actionId: z.string().nullable().optional(),
+  durationMs: z.number().nullable().optional(),
+  errorCode: z.string().nullable().optional(),
+  errorMessage: z.string().nullable().optional(),
+  appVersion: z.string().nullable().optional(),
+  appBuild: z.string().nullable().optional(),
+  platform: z.string().nullable().optional(),
+  locale: z.string().nullable().optional(),
+  metadata: z.record(z.unknown()),
+  createdAt: isoDateTimeSchema
+});
+
+export const llmRunSummarySchema = z.object({
+  id: uuidSchema,
+  traceId: z.string(),
+  userId: uuidSchema.nullable().optional(),
+  source: z.string().nullable().optional(),
+  locale: z.string().nullable().optional(),
+  timezone: z.string().nullable().optional(),
+  model: z.string(),
+  inputMode: z.string().nullable().optional(),
+  activeProposalId: uuidSchema.nullable().optional(),
+  decisionSource: z.string().nullable().optional(),
+  selectedTool: z.string().nullable().optional(),
+  executedTool: z.string().nullable().optional(),
+  resultKind: z.string().nullable().optional(),
+  actionCallId: uuidSchema.nullable().optional(),
+  promptChars: z.number().int().nullable().optional(),
+  toolsJsonChars: z.number().int().nullable().optional(),
+  messagesJsonChars: z.number().int().nullable().optional(),
+  requestPayloadChars: z.number().int().nullable().optional(),
+  promptTokens: z.number().int().nullable().optional(),
+  completionTokens: z.number().int().nullable().optional(),
+  totalTokens: z.number().int().nullable().optional(),
+  reasoningTokens: z.number().int().nullable().optional(),
+  firstByteMs: z.number().int().nullable().optional(),
+  firstToolCallMs: z.number().int().nullable().optional(),
+  largestStreamGapMs: z.number().int().nullable().optional(),
+  llmMs: z.number().int().nullable().optional(),
+  actionMs: z.number().int().nullable().optional(),
+  totalMs: z.number().int().nullable().optional(),
+  emptyToolCall: z.boolean(),
+  invalidToolArguments: z.boolean(),
+  providerError: z.boolean(),
+  metadata: z.record(z.unknown()),
+  createdAt: isoDateTimeSchema
+});
+
+export const foodSearchEventSummarySchema = z.object({
+  id: uuidSchema,
+  traceId: z.string(),
+  userId: uuidSchema.nullable().optional(),
+  queryText: z.string().nullable().optional(),
+  queryHash: z.string().nullable().optional(),
+  queryLength: z.number().int(),
+  locale: z.string().nullable().optional(),
+  barcodePresent: z.boolean(),
+  normalizedSearchEnabled: z.boolean().nullable().optional(),
+  normalizedScope: z.string().nullable().optional(),
+  path: z.string().nullable().optional(),
+  resultCount: z.number().int(),
+  candidateGroupCount: z.number().int().nullable().optional(),
+  topScore: z.number().nullable().optional(),
+  topExternalSource: z.string().nullable().optional(),
+  topResultType: z.string().nullable().optional(),
+  zeroResults: z.boolean(),
+  lowConfidence: z.boolean(),
+  selectedRank: z.number().int().nullable().optional(),
+  durationMs: z.number().int().nullable().optional(),
+  metadata: z.record(z.unknown()),
+  createdAt: isoDateTimeSchema
+});
+
+export const telemetryEventsResponseSchema = z.object({
+  events: z.array(telemetryEventSummarySchema)
+});
+
+export const telemetryTraceResponseSchema = z.object({
+  traceId: z.string(),
+  events: z.array(telemetryEventSummarySchema),
+  llmRuns: z.array(llmRunSummarySchema),
+  foodSearchEvents: z.array(foodSearchEventSummarySchema)
+});
+
+export const telemetryOverviewResponseSchema = z.object({
+  from: isoDateTimeSchema,
+  to: isoDateTimeSchema,
+  totalEvents: z.number().int().nonnegative(),
+  totalLlmRuns: z.number().int().nonnegative(),
+  totalFoodSearchEvents: z.number().int().nonnegative(),
+  uniqueUsers: z.number().int().nonnegative(),
+  uniqueTraces: z.number().int().nonnegative(),
+  eventsBySeverity: z.record(z.number().int().nonnegative()),
+  eventsBySurface: z.record(z.number().int().nonnegative()),
+  recentResultKinds: z.record(z.number().int().nonnegative()),
+  zeroResultRate: z.number().min(0).max(1),
+  lowConfidenceRate: z.number().min(0).max(1),
+  providerErrorRate: z.number().min(0).max(1)
+});
+
+export const telemetryLlmRunsResponseSchema = z.object({
+  llmRuns: z.array(llmRunSummarySchema)
+});
+
+export const telemetryFoodSearchResponseSchema = z.object({
+  foodSearchEvents: z.array(foodSearchEventSummarySchema)
+});
+
+export const telemetryEventsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(200).optional(),
+  severity: telemetrySeveritySchema.optional(),
+  eventType: z.string().trim().max(120).optional(),
+  surface: telemetrySurfaceSchema.optional(),
+  traceId: z.string().trim().max(120).optional(),
+  userId: uuidSchema.optional(),
+  from: z.string().datetime().optional(),
+  to: z.string().datetime().optional()
+});
+
+export const telemetryLlmRunsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(200).optional(),
+  resultKind: z.string().trim().max(80).optional(),
+  selectedTool: z.string().trim().max(80).optional(),
+  executedTool: z.string().trim().max(80).optional(),
+  traceId: z.string().trim().max(120).optional(),
+  userId: uuidSchema.optional(),
+  from: z.string().datetime().optional(),
+  to: z.string().datetime().optional()
+});
+
+export const telemetryFoodSearchQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(200).optional(),
+  zeroResults: z
+    .union([z.literal("true"), z.literal("false")])
+    .transform((value) => value === "true")
+    .optional(),
+  lowConfidence: z
+    .union([z.literal("true"), z.literal("false")])
+    .transform((value) => value === "true")
+    .optional(),
+  path: z.string().trim().max(80).optional(),
+  traceId: z.string().trim().max(120).optional(),
+  userId: uuidSchema.optional(),
+  from: z.string().datetime().optional(),
+  to: z.string().datetime().optional()
+});
+
+export const telemetryOverviewQuerySchema = z.object({
+  from: z.string().datetime().optional(),
+  to: z.string().datetime().optional()
+});
+
+export type TelemetrySurface = z.infer<typeof telemetrySurfaceSchema>;
+export type TelemetrySeverity = z.infer<typeof telemetrySeveritySchema>;
+export type TelemetryStatus = z.infer<typeof telemetryStatusSchema>;
+export type ClientTelemetryEventInput = z.infer<typeof clientTelemetryEventInputSchema>;
+export type ClientTelemetryIngestRequest = z.infer<typeof clientTelemetryIngestRequestSchema>;
+export type ClientTelemetryIngestResponse = z.infer<typeof clientTelemetryIngestResponseSchema>;
+export type TelemetryEventSummary = z.infer<typeof telemetryEventSummarySchema>;
+export type TelemetryEventsResponse = z.infer<typeof telemetryEventsResponseSchema>;
+export type TelemetryTraceResponse = z.infer<typeof telemetryTraceResponseSchema>;
+export type TelemetryOverviewResponse = z.infer<typeof telemetryOverviewResponseSchema>;
+export type TelemetryLlmRunsResponse = z.infer<typeof telemetryLlmRunsResponseSchema>;
+export type TelemetryFoodSearchResponse = z.infer<typeof telemetryFoodSearchResponseSchema>;
+export type LlmRunSummary = z.infer<typeof llmRunSummarySchema>;
+export type FoodSearchEventSummary = z.infer<typeof foodSearchEventSummarySchema>;

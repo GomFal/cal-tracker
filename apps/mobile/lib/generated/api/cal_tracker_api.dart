@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -6,6 +7,9 @@ import 'package:http/io_client.dart';
 import 'package:http_parser/http_parser.dart';
 
 import '../../data/services/api_config.dart';
+import '../../data/services/client_metadata_provider.dart';
+import '../../data/services/client_telemetry_service.dart';
+import '../../data/services/request_id_generator.dart';
 import '../../data/services/secure_token_storage.dart';
 import '../../domain/models/nutrition_models.dart';
 
@@ -27,13 +31,26 @@ class CalTrackerApiClient {
     required this.tokenStorage,
     http.Client? httpClient,
     Future<String?> Function()? localeTagProvider,
+    ClientMetadataProvider? metadataProvider,
+    RequestIdGenerator? requestIdGenerator,
+    ClientTelemetryService? telemetryService,
   }) : _httpClient = httpClient ?? http.Client(),
-       _localeTagProvider = localeTagProvider;
+       _localeTagProvider = localeTagProvider,
+       _metadataProvider = metadataProvider,
+       _requestIdGenerator = requestIdGenerator ?? RequestIdGenerator(),
+       _telemetryService = telemetryService;
 
   final ApiConfig config;
   final TokenStorage tokenStorage;
   final http.Client _httpClient;
   final Future<String?> Function()? _localeTagProvider;
+  final ClientMetadataProvider? _metadataProvider;
+  final RequestIdGenerator _requestIdGenerator;
+  final ClientTelemetryService? _telemetryService;
+  String? _lastRequestId;
+
+  /// Most recently generated `X-Request-Id` for diagnostic/telemetry use.
+  String? get lastRequestId => _lastRequestId;
 
   Future<Map<String, Object?>> getHealth() => _get('/v1/health');
 
@@ -234,10 +251,9 @@ class CalTrackerApiClient {
     File audioFile, {
     String? source,
   }) async {
-    final request = http.MultipartRequest(
-      'POST',
-      _uri('/v1/stt/transcriptions'),
-    );
+    const path = '/v1/stt/transcriptions';
+    final stopwatch = Stopwatch()..start();
+    final request = http.MultipartRequest('POST', _uri(path));
     request.headers.addAll(await _headers(includeContentType: false));
     request.files.add(
       await http.MultipartFile.fromPath(
@@ -249,6 +265,10 @@ class CalTrackerApiClient {
     if (source != null) {
       request.fields['source'] = source;
     }
+    final traceId = _requestIdGenerator.next();
+    request.headers['X-Request-Id'] = traceId;
+    _lastRequestId = traceId;
+    unawaited(_attachMetadataHeaders(request.headers));
 
     // Use a dedicated client with longer timeouts for file uploads.
     final ioClient = HttpClient()
@@ -274,7 +294,12 @@ class CalTrackerApiClient {
         }
       }
 
-      return _decode(response);
+      return _decode(
+        response,
+        route: path,
+        method: 'POST',
+        durationMs: stopwatch.elapsed.inMilliseconds,
+      );
     } finally {
       uploadClient.close();
     }
@@ -285,7 +310,9 @@ class CalTrackerApiClient {
     String? source,
     String? activeProposalId,
   }) async {
-    final request = http.MultipartRequest('POST', _uri('/v1/voice/meal-runs'));
+    const path = '/v1/voice/meal-runs';
+    final stopwatch = Stopwatch()..start();
+    final request = http.MultipartRequest('POST', _uri(path));
     request.headers.addAll(await _headers(includeContentType: false));
     request.files.add(
       await http.MultipartFile.fromPath(
@@ -300,6 +327,10 @@ class CalTrackerApiClient {
     if (activeProposalId != null) {
       request.fields['activeProposalId'] = activeProposalId;
     }
+    final traceId = _requestIdGenerator.next();
+    request.headers['X-Request-Id'] = traceId;
+    _lastRequestId = traceId;
+    unawaited(_attachMetadataHeaders(request.headers));
 
     // Use a dedicated client with longer timeouts for file uploads.
     final ioClient = HttpClient()
@@ -329,17 +360,28 @@ class CalTrackerApiClient {
         }
       }
 
-      return _decode(response);
+      return _decode(
+        response,
+        route: path,
+        method: 'POST',
+        durationMs: stopwatch.elapsed.inMilliseconds,
+      );
     } finally {
       uploadClient.close();
     }
   }
 
   Future<Map<String, Object?>> _get(String path) async {
+    final stopwatch = Stopwatch()..start();
     final response = await _sendWithRefresh(
       () async => _httpClient.get(_uri(path), headers: await _headers()),
     );
-    return _decode(response);
+    return _decode(
+      response,
+      route: path,
+      method: 'GET',
+      durationMs: stopwatch.elapsed.inMilliseconds,
+    );
   }
 
   Future<Map<String, Object?>> _post(
@@ -347,6 +389,7 @@ class CalTrackerApiClient {
     Map<String, Object?> body, {
     bool authenticated = true,
   }) async {
+    final stopwatch = Stopwatch()..start();
     final response = await _sendWithRefresh(
       () async => _httpClient.post(
         _uri(path),
@@ -355,13 +398,19 @@ class CalTrackerApiClient {
       ),
       authenticated: authenticated,
     );
-    return _decode(response);
+    return _decode(
+      response,
+      route: path,
+      method: 'POST',
+      durationMs: stopwatch.elapsed.inMilliseconds,
+    );
   }
 
   Future<Map<String, Object?>> _put(
     String path,
     Map<String, Object?> body,
   ) async {
+    final stopwatch = Stopwatch()..start();
     final response = await _sendWithRefresh(
       () async => _httpClient.put(
         _uri(path),
@@ -369,14 +418,25 @@ class CalTrackerApiClient {
         body: jsonEncode(body),
       ),
     );
-    return _decode(response);
+    return _decode(
+      response,
+      route: path,
+      method: 'PUT',
+      durationMs: stopwatch.elapsed.inMilliseconds,
+    );
   }
 
   Future<Map<String, Object?>> _delete(String path) async {
+    final stopwatch = Stopwatch()..start();
     final response = await _sendWithRefresh(
       () async => _httpClient.delete(_uri(path), headers: await _headers()),
     );
-    return _decode(response);
+    return _decode(
+      response,
+      route: path,
+      method: 'DELETE',
+      durationMs: stopwatch.elapsed.inMilliseconds,
+    );
   }
 
   Future<http.Response> _sendWithRefresh(
@@ -420,7 +480,63 @@ class CalTrackerApiClient {
             'Bearer ${tokens.accessToken}';
       }
     }
+    headers['X-Request-Id'] = _requestIdGenerator.next();
+    _lastRequestId = headers['X-Request-Id'];
+    await _attachMetadataHeaders(headers);
     return headers;
+  }
+
+  Future<void> _attachMetadataHeaders(Map<String, String> headers) async {
+    final provider = _metadataProvider;
+    if (provider == null) return;
+    try {
+      final metadata = await provider.read();
+      metadata.toHeaderMap().forEach((key, value) {
+        headers[key] = value;
+      });
+    } on Object {
+      // Metadata is best-effort. Never let it break a request.
+    }
+  }
+
+  void _recordApiFailure({
+    String? route,
+    String? method,
+    required int status,
+    String? traceId,
+    int? durationMs,
+    String? errorCode,
+  }) {
+    final telemetry = _telemetryService;
+    if (telemetry == null) return;
+    final resolvedTraceId = traceId ?? _lastRequestId;
+    try {
+      telemetry.record(
+        ClientTelemetryEvent(
+          eventType: 'mobile.api_request_failed',
+          flow: route != null && route.contains('/voice')
+              ? 'voice_meal'
+              : (route != null && route.contains('/stt')
+                  ? 'stt'
+                  : 'api'),
+          surface: 'mobile',
+          severity: status >= 500 ? 'error' : 'warning',
+          status: 'failure',
+          traceId: resolvedTraceId,
+          route: route,
+          method: method,
+          durationMs: durationMs,
+          errorCode: errorCode ?? 'http_$status',
+          errorMessage: 'HTTP $status',
+          metadata: <String, Object?>{
+            'status': status,
+            if (resolvedTraceId != null) 'requestId': resolvedTraceId,
+          },
+        ),
+      );
+    } on Object {
+      // Telemetry must never break the API call.
+    }
   }
 
   static MediaType _detectContentType(String path) {
@@ -441,15 +557,31 @@ class CalTrackerApiClient {
     }
   }
 
-  Map<String, Object?> _decode(http.Response response) {
+  Map<String, Object?> _decode(
+    http.Response response, {
+    String? route,
+    String? method,
+    int? durationMs,
+  }) {
     final body = _decodeBody(response.body);
     if (response.statusCode >= 200 && response.statusCode < 300) return body;
     final error = body['error'] as Map<String, Object?>?;
+    final traceId = (error?['traceId'] as String?) ??
+        (response.headers['x-request-id'] ??
+            response.headers['X-Request-Id']);
+    _recordApiFailure(
+      route: route,
+      method: method,
+      status: response.statusCode,
+      traceId: traceId,
+      durationMs: durationMs,
+      errorCode: error?['code'] as String?,
+    );
     throw ApiException(
       response.statusCode,
       error?['message'] as String? ?? 'We could not complete that request.',
       code: error?['code'] as String?,
-      traceId: error?['traceId'] as String?,
+      traceId: traceId,
     );
   }
 

@@ -89,6 +89,56 @@
         ],
         "additionalProperties": false
       },
+      "AdminLoginRequest": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          }
+        },
+        "required": [
+          "username",
+          "password"
+        ],
+        "additionalProperties": false
+      },
+      "AdminTokenResponse": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "tokenType": {
+            "type": "string",
+            "const": "Bearer"
+          },
+          "scope": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "accessToken",
+          "expiresAt",
+          "tokenType",
+          "scope",
+          "username"
+        ],
+        "additionalProperties": false
+      },
       "GoogleLoginRequest": {
         "type": "object",
         "properties": {
@@ -833,6 +883,13 @@
                           "portionDescription": {
                             "type": "string"
                           },
+                          "displayDetails": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
                           "rank": {
                             "type": "integer",
                             "exclusiveMinimum": 0
@@ -1309,6 +1366,13 @@
                           "portionDescription": {
                             "type": "string"
                           },
+                          "displayDetails": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
                           "rank": {
                             "type": "integer",
                             "exclusiveMinimum": 0
@@ -1669,6 +1733,13 @@
                 "portionDescription": {
                   "type": "string"
                 },
+                "displayDetails": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
                 "rank": {
                   "type": "integer",
                   "exclusiveMinimum": 0
@@ -1719,20 +1790,24 @@
                   "properties": {
                     "originalText": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "description": "Exact food phrase from the user's text or transcript; do not translate."
                     },
                     "canonicalName": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "description": "Normalized food name in the same language as originalText."
                     },
                     "canonicalEnglishName": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "description": "English generic food name when confidently known; omit when uncertain and do not invent translations."
                     },
                     "language": {
                       "type": "string",
                       "minLength": 2,
-                      "maxLength": 16
+                      "maxLength": 16,
+                      "description": "Language code of originalText when clear; this is the food phrase language, not the app locale."
                     },
                     "quantity": {
                       "type": "number",
@@ -1866,6 +1941,13 @@
                       },
                       "portionDescription": {
                         "type": "string"
+                      },
+                      "displayDetails": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
                       },
                       "rank": {
                         "type": "integer",
@@ -2575,6 +2657,13 @@
                     "portionDescription": {
                       "type": "string"
                     },
+                    "displayDetails": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
                     "rank": {
                       "type": "integer",
                       "exclusiveMinimum": 0
@@ -2747,6 +2836,13 @@
                 "portionDescription": {
                   "type": "string"
                 },
+                "displayDetails": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
                 "rank": {
                   "type": "integer",
                   "exclusiveMinimum": 0
@@ -2794,20 +2890,24 @@
               "properties": {
                 "originalText": {
                   "type": "string",
-                  "minLength": 1
+                  "minLength": 1,
+                  "description": "Exact food phrase from the user's text or transcript; do not translate."
                 },
                 "canonicalName": {
                   "type": "string",
-                  "minLength": 1
+                  "minLength": 1,
+                  "description": "Normalized food name in the same language as originalText."
                 },
                 "canonicalEnglishName": {
                   "type": "string",
-                  "minLength": 1
+                  "minLength": 1,
+                  "description": "English generic food name when confidently known; omit when uncertain and do not invent translations."
                 },
                 "language": {
                   "type": "string",
                   "minLength": 2,
-                  "maxLength": 16
+                  "maxLength": 16,
+                  "description": "Language code of originalText when clear; this is the food phrase language, not the app locale."
                 },
                 "quantity": {
                   "type": "number",
@@ -2873,20 +2973,24 @@
                   "properties": {
                     "originalText": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "description": "Exact food phrase from the user's text or transcript; do not translate."
                     },
                     "canonicalName": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "description": "Normalized food name in the same language as originalText."
                     },
                     "canonicalEnglishName": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "description": "English generic food name when confidently known; omit when uncertain and do not invent translations."
                     },
                     "language": {
                       "type": "string",
                       "minLength": 2,
-                      "maxLength": 16
+                      "maxLength": 16,
+                      "description": "Language code of originalText when clear; this is the food phrase language, not the app locale."
                     },
                     "quantity": {
                       "type": "number",
@@ -3020,6 +3124,13 @@
                       },
                       "portionDescription": {
                         "type": "string"
+                      },
+                      "displayDetails": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
                       },
                       "rank": {
                         "type": "integer",
@@ -3145,20 +3256,24 @@
                   "properties": {
                     "originalText": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "description": "Exact food phrase from the user's text or transcript; do not translate."
                     },
                     "canonicalName": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "description": "Normalized food name in the same language as originalText."
                     },
                     "canonicalEnglishName": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "description": "English generic food name when confidently known; omit when uncertain and do not invent translations."
                     },
                     "language": {
                       "type": "string",
                       "minLength": 2,
-                      "maxLength": 16
+                      "maxLength": 16,
+                      "description": "Language code of originalText when clear; this is the food phrase language, not the app locale."
                     },
                     "quantity": {
                       "type": "number",
@@ -3292,6 +3407,13 @@
                       },
                       "portionDescription": {
                         "type": "string"
+                      },
+                      "displayDetails": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
                       },
                       "rank": {
                         "type": "integer",
@@ -3614,6 +3736,13 @@
                     "portionDescription": {
                       "type": "string"
                     },
+                    "displayDetails": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
                     "rank": {
                       "type": "integer",
                       "exclusiveMinimum": 0
@@ -3829,6 +3958,13 @@
                     },
                     "portionDescription": {
                       "type": "string"
+                    },
+                    "displayDetails": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
                     },
                     "rank": {
                       "type": "integer",
@@ -4265,6 +4401,13 @@
                           "portionDescription": {
                             "type": "string"
                           },
+                          "displayDetails": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
                           "rank": {
                             "type": "integer",
                             "exclusiveMinimum": 0
@@ -4532,6 +4675,13 @@
                       "portionDescription": {
                         "type": "string"
                       },
+                      "displayDetails": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
                       "rank": {
                         "type": "integer",
                         "exclusiveMinimum": 0
@@ -4678,6 +4828,13 @@
                 },
                 "portionDescription": {
                   "type": "string"
+                },
+                "displayDetails": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
                 },
                 "rank": {
                   "type": "integer",
@@ -4841,6 +4998,13 @@
                       },
                       "portionDescription": {
                         "type": "string"
+                      },
+                      "displayDetails": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
                       },
                       "rank": {
                         "type": "integer",
@@ -5020,6 +5184,13 @@
                     },
                     "portionDescription": {
                       "type": "string"
+                    },
+                    "displayDetails": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
                     },
                     "rank": {
                       "type": "integer",
@@ -5272,6 +5443,13 @@
                         "portionDescription": {
                           "type": "string"
                         },
+                        "displayDetails": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
                         "rank": {
                           "type": "integer",
                           "exclusiveMinimum": 0
@@ -5444,6 +5622,13 @@
                     "portionDescription": {
                       "type": "string"
                     },
+                    "displayDetails": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
                     "rank": {
                       "type": "integer",
                       "exclusiveMinimum": 0
@@ -5491,20 +5676,24 @@
                   "properties": {
                     "originalText": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "description": "Exact food phrase from the user's text or transcript; do not translate."
                     },
                     "canonicalName": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "description": "Normalized food name in the same language as originalText."
                     },
                     "canonicalEnglishName": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "description": "English generic food name when confidently known; omit when uncertain and do not invent translations."
                     },
                     "language": {
                       "type": "string",
                       "minLength": 2,
-                      "maxLength": 16
+                      "maxLength": 16,
+                      "description": "Language code of originalText when clear; this is the food phrase language, not the app locale."
                     },
                     "quantity": {
                       "type": "number",
@@ -5570,20 +5759,24 @@
                       "properties": {
                         "originalText": {
                           "type": "string",
-                          "minLength": 1
+                          "minLength": 1,
+                          "description": "Exact food phrase from the user's text or transcript; do not translate."
                         },
                         "canonicalName": {
                           "type": "string",
-                          "minLength": 1
+                          "minLength": 1,
+                          "description": "Normalized food name in the same language as originalText."
                         },
                         "canonicalEnglishName": {
                           "type": "string",
-                          "minLength": 1
+                          "minLength": 1,
+                          "description": "English generic food name when confidently known; omit when uncertain and do not invent translations."
                         },
                         "language": {
                           "type": "string",
                           "minLength": 2,
-                          "maxLength": 16
+                          "maxLength": 16,
+                          "description": "Language code of originalText when clear; this is the food phrase language, not the app locale."
                         },
                         "quantity": {
                           "type": "number",
@@ -5717,6 +5910,13 @@
                           },
                           "portionDescription": {
                             "type": "string"
+                          },
+                          "displayDetails": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            }
                           },
                           "rank": {
                             "type": "integer",
@@ -5842,20 +6042,24 @@
                       "properties": {
                         "originalText": {
                           "type": "string",
-                          "minLength": 1
+                          "minLength": 1,
+                          "description": "Exact food phrase from the user's text or transcript; do not translate."
                         },
                         "canonicalName": {
                           "type": "string",
-                          "minLength": 1
+                          "minLength": 1,
+                          "description": "Normalized food name in the same language as originalText."
                         },
                         "canonicalEnglishName": {
                           "type": "string",
-                          "minLength": 1
+                          "minLength": 1,
+                          "description": "English generic food name when confidently known; omit when uncertain and do not invent translations."
                         },
                         "language": {
                           "type": "string",
                           "minLength": 2,
-                          "maxLength": 16
+                          "maxLength": 16,
+                          "description": "Language code of originalText when clear; this is the food phrase language, not the app locale."
                         },
                         "quantity": {
                           "type": "number",
@@ -5989,6 +6193,13 @@
                           },
                           "portionDescription": {
                             "type": "string"
+                          },
+                          "displayDetails": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            }
                           },
                           "rank": {
                             "type": "integer",
@@ -6137,20 +6348,24 @@
                       "properties": {
                         "originalText": {
                           "type": "string",
-                          "minLength": 1
+                          "minLength": 1,
+                          "description": "Exact food phrase from the user's text or transcript; do not translate."
                         },
                         "canonicalName": {
                           "type": "string",
-                          "minLength": 1
+                          "minLength": 1,
+                          "description": "Normalized food name in the same language as originalText."
                         },
                         "canonicalEnglishName": {
                           "type": "string",
-                          "minLength": 1
+                          "minLength": 1,
+                          "description": "English generic food name when confidently known; omit when uncertain and do not invent translations."
                         },
                         "language": {
                           "type": "string",
                           "minLength": 2,
-                          "maxLength": 16
+                          "maxLength": 16,
+                          "description": "Language code of originalText when clear; this is the food phrase language, not the app locale."
                         },
                         "quantity": {
                           "type": "number",
@@ -6284,6 +6499,13 @@
                           },
                           "portionDescription": {
                             "type": "string"
+                          },
+                          "displayDetails": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            }
                           },
                           "rank": {
                             "type": "integer",
@@ -6414,20 +6636,24 @@
                       "properties": {
                         "originalText": {
                           "type": "string",
-                          "minLength": 1
+                          "minLength": 1,
+                          "description": "Exact food phrase from the user's text or transcript; do not translate."
                         },
                         "canonicalName": {
                           "type": "string",
-                          "minLength": 1
+                          "minLength": 1,
+                          "description": "Normalized food name in the same language as originalText."
                         },
                         "canonicalEnglishName": {
                           "type": "string",
-                          "minLength": 1
+                          "minLength": 1,
+                          "description": "English generic food name when confidently known; omit when uncertain and do not invent translations."
                         },
                         "language": {
                           "type": "string",
                           "minLength": 2,
-                          "maxLength": 16
+                          "maxLength": 16,
+                          "description": "Language code of originalText when clear; this is the food phrase language, not the app locale."
                         },
                         "quantity": {
                           "type": "number",
@@ -6561,6 +6787,13 @@
                           },
                           "portionDescription": {
                             "type": "string"
+                          },
+                          "displayDetails": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            }
                           },
                           "rank": {
                             "type": "integer",
@@ -6897,6 +7130,13 @@
                               "portionDescription": {
                                 "type": "string"
                               },
+                              "displayDetails": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
                               "rank": {
                                 "type": "integer",
                                 "exclusiveMinimum": 0
@@ -7079,6 +7319,13 @@
                 "portionDescription": {
                   "type": "string"
                 },
+                "displayDetails": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
                 "rank": {
                   "type": "integer",
                   "exclusiveMinimum": 0
@@ -7129,20 +7376,24 @@
                   "properties": {
                     "originalText": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "description": "Exact food phrase from the user's text or transcript; do not translate."
                     },
                     "canonicalName": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "description": "Normalized food name in the same language as originalText."
                     },
                     "canonicalEnglishName": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "description": "English generic food name when confidently known; omit when uncertain and do not invent translations."
                     },
                     "language": {
                       "type": "string",
                       "minLength": 2,
-                      "maxLength": 16
+                      "maxLength": 16,
+                      "description": "Language code of originalText when clear; this is the food phrase language, not the app locale."
                     },
                     "quantity": {
                       "type": "number",
@@ -7276,6 +7527,13 @@
                       },
                       "portionDescription": {
                         "type": "string"
+                      },
+                      "displayDetails": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
                       },
                       "rank": {
                         "type": "integer",
@@ -7401,20 +7659,24 @@
                   "properties": {
                     "originalText": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "description": "Exact food phrase from the user's text or transcript; do not translate."
                     },
                     "canonicalName": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "description": "Normalized food name in the same language as originalText."
                     },
                     "canonicalEnglishName": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "description": "English generic food name when confidently known; omit when uncertain and do not invent translations."
                     },
                     "language": {
                       "type": "string",
                       "minLength": 2,
-                      "maxLength": 16
+                      "maxLength": 16,
+                      "description": "Language code of originalText when clear; this is the food phrase language, not the app locale."
                     },
                     "quantity": {
                       "type": "number",
@@ -7548,6 +7810,13 @@
                       },
                       "portionDescription": {
                         "type": "string"
+                      },
+                      "displayDetails": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
                       },
                       "rank": {
                         "type": "integer",
@@ -7683,20 +7952,24 @@
               "properties": {
                 "originalText": {
                   "type": "string",
-                  "minLength": 1
+                  "minLength": 1,
+                  "description": "Exact food phrase from the user's text or transcript; do not translate."
                 },
                 "canonicalName": {
                   "type": "string",
-                  "minLength": 1
+                  "minLength": 1,
+                  "description": "Normalized food name in the same language as originalText."
                 },
                 "canonicalEnglishName": {
                   "type": "string",
-                  "minLength": 1
+                  "minLength": 1,
+                  "description": "English generic food name when confidently known; omit when uncertain and do not invent translations."
                 },
                 "language": {
                   "type": "string",
                   "minLength": 2,
-                  "maxLength": 16
+                  "maxLength": 16,
+                  "description": "Language code of originalText when clear; this is the food phrase language, not the app locale."
                 },
                 "quantity": {
                   "type": "number",
@@ -7754,7 +8027,8 @@
           },
           "occurredAt": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "description": "Optional consumed-at time. Omit unless the user clearly indicates when the food was consumed. If included, use UTC ISO 8601 with Z."
           }
         },
         "required": [
@@ -7908,6 +8182,13 @@
                     },
                     "portionDescription": {
                       "type": "string"
+                    },
+                    "displayDetails": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
                     },
                     "rank": {
                       "type": "integer",
@@ -8127,6 +8408,13 @@
                         "portionDescription": {
                           "type": "string"
                         },
+                        "displayDetails": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
                         "rank": {
                           "type": "integer",
                           "exclusiveMinimum": 0
@@ -8281,6 +8569,13 @@
                 "portionDescription": {
                   "type": "string"
                 },
+                "displayDetails": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
                 "rank": {
                   "type": "integer",
                   "exclusiveMinimum": 0
@@ -8328,20 +8623,24 @@
               "properties": {
                 "originalText": {
                   "type": "string",
-                  "minLength": 1
+                  "minLength": 1,
+                  "description": "Exact food phrase from the user's text or transcript; do not translate."
                 },
                 "canonicalName": {
                   "type": "string",
-                  "minLength": 1
+                  "minLength": 1,
+                  "description": "Normalized food name in the same language as originalText."
                 },
                 "canonicalEnglishName": {
                   "type": "string",
-                  "minLength": 1
+                  "minLength": 1,
+                  "description": "English generic food name when confidently known; omit when uncertain and do not invent translations."
                 },
                 "language": {
                   "type": "string",
                   "minLength": 2,
-                  "maxLength": 16
+                  "maxLength": 16,
+                  "description": "Language code of originalText when clear; this is the food phrase language, not the app locale."
                 },
                 "quantity": {
                   "type": "number",
@@ -8407,20 +8706,24 @@
                   "properties": {
                     "originalText": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "description": "Exact food phrase from the user's text or transcript; do not translate."
                     },
                     "canonicalName": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "description": "Normalized food name in the same language as originalText."
                     },
                     "canonicalEnglishName": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "description": "English generic food name when confidently known; omit when uncertain and do not invent translations."
                     },
                     "language": {
                       "type": "string",
                       "minLength": 2,
-                      "maxLength": 16
+                      "maxLength": 16,
+                      "description": "Language code of originalText when clear; this is the food phrase language, not the app locale."
                     },
                     "quantity": {
                       "type": "number",
@@ -8554,6 +8857,13 @@
                       },
                       "portionDescription": {
                         "type": "string"
+                      },
+                      "displayDetails": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
                       },
                       "rank": {
                         "type": "integer",
@@ -8679,20 +8989,24 @@
                   "properties": {
                     "originalText": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "description": "Exact food phrase from the user's text or transcript; do not translate."
                     },
                     "canonicalName": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "description": "Normalized food name in the same language as originalText."
                     },
                     "canonicalEnglishName": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "description": "English generic food name when confidently known; omit when uncertain and do not invent translations."
                     },
                     "language": {
                       "type": "string",
                       "minLength": 2,
-                      "maxLength": 16
+                      "maxLength": 16,
+                      "description": "Language code of originalText when clear; this is the food phrase language, not the app locale."
                     },
                     "quantity": {
                       "type": "number",
@@ -8826,6 +9140,13 @@
                       },
                       "portionDescription": {
                         "type": "string"
+                      },
+                      "displayDetails": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
                       },
                       "rank": {
                         "type": "integer",
@@ -9037,6 +9358,13 @@
                 },
                 "portionDescription": {
                   "type": "string"
+                },
+                "displayDetails": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
                 },
                 "rank": {
                   "type": "integer",
@@ -9275,6 +9603,13 @@
                     "portionDescription": {
                       "type": "string"
                     },
+                    "displayDetails": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
                     "rank": {
                       "type": "integer",
                       "exclusiveMinimum": 0
@@ -9437,6 +9772,13 @@
                 },
                 "portionDescription": {
                   "type": "string"
+                },
+                "displayDetails": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
                 },
                 "rank": {
                   "type": "integer",
@@ -9637,6 +9979,13 @@
                     "portionDescription": {
                       "type": "string"
                     },
+                    "displayDetails": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
                     "rank": {
                       "type": "integer",
                       "exclusiveMinimum": 0
@@ -9793,6 +10142,13 @@
                 },
                 "portionDescription": {
                   "type": "string"
+                },
+                "displayDetails": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
                 },
                 "rank": {
                   "type": "integer",
@@ -9987,6 +10343,13 @@
                     },
                     "portionDescription": {
                       "type": "string"
+                    },
+                    "displayDetails": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
                     },
                     "rank": {
                       "type": "integer",
@@ -10204,6 +10567,13 @@
                     "portionDescription": {
                       "type": "string"
                     },
+                    "displayDetails": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
                     "rank": {
                       "type": "integer",
                       "exclusiveMinimum": 0
@@ -10300,20 +10670,24 @@
                       "properties": {
                         "originalText": {
                           "type": "string",
-                          "minLength": 1
+                          "minLength": 1,
+                          "description": "Exact food phrase from the user's text or transcript; do not translate."
                         },
                         "canonicalName": {
                           "type": "string",
-                          "minLength": 1
+                          "minLength": 1,
+                          "description": "Normalized food name in the same language as originalText."
                         },
                         "canonicalEnglishName": {
                           "type": "string",
-                          "minLength": 1
+                          "minLength": 1,
+                          "description": "English generic food name when confidently known; omit when uncertain and do not invent translations."
                         },
                         "language": {
                           "type": "string",
                           "minLength": 2,
-                          "maxLength": 16
+                          "maxLength": 16,
+                          "description": "Language code of originalText when clear; this is the food phrase language, not the app locale."
                         },
                         "quantity": {
                           "type": "number",
@@ -10416,20 +10790,24 @@
                       "properties": {
                         "originalText": {
                           "type": "string",
-                          "minLength": 1
+                          "minLength": 1,
+                          "description": "Exact food phrase from the user's text or transcript; do not translate."
                         },
                         "canonicalName": {
                           "type": "string",
-                          "minLength": 1
+                          "minLength": 1,
+                          "description": "Normalized food name in the same language as originalText."
                         },
                         "canonicalEnglishName": {
                           "type": "string",
-                          "minLength": 1
+                          "minLength": 1,
+                          "description": "English generic food name when confidently known; omit when uncertain and do not invent translations."
                         },
                         "language": {
                           "type": "string",
                           "minLength": 2,
-                          "maxLength": 16
+                          "maxLength": 16,
+                          "description": "Language code of originalText when clear; this is the food phrase language, not the app locale."
                         },
                         "quantity": {
                           "type": "number",
@@ -10685,6 +11063,13 @@
                     "portionDescription": {
                       "type": "string"
                     },
+                    "displayDetails": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
                     "rank": {
                       "type": "integer",
                       "exclusiveMinimum": 0
@@ -10828,6 +11213,13 @@
                 "portionDescription": {
                   "type": "string"
                 },
+                "displayDetails": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
                 "rank": {
                   "type": "integer",
                   "exclusiveMinimum": 0
@@ -10875,20 +11267,24 @@
               "properties": {
                 "originalText": {
                   "type": "string",
-                  "minLength": 1
+                  "minLength": 1,
+                  "description": "Exact food phrase from the user's text or transcript; do not translate."
                 },
                 "canonicalName": {
                   "type": "string",
-                  "minLength": 1
+                  "minLength": 1,
+                  "description": "Normalized food name in the same language as originalText."
                 },
                 "canonicalEnglishName": {
                   "type": "string",
-                  "minLength": 1
+                  "minLength": 1,
+                  "description": "English generic food name when confidently known; omit when uncertain and do not invent translations."
                 },
                 "language": {
                   "type": "string",
                   "minLength": 2,
-                  "maxLength": 16
+                  "maxLength": 16,
+                  "description": "Language code of originalText when clear; this is the food phrase language, not the app locale."
                 },
                 "quantity": {
                   "type": "number",
@@ -10954,20 +11350,24 @@
                   "properties": {
                     "originalText": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "description": "Exact food phrase from the user's text or transcript; do not translate."
                     },
                     "canonicalName": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "description": "Normalized food name in the same language as originalText."
                     },
                     "canonicalEnglishName": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "description": "English generic food name when confidently known; omit when uncertain and do not invent translations."
                     },
                     "language": {
                       "type": "string",
                       "minLength": 2,
-                      "maxLength": 16
+                      "maxLength": 16,
+                      "description": "Language code of originalText when clear; this is the food phrase language, not the app locale."
                     },
                     "quantity": {
                       "type": "number",
@@ -11101,6 +11501,13 @@
                       },
                       "portionDescription": {
                         "type": "string"
+                      },
+                      "displayDetails": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
                       },
                       "rank": {
                         "type": "integer",
@@ -11226,20 +11633,24 @@
                   "properties": {
                     "originalText": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "description": "Exact food phrase from the user's text or transcript; do not translate."
                     },
                     "canonicalName": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "description": "Normalized food name in the same language as originalText."
                     },
                     "canonicalEnglishName": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "description": "English generic food name when confidently known; omit when uncertain and do not invent translations."
                     },
                     "language": {
                       "type": "string",
                       "minLength": 2,
-                      "maxLength": 16
+                      "maxLength": 16,
+                      "description": "Language code of originalText when clear; this is the food phrase language, not the app locale."
                     },
                     "quantity": {
                       "type": "number",
@@ -11373,6 +11784,13 @@
                       },
                       "portionDescription": {
                         "type": "string"
+                      },
+                      "displayDetails": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
                       },
                       "rank": {
                         "type": "integer",
@@ -11907,6 +12325,13 @@
                           "portionDescription": {
                             "type": "string"
                           },
+                          "displayDetails": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
                           "rank": {
                             "type": "integer",
                             "exclusiveMinimum": 0
@@ -12212,6 +12637,13 @@
                       },
                       "portionDescription": {
                         "type": "string"
+                      },
+                      "displayDetails": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
                       },
                       "rank": {
                         "type": "integer",
@@ -12925,6 +13357,13 @@
                       "portionDescription": {
                         "type": "string"
                       },
+                      "displayDetails": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
                       "rank": {
                         "type": "integer",
                         "exclusiveMinimum": 0
@@ -13100,6 +13539,13 @@
                     "portionDescription": {
                       "type": "string"
                     },
+                    "displayDetails": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
                     "rank": {
                       "type": "integer",
                       "exclusiveMinimum": 0
@@ -13272,6 +13718,13 @@
                 "portionDescription": {
                   "type": "string"
                 },
+                "displayDetails": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
                 "rank": {
                   "type": "integer",
                   "exclusiveMinimum": 0
@@ -13319,20 +13772,24 @@
               "properties": {
                 "originalText": {
                   "type": "string",
-                  "minLength": 1
+                  "minLength": 1,
+                  "description": "Exact food phrase from the user's text or transcript; do not translate."
                 },
                 "canonicalName": {
                   "type": "string",
-                  "minLength": 1
+                  "minLength": 1,
+                  "description": "Normalized food name in the same language as originalText."
                 },
                 "canonicalEnglishName": {
                   "type": "string",
-                  "minLength": 1
+                  "minLength": 1,
+                  "description": "English generic food name when confidently known; omit when uncertain and do not invent translations."
                 },
                 "language": {
                   "type": "string",
                   "minLength": 2,
-                  "maxLength": 16
+                  "maxLength": 16,
+                  "description": "Language code of originalText when clear; this is the food phrase language, not the app locale."
                 },
                 "quantity": {
                   "type": "number",
@@ -13398,20 +13855,24 @@
                   "properties": {
                     "originalText": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "description": "Exact food phrase from the user's text or transcript; do not translate."
                     },
                     "canonicalName": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "description": "Normalized food name in the same language as originalText."
                     },
                     "canonicalEnglishName": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "description": "English generic food name when confidently known; omit when uncertain and do not invent translations."
                     },
                     "language": {
                       "type": "string",
                       "minLength": 2,
-                      "maxLength": 16
+                      "maxLength": 16,
+                      "description": "Language code of originalText when clear; this is the food phrase language, not the app locale."
                     },
                     "quantity": {
                       "type": "number",
@@ -13545,6 +14006,13 @@
                       },
                       "portionDescription": {
                         "type": "string"
+                      },
+                      "displayDetails": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
                       },
                       "rank": {
                         "type": "integer",
@@ -13670,20 +14138,24 @@
                   "properties": {
                     "originalText": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "description": "Exact food phrase from the user's text or transcript; do not translate."
                     },
                     "canonicalName": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "description": "Normalized food name in the same language as originalText."
                     },
                     "canonicalEnglishName": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "description": "English generic food name when confidently known; omit when uncertain and do not invent translations."
                     },
                     "language": {
                       "type": "string",
                       "minLength": 2,
-                      "maxLength": 16
+                      "maxLength": 16,
+                      "description": "Language code of originalText when clear; this is the food phrase language, not the app locale."
                     },
                     "quantity": {
                       "type": "number",
@@ -13817,6 +14289,13 @@
                       },
                       "portionDescription": {
                         "type": "string"
+                      },
+                      "displayDetails": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
                       },
                       "rank": {
                         "type": "integer",
@@ -14033,6 +14512,13 @@
                 "portionDescription": {
                   "type": "string"
                 },
+                "displayDetails": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
                 "rank": {
                   "type": "integer",
                   "exclusiveMinimum": 0
@@ -14212,6 +14698,13 @@
                     "portionDescription": {
                       "type": "string"
                     },
+                    "displayDetails": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
                     "rank": {
                       "type": "integer",
                       "exclusiveMinimum": 0
@@ -14365,6 +14858,13 @@
                 },
                 "portionDescription": {
                   "type": "string"
+                },
+                "displayDetails": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
                 },
                 "rank": {
                   "type": "integer",
@@ -14547,6 +15047,13 @@
                     },
                     "portionDescription": {
                       "type": "string"
+                    },
+                    "displayDetails": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
                     },
                     "rank": {
                       "type": "integer",
@@ -14805,6 +15312,33 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TokenPair"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/auth/login": {
+      "post": {
+        "operationId": "adminLogin",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminLoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Admin token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminTokenResponse"
                 }
               }
             }

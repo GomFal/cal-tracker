@@ -197,6 +197,17 @@ extension FreshPaletteLookup on BuildContext {
   FreshPalette get freshPalette {
     return Theme.of(this).extension<FreshPalette>() ?? FreshPalette.light;
   }
+
+  Color freshShadowColor({
+    required double lightAlpha,
+    required double darkAlpha,
+  }) {
+    final palette = freshPalette;
+    final isDark = Theme.of(this).brightness == Brightness.dark;
+    return (isDark ? palette.appBg : palette.ink).withValues(
+      alpha: isDark ? darkAlpha : lightAlpha,
+    );
+  }
 }
 
 class FreshSpacing {
@@ -221,27 +232,17 @@ class FreshRadii {
 
 const _lightSoftShadow = [
   BoxShadow(
-    color: Color(0x1f080907),
-    blurRadius: 30,
-    offset: Offset(0, 16),
-  ),
-  BoxShadow(
-    color: Color(0x0f080907),
-    blurRadius: 10,
-    offset: Offset(0, 4),
+    color: Color(0x14080907),
+    blurRadius: 14,
+    offset: Offset(0, 8),
   ),
 ];
 
 const _darkSoftShadow = [
   BoxShadow(
-    color: Color(0x66080b07),
-    blurRadius: 24,
-    offset: Offset(0, 14),
-  ),
-  BoxShadow(
-    color: Color(0x3310140d),
-    blurRadius: 8,
-    offset: Offset(0, 3),
+    color: Color(0x4d080b07),
+    blurRadius: 12,
+    offset: Offset(0, 7),
   ),
 ];
 
@@ -611,12 +612,14 @@ class FreshProgressRing extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          CustomPaint(
-            size: Size.square(size),
-            painter: _RingPainter(
-              progress: progress.clamp(0, 1).toDouble(),
-              color: color,
-              trackColor: trackColor ?? palette.surface,
+          RepaintBoundary(
+            child: CustomPaint(
+              size: Size.square(size),
+              painter: _RingPainter(
+                progress: progress.clamp(0, 1).toDouble(),
+                color: color,
+                trackColor: trackColor ?? palette.surface,
+              ),
             ),
           ),
           center,

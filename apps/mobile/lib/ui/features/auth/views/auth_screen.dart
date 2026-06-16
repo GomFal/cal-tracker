@@ -453,7 +453,6 @@ class _LoginHeroCarouselState extends State<_LoginHeroCarousel>
     final height = MediaQuery.of(context).size.height < 740 ? 318.0 : 372.0;
     final staticMode =
         MediaQuery.of(context).disableAnimations || widget.assets.length == 1;
-    final palette = context.freshPalette;
     return SizedBox(
       key: const ValueKey('login_hero_carousel'),
       height: height,
@@ -462,7 +461,10 @@ class _LoginHeroCarouselState extends State<_LoginHeroCarousel>
           borderRadius: BorderRadius.circular(FreshRadii.xl),
           boxShadow: [
             BoxShadow(
-              color: palette.ink.withValues(alpha: 0.12),
+              color: context.freshShadowColor(
+                lightAlpha: 0.12,
+                darkAlpha: 0.42,
+              ),
               blurRadius: 28,
               offset: const Offset(0, 16),
             ),

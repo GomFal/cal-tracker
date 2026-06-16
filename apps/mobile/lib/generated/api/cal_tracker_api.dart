@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 import 'package:http_parser/http_parser.dart';
@@ -40,19 +41,24 @@ class CalTrackerApiClient {
     ClientMetadataProvider? metadataProvider,
     RequestIdGenerator? requestIdGenerator,
     ClientTelemetryService? telemetryService,
-  }) : _httpClient = httpClient ?? http.Client(),
-       _localeTagProvider = localeTagProvider,
-       _metadataProvider = metadataProvider,
-       _requestIdGenerator = requestIdGenerator ?? RequestIdGenerator(),
-       _telemetryService = telemetryService;
+    Duration requestTimeout = const Duration(seconds: 20),
+  })  : _httpClient = httpClient ?? http.Client(),
+        _localeTagProvider = localeTagProvider,
+        _metadataProvider = metadataProvider,
+        _requestIdGenerator = requestIdGenerator ?? RequestIdGenerator(),
+        _telemetryService = telemetryService,
+        _requestTimeout = requestTimeout;
 
   final ApiConfig config;
   final TokenStorage tokenStorage;
+  static const _largeJsonDecodeThresholdBytes = 64 * 1024;
+
   final http.Client _httpClient;
   final Future<String?> Function()? _localeTagProvider;
   final ClientMetadataProvider? _metadataProvider;
   final RequestIdGenerator _requestIdGenerator;
   final ClientTelemetryService? _telemetryService;
+  final Duration _requestTimeout;
   String? _lastRequestId;
 
   /// Most recently generated `X-Request-Id` for diagnostic/telemetry use.
@@ -65,33 +71,45 @@ class CalTrackerApiClient {
     required String password,
     required String displayName,
   }) {
-    return _post('/v1/auth/register', {
-      'email': email,
-      'password': password,
-      'displayName': displayName,
-    }, authenticated: false);
+    return _post(
+        '/v1/auth/register',
+        {
+          'email': email,
+          'password': password,
+          'displayName': displayName,
+        },
+        authenticated: false);
   }
 
   Future<Map<String, Object?>> login({
     required String email,
     required String password,
   }) {
-    return _post('/v1/auth/login', {
-      'email': email,
-      'password': password,
-    }, authenticated: false);
+    return _post(
+        '/v1/auth/login',
+        {
+          'email': email,
+          'password': password,
+        },
+        authenticated: false);
   }
 
   Future<Map<String, Object?>> loginWithGoogle({required String idToken}) {
-    return _post('/v1/auth/google/login', {
-      'idToken': idToken,
-    }, authenticated: false);
+    return _post(
+        '/v1/auth/google/login',
+        {
+          'idToken': idToken,
+        },
+        authenticated: false);
   }
 
   Future<Map<String, Object?>> refresh(String refreshToken) {
-    return _post('/v1/auth/refresh', {
-      'refreshToken': refreshToken,
-    }, authenticated: false);
+    return _post(
+        '/v1/auth/refresh',
+        {
+          'refreshToken': refreshToken,
+        },
+        authenticated: false);
   }
 
   Future<Map<String, Object?>> getMe() => _get('/v1/auth/me');
@@ -312,7 +330,7 @@ class CalTrackerApiClient {
         }
       }
 
-      return _decode(
+      return await _decode(
         response,
         route: path,
         method: 'POST',
@@ -378,7 +396,7 @@ class CalTrackerApiClient {
         }
       }
 
-      return _decode(
+      return await _decode(
         response,
         route: path,
         method: 'POST',
@@ -399,7 +417,7 @@ class CalTrackerApiClient {
         headers: await _headers(requestId: requestId),
       ),
     );
-    return _decode(
+    return await _decode(
       response,
       route: path,
       method: 'GET',
@@ -440,7 +458,7 @@ class CalTrackerApiClient {
       authenticated: authenticated,
     );
     return ApiCallResult<Map<String, Object?>>(
-      body: _decode(
+      body: await _decode(
         response,
         route: path,
         method: 'POST',
@@ -464,7 +482,7 @@ class CalTrackerApiClient {
         body: jsonEncode(body),
       ),
     );
-    return _decode(
+    return await _decode(
       response,
       route: path,
       method: 'PUT',
@@ -482,7 +500,7 @@ class CalTrackerApiClient {
         headers: await _headers(requestId: requestId),
       ),
     );
-    return _decode(
+    return await _decode(
       response,
       route: path,
       method: 'DELETE',
@@ -495,7 +513,7 @@ class CalTrackerApiClient {
     Future<http.Response> Function() send, {
     bool authenticated = true,
   }) async {
-    final first = await send();
+    final first = await _withRequestTimeout(send());
     if (!authenticated || first.statusCode != 401) return first;
 
     final tokens = await tokenStorage.read();
@@ -507,7 +525,18 @@ class CalTrackerApiClient {
         refreshToken: refreshed['refreshToken'] as String,
       ),
     );
-    return send();
+    return _withRequestTimeout(send());
+  }
+
+  Future<http.Response> _withRequestTimeout(Future<http.Response> request) {
+    return request.timeout(
+      _requestTimeout,
+      onTimeout: () => throw const ApiException(
+        408,
+        'The request took too long. Please try again.',
+        code: 'request_timeout',
+      ),
+    );
   }
 
   Future<Map<String, String>> _headers({
@@ -608,18 +637,17 @@ class CalTrackerApiClient {
     }
   }
 
-  Map<String, Object?> _decode(
+  Future<Map<String, Object?>> _decode(
     http.Response response, {
     String? route,
     String? method,
     String? requestId,
     int? durationMs,
-  }) {
-    final body = _decodeBody(response.body);
+  }) async {
+    final body = await _decodeBody(response.body);
     if (response.statusCode >= 200 && response.statusCode < 300) return body;
     final error = body['error'] as Map<String, Object?>?;
-    final traceId =
-        (error?['traceId'] as String?) ??
+    final traceId = (error?['traceId'] as String?) ??
         (response.headers['x-request-id'] ?? response.headers['X-Request-Id']);
     _recordApiFailure(
       route: route,
@@ -639,8 +667,15 @@ class CalTrackerApiClient {
 
   Uri _uri(String path) => Uri.parse('${config.baseUrl}$path');
 
-  Map<String, Object?> _decodeBody(String rawBody) {
-    if (rawBody.isEmpty) return <String, Object?>{};
+  Future<Map<String, Object?>> _decodeBody(String rawBody) {
+    if (rawBody.isEmpty) return Future.value(<String, Object?>{});
+    if (rawBody.length >= _largeJsonDecodeThresholdBytes) {
+      return compute(_decodeJsonMap, rawBody);
+    }
+    return Future.value(_decodeJsonMap(rawBody));
+  }
+
+  static Map<String, Object?> _decodeJsonMap(String rawBody) {
     try {
       final decoded = jsonDecode(rawBody);
       if (decoded is Map<String, Object?>) return decoded;

@@ -163,7 +163,8 @@ class _CalorieTargetSheetState extends State<CalorieTargetSheet> {
   void _step(int delta) {
     final current =
         int.tryParse(_controller.text.trim()) ?? widget.initialValue;
-    final next = (current + delta).clamp(kMinDailyCalories, kMaxDailyCalories).toInt();
+    final next =
+        (current + delta).clamp(kMinDailyCalories, kMaxDailyCalories).toInt();
     setState(() {
       _source = 'manual';
       _error = null;
@@ -203,7 +204,9 @@ class _CalorieTargetSheetState extends State<CalorieTargetSheet> {
 
   void _submit() {
     final value = int.tryParse(_controller.text.trim());
-    if (value == null || value < kMinDailyCalories || value > kMaxDailyCalories) {
+    if (value == null ||
+        value < kMinDailyCalories ||
+        value > kMaxDailyCalories) {
       setState(() => _error = context.l10n.calorieTargetRangeValidationError(
             kMinDailyCalories,
             kMaxDailyCalories,
@@ -560,7 +563,8 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
 
   String _formatFeetAndInches(double value) => formatFeetAndInches(value);
 
-  DateTime _youngestAllowedBirthDate() => youngestAllowedBirthDate(DateTime.now());
+  DateTime _youngestAllowedBirthDate() =>
+      youngestAllowedBirthDate(DateTime.now());
 
   DateTime _oldestAllowedBirthDate() => oldestAllowedBirthDate(DateTime.now());
 
@@ -1067,7 +1071,8 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
     return ProfileValues(age: age, heightCm: heightCm, weightKg: weightKg);
   }
 
-  double? _heightInCm() => heightInCm(_feetController.text, _inchesController.text);
+  double? _heightInCm() =>
+      heightInCm(_feetController.text, _inchesController.text);
 
   double? _weightInKg() => weightInKg(_poundsController.text);
 }
@@ -1120,10 +1125,9 @@ List<_WizardOption> _activityOptions(AppLocalizations l10n) => [
     ];
 
 List<BoxShadow> _calorieWizardCardShadow(BuildContext context) {
-  final palette = context.freshPalette;
   return [
     BoxShadow(
-      color: palette.ink.withValues(alpha: 0.05),
+      color: context.freshShadowColor(lightAlpha: 0.05, darkAlpha: 0.36),
       blurRadius: 20,
       offset: const Offset(0, 7),
     ),
@@ -1688,7 +1692,10 @@ class _CompactUnitSegment extends StatelessWidget {
                 ? const []
                 : [
                     BoxShadow(
-                      color: palette.ink.withValues(alpha: 0.08),
+                      color: context.freshShadowColor(
+                        lightAlpha: 0.08,
+                        darkAlpha: 0.36,
+                      ),
                       blurRadius: 16,
                       offset: const Offset(0, 8),
                     ),

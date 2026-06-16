@@ -10,11 +10,13 @@ class PerformanceOverlayHost extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final visible = context.watch<PerformanceOverlayViewModel>().visible;
+    final visible = context.select<PerformanceOverlayViewModel, bool>(
+      (viewModel) => viewModel.visible,
+    );
     return Stack(
       children: [
         child,
-        if (visible) const _PerformanceOverlayStrip(),
+        if (visible) const RepaintBoundary(child: _PerformanceOverlayStrip()),
       ],
     );
   }
@@ -34,23 +36,20 @@ class _PerformanceOverlayStrip extends StatelessWidget {
       child: IgnorePointer(
         child: SafeArea(
           bottom: false,
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: SizedBox(
-              height: _height,
-              width: double.infinity,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.76),
-                  border: Border(
-                    bottom: BorderSide(
-                      color: Colors.white.withValues(alpha: 0.22),
-                    ),
+          child: SizedBox(
+            height: _height,
+            width: double.infinity,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.76),
+                border: Border(
+                  bottom: BorderSide(
+                    color: Colors.white.withValues(alpha: 0.22),
                   ),
                 ),
-                child: ClipRect(
-                  child: PerformanceOverlay.allEnabled(),
-                ),
+              ),
+              child: ClipRect(
+                child: PerformanceOverlay.allEnabled(),
               ),
             ),
           ),

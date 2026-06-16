@@ -33,6 +33,7 @@ data/food-normalization/
 data/food-search-benchmarks/
 data/meal-proposal-search-benchmarks/
 tools/benchmarks/
+perf-traces/
 __pycache__/
 *.pyc
 .pytest_cache/

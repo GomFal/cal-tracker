@@ -75,6 +75,7 @@ class _LocalToolkitHost extends StatefulWidget {
 
 class _LocalToolkitHostState extends State<_LocalToolkitHost> {
   LocalToolkitScenario _activeScenario = LocalToolkitScenario.normalDay;
+
   LocalFixtureStore get _store => widget.dependencies.store;
 
   @override

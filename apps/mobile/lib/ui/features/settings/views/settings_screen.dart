@@ -510,7 +510,9 @@ class _DeveloperSettingsCard extends StatelessWidget {
           Row(
             children: [
               FreshIconChip(
-                  icon: Icons.developer_mode_rounded, color: palette.mint),
+                icon: Icons.developer_mode_rounded,
+                color: palette.mint,
+              ),
               const SizedBox(width: FreshSpacing.md),
               Expanded(child: Text(title, style: textTheme.titleMedium)),
             ],
@@ -520,8 +522,9 @@ class _DeveloperSettingsCard extends StatelessWidget {
             key: const ValueKey('settings_performance_overlay_switch'),
             contentPadding: EdgeInsets.zero,
             title: Text(performanceOverlayTitle),
-            subtitle:
-                Text('$performanceOverlaySubtitle\n$performanceOverlayStatus'),
+            subtitle: Text(
+              '$performanceOverlaySubtitle\n$performanceOverlayStatus',
+            ),
             value: performanceOverlayEnabled,
             onChanged: onPerformanceOverlayChanged,
           ),

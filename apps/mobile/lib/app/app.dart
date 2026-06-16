@@ -123,7 +123,9 @@ class _CalTrackerBootstrapState extends State<CalTrackerBootstrap> {
               updateService: composition.mobileUpdateService,
             );
             if (widget.checkForUpdates) {
-              viewModel.checkForUpdate();
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                viewModel.checkForUpdate();
+              });
             }
             return viewModel;
           },
@@ -138,7 +140,9 @@ class _CalTrackerBootstrapState extends State<CalTrackerBootstrap> {
             preferencesRepository: composition.preferencesRepository,
           )..load(),
         ),
-        ChangeNotifierProvider(create: (_) => PerformanceOverlayViewModel()),
+        ChangeNotifierProvider(
+          create: (_) => PerformanceOverlayViewModel(),
+        ),
         ChangeNotifierProvider(
           create: (_) =>
               AuthViewModel(authRepository: composition.authRepository)
@@ -330,9 +334,12 @@ class _CalTrackerAppState extends State<_CalTrackerApp> {
           child: child ?? const SizedBox.shrink(),
         );
         final preloadedApp = _AuthenticatedDataPreloader(child: app);
-        final wrappedApp =
-            widget.appWrapperBuilder?.call(context, preloadedApp, _router!) ??
-                preloadedApp;
+        final wrappedApp = widget.appWrapperBuilder?.call(
+              context,
+              preloadedApp,
+              _router!,
+            ) ??
+            preloadedApp;
         return PerformanceOverlayHost(child: wrappedApp);
       },
     );
@@ -408,15 +415,17 @@ class _AuthenticatedDataPreloaderState
   }
 
   Future<void> _preloadAuthenticatedData() async {
-    await Future.wait([
-      _ignorePreloadError(() => context.read<DashboardViewModel>().load()),
-      _ignorePreloadError(() => context.read<MealHistoryViewModel>().load()),
-      _ignorePreloadError(() => context.read<MealTemplatesViewModel>().load()),
-      _ignorePreloadError(() => context.read<SettingsViewModel>().load()),
-      _ignorePreloadError(() async {
-        await context.read<NutritionRepository>().checkBackendHealth();
-      }),
-    ]);
+    // Keep startup responsive on real dev/prod backends. The dashboard is the
+    // first visible authenticated screen, so warm it first, then reuse its
+    // cached daily summary for settings. Avoid preloading the full history week
+    // here: that can fan out into seven summary requests and large JSON/cache
+    // work on the UI isolate. History still loads cache-first when opened.
+    await _ignorePreloadError(() => context.read<DashboardViewModel>().load());
+    if (!mounted) return;
+    await _ignorePreloadError(() => context.read<SettingsViewModel>().load());
+    if (!mounted) return;
+    await _ignorePreloadError(
+        () => context.read<MealTemplatesViewModel>().load());
   }
 
   Future<void> _ignorePreloadError(Future<void> Function() operation) async {

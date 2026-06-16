@@ -1578,6 +1578,23 @@ class AppLocalizationsEs extends AppLocalizations {
   String get localToolkitRouteTemplates => 'Plantillas';
 
   @override
+  String get localToolkitRouteNewUsualMeal => 'Nueva comida habitual';
+
+  @override
+  String get localToolkitRouteEditFirstUsualMeal =>
+      'Editar primera comida habitual';
+
+  @override
+  String get localToolkitRouteNewUsualFood => 'Nuevo alimento habitual';
+
+  @override
+  String get localToolkitRouteEditFirstUsualFood =>
+      'Editar primer alimento habitual';
+
+  @override
+  String get localToolkitRouteScanUsualFood => 'Escanear alimento habitual';
+
+  @override
   String get localToolkitRouteSettings => 'Ajustes';
 
   @override
@@ -1627,6 +1644,16 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get localToolkitQuickSwitchTheme => 'Cambiar tema claro/oscuro';
+
+  @override
+  String get localToolkitQuickTogglePerformanceOverlay =>
+      'Alternar overlay de rendimiento';
+
+  @override
+  String get localToolkitPerformanceOverlayOn => 'Overlay activo';
+
+  @override
+  String get localToolkitPerformanceOverlayOff => 'Overlay inactivo';
 
   @override
   String get localToolkitTrustedModeOn => 'Confianza activa';

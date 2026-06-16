@@ -32,7 +32,6 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
     final l10n = context.l10n;
     return ContentFrame(
       title: l10n.historyTitle,
-      subtitle: l10n.historySubtitle,
       actions: [
         FreshIconButton(
           icon: Icons.refresh_rounded,

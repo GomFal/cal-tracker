@@ -48,7 +48,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final limeCardTextColor = isDark ? palette.ink : FreshPalette.dark.limeWash;
     return ContentFrame(
       title: l10n.settingsTitle,
-      subtitle: l10n.settingsSubtitle,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

@@ -717,10 +717,7 @@ class FreshMiniBars extends StatelessWidget {
 class FreshFoodStack extends StatelessWidget {
   const FreshFoodStack({
     super.key,
-    this.assets = const [
-      'assets/images/meal_breakfast.webp',
-      'assets/images/meal_lunch.webp',
-    ],
+    this.assets = const [],
     this.size = 38,
   });
 
@@ -730,6 +727,21 @@ class FreshFoodStack extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
+    if (assets.isEmpty) {
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: palette.surfaceSoft,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          Icons.restaurant_menu_rounded,
+          color: palette.inkMuted,
+          size: size * 0.5,
+        ),
+      );
+    }
     return SizedBox(
       width: size + (assets.length - 1) * (size * 0.62),
       height: size,

@@ -125,7 +125,6 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
                   padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
                   child: FreshHeader(
                     title: title,
-                    subtitle: l10n.usualFoodsEditorSubtitle,
                     leading: FreshIconButton(
                       icon: Icons.arrow_back_rounded,
                       tooltip: l10n.commonBack,

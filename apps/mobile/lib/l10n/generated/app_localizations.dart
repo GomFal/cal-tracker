@@ -2889,6 +2889,36 @@ abstract class AppLocalizations {
   /// **'Templates'**
   String get localToolkitRouteTemplates;
 
+  /// No description provided for @localToolkitRouteNewUsualMeal.
+  ///
+  /// In en, this message translates to:
+  /// **'New usual meal'**
+  String get localToolkitRouteNewUsualMeal;
+
+  /// No description provided for @localToolkitRouteEditFirstUsualMeal.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit first usual meal'**
+  String get localToolkitRouteEditFirstUsualMeal;
+
+  /// No description provided for @localToolkitRouteNewUsualFood.
+  ///
+  /// In en, this message translates to:
+  /// **'New usual food'**
+  String get localToolkitRouteNewUsualFood;
+
+  /// No description provided for @localToolkitRouteEditFirstUsualFood.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit first usual food'**
+  String get localToolkitRouteEditFirstUsualFood;
+
+  /// No description provided for @localToolkitRouteScanUsualFood.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan usual food'**
+  String get localToolkitRouteScanUsualFood;
+
   /// No description provided for @localToolkitRouteSettings.
   ///
   /// In en, this message translates to:
@@ -2984,6 +3014,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Switch light/dark theme'**
   String get localToolkitQuickSwitchTheme;
+
+  /// No description provided for @localToolkitQuickTogglePerformanceOverlay.
+  ///
+  /// In en, this message translates to:
+  /// **'Toggle perf overlay'**
+  String get localToolkitQuickTogglePerformanceOverlay;
+
+  /// No description provided for @localToolkitPerformanceOverlayOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Overlay on'**
+  String get localToolkitPerformanceOverlayOn;
+
+  /// No description provided for @localToolkitPerformanceOverlayOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Overlay off'**
+  String get localToolkitPerformanceOverlayOff;
 
   /// No description provided for @localToolkitTrustedModeOn.
   ///

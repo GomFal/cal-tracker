@@ -45,7 +45,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         : l10n.fallbackUserName;
     return ContentFrame(
       title: displayName,
-      subtitle: dashboardGreeting(DateTime.now(), l10n),
       leading: const _Avatar(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -232,10 +231,10 @@ class _Avatar extends StatelessWidget {
         shape: BoxShape.circle,
         border: Border.all(color: palette.surface, width: 3),
       ),
-      clipBehavior: Clip.antiAlias,
-      child: Image.asset(
-        'assets/images/icons/protein_icon.png',
-        fit: BoxFit.cover,
+      child: Icon(
+        Icons.person_rounded,
+        color: palette.limeDeep,
+        size: 28,
       ),
     );
   }

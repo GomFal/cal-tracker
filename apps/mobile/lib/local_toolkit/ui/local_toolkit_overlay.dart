@@ -11,6 +11,11 @@ enum LocalToolkitRoute {
   logMeal,
   history,
   templates,
+  newUsualMeal,
+  editFirstUsualMeal,
+  newUsualFood,
+  editFirstUsualFood,
+  scanUsualFood,
   settings,
 }
 
@@ -40,6 +45,11 @@ class LocalToolkitOverlayLabels {
     required this.routeHistory,
     required this.routeTemplates,
     required this.routeSettings,
+    required this.routeNewUsualMeal,
+    required this.routeEditFirstUsualMeal,
+    required this.routeNewUsualFood,
+    required this.routeEditFirstUsualFood,
+    required this.routeScanUsualFood,
     required this.scenarioUnauthenticated,
     required this.scenarioEmptyDay,
     required this.scenarioNormalDay,
@@ -55,6 +65,9 @@ class LocalToolkitOverlayLabels {
     required this.quickToggleTrustedMode,
     required this.quickSwitchLocale,
     required this.quickSwitchTheme,
+    required this.quickTogglePerformanceOverlay,
+    required this.performanceOverlayOn,
+    required this.performanceOverlayOff,
     required this.trustedModeOn,
     required this.trustedModeOff,
     required this.closeTooltip,
@@ -72,6 +85,11 @@ class LocalToolkitOverlayLabels {
   final String routeHistory;
   final String routeTemplates;
   final String routeSettings;
+  final String routeNewUsualMeal;
+  final String routeEditFirstUsualMeal;
+  final String routeNewUsualFood;
+  final String routeEditFirstUsualFood;
+  final String routeScanUsualFood;
   final String scenarioUnauthenticated;
   final String scenarioEmptyDay;
   final String scenarioNormalDay;
@@ -87,6 +105,9 @@ class LocalToolkitOverlayLabels {
   final String quickToggleTrustedMode;
   final String quickSwitchLocale;
   final String quickSwitchTheme;
+  final String quickTogglePerformanceOverlay;
+  final String performanceOverlayOn;
+  final String performanceOverlayOff;
   final String trustedModeOn;
   final String trustedModeOff;
   final String closeTooltip;
@@ -98,6 +119,11 @@ class LocalToolkitOverlayLabels {
       LocalToolkitRoute.logMeal => routeLogMeal,
       LocalToolkitRoute.history => routeHistory,
       LocalToolkitRoute.templates => routeTemplates,
+      LocalToolkitRoute.newUsualMeal => routeNewUsualMeal,
+      LocalToolkitRoute.editFirstUsualMeal => routeEditFirstUsualMeal,
+      LocalToolkitRoute.newUsualFood => routeNewUsualFood,
+      LocalToolkitRoute.editFirstUsualFood => routeEditFirstUsualFood,
+      LocalToolkitRoute.scanUsualFood => routeScanUsualFood,
       LocalToolkitRoute.settings => routeSettings,
     };
   }
@@ -136,6 +162,8 @@ class LocalToolkitOverlay extends StatefulWidget {
     this.onToggleTrustedMode,
     this.onSwitchLocale,
     this.onSwitchTheme,
+    this.onTogglePerformanceOverlay,
+    this.showPerformanceOverlay = false,
     this.alignment = Alignment.bottomRight,
     this.margin = const EdgeInsets.all(16),
   });
@@ -161,6 +189,8 @@ class LocalToolkitOverlay extends StatefulWidget {
   final VoidCallback? onToggleTrustedMode;
   final VoidCallback? onSwitchLocale;
   final VoidCallback? onSwitchTheme;
+  final VoidCallback? onTogglePerformanceOverlay;
+  final bool showPerformanceOverlay;
   final AlignmentGeometry alignment;
   final EdgeInsets margin;
 
@@ -177,6 +207,11 @@ class _LocalToolkitOverlayState extends State<LocalToolkitOverlay> {
     return Stack(
       children: [
         widget.child,
+        if (widget.showPerformanceOverlay) ...[
+          Positioned.fill(
+            child: PerformanceOverlay.allEnabled(),
+          ),
+        ],
         if (_isPanelOpen) ...[
           Positioned.fill(
             child: GestureDetector(
@@ -218,6 +253,8 @@ class _LocalToolkitOverlayState extends State<LocalToolkitOverlay> {
                       onToggleTrustedMode: widget.onToggleTrustedMode,
                       onSwitchLocale: widget.onSwitchLocale,
                       onSwitchTheme: widget.onSwitchTheme,
+                      showPerformanceOverlay: widget.showPerformanceOverlay,
+                      onTogglePerformanceOverlay: widget.onTogglePerformanceOverlay,
                     ),
                   ),
                 ),
@@ -275,6 +312,8 @@ class LocalToolkitPanel extends StatelessWidget {
     this.onToggleTrustedMode,
     this.onSwitchLocale,
     this.onSwitchTheme,
+    this.showPerformanceOverlay,
+    this.onTogglePerformanceOverlay,
   });
 
   final LocalToolkitOverlayLabels labels;
@@ -291,6 +330,8 @@ class LocalToolkitPanel extends StatelessWidget {
   final VoidCallback? onToggleTrustedMode;
   final VoidCallback? onSwitchLocale;
   final VoidCallback? onSwitchTheme;
+  final bool? showPerformanceOverlay;
+  final VoidCallback? onTogglePerformanceOverlay;
 
   @override
   Widget build(BuildContext context) {
@@ -479,6 +520,23 @@ class LocalToolkitPanel extends StatelessWidget {
                           onClose: onClose,
                           onPressed: onSwitchTheme,
                         ),
+                        _MutatorButton(
+                          key: const ValueKey<String>(
+                            'local_toolkit_quick_toggle_performance_overlay',
+                          ),
+                          width: width,
+                          icon: showPerformanceOverlay == true
+                              ? Icons.speed_rounded
+                              : Icons.speed_outlined,
+                          label: labels.quickTogglePerformanceOverlay,
+                          value: showPerformanceOverlay == null
+                              ? null
+                              : showPerformanceOverlay == true
+                                  ? labels.performanceOverlayOn
+                                  : labels.performanceOverlayOff,
+                          onClose: onClose,
+                          onPressed: onTogglePerformanceOverlay,
+                        ),
                       ],
                     );
                   },
@@ -598,6 +656,11 @@ extension on LocalToolkitRoute {
       LocalToolkitRoute.logMeal => 'log_meal',
       LocalToolkitRoute.history => 'history',
       LocalToolkitRoute.templates => 'templates',
+      LocalToolkitRoute.newUsualMeal => 'new_usual_meal',
+      LocalToolkitRoute.editFirstUsualMeal => 'edit_first_usual_meal',
+      LocalToolkitRoute.newUsualFood => 'new_usual_food',
+      LocalToolkitRoute.editFirstUsualFood => 'edit_first_usual_food',
+      LocalToolkitRoute.scanUsualFood => 'scan_usual_food',
       LocalToolkitRoute.settings => 'settings',
     };
   }
@@ -609,6 +672,11 @@ extension on LocalToolkitRoute {
       LocalToolkitRoute.logMeal => Icons.mic_rounded,
       LocalToolkitRoute.history => Icons.query_stats_rounded,
       LocalToolkitRoute.templates => Icons.bookmarks_rounded,
+      LocalToolkitRoute.newUsualMeal => Icons.restaurant_menu_rounded,
+      LocalToolkitRoute.editFirstUsualMeal => Icons.edit_note_rounded,
+      LocalToolkitRoute.newUsualFood => Icons.add_shopping_cart_rounded,
+      LocalToolkitRoute.editFirstUsualFood => Icons.edit_attributes_rounded,
+      LocalToolkitRoute.scanUsualFood => Icons.document_scanner_rounded,
       LocalToolkitRoute.settings => Icons.settings_rounded,
     };
   }

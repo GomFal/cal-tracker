@@ -55,7 +55,6 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
         key: const ValueKey('meal_create_screen'),
         child: ContentFrame(
           title: 'Create meal',
-          subtitle: _stateLabel(viewModel.state),
           leading: FreshIconButton(
             icon: Icons.arrow_back_rounded,
             tooltip: 'Back',
@@ -1936,12 +1935,6 @@ class _ProposalCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const FreshFoodStack(
-                assets: [
-                  'assets/images/meal_breakfast.webp',
-                  'assets/images/meal_lunch.webp',
-                ],
-              ),
             ],
           ),
           const SizedBox(height: FreshSpacing.lg),
@@ -2595,19 +2588,3 @@ class _MealLine extends StatelessWidget {
 
 String _mealItemDisplayName(MealItem item) =>
     item.canonicalName?.isNotEmpty == true ? item.canonicalName! : item.name;
-
-String _stateLabel(VoiceLogState state) {
-  return switch (state) {
-    VoiceLogState.recording => 'Listening',
-    VoiceLogState.stopping => 'Saving audio',
-    VoiceLogState.transcribing => 'Whisper transcription',
-    VoiceLogState.transcriptReady => 'Transcript ready',
-    VoiceLogState.agentRunning => 'Building proposal',
-    VoiceLogState.proposalReady => 'Review meal',
-    VoiceLogState.autoCommitted => 'Logged',
-    VoiceLogState.resultReady => 'Result ready',
-    VoiceLogState.clarificationRequired => 'Clarification',
-    VoiceLogState.error => 'Needs attention',
-    _ => 'Voice or text input',
-  };
-}

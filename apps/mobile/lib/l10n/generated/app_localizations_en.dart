@@ -1562,6 +1562,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get localToolkitRouteTemplates => 'Templates';
 
   @override
+  String get localToolkitRouteNewUsualMeal => 'New usual meal';
+
+  @override
+  String get localToolkitRouteEditFirstUsualMeal => 'Edit first usual meal';
+
+  @override
+  String get localToolkitRouteNewUsualFood => 'New usual food';
+
+  @override
+  String get localToolkitRouteEditFirstUsualFood => 'Edit first usual food';
+
+  @override
+  String get localToolkitRouteScanUsualFood => 'Scan usual food';
+
+  @override
   String get localToolkitRouteSettings => 'Settings';
 
   @override
@@ -1610,6 +1625,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get localToolkitQuickSwitchTheme => 'Switch light/dark theme';
+
+  @override
+  String get localToolkitQuickTogglePerformanceOverlay => 'Toggle perf overlay';
+
+  @override
+  String get localToolkitPerformanceOverlayOn => 'Overlay on';
+
+  @override
+  String get localToolkitPerformanceOverlayOff => 'Overlay off';
 
   @override
   String get localToolkitTrustedModeOn => 'Trusted on';

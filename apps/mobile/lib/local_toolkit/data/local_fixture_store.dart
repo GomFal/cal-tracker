@@ -646,11 +646,12 @@ class LocalFixtureStore extends ChangeNotifier {
     required String title,
     required List<MealItem> items,
     required List<String> aliases,
+    bool trustedAutoCommitEnabled = false,
   }) {
     final template = MealTemplate(
       id: 'local-template-${_templates.length + 1}',
       title: title,
-      trustedAutoCommitEnabled: false,
+      trustedAutoCommitEnabled: trustedAutoCommitEnabled,
       nutrition: _nutritionFor(items),
       items: List.of(items),
       aliases: List.of(aliases),
@@ -658,6 +659,32 @@ class LocalFixtureStore extends ChangeNotifier {
     _templates = [..._templates, template];
     notifyListeners();
     return template;
+  }
+
+  MealTemplate updateTemplate({
+    required String templateId,
+    required String title,
+    required List<MealItem> items,
+    required List<String> aliases,
+    bool trustedAutoCommitEnabled = false,
+  }) {
+    _templates.firstWhere(
+      (template) => template.id == templateId,
+      orElse: () => throw StateError('Unknown local template: $templateId'),
+    );
+    final updated = MealTemplate(
+      id: templateId,
+      title: title,
+      trustedAutoCommitEnabled: trustedAutoCommitEnabled,
+      nutrition: _nutritionFor(items),
+      items: List.of(items),
+      aliases: List.of(aliases),
+    );
+    _templates = _templates
+        .map((template) => template.id == templateId ? updated : template)
+        .toList(growable: false);
+    notifyListeners();
+    return updated;
   }
 
   bool deleteTemplate(String templateId) {
@@ -668,6 +695,20 @@ class LocalFixtureStore extends ChangeNotifier {
     _templates = next;
     notifyListeners();
     return true;
+  }
+
+  UsualMealDraft draftUsualMeal(String text) {
+    final phrase = text.trim();
+    final words = phrase.isEmpty ? const <String>[] : phrase.split(RegExp(r'\s+'));
+    final title = words.isEmpty
+        ? 'Local drafted meal'
+        : words.first[0].toUpperCase() + words.first.substring(1);
+    final items = _foodCatalog.take(2).toList(growable: false);
+    return UsualMealDraft(
+      title: title,
+      aliases: words.length > 1 ? words.sublist(1) : const [],
+      items: items,
+    );
   }
 
   UsualFood createUsualFood(UsualFoodInput input) {

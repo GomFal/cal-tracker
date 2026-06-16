@@ -86,7 +86,6 @@ class _MealTemplateEditorScreenState extends State<MealTemplateEditorScreen> {
       title: _isEditing
           ? l10n.mealTemplateEditorEditTitle
           : l10n.mealTemplateEditorCreateTitle,
-      subtitle: l10n.mealTemplateEditorSubtitle,
       actions: [
         FreshIconButton(
           onPressed: () => _closeEditor(context),

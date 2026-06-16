@@ -74,6 +74,7 @@ class _LocalToolkitHost extends StatefulWidget {
 
 class _LocalToolkitHostState extends State<_LocalToolkitHost> {
   LocalToolkitScenario _activeScenario = LocalToolkitScenario.normalDay;
+  bool _showPerformanceOverlay = false;
 
   LocalFixtureStore get _store => widget.dependencies.store;
 
@@ -99,6 +100,8 @@ class _LocalToolkitHostState extends State<_LocalToolkitHost> {
           onToggleTrustedMode: _toggleTrustedMode,
           onSwitchLocale: _switchLocale,
           onSwitchTheme: _switchTheme,
+          showPerformanceOverlay: _showPerformanceOverlay,
+          onTogglePerformanceOverlay: _togglePerformanceOverlay,
           child: child ?? widget.child,
         );
       },
@@ -120,6 +123,11 @@ class _LocalToolkitHostState extends State<_LocalToolkitHost> {
       routeHistory: l10n.localToolkitRouteHistory,
       routeTemplates: l10n.localToolkitRouteTemplates,
       routeSettings: l10n.localToolkitRouteSettings,
+      routeNewUsualMeal: l10n.localToolkitRouteNewUsualMeal,
+      routeEditFirstUsualMeal: l10n.localToolkitRouteEditFirstUsualMeal,
+      routeNewUsualFood: l10n.localToolkitRouteNewUsualFood,
+      routeEditFirstUsualFood: l10n.localToolkitRouteEditFirstUsualFood,
+      routeScanUsualFood: l10n.localToolkitRouteScanUsualFood,
       scenarioUnauthenticated: l10n.localToolkitScenarioUnauthenticated,
       scenarioEmptyDay: l10n.localToolkitScenarioEmptyDay,
       scenarioNormalDay: l10n.localToolkitScenarioNormalDay,
@@ -137,6 +145,10 @@ class _LocalToolkitHostState extends State<_LocalToolkitHost> {
       quickToggleTrustedMode: l10n.localToolkitQuickToggleTrustedMode,
       quickSwitchLocale: l10n.localToolkitQuickSwitchLocale,
       quickSwitchTheme: l10n.localToolkitQuickSwitchTheme,
+      quickTogglePerformanceOverlay:
+          l10n.localToolkitQuickTogglePerformanceOverlay,
+      performanceOverlayOn: l10n.localToolkitPerformanceOverlayOn,
+      performanceOverlayOff: l10n.localToolkitPerformanceOverlayOff,
       trustedModeOn: l10n.localToolkitTrustedModeOn,
       trustedModeOff: l10n.localToolkitTrustedModeOff,
       closeTooltip: l10n.localToolkitCloseTooltip,
@@ -151,12 +163,21 @@ class _LocalToolkitHostState extends State<_LocalToolkitHost> {
       return;
     }
     _ensureAuthenticated();
+    final firstTemplateId = _store.templates.isNotEmpty ? _store.templates.first.id : null;
+    final firstUsualFoodId = _store.usualFoods.isNotEmpty ? _store.usualFoods.first.id : null;
     widget.router.go(switch (route) {
       LocalToolkitRoute.auth => '/auth',
       LocalToolkitRoute.dashboard => '/dashboard',
       LocalToolkitRoute.logMeal => '/meal/create',
       LocalToolkitRoute.history => '/history',
       LocalToolkitRoute.templates => '/templates',
+      LocalToolkitRoute.newUsualMeal => '/templates/meals/new',
+      LocalToolkitRoute.editFirstUsualMeal =>
+        firstTemplateId != null ? '/templates/meals/$firstTemplateId/edit' : '/templates',
+      LocalToolkitRoute.newUsualFood => '/templates/ingredients/new',
+      LocalToolkitRoute.editFirstUsualFood =>
+        firstUsualFoodId != null ? '/templates/ingredients/$firstUsualFoodId/edit' : '/templates',
+      LocalToolkitRoute.scanUsualFood => '/templates/ingredients/scan',
       LocalToolkitRoute.settings => '/settings',
     });
     _refreshVisibleData();
@@ -254,6 +275,10 @@ class _LocalToolkitHostState extends State<_LocalToolkitHost> {
   void _switchTheme() {
     final themeViewModel = context.read<ThemeModeViewModel>();
     unawaited(themeViewModel.setDarkMode(!themeViewModel.isDarkMode));
+  }
+
+  void _togglePerformanceOverlay() {
+    setState(() => _showPerformanceOverlay = !_showPerformanceOverlay);
   }
 
   void _ensureAuthenticated() {

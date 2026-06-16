@@ -129,8 +129,13 @@ class LocalAuthRepository extends AuthRepository {
 }
 
 class LocalNutritionRepository extends NutritionRepository {
-  LocalNutritionRepository(this.store)
-      : super(apiClient: createLocalApiClient());
+  LocalNutritionRepository(this.store) : super(apiClient: createLocalApiClient());
+
+  @override
+  bool get isBackendLikelyHealthy => true;
+
+  @override
+  Future<bool> checkBackendHealth() async => true;
 
   final LocalFixtureStore store;
 
@@ -317,7 +322,34 @@ class LocalNutritionRepository extends NutritionRepository {
     required List<String> aliases,
     bool trustedAutoCommitEnabled = false,
   }) async {
-    return store.createTemplate(title: title, items: items, aliases: aliases);
+    return store.createTemplate(
+      title: title,
+      items: items,
+      aliases: aliases,
+      trustedAutoCommitEnabled: trustedAutoCommitEnabled,
+    );
+  }
+
+  @override
+  Future<MealTemplate> updateTemplate({
+    required String templateId,
+    required String title,
+    required List<MealItem> items,
+    required List<String> aliases,
+    bool trustedAutoCommitEnabled = false,
+  }) async {
+    return store.updateTemplate(
+      templateId: templateId,
+      title: title,
+      items: items,
+      aliases: aliases,
+      trustedAutoCommitEnabled: trustedAutoCommitEnabled,
+    );
+  }
+
+  @override
+  Future<UsualMealDraft> draftUsualMeal(String text) async {
+    return store.draftUsualMeal(text);
   }
 
   @override
@@ -342,15 +374,48 @@ class LocalNutritionRepository extends NutritionRepository {
 
   @override
   Future<UsualFoodDraft> draftUsualFood(String text) async {
-    return const UsualFoodDraft(
-      missingRequiredFields: [
-        'name',
-        'servingGrams',
-        'calories',
-        'proteinGrams',
-        'carbsGrams',
-        'fatGrams',
-      ],
+    final lines = text.split(RegExp(r'[\r\n]+'));
+    final name = lines.isNotEmpty && lines.first.trim().isNotEmpty
+        ? lines.first.trim()
+        : 'Scanned local food';
+    final servingMatch = RegExp(r'(\d+)\s*(g|gr|gram|grams)').firstMatch(text);
+    final caloriesMatch = RegExp(r'(\d+)\s*kcal').firstMatch(text);
+    final proteinMatch = RegExp(r'protein[^\d]*(\d+)\s*g').firstMatch(text);
+    final carbsMatch = RegExp(r'carbs?[^\d]*(\d+)\s*g').firstMatch(text);
+    final fatMatch = RegExp(r'fat[^\d]*(\d+)\s*g').firstMatch(text);
+
+    final servingGrams = servingMatch != null
+        ? double.parse(servingMatch.group(1)!)
+        : 100.0;
+    final calories = caloriesMatch != null
+        ? int.parse(caloriesMatch.group(1)!)
+        : 150;
+    final proteinGrams = proteinMatch != null
+        ? double.parse(proteinMatch.group(1)!)
+        : 0.0;
+    final carbsGrams = carbsMatch != null
+        ? double.parse(carbsMatch.group(1)!)
+        : 0.0;
+    final fatGrams = fatMatch != null
+        ? double.parse(fatMatch.group(1)!)
+        : 0.0;
+
+    final missing = <String>[
+      if (servingMatch == null) 'servingGrams',
+      if (caloriesMatch == null) 'calories',
+      if (proteinMatch == null) 'proteinGrams',
+      if (carbsMatch == null) 'carbsGrams',
+      if (fatMatch == null) 'fatGrams',
+    ];
+
+    return UsualFoodDraft(
+      name: name,
+      servingGrams: servingGrams,
+      calories: calories,
+      proteinGrams: proteinGrams,
+      carbsGrams: carbsGrams,
+      fatGrams: fatGrams,
+      missingRequiredFields: missing,
     );
   }
 

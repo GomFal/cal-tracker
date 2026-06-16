@@ -36,9 +36,6 @@ class _MealTemplatesScreenState extends State<MealTemplatesScreen> {
     final palette = context.freshPalette;
     return ContentFrame(
       title: l10n.templatesTitle,
-      subtitle: _selectedSection == _UsualSection.meals
-          ? l10n.templatesExplainer
-          : l10n.usualFoodsExplainer,
       actions: [
         FreshIconButton(
           onPressed: () => viewModel.load(forceRefresh: true),

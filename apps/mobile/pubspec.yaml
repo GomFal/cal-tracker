@@ -27,6 +27,7 @@ dependencies:
   marionette_flutter: ^0.5.0
   shared_preferences: ^2.5.3
   url_launcher: ^6.3.2
+  flutter_svg: ^2.3.0
 
 dev_dependencies:
   flutter_driver:
@@ -59,6 +60,7 @@ flutter:
   assets:
     - assets/images/
     - assets/images/icons/
+    - assets/images/icons/svg/
     - assets/images/login/
     - assets/images/login/cropped/
     - assets/google_brand/android_neutral_rd_ctn@4x.png

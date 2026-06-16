@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 import 'package:http_parser/http_parser.dart';
@@ -27,13 +28,18 @@ class CalTrackerApiClient {
     required this.tokenStorage,
     http.Client? httpClient,
     Future<String?> Function()? localeTagProvider,
-  }) : _httpClient = httpClient ?? http.Client(),
-       _localeTagProvider = localeTagProvider;
+    Duration requestTimeout = const Duration(seconds: 20),
+  })  : _httpClient = httpClient ?? http.Client(),
+        _localeTagProvider = localeTagProvider,
+        _requestTimeout = requestTimeout;
 
   final ApiConfig config;
   final TokenStorage tokenStorage;
+  static const _largeJsonDecodeThresholdBytes = 64 * 1024;
+
   final http.Client _httpClient;
   final Future<String?> Function()? _localeTagProvider;
+  final Duration _requestTimeout;
 
   Future<Map<String, Object?>> getHealth() => _get('/v1/health');
 
@@ -42,33 +48,45 @@ class CalTrackerApiClient {
     required String password,
     required String displayName,
   }) {
-    return _post('/v1/auth/register', {
-      'email': email,
-      'password': password,
-      'displayName': displayName,
-    }, authenticated: false);
+    return _post(
+        '/v1/auth/register',
+        {
+          'email': email,
+          'password': password,
+          'displayName': displayName,
+        },
+        authenticated: false);
   }
 
   Future<Map<String, Object?>> login({
     required String email,
     required String password,
   }) {
-    return _post('/v1/auth/login', {
-      'email': email,
-      'password': password,
-    }, authenticated: false);
+    return _post(
+        '/v1/auth/login',
+        {
+          'email': email,
+          'password': password,
+        },
+        authenticated: false);
   }
 
   Future<Map<String, Object?>> loginWithGoogle({required String idToken}) {
-    return _post('/v1/auth/google/login', {
-      'idToken': idToken,
-    }, authenticated: false);
+    return _post(
+        '/v1/auth/google/login',
+        {
+          'idToken': idToken,
+        },
+        authenticated: false);
   }
 
   Future<Map<String, Object?>> refresh(String refreshToken) {
-    return _post('/v1/auth/refresh', {
-      'refreshToken': refreshToken,
-    }, authenticated: false);
+    return _post(
+        '/v1/auth/refresh',
+        {
+          'refreshToken': refreshToken,
+        },
+        authenticated: false);
   }
 
   Future<Map<String, Object?>> getMe() => _get('/v1/auth/me');
@@ -383,7 +401,7 @@ class CalTrackerApiClient {
     Future<http.Response> Function() send, {
     bool authenticated = true,
   }) async {
-    final first = await send();
+    final first = await _withRequestTimeout(send());
     if (!authenticated || first.statusCode != 401) return first;
 
     final tokens = await tokenStorage.read();
@@ -395,7 +413,18 @@ class CalTrackerApiClient {
         refreshToken: refreshed['refreshToken'] as String,
       ),
     );
-    return send();
+    return _withRequestTimeout(send());
+  }
+
+  Future<http.Response> _withRequestTimeout(Future<http.Response> request) {
+    return request.timeout(
+      _requestTimeout,
+      onTimeout: () => throw const ApiException(
+        408,
+        'The request took too long. Please try again.',
+        code: 'request_timeout',
+      ),
+    );
   }
 
   Future<Map<String, String>> _headers({
@@ -441,8 +470,8 @@ class CalTrackerApiClient {
     }
   }
 
-  Map<String, Object?> _decode(http.Response response) {
-    final body = _decodeBody(response.body);
+  Future<Map<String, Object?>> _decode(http.Response response) async {
+    final body = await _decodeBody(response.body);
     if (response.statusCode >= 200 && response.statusCode < 300) return body;
     final error = body['error'] as Map<String, Object?>?;
     throw ApiException(
@@ -455,8 +484,15 @@ class CalTrackerApiClient {
 
   Uri _uri(String path) => Uri.parse('${config.baseUrl}$path');
 
-  Map<String, Object?> _decodeBody(String rawBody) {
-    if (rawBody.isEmpty) return <String, Object?>{};
+  Future<Map<String, Object?>> _decodeBody(String rawBody) {
+    if (rawBody.isEmpty) return Future.value(<String, Object?>{});
+    if (rawBody.length >= _largeJsonDecodeThresholdBytes) {
+      return compute(_decodeJsonMap, rawBody);
+    }
+    return Future.value(_decodeJsonMap(rawBody));
+  }
+
+  static Map<String, Object?> _decodeJsonMap(String rawBody) {
     try {
       final decoded = jsonDecode(rawBody);
       if (decoded is Map<String, Object?>) return decoded;

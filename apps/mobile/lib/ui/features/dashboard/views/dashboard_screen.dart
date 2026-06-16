@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../domain/models/macro_distribution.dart';
@@ -535,7 +536,7 @@ class _MacroSummaryRow extends StatelessWidget {
       children: [
         Expanded(
           child: _MacroSummaryPill(
-            assetPath: 'assets/images/icons/carbs_icon.png',
+            assetPath: 'assets/images/icons/svg/carbs_icon.svg',
             iconKey: const ValueKey('dashboard_macro_carbs_icon'),
             label: l10n.commonCarbs,
             value: hasConfiguredMacros
@@ -550,7 +551,7 @@ class _MacroSummaryRow extends StatelessWidget {
         const SizedBox(width: FreshSpacing.sm),
         Expanded(
           child: _MacroSummaryPill(
-            assetPath: 'assets/images/icons/protein_icon.png',
+            assetPath: 'assets/images/icons/svg/protein_icon.svg',
             iconKey: const ValueKey('dashboard_macro_protein_icon'),
             label: l10n.localeName.startsWith('es') ? 'Proteínas' : 'Proteins',
             value: hasConfiguredMacros
@@ -565,7 +566,7 @@ class _MacroSummaryRow extends StatelessWidget {
         const SizedBox(width: FreshSpacing.sm),
         Expanded(
           child: _MacroSummaryPill(
-            assetPath: 'assets/images/icons/fats_icon.png',
+            assetPath: 'assets/images/icons/svg/fats_icon.svg',
             iconKey: const ValueKey('dashboard_macro_fats_icon'),
             label: l10n.localeName.startsWith('es') ? 'Grasas' : 'Fats',
             value: hasConfiguredMacros
@@ -604,6 +605,7 @@ class _MacroSummaryPill extends StatelessWidget {
     return FreshCard(
       color: palette.surface,
       radius: FreshRadii.lg,
+      shadow: false,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: 42),
@@ -616,15 +618,13 @@ class _MacroSummaryPill extends StatelessWidget {
                 color: color.withValues(alpha: 0.2),
                 shape: BoxShape.circle,
               ),
-              clipBehavior: Clip.antiAlias,
-              child: ClipOval(
-                child: Image.asset(
-                  assetPath,
-                  key: iconKey,
-                  fit: BoxFit.cover,
-                  filterQuality: FilterQuality.medium,
-                  excludeFromSemantics: true,
-                ),
+              child: SvgPicture.asset(
+                assetPath,
+                key: iconKey,
+                width: 22,
+                height: 22,
+                fit: BoxFit.contain,
+                excludeFromSemantics: true,
               ),
             ),
             const SizedBox(width: 7),
@@ -691,33 +691,15 @@ class _WaterIntakeCard extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final waterCardColor =
         isDark ? const Color(0xff18343a) : const Color(0xffd5f2f8);
-    final shadows = isDark
-        ? [
-            BoxShadow(
-              color: palette.appBg.withValues(alpha: 0.55),
-              blurRadius: 22,
-              offset: const Offset(0, 12),
-            ),
-            BoxShadow(
-              color: palette.water.withValues(alpha: 0.08),
-              blurRadius: 16,
-              spreadRadius: -3,
-              offset: const Offset(0, 6),
-            ),
-          ]
-        : [
-            BoxShadow(
-              color: palette.water.withValues(alpha: 0.16),
-              blurRadius: 18,
-              spreadRadius: 1,
-              offset: const Offset(0, 8),
-            ),
-            BoxShadow(
-              color: palette.ink.withValues(alpha: 0.08),
-              blurRadius: 24,
-              offset: const Offset(0, 12),
-            ),
-          ];
+    final shadows = [
+      BoxShadow(
+        color: (isDark ? palette.appBg : palette.water).withValues(
+          alpha: isDark ? 0.38 : 0.14,
+        ),
+        blurRadius: 10,
+        offset: const Offset(0, 6),
+      ),
+    ];
     return Container(
       key: const ValueKey('dashboard_water_intake_card'),
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),

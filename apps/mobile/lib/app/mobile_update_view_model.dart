@@ -14,6 +14,7 @@ class MobileUpdateViewModel extends ChangeNotifier {
   bool _dialogHandled = false;
   String? _error;
   MobileUpdateCheck? _update;
+  bool _disposed = false;
 
   bool get checking => _checking;
   bool get opening => _opening;
@@ -23,26 +24,32 @@ class MobileUpdateViewModel extends ChangeNotifier {
       !_dialogHandled && (_update?.updateAvailable ?? false);
 
   Future<void> checkForUpdate() async {
-    if (_checking) return;
+    if (_disposed || _checking) return;
     _checking = true;
     _error = null;
-    notifyListeners();
+    _notifyListenersIfActive();
     try {
-      _update = await _updateService.checkForUpdate();
+      final update = await _updateService.checkForUpdate();
+      if (_disposed) return;
+      _update = update;
     } on MobileUpdateException catch (caught) {
+      if (_disposed) return;
       _error = caught.message;
     } on Object catch (caught) {
+      if (_disposed) return;
       _error = '$caught';
     } finally {
-      _checking = false;
-      notifyListeners();
+      if (!_disposed) {
+        _checking = false;
+        _notifyListenersIfActive();
+      }
     }
   }
 
   void markDialogHandled() {
     if (_dialogHandled) return;
     _dialogHandled = true;
-    notifyListeners();
+    _notifyListenersIfActive();
   }
 
   Future<void> openUpdate() async {
@@ -50,7 +57,7 @@ class MobileUpdateViewModel extends ChangeNotifier {
     if (manifest == null) return;
     _opening = true;
     _error = null;
-    notifyListeners();
+    _notifyListenersIfActive();
     try {
       await _updateService.openDownload(manifest);
     } on MobileUpdateException catch (caught) {
@@ -58,8 +65,20 @@ class MobileUpdateViewModel extends ChangeNotifier {
     } on Object catch (caught) {
       _error = '$caught';
     } finally {
-      _opening = false;
-      notifyListeners();
+      if (!_disposed) {
+        _opening = false;
+        _notifyListenersIfActive();
+      }
     }
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
+  void _notifyListenersIfActive() {
+    if (!_disposed) notifyListeners();
   }
 }

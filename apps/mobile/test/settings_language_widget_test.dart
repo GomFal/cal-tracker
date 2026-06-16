@@ -1,4 +1,5 @@
 import 'package:cal_tracker_mobile/app/locale_view_model.dart';
+import 'package:cal_tracker_mobile/app/performance_overlay_view_model.dart';
 import 'package:cal_tracker_mobile/app/theme.dart';
 import 'package:cal_tracker_mobile/app/theme_mode_view_model.dart';
 import 'package:cal_tracker_mobile/data/repositories/auth_repository.dart';
@@ -114,6 +115,36 @@ void main() {
     expect(themeModeViewModel.themeMode, ThemeMode.light);
     expect(preferencesRepository.savedModes, [ThemeMode.dark, ThemeMode.light]);
     expect(find.text('Light'), findsOneWidget);
+  });
+
+  testWidgets('Developer menu toggles the performance overlay', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 1400);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final performanceOverlayViewModel = PerformanceOverlayViewModel();
+    await _pumpSettings(
+      tester,
+      performanceOverlayViewModel: performanceOverlayViewModel,
+    );
+
+    expect(find.text('Developer tools'), findsOneWidget);
+    expect(find.text('Performance overlay'), findsOneWidget);
+    expect(performanceOverlayViewModel.visible, isFalse);
+
+    final switchFinder = find.byKey(
+      const ValueKey('settings_performance_overlay_switch'),
+    );
+    await tester.ensureVisible(switchFinder);
+    await tester.pumpAndSettle();
+    await tester.tap(switchFinder.hitTestable());
+    await tester.pumpAndSettle();
+
+    expect(performanceOverlayViewModel.visible, isTrue);
+    expect(find.textContaining('Overlay on'), findsOneWidget);
   });
 
   testWidgets('Menu hydration sheet uses localized copy and saves liters', (
@@ -315,6 +346,7 @@ Future<void> _pumpSettings(
   _FakeNutritionRepository? nutritionRepository,
   LocaleViewModel? localeViewModel,
   ThemeModeViewModel? themeModeViewModel,
+  PerformanceOverlayViewModel? performanceOverlayViewModel,
 }) async {
   final effectivePreferencesRepository =
       preferencesRepository ?? _FakePreferencesRepository();
@@ -324,6 +356,8 @@ Future<void> _pumpSettings(
       ThemeModeViewModel(preferencesRepository: effectivePreferencesRepository);
   final effectiveNutritionRepository =
       nutritionRepository ?? _FakeNutritionRepository();
+  final effectivePerformanceOverlayViewModel =
+      performanceOverlayViewModel ?? PerformanceOverlayViewModel();
   final authRepository = _FakeAuthRepository();
   final authViewModel = AuthViewModel(authRepository: authRepository)
     ..setUser(_testUser);
@@ -337,6 +371,9 @@ Future<void> _pumpSettings(
         ),
         ChangeNotifierProvider<ThemeModeViewModel>.value(
           value: effectiveThemeModeViewModel,
+        ),
+        ChangeNotifierProvider<PerformanceOverlayViewModel>.value(
+          value: effectivePerformanceOverlayViewModel,
         ),
         ChangeNotifierProvider(
           create: (_) => DashboardViewModel(

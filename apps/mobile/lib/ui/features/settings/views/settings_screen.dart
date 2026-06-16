@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../app/locale_view_model.dart';
+import '../../../../app/performance_overlay_view_model.dart';
 import '../../../../app/theme_mode_view_model.dart';
 import '../../../../domain/models/macro_distribution.dart';
 import '../../../../domain/models/nutrition_models.dart';
@@ -40,6 +42,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final settings = context.watch<SettingsViewModel>();
     final locale = context.watch<LocaleViewModel>();
     final themeMode = context.watch<ThemeModeViewModel>().themeMode;
+    final performanceOverlay = context.watch<PerformanceOverlayViewModel>();
     final l10n = context.l10n;
     final palette = context.freshPalette;
     final user = auth.user;
@@ -164,6 +167,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: _themeModeSubtitle(l10n, themeMode),
             onTap: () => _showThemeSheet(context),
           ),
+          if (!kReleaseMode) ...[
+            const SizedBox(height: FreshSpacing.md),
+            _DeveloperSettingsCard(
+              title: l10n.settingsDeveloperMenuTitle,
+              performanceOverlayTitle: l10n.settingsPerformanceOverlayTitle,
+              performanceOverlaySubtitle:
+                  l10n.settingsPerformanceOverlaySubtitle,
+              performanceOverlayStatus: performanceOverlay.visible
+                  ? l10n.settingsPerformanceOverlayOn
+                  : l10n.settingsPerformanceOverlayOff,
+              performanceOverlayEnabled: performanceOverlay.visible,
+              onPerformanceOverlayChanged: performanceOverlay.setVisible,
+            ),
+          ],
           const SizedBox(height: FreshSpacing.md),
           _DataSourcesCard(
             title: l10n.settingsDataSourcesTitle,
@@ -460,6 +477,60 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   String _languageDisplayName(Locale locale) {
     return lookupAppLocalizations(locale).settingsLanguageNativeName;
+  }
+}
+
+class _DeveloperSettingsCard extends StatelessWidget {
+  const _DeveloperSettingsCard({
+    required this.title,
+    required this.performanceOverlayTitle,
+    required this.performanceOverlaySubtitle,
+    required this.performanceOverlayStatus,
+    required this.performanceOverlayEnabled,
+    required this.onPerformanceOverlayChanged,
+  });
+
+  final String title;
+  final String performanceOverlayTitle;
+  final String performanceOverlaySubtitle;
+  final String performanceOverlayStatus;
+  final bool performanceOverlayEnabled;
+  final ValueChanged<bool> onPerformanceOverlayChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.freshPalette;
+    final textTheme = Theme.of(context).textTheme;
+    return FreshCard(
+      padding: const EdgeInsets.all(16),
+      shadow: false,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              FreshIconChip(
+                icon: Icons.developer_mode_rounded,
+                color: palette.mint,
+              ),
+              const SizedBox(width: FreshSpacing.md),
+              Expanded(child: Text(title, style: textTheme.titleMedium)),
+            ],
+          ),
+          const SizedBox(height: FreshSpacing.sm),
+          SwitchListTile.adaptive(
+            key: const ValueKey('settings_performance_overlay_switch'),
+            contentPadding: EdgeInsets.zero,
+            title: Text(performanceOverlayTitle),
+            subtitle: Text(
+              '$performanceOverlaySubtitle\n$performanceOverlayStatus',
+            ),
+            value: performanceOverlayEnabled,
+            onChanged: onPerformanceOverlayChanged,
+          ),
+        ],
+      ),
+    );
   }
 }
 

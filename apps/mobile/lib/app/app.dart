@@ -17,6 +17,7 @@ import '../data/services/secure_token_storage.dart';
 import '../generated/api/cal_tracker_api.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../ui/core/mobile_update_dialog_host.dart';
+import '../ui/core/performance_overlay_strip.dart';
 import '../ui/features/auth/view_models/auth_view_model.dart';
 import '../ui/features/dashboard/view_models/dashboard_view_model.dart';
 import '../ui/features/meal_history/view_models/meal_history_view_model.dart';
@@ -25,12 +26,13 @@ import '../ui/features/settings/view_models/settings_view_model.dart';
 import '../ui/features/voice_log/view_models/voice_log_view_model.dart';
 import 'locale_view_model.dart';
 import 'mobile_update_view_model.dart';
+import 'performance_overlay_view_model.dart';
 import 'router.dart';
 import 'theme.dart';
 import 'theme_mode_view_model.dart';
 
-typedef CalTrackerAppWrapperBuilder =
-    Widget Function(BuildContext context, Widget child, GoRouter router);
+typedef CalTrackerAppWrapperBuilder = Widget Function(
+    BuildContext context, Widget child, GoRouter router);
 
 class CalTrackerBootstrap extends StatelessWidget {
   const CalTrackerBootstrap({
@@ -59,8 +61,7 @@ class CalTrackerBootstrap extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokenStorage = this.tokenStorage ?? const SecureTokenStorage();
-    final preferencesRepository =
-        this.preferencesRepository ??
+    final preferencesRepository = this.preferencesRepository ??
         AppPreferencesRepository(storage: AppPreferencesStorage());
     final apiClient = CalTrackerApiClient(
       config: apiConfig,
@@ -70,11 +71,9 @@ class CalTrackerBootstrap extends StatelessWidget {
         return LocaleViewModel.normalizeLocaleTag(savedTag).toLanguageTag();
       },
     );
-    final authRepository =
-        this.authRepository ??
+    final authRepository = this.authRepository ??
         AuthRepository(apiClient: apiClient, tokenStorage: tokenStorage);
-    final nutritionRepository =
-        this.nutritionRepository ??
+    final nutritionRepository = this.nutritionRepository ??
         NutritionRepository(
           apiClient: apiClient,
           cacheStore: NutritionCacheStore(storage: AppPreferencesStorage()),
@@ -96,7 +95,9 @@ class CalTrackerBootstrap extends StatelessWidget {
               updateService: mobileUpdateService,
             );
             if (checkForUpdates) {
-              viewModel.checkForUpdate();
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                viewModel.checkForUpdate();
+              });
             }
             return viewModel;
           },
@@ -110,6 +111,9 @@ class CalTrackerBootstrap extends StatelessWidget {
           create: (_) =>
               LocaleViewModel(preferencesRepository: preferencesRepository)
                 ..load(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => PerformanceOverlayViewModel(),
         ),
         ChangeNotifierProvider(
           create: (_) =>
@@ -200,12 +204,13 @@ class _CalTrackerAppState extends State<_CalTrackerApp> {
           child: child ?? const SizedBox.shrink(),
         );
         final preloadedApp = _AuthenticatedDataPreloader(child: app);
-        return widget.appWrapperBuilder?.call(
+        final wrappedApp = widget.appWrapperBuilder?.call(
               context,
               preloadedApp,
               _router!,
             ) ??
             preloadedApp;
+        return PerformanceOverlayHost(child: wrappedApp);
       },
     );
   }
@@ -280,15 +285,17 @@ class _AuthenticatedDataPreloaderState
   }
 
   Future<void> _preloadAuthenticatedData() async {
-    await Future.wait([
-      _ignorePreloadError(() => context.read<DashboardViewModel>().load()),
-      _ignorePreloadError(() => context.read<MealHistoryViewModel>().load()),
-      _ignorePreloadError(() => context.read<MealTemplatesViewModel>().load()),
-      _ignorePreloadError(() => context.read<SettingsViewModel>().load()),
-      _ignorePreloadError(() async {
-        await context.read<NutritionRepository>().checkBackendHealth();
-      }),
-    ]);
+    // Keep startup responsive on real dev/prod backends. The dashboard is the
+    // first visible authenticated screen, so warm it first, then reuse its
+    // cached daily summary for settings. Avoid preloading the full history week
+    // here: that can fan out into seven summary requests and large JSON/cache
+    // work on the UI isolate. History still loads cache-first when opened.
+    await _ignorePreloadError(() => context.read<DashboardViewModel>().load());
+    if (!mounted) return;
+    await _ignorePreloadError(() => context.read<SettingsViewModel>().load());
+    if (!mounted) return;
+    await _ignorePreloadError(
+        () => context.read<MealTemplatesViewModel>().load());
   }
 
   Future<void> _ignorePreloadError(Future<void> Function() operation) async {

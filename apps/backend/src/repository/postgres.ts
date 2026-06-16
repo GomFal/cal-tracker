@@ -2199,14 +2199,19 @@ export class PostgresRepository implements AppRepository {
           food_in_range AS (
             SELECT * FROM food_search_events
             WHERE created_at >= ${input.from}::timestamptz AND created_at <= ${input.to}::timestamptz
+          ),
+          trace_ids_in_range AS (
+            SELECT trace_id FROM events_in_range
+            UNION
+            SELECT trace_id FROM llm_in_range
+            UNION
+            SELECT trace_id FROM food_in_range
           )
           SELECT
             (SELECT COUNT(*)::int FROM events_in_range) AS total_events,
             (SELECT COUNT(*)::int FROM llm_in_range) AS total_llm_runs,
             (SELECT COUNT(*)::int FROM food_in_range) AS total_food_search_events,
-            (SELECT COUNT(DISTINCT trace_id)::int FROM events_in_range) AS event_unique_traces,
-            (SELECT COUNT(DISTINCT trace_id)::int FROM llm_in_range) AS llm_unique_traces,
-            (SELECT COUNT(DISTINCT trace_id)::int FROM food_in_range) AS food_unique_traces,
+            (SELECT COUNT(*)::int FROM trace_ids_in_range) AS unique_traces,
             (SELECT COALESCE(SUM(CASE WHEN zero_results THEN 1 ELSE 0 END), 0)::int FROM food_in_range) AS zero_results_count,
             (SELECT COALESCE(SUM(CASE WHEN low_confidence THEN 1 ELSE 0 END), 0)::int FROM food_in_range) AS low_confidence_count,
             (SELECT COALESCE(SUM(CASE WHEN provider_error THEN 1 ELSE 0 END), 0)::int FROM llm_in_range) AS provider_error_count
@@ -2260,7 +2265,7 @@ export class PostgresRepository implements AppRepository {
       totalLlmRuns,
       totalFoodSearchEvents,
       uniqueUsers,
-      uniqueTraces: Number(overview.event_unique_traces ?? 0) + Number(overview.llm_unique_traces ?? 0) + Number(overview.food_unique_traces ?? 0),
+      uniqueTraces: Number(overview.unique_traces ?? 0),
       eventsBySeverity,
       eventsBySurface,
       recentResultKinds,

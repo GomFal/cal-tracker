@@ -9,6 +9,8 @@ import {
   agentRunResponseSchema,
   calorieEstimateRequestSchema,
   calorieEstimateResponseSchema,
+  clientTelemetryIngestRequestSchema,
+  clientTelemetryIngestResponseSchema,
   createUsualFoodRequestSchema,
   dailyHydrationResponseSchema,
   dailyHydrationUpdateSchema,
@@ -26,6 +28,11 @@ import {
   refreshRequestSchema,
   registerRequestSchema,
   settingsUpdateSchema,
+  telemetryEventsResponseSchema,
+  telemetryFoodSearchResponseSchema,
+  telemetryLlmRunsResponseSchema,
+  telemetryOverviewResponseSchema,
+  telemetryTraceResponseSchema,
   tokenPairSchema,
   transcriptionResponseSchema,
   updateUsualFoodRequestSchema,
@@ -47,6 +54,34 @@ const actionSchemas = Object.fromEntries(
     [`${action.id}_output`, schema(`${action.id}_output`, action.outputSchema)]
   ])
 );
+
+const jsonContent = (schemaRef: string) => ({
+  "application/json": { schema: { $ref: schemaRef } }
+});
+
+const jsonResponse = (description: string, schemaRef: string) => ({
+  description,
+  content: jsonContent(schemaRef)
+});
+
+const queryParameter = (
+  name: string,
+  schema: Record<string, unknown>,
+  required = false
+) => ({
+  name,
+  in: "query",
+  required,
+  schema
+});
+
+const telemetryCommonQueryParameters = [
+  queryParameter("limit", { type: "integer", minimum: 1, maximum: 200 }),
+  queryParameter("traceId", { type: "string", maxLength: 120 }),
+  queryParameter("userId", { type: "string", format: "uuid" }),
+  queryParameter("from", { type: "string", format: "date-time" }),
+  queryParameter("to", { type: "string", format: "date-time" })
+];
 
 const voiceMealRunResponseOpenApiSchema = {
   type: "object",
@@ -110,6 +145,13 @@ const spec = {
       AgentRunResponse: schema("AgentRunResponse", agentRunResponseSchema),
       TranscriptionResponse: schema("TranscriptionResponse", transcriptionResponseSchema),
       VoiceMealRunResponse: voiceMealRunResponseOpenApiSchema,
+      ClientTelemetryIngestRequest: schema("ClientTelemetryIngestRequest", clientTelemetryIngestRequestSchema),
+      ClientTelemetryIngestResponse: schema("ClientTelemetryIngestResponse", clientTelemetryIngestResponseSchema),
+      TelemetryEventsResponse: schema("TelemetryEventsResponse", telemetryEventsResponseSchema),
+      TelemetryTraceResponse: schema("TelemetryTraceResponse", telemetryTraceResponseSchema),
+      TelemetryOverviewResponse: schema("TelemetryOverviewResponse", telemetryOverviewResponseSchema),
+      TelemetryLlmRunsResponse: schema("TelemetryLlmRunsResponse", telemetryLlmRunsResponseSchema),
+      TelemetryFoodSearchResponse: schema("TelemetryFoodSearchResponse", telemetryFoodSearchResponseSchema),
       ...actionSchemas
     }
   },
@@ -373,6 +415,89 @@ const spec = {
         },
         responses: {
           "200": { description: "Transcript and meal agent result", content: { "application/json": { schema: { $ref: "#/components/schemas/VoiceMealRunResponse" } } } }
+        }
+      }
+    },
+    "/v1/telemetry/client-events": {
+      post: {
+        operationId: "ingestClientTelemetryEvents",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: jsonContent("#/components/schemas/ClientTelemetryIngestRequest")
+        },
+        responses: {
+          "200": jsonResponse("Accepted client telemetry events", "#/components/schemas/ClientTelemetryIngestResponse")
+        }
+      }
+    },
+    "/v1/admin/telemetry/overview": {
+      get: {
+        operationId: "getAdminTelemetryOverview",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          queryParameter("from", { type: "string", format: "date-time" }),
+          queryParameter("to", { type: "string", format: "date-time" })
+        ],
+        responses: {
+          "200": jsonResponse("Telemetry overview", "#/components/schemas/TelemetryOverviewResponse")
+        }
+      }
+    },
+    "/v1/admin/telemetry/events": {
+      get: {
+        operationId: "listAdminTelemetryEvents",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          ...telemetryCommonQueryParameters,
+          queryParameter("severity", { type: "string", enum: ["info", "warning", "error"] }),
+          queryParameter("eventType", { type: "string", maxLength: 120 }),
+          queryParameter("surface", { type: "string", enum: ["backend", "mobile", "agent", "stt", "db", "admin"] })
+        ],
+        responses: {
+          "200": jsonResponse("Telemetry events", "#/components/schemas/TelemetryEventsResponse")
+        }
+      }
+    },
+    "/v1/admin/telemetry/llm-runs": {
+      get: {
+        operationId: "listAdminTelemetryLlmRuns",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          ...telemetryCommonQueryParameters,
+          queryParameter("resultKind", { type: "string", maxLength: 80 }),
+          queryParameter("selectedTool", { type: "string", maxLength: 80 }),
+          queryParameter("executedTool", { type: "string", maxLength: 80 })
+        ],
+        responses: {
+          "200": jsonResponse("LLM telemetry runs", "#/components/schemas/TelemetryLlmRunsResponse")
+        }
+      }
+    },
+    "/v1/admin/telemetry/food-search": {
+      get: {
+        operationId: "listAdminTelemetryFoodSearchEvents",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          ...telemetryCommonQueryParameters,
+          queryParameter("zeroResults", { type: "string", enum: ["true", "false"] }),
+          queryParameter("lowConfidence", { type: "string", enum: ["true", "false"] }),
+          queryParameter("path", { type: "string", maxLength: 80 })
+        ],
+        responses: {
+          "200": jsonResponse("Food search telemetry events", "#/components/schemas/TelemetryFoodSearchResponse")
+        }
+      }
+    },
+    "/v1/admin/telemetry/traces/{traceId}": {
+      get: {
+        operationId: "getAdminTelemetryTrace",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "traceId", in: "path", required: true, schema: { type: "string", maxLength: 120 } }
+        ],
+        responses: {
+          "200": jsonResponse("Telemetry trace detail", "#/components/schemas/TelemetryTraceResponse")
         }
       }
     },

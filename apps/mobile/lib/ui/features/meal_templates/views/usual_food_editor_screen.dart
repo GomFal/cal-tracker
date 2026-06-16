@@ -519,8 +519,6 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
   }
 }
 
-
-
 class _EditorSection extends StatelessWidget {
   const _EditorSection({
     required this.title,
@@ -672,7 +670,10 @@ class _BottomSaveBar extends StatelessWidget {
         color: palette.screen,
         boxShadow: [
           BoxShadow(
-            color: palette.ink.withValues(alpha: 0.10),
+            color: context.freshShadowColor(
+              lightAlpha: 0.10,
+              darkAlpha: 0.40,
+            ),
             blurRadius: 24,
             offset: const Offset(0, -8),
           ),

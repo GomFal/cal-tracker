@@ -197,6 +197,17 @@ extension FreshPaletteLookup on BuildContext {
   FreshPalette get freshPalette {
     return Theme.of(this).extension<FreshPalette>() ?? FreshPalette.light;
   }
+
+  Color freshShadowColor({
+    required double lightAlpha,
+    required double darkAlpha,
+  }) {
+    final palette = freshPalette;
+    final isDark = Theme.of(this).brightness == Brightness.dark;
+    return (isDark ? palette.appBg : palette.ink).withValues(
+      alpha: isDark ? darkAlpha : lightAlpha,
+    );
+  }
 }
 
 class FreshSpacing {

@@ -758,7 +758,10 @@ class _PersonalizedMacroCard extends StatelessWidget {
             ),
             boxShadow: [
               BoxShadow(
-                color: palette.ink.withValues(alpha: 0.09),
+                color: context.freshShadowColor(
+                  lightAlpha: 0.09,
+                  darkAlpha: 0.42,
+                ),
                 blurRadius: 28,
                 offset: const Offset(0, 14),
               ),
@@ -896,7 +899,10 @@ class MacroPresetCard extends StatelessWidget {
             ),
             boxShadow: [
               BoxShadow(
-                color: palette.ink.withValues(alpha: 0.09),
+                color: context.freshShadowColor(
+                  lightAlpha: 0.09,
+                  darkAlpha: 0.42,
+                ),
                 blurRadius: 28,
                 offset: const Offset(0, 14),
               ),

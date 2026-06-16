@@ -17,7 +17,7 @@
     >
     <link rel="stylesheet" href="styles.css">
   </head>
-  <body>
+  <body class="is-locked">
     <a class="skip-link" href="#main">Skip to content</a>
 
     <header class="topbar" aria-label="Admin header">
@@ -79,6 +79,22 @@
         <p class="status-message" id="status-message">
           Enter the admin username and deployment password to load telemetry.
         </p>
+      </section>
+
+      <section class="auth-gate" id="auth-gate" aria-labelledby="auth-gate-title">
+        <div class="auth-gate-card">
+          <p class="eyebrow">Restricted admin area</p>
+          <h1 id="auth-gate-title">Sign in to unlock telemetry</h1>
+          <p>
+            The telemetry dashboard is hidden until a valid admin session is created.
+            Use the admin username and deployment password in the header form.
+          </p>
+          <ul>
+            <li>No telemetry requests are sent before authentication.</li>
+            <li>The admin token is kept only in this browser tab.</li>
+            <li>Signing out clears the token and locks the panel again.</li>
+          </ul>
+        </div>
       </section>
 
       <nav class="tabs" role="tablist" aria-label="Admin views">

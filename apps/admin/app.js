@@ -163,6 +163,13 @@
     setStatus("idle", "Idle.");
   }
 
+  function setStatusLocked() {
+    setStatus(
+      "locked",
+      "Telemetry is locked. Sign in with the admin deployment password to continue.",
+    );
+  }
+
   /* ========== HTTP ========== */
 
   function normalizeBase(raw) {
@@ -188,6 +195,9 @@
   }
 
   async function apiGet(path, { params } = {}) {
+    if (!isSignedIn()) {
+      throw lockedError();
+    }
     abortInFlight();
     const ctrl = new AbortController();
     state.controllers.add(ctrl);
@@ -251,6 +261,7 @@
         clearSession();
         state.apiToken = "";
         state.adminUsername = "";
+        clearProtectedData();
         renderAuthUi();
       }
       throw apiErr;
@@ -328,6 +339,36 @@
     return null;
   }
 
+  function isSignedIn() {
+    return Boolean(state.apiToken);
+  }
+
+  function lockedError() {
+    const err = new Error("Admin sign-in required.");
+    err.status = 401;
+    err.body = { error: { code: "admin_token_required" } };
+    return err;
+  }
+
+  function clearProtectedData() {
+    abortInFlight();
+    setCardsLoading(false);
+    $$(".card [data-value]").forEach((node) => {
+      node.textContent = "—";
+    });
+    $$(".card").forEach((card) => {
+      card.classList.remove("is-loading", "is-error", "is-warning", "is-success");
+    });
+    const overviewRaw = $("#overview-raw");
+    if (overviewRaw) overviewRaw.textContent = "Sign in to load telemetry.";
+    const traceRaw = $("#trace-raw");
+    if (traceRaw) traceRaw.textContent = "Sign in to load telemetry.";
+    renderEventsTable([]);
+    renderLlmTable([]);
+    renderFoodTable([]);
+    renderTraceView({ traceId: "—", events: [], llmRuns: [], foodSearchEvents: [] });
+  }
+
   async function loginAdmin(username, password) {
     const data = await apiPost(ENDPOINTS.adminLogin || "/v1/admin/auth/login", {
       username,
@@ -347,8 +388,9 @@
     clearSession();
     state.apiToken = "";
     state.adminUsername = "";
+    clearProtectedData();
     renderAuthUi();
-    setStatusIdle();
+    setStatusLocked();
   }
 
   function renderAuthUi() {
@@ -360,7 +402,17 @@
     const sessionUsername = $("#admin-session-username");
     const submit = $("#admin-login-submit");
     const signout = $("#admin-signout");
-    const signedIn = Boolean(state.apiToken);
+    const signedIn = isSignedIn();
+
+    document.body.classList.toggle("is-locked", !signedIn);
+    $$(".tab").forEach((btn) => {
+      btn.disabled = !signedIn;
+      btn.setAttribute("aria-disabled", signedIn ? "false" : "true");
+      btn.tabIndex = signedIn ? 0 : -1;
+    });
+    $$(".filters input, .filters select, .filters button").forEach((control) => {
+      control.disabled = !signedIn;
+    });
 
     if (usernameField) usernameField.hidden = signedIn;
     if (passwordField) passwordField.hidden = signedIn;
@@ -527,6 +579,10 @@
   /* ========== Tabs ========== */
 
   function activateTab(target) {
+    if (!isSignedIn()) {
+      setStatusLocked();
+      return;
+    }
     $$(".tab").forEach((btn) => {
       const active = btn.dataset.target === target;
       btn.classList.toggle("is-active", active);
@@ -545,11 +601,18 @@
 
   function bindTabs() {
     $$(".tab").forEach((btn) => {
-      btn.addEventListener("click", () => activateTab(btn.dataset.target));
+      btn.addEventListener("click", () => {
+        if (!isSignedIn()) {
+          setStatusLocked();
+          return;
+        }
+        activateTab(btn.dataset.target);
+      });
     });
   }
 
   function bootstrapTabFromHash() {
+    if (!isSignedIn()) return;
     const hash = (location.hash || "").replace(/^#/, "");
     if (hash && $$(".view").some((v) => v.id === hash)) {
       activateTab(hash);
@@ -841,6 +904,11 @@
   /* ========== Loaders ========== */
 
   async function loadOverview(filters) {
+    if (!isSignedIn()) {
+      renderAuthUi();
+      setStatusLocked();
+      return;
+    }
     setCardsLoading(true);
     setStatusLoading("Loading overview…");
     const params = {};
@@ -865,6 +933,11 @@
   }
 
   async function loadEvents(filters) {
+    if (!isSignedIn()) {
+      renderAuthUi();
+      setStatusLocked();
+      return;
+    }
     setStatusLoading("Loading events…");
     try {
       const params = {
@@ -887,6 +960,11 @@
   }
 
   async function loadLlmRuns(filters) {
+    if (!isSignedIn()) {
+      renderAuthUi();
+      setStatusLocked();
+      return;
+    }
     setStatusLoading("Loading LLM runs…");
     try {
       const params = {
@@ -909,6 +987,11 @@
   }
 
   async function loadFoodSearch(filters) {
+    if (!isSignedIn()) {
+      renderAuthUi();
+      setStatusLocked();
+      return;
+    }
     setStatusLoading("Loading food search events…");
     try {
       const params = {
@@ -935,6 +1018,11 @@
   }
 
   async function loadTrace(traceId) {
+    if (!isSignedIn()) {
+      renderAuthUi();
+      setStatusLocked();
+      return;
+    }
     if (!traceId) {
       setStatusError({ message: "Trace id is required" });
       return;
@@ -1130,6 +1218,10 @@
       const view = shortcuts[e.key];
       if (view) {
         e.preventDefault();
+        if (!isSignedIn()) {
+          setStatusLocked();
+          return;
+        }
         activateTab(view);
       }
     });
@@ -1142,7 +1234,14 @@
     bindConfigForm();
     bindFilterForms();
     bindGlobalHotkeys();
-    bootstrapTabFromHash();
+    if (isSignedIn()) {
+      bootstrapTabFromHash();
+      loadOverview({});
+    } else {
+      clearProtectedData();
+      renderAuthUi();
+      setStatusLocked();
+    }
     window.addEventListener("hashchange", bootstrapTabFromHash);
   }
 

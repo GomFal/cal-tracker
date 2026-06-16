@@ -357,7 +357,7 @@ export const telemetryStatusSchema = z.enum([
 ]);
 
 export const clientTelemetryEventInputSchema = z.object({
-  eventType: z.string().trim().min(1).max(120),
+  eventType: z.string().trim().min(1).max(120).regex(/^mobile\./),
   flow: z.string().trim().max(120).optional(),
   surface: clientTelemetrySurfaceSchema.default("mobile"),
   severity: telemetrySeveritySchema.default("info"),

@@ -219,8 +219,8 @@ describe("client telemetry ingestion", () => {
     expect(me.status).toBe(200);
   });
 
-  it("forces client telemetry to mobile surface and drops non-mobile event types", async () => {
-    const { request, telemetry } = buildTestApp();
+  it("rejects non-mobile client telemetry event types", async () => {
+    const { request } = buildTestApp();
     const { authHeader } = await registerAndAuth(request);
 
     const response = await request("http://localhost/v1/telemetry/client-events", {
@@ -229,33 +229,15 @@ describe("client telemetry ingestion", () => {
       body: JSON.stringify({
         events: [
           {
-            eventType: "mobile.api_request_failed",
-            surface: "admin",
-            severity: "warning",
-            traceId: "trace-client-forced-mobile"
-          },
-          {
             eventType: "backend.api_request_completed",
-            surface: "backend",
+            surface: "mobile",
             severity: "info",
             traceId: "trace-client-dropped-backend"
           }
         ]
       })
     });
-    expect(response.status).toBe(200);
-    const body = await response.json() as { accepted: number };
-    expect(body.accepted).toBe(1);
-
-    const accepted = await telemetry.listEvents({ traceId: "trace-client-forced-mobile", limit: 10 });
-    expect(accepted).toHaveLength(1);
-    expect(accepted[0]).toMatchObject({
-      eventType: "mobile.api_request_failed",
-      surface: "mobile"
-    });
-
-    const dropped = await telemetry.listEvents({ traceId: "trace-client-dropped-backend", limit: 10 });
-    expect(dropped).toHaveLength(0);
+    expect(response.status).toBe(400);
   });
 
   it("rejects an oversized batch with a 400", async () => {

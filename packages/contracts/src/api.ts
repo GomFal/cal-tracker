@@ -345,6 +345,8 @@ export const telemetrySurfaceSchema = z.enum([
   "admin"
 ]);
 
+export const clientTelemetrySurfaceSchema = z.enum(["mobile"]);
+
 export const telemetrySeveritySchema = z.enum(["info", "warning", "error"]);
 
 export const telemetryStatusSchema = z.enum([
@@ -357,7 +359,7 @@ export const telemetryStatusSchema = z.enum([
 export const clientTelemetryEventInputSchema = z.object({
   eventType: z.string().trim().min(1).max(120),
   flow: z.string().trim().max(120).optional(),
-  surface: telemetrySurfaceSchema.default("mobile"),
+  surface: clientTelemetrySurfaceSchema.default("mobile"),
   severity: telemetrySeveritySchema.default("info"),
   status: telemetryStatusSchema.optional(),
   traceId: z.string().trim().max(120).optional(),
@@ -548,6 +550,7 @@ export const telemetryOverviewQuerySchema = z.object({
 });
 
 export type TelemetrySurface = z.infer<typeof telemetrySurfaceSchema>;
+export type ClientTelemetrySurface = z.infer<typeof clientTelemetrySurfaceSchema>;
 export type TelemetrySeverity = z.infer<typeof telemetrySeveritySchema>;
 export type TelemetryStatus = z.infer<typeof telemetryStatusSchema>;
 export type ClientTelemetryEventInput = z.infer<typeof clientTelemetryEventInputSchema>;

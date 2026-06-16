@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { PostgresRepository } from "../repository/postgres.js";
 import { buildTestApp, loginAdmin, registerAndAuth } from "./testApp.js";
 
 describe("admin telemetry routes", () => {
@@ -248,6 +249,67 @@ describe("client telemetry ingestion", () => {
       })
     });
     expect(response.status).toBe(400);
+  });
+
+  it("rejects non-mobile client telemetry surfaces", async () => {
+    const { request } = buildTestApp();
+    const { authHeader } = await registerAndAuth(request);
+
+    const response = await request("http://localhost/v1/telemetry/client-events", {
+      method: "POST",
+      headers: authHeader,
+      body: JSON.stringify({
+        events: [
+          {
+            eventType: "backend.api_request_failed",
+            surface: "backend",
+            severity: "warning"
+          }
+        ]
+      })
+    });
+    expect(response.status).toBe(400);
+  });
+});
+
+describe("Postgres telemetry overview", () => {
+  it("uses a global unique trace count instead of summing table-local trace counts", async () => {
+    const repository = new PostgresRepository("postgres://cal_tracker:cal_tracker@localhost:5432/cal_tracker");
+    const executeResponses: Array<Record<string, unknown>[]> = [
+      [{
+        total_events: 2,
+        total_llm_runs: 2,
+        total_food_search_events: 2,
+        event_unique_traces: 2,
+        llm_unique_traces: 2,
+        food_unique_traces: 2,
+        unique_traces: 2,
+        zero_results_count: 1,
+        low_confidence_count: 1,
+        provider_error_count: 1
+      }],
+      [{ user_id: "user-a" }, { user_id: "user-b" }],
+      [{ severity: "warning", count: 2 }],
+      [{ surface: "mobile", count: 2 }],
+      [{ result_kind: "proposal", count: 2 }]
+    ];
+
+    (repository as unknown as { execute: () => Promise<Record<string, unknown>[]> }).execute =
+      async () => executeResponses.shift() ?? [];
+
+    try {
+      const overview = await repository.getTelemetryOverview({
+        from: "2026-06-16T00:00:00.000Z",
+        to: "2026-06-16T23:59:59.999Z"
+      });
+
+      expect(overview.uniqueTraces).toBe(2);
+      expect(overview.uniqueUsers).toBe(2);
+      expect(overview.zeroResultRate).toBe(0.5);
+      expect(overview.providerErrorRate).toBe(0.5);
+    } finally {
+      await repository.close();
+    }
   });
 });
 

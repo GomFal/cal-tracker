@@ -23,9 +23,7 @@ class _MemoryTokenStorage implements TokenStorage {
 
 class _FixedMetadataProvider extends ClientMetadataProvider {
   _FixedMetadataProvider()
-      : super(
-          packageInfoLoader: () async => throw Exception('unused'),
-        );
+    : super(packageInfoLoader: () async => throw Exception('unused'));
 
   @override
   Future<ClientMetadata> read() async {
@@ -40,11 +38,11 @@ class _FixedMetadataProvider extends ClientMetadataProvider {
 
 class _RecordingTelemetryService extends ClientTelemetryService {
   _RecordingTelemetryService()
-      : super(
-          apiConfig: const ApiConfig(baseUrl: 'http://localhost'),
-          tokenStorage: _MemoryTokenStorage(),
-          metadataProvider: _FixedMetadataProvider(),
-        );
+    : super(
+        apiConfig: const ApiConfig(baseUrl: 'http://localhost'),
+        tokenStorage: _MemoryTokenStorage(),
+        metadataProvider: _FixedMetadataProvider(),
+      );
 
   final List<ClientTelemetryEvent> events = <ClientTelemetryEvent>[];
 
@@ -99,9 +97,36 @@ void main() {
       expect(headers['X-App-Version'], '0.1.9');
       expect(headers['X-App-Build'], '15');
       expect(headers['X-Client-Platform'], 'android');
-      expect(headers['X-Client-Session-Id'],
-          '01234567-89ab-4cde-9012-3456789abcdef');
+      expect(
+        headers['X-Client-Session-Id'],
+        '01234567-89ab-4cde-9012-3456789abcdef',
+      );
     });
+
+    test(
+      'searchFoodsWithRequestId returns the id sent on the request',
+      () async {
+        String? seenRequestId;
+        final client = CalTrackerApiClient(
+          config: const ApiConfig(baseUrl: 'http://localhost'),
+          tokenStorage: _MemoryTokenStorage(),
+          metadataProvider: _FixedMetadataProvider(),
+          httpClient: MockClient((request) async {
+            seenRequestId = request.headers['X-Request-Id'];
+            return http.Response(
+              jsonEncode(<String, Object?>{'items': <Object?>[]}),
+              200,
+            );
+          }),
+        );
+
+        final result = await client.searchFoodsWithRequestId(query: 'rice');
+
+        expect(result.requestId, seenRequestId);
+        expect(result.requestId.length, 36);
+        expect(result.body['items'], isEmpty);
+      },
+    );
 
     test('sends X-Request-Id on multipart voice requests', () async {
       // The multipart path uses a dedicated IOClient that bypasses the
@@ -161,7 +186,9 @@ void main() {
       });
 
       final client = CalTrackerApiClient(
-        config: ApiConfig(baseUrl: 'http://${server.address.host}:${server.port}'),
+        config: ApiConfig(
+          baseUrl: 'http://${server.address.host}:${server.port}',
+        ),
         tokenStorage: _MemoryTokenStorage(),
         metadataProvider: _FixedMetadataProvider(),
       );
@@ -174,14 +201,8 @@ void main() {
       expect(requestId, isNotNull);
       expect(requestId!.length, 36);
       expect(requestId[14], '4');
-      expect(
-        headers['x-app-version'] ?? headers['X-App-Version'],
-        '0.1.9',
-      );
-      expect(
-        headers['x-app-build'] ?? headers['X-App-Build'],
-        '15',
-      );
+      expect(headers['x-app-version'] ?? headers['X-App-Version'], '0.1.9');
+      expect(headers['x-app-build'] ?? headers['X-App-Build'], '15');
       expect(
         headers['x-client-platform'] ?? headers['X-Client-Platform'],
         'android',
@@ -193,49 +214,52 @@ void main() {
     });
 
     test(
-        'emits api_request_failed telemetry with status + server traceId on 4xx',
-        () async {
-      final telemetry = _RecordingTelemetryService();
-      final client = CalTrackerApiClient(
-        config: const ApiConfig(baseUrl: 'http://localhost'),
-        tokenStorage: _MemoryTokenStorage(),
-        metadataProvider: _FixedMetadataProvider(),
-        telemetryService: telemetry,
-        httpClient: MockClient((request) async {
-          return http.Response(
-            jsonEncode(<String, Object?>{
-              'error': <String, Object?>{
-                'code': 'rate_limited',
-                'message': 'Too many requests',
-                'traceId': 'srv-trace-1234',
-              },
-            }),
-            429,
-            headers: <String, String>{'x-request-id': 'srv-trace-1234'},
-          );
-        }),
-      );
+      'emits api_request_failed telemetry with status + server traceId on 4xx',
+      () async {
+        final telemetry = _RecordingTelemetryService();
+        final client = CalTrackerApiClient(
+          config: const ApiConfig(baseUrl: 'http://localhost'),
+          tokenStorage: _MemoryTokenStorage(),
+          metadataProvider: _FixedMetadataProvider(),
+          telemetryService: telemetry,
+          httpClient: MockClient((request) async {
+            return http.Response(
+              jsonEncode(<String, Object?>{
+                'error': <String, Object?>{
+                  'code': 'rate_limited',
+                  'message': 'Too many requests',
+                  'traceId': 'srv-trace-1234',
+                },
+              }),
+              429,
+              headers: <String, String>{'x-request-id': 'srv-trace-1234'},
+            );
+          }),
+        );
 
-      await expectLater(
-        client.runAgent('100 grams rice'),
-        throwsA(isA<ApiException>()
-            .having((e) => e.statusCode, 'statusCode', 429)
-            .having((e) => e.code, 'code', 'rate_limited')
-            .having((e) => e.traceId, 'traceId', 'srv-trace-1234')),
-      );
+        await expectLater(
+          client.runAgent('100 grams rice'),
+          throwsA(
+            isA<ApiException>()
+                .having((e) => e.statusCode, 'statusCode', 429)
+                .having((e) => e.code, 'code', 'rate_limited')
+                .having((e) => e.traceId, 'traceId', 'srv-trace-1234'),
+          ),
+        );
 
-      expect(telemetry.events, hasLength(1));
-      final event = telemetry.events.single;
-      expect(event.eventType, 'mobile.api_request_failed');
-      expect(event.severity, 'warning');
-      expect(event.status, 'failure');
-      expect(event.route, '/v1/agent/runs');
-      expect(event.method, 'POST');
-      expect(event.errorCode, 'rate_limited');
-      expect(event.traceId, 'srv-trace-1234');
-      expect(event.durationMs, isNotNull);
-      expect(event.metadata['status'], 429);
-    });
+        expect(telemetry.events, hasLength(1));
+        final event = telemetry.events.single;
+        expect(event.eventType, 'mobile.api_request_failed');
+        expect(event.severity, 'warning');
+        expect(event.status, 'failure');
+        expect(event.route, '/v1/agent/runs');
+        expect(event.method, 'POST');
+        expect(event.errorCode, 'rate_limited');
+        expect(event.traceId, 'srv-trace-1234');
+        expect(event.durationMs, isNotNull);
+        expect(event.metadata['status'], 429);
+      },
+    );
 
     test('emits error severity telemetry on 5xx responses', () async {
       final telemetry = _RecordingTelemetryService();

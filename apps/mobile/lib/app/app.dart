@@ -69,34 +69,158 @@ class CalTrackerBootstrap extends StatefulWidget {
 }
 
 class _CalTrackerBootstrapState extends State<CalTrackerBootstrap> {
-  ClientTelemetryService? _ownedTelemetryService;
+  late _CalTrackerComposition _composition;
+  int _providerEpoch = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _composition = _CalTrackerComposition.create(widget);
+  }
+
+  @override
+  void didUpdateWidget(covariant CalTrackerBootstrap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_compositionInputsChanged(oldWidget, widget)) {
+      unawaited(_composition.dispose());
+      _composition = _CalTrackerComposition.create(widget);
+      _providerEpoch += 1;
+    }
+  }
 
   @override
   void dispose() {
-    // If we created the telemetry service we own its lifecycle and must
-    // cancel its periodic flush timer. External services (e.g. tests that
-    // inject their own instance) are left to the caller.
-    _ownedTelemetryService?.dispose();
+    unawaited(_composition.dispose());
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final composition = _composition;
+
+    return MultiProvider(
+      key: ValueKey<int>(_providerEpoch),
+      providers: [
+        Provider<ClientTelemetryService>.value(
+          value: composition.telemetryService,
+        ),
+        Provider<ClientMetadataProvider>.value(
+          value: composition.metadataProvider,
+        ),
+        Provider<AuthRepository>.value(value: composition.authRepository),
+        Provider<NutritionRepository>.value(
+          value: composition.nutritionRepository,
+        ),
+        Provider<AudioRecorderService>.value(
+          value: composition.audioRecorderService,
+        ),
+        Provider<AppPreferencesRepository>.value(
+          value: composition.preferencesRepository,
+        ),
+        ChangeNotifierProvider(
+          create: (_) {
+            final viewModel = MobileUpdateViewModel(
+              updateService: composition.mobileUpdateService,
+            );
+            if (widget.checkForUpdates) {
+              viewModel.checkForUpdate();
+            }
+            return viewModel;
+          },
+        ),
+        ChangeNotifierProvider(
+          create: (_) => ThemeModeViewModel(
+            preferencesRepository: composition.preferencesRepository,
+          )..load(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => LocaleViewModel(
+            preferencesRepository: composition.preferencesRepository,
+          )..load(),
+        ),
+        ChangeNotifierProvider(create: (_) => PerformanceOverlayViewModel()),
+        ChangeNotifierProvider(
+          create: (_) =>
+              AuthViewModel(authRepository: composition.authRepository)
+                ..restoreSession(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => VoiceLogViewModel(
+            nutritionRepository: composition.nutritionRepository,
+            audioRecorderService: composition.audioRecorderService,
+            ownsAudioRecorderService: composition.ownsAudioRecorderService,
+            telemetryService: composition.telemetryService,
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => DashboardViewModel(
+            nutritionRepository: composition.nutritionRepository,
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => MealHistoryViewModel(
+            nutritionRepository: composition.nutritionRepository,
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => MealTemplatesViewModel(
+            nutritionRepository: composition.nutritionRepository,
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => SettingsViewModel(
+            authRepository: composition.authRepository,
+            nutritionRepository: composition.nutritionRepository,
+          ),
+        ),
+      ],
+      child: _CalTrackerApp(appWrapperBuilder: widget.appWrapperBuilder),
+    );
+  }
+}
+
+bool _compositionInputsChanged(
+  CalTrackerBootstrap oldWidget,
+  CalTrackerBootstrap widget,
+) {
+  return oldWidget.apiConfig.baseUrl != widget.apiConfig.baseUrl ||
+      oldWidget.preferencesRepository != widget.preferencesRepository ||
+      oldWidget.authRepository != widget.authRepository ||
+      oldWidget.nutritionRepository != widget.nutritionRepository ||
+      oldWidget.tokenStorage != widget.tokenStorage ||
+      oldWidget.mobileUpdateService != widget.mobileUpdateService ||
+      oldWidget.audioRecorderService != widget.audioRecorderService ||
+      oldWidget.clientTelemetryService != widget.clientTelemetryService ||
+      oldWidget.clientMetadataProvider != widget.clientMetadataProvider;
+}
+
+class _CalTrackerComposition {
+  _CalTrackerComposition({
+    required this.preferencesRepository,
+    required this.authRepository,
+    required this.nutritionRepository,
+    required this.mobileUpdateService,
+    required this.audioRecorderService,
+    required this.ownsAudioRecorderService,
+    required this.telemetryService,
+    required this.metadataProvider,
+    required bool ownsTelemetryService,
+  }) : _ownsTelemetryService = ownsTelemetryService;
+
+  factory _CalTrackerComposition.create(CalTrackerBootstrap widget) {
     final tokenStorage = widget.tokenStorage ?? const SecureTokenStorage();
     final preferencesRepository = widget.preferencesRepository ??
         AppPreferencesRepository(storage: AppPreferencesStorage());
     final metadataProvider =
         widget.clientMetadataProvider ?? ClientMetadataProvider();
+    final ownsTelemetryService = widget.clientTelemetryService == null;
     final telemetryService = widget.clientTelemetryService ??
-        (_ownedTelemetryService = ClientTelemetryService(
+        ClientTelemetryService(
           apiConfig: widget.apiConfig,
           tokenStorage: tokenStorage,
           metadataProvider: metadataProvider,
-        ));
-    // Only start the periodic flush when this widget owns the service so
-    // tests that inject their own ClientTelemetryService stay in control of
-    // its lifecycle.
-    if (widget.clientTelemetryService == null) {
+        );
+    if (ownsTelemetryService) {
       telemetryService.start();
     }
     final apiClient = CalTrackerApiClient(
@@ -117,75 +241,37 @@ class _CalTrackerBootstrapState extends State<CalTrackerBootstrap> {
           cacheStore: NutritionCacheStore(storage: AppPreferencesStorage()),
           telemetryService: telemetryService,
         );
-    final mobileUpdateService = widget.mobileUpdateService ??
-        MobileUpdateService(apiConfig: widget.apiConfig);
-    final audioRecorderService =
-        widget.audioRecorderService ?? AudioRecorderService();
+    final ownsAudioRecorderService = widget.audioRecorderService == null;
 
-    return MultiProvider(
-      providers: [
-        Provider<ClientTelemetryService>.value(value: telemetryService),
-        Provider<ClientMetadataProvider>.value(value: metadataProvider),
-        Provider<AuthRepository>.value(value: authRepository),
-        Provider<NutritionRepository>.value(value: nutritionRepository),
-        Provider<AudioRecorderService>.value(value: audioRecorderService),
-        Provider<AppPreferencesRepository>.value(value: preferencesRepository),
-        ChangeNotifierProvider(
-          create: (_) {
-            final viewModel = MobileUpdateViewModel(
-              updateService: mobileUpdateService,
-            );
-            if (widget.checkForUpdates) {
-              viewModel.checkForUpdate();
-            }
-            return viewModel;
-          },
-        ),
-        ChangeNotifierProvider(
-          create: (_) =>
-              ThemeModeViewModel(preferencesRepository: preferencesRepository)
-                ..load(),
-        ),
-        ChangeNotifierProvider(
-          create: (_) =>
-              LocaleViewModel(preferencesRepository: preferencesRepository)
-                ..load(),
-        ),
-        ChangeNotifierProvider(
-          create: (_) => PerformanceOverlayViewModel(),
-        ),
-        ChangeNotifierProvider(
-          create: (_) =>
-              AuthViewModel(authRepository: authRepository)..restoreSession(),
-        ),
-        ChangeNotifierProvider(
-          create: (_) => VoiceLogViewModel(
-            nutritionRepository: nutritionRepository,
-            audioRecorderService: audioRecorderService,
-            telemetryService: telemetryService,
-          ),
-        ),
-        ChangeNotifierProvider(
-          create: (_) =>
-              DashboardViewModel(nutritionRepository: nutritionRepository),
-        ),
-        ChangeNotifierProvider(
-          create: (_) =>
-              MealHistoryViewModel(nutritionRepository: nutritionRepository),
-        ),
-        ChangeNotifierProvider(
-          create: (_) =>
-              MealTemplatesViewModel(nutritionRepository: nutritionRepository),
-        ),
-        ChangeNotifierProvider(
-          create: (_) => SettingsViewModel(
-            authRepository: authRepository,
-            nutritionRepository: nutritionRepository,
-          ),
-        ),
-      ],
-      child: _CalTrackerApp(appWrapperBuilder: widget.appWrapperBuilder),
+    return _CalTrackerComposition(
+      preferencesRepository: preferencesRepository,
+      authRepository: authRepository,
+      nutritionRepository: nutritionRepository,
+      mobileUpdateService: widget.mobileUpdateService ??
+          MobileUpdateService(apiConfig: widget.apiConfig),
+      audioRecorderService:
+          widget.audioRecorderService ?? AudioRecorderService(),
+      ownsAudioRecorderService: ownsAudioRecorderService,
+      telemetryService: telemetryService,
+      metadataProvider: metadataProvider,
+      ownsTelemetryService: ownsTelemetryService,
     );
+  }
+
+  final AppPreferencesRepository preferencesRepository;
+  final AuthRepository authRepository;
+  final NutritionRepository nutritionRepository;
+  final MobileUpdateService mobileUpdateService;
+  final AudioRecorderService audioRecorderService;
+  final bool ownsAudioRecorderService;
+  final ClientTelemetryService telemetryService;
+  final ClientMetadataProvider metadataProvider;
+  final bool _ownsTelemetryService;
+
+  Future<void> dispose() async {
+    if (_ownsTelemetryService) {
+      await telemetryService.dispose();
+    }
   }
 }
 
@@ -244,12 +330,9 @@ class _CalTrackerAppState extends State<_CalTrackerApp> {
           child: child ?? const SizedBox.shrink(),
         );
         final preloadedApp = _AuthenticatedDataPreloader(child: app);
-        final wrappedApp = widget.appWrapperBuilder?.call(
-              context,
-              preloadedApp,
-              _router!,
-            ) ??
-            preloadedApp;
+        final wrappedApp =
+            widget.appWrapperBuilder?.call(context, preloadedApp, _router!) ??
+                preloadedApp;
         return PerformanceOverlayHost(child: wrappedApp);
       },
     );

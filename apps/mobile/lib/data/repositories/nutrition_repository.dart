@@ -312,13 +312,15 @@ class NutritionRepository {
     String? barcode,
   }) async {
     final stopwatch = Stopwatch()..start();
-    final requestId = _apiClient.lastRequestId;
+    String? requestId;
     try {
-      final json = await _apiClient.searchFoods(
+      final response = await _apiClient.searchFoodsWithRequestId(
         query: query,
         barcode: barcode,
         limit: limit,
       );
+      requestId = response.requestId;
+      final json = response.body;
       _healthMonitor.recordSuccess();
       stopwatch.stop();
       final result = FoodSearchResult(
@@ -334,7 +336,7 @@ class NutritionRepository {
         limit: limit,
         result: result,
         duration: stopwatch.elapsed,
-        requestId: _apiClient.lastRequestId ?? requestId,
+        requestId: requestId,
         status: 'success',
       );
       return result;
@@ -346,7 +348,9 @@ class NutritionRepository {
         limit: limit,
         result: const FoodSearchResult(items: []),
         duration: stopwatch.elapsed,
-        requestId: _apiClient.lastRequestId ?? requestId,
+        requestId: error is ApiException
+            ? error.traceId ?? requestId
+            : requestId,
         status: 'failure',
         error: error,
       );
@@ -859,7 +863,10 @@ class NutritionRepository {
         durationMs: null,
         errorCode: error.runtimeType.toString(),
         errorMessage: error.toString(),
-        metadata: <String, Object?>{'cacheKey': cacheKey, 'operation': operation},
+        metadata: <String, Object?>{
+          'cacheKey': cacheKey,
+          'operation': operation,
+        },
       ),
     );
   }

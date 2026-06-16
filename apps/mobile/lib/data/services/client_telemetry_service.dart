@@ -72,17 +72,16 @@ class ClientTelemetryEvent {
   }
 }
 
-typedef TelemetryHttpSender = Future<http.Response> Function(
-  Uri uri, {
-  Map<String, String>? headers,
-  Object? body,
-});
+typedef TelemetryHttpSender =
+    Future<http.Response> Function(
+      Uri uri, {
+      Map<String, String>? headers,
+      Object? body,
+    });
 
 /// Sender contract that lets the service be unit tested without HTTP.
-typedef TelemetryJsonSender = Future<void> Function(
-  Uri uri,
-  Map<String, Object?> json,
-);
+typedef TelemetryJsonSender =
+    Future<void> Function(Uri uri, Map<String, Object?> json);
 
 /// Maximum events flushed in a single ingestion call.
 const int kDefaultMaxBatchSize = 50;
@@ -102,17 +101,19 @@ class ClientTelemetryService {
     TelemetryHttpSender? httpSender,
     Future<String?> Function()? sessionIdProvider,
     Duration flushInterval = kDefaultFlushInterval,
+    Duration deliveryTimeout = const Duration(seconds: 10),
     int maxBatchSize = kDefaultMaxBatchSize,
     int maxBufferSize = kDefaultMaxBufferSize,
-  })  : _apiConfig = apiConfig,
-        _tokenStorage = tokenStorage,
-        _metadataProvider = metadataProvider,
-        _localeTagProvider = localeTagProvider,
-        _sessionIdProvider = sessionIdProvider,
-        _flushInterval = flushInterval,
-        _maxBatchSize = maxBatchSize,
-        _maxBufferSize = maxBufferSize,
-        _httpSender = httpSender ?? _defaultHttpSender;
+  }) : _apiConfig = apiConfig,
+       _tokenStorage = tokenStorage,
+       _metadataProvider = metadataProvider,
+       _localeTagProvider = localeTagProvider,
+       _sessionIdProvider = sessionIdProvider,
+       _flushInterval = flushInterval,
+       _deliveryTimeout = deliveryTimeout,
+       _maxBatchSize = maxBatchSize,
+       _maxBufferSize = maxBufferSize,
+       _httpSender = httpSender ?? _defaultHttpSender;
 
   final ApiConfig _apiConfig;
   final TokenStorage _tokenStorage;
@@ -120,11 +121,13 @@ class ClientTelemetryService {
   final Future<String?> Function()? _localeTagProvider;
   final Future<String?> Function()? _sessionIdProvider;
   final Duration _flushInterval;
+  final Duration _deliveryTimeout;
   final int _maxBatchSize;
   final int _maxBufferSize;
   final TelemetryHttpSender _httpSender;
 
   bool _disposed = false;
+  bool _flushInFlight = false;
   Timer? _flushTimer;
   final List<ClientTelemetryEvent> _buffer = <ClientTelemetryEvent>[];
 
@@ -151,18 +154,29 @@ class ClientTelemetryService {
   /// Drain the queue and POST pending events. Never throws.
   Future<void> flush() async {
     if (_disposed) return;
+    if (_flushInFlight) return;
     if (_buffer.isEmpty) return;
+    _flushInFlight = true;
     final batchSize = math.min(_buffer.length, _maxBatchSize);
     final batch = List<ClientTelemetryEvent>.from(_buffer.take(batchSize));
     _buffer.removeRange(0, batchSize);
     try {
+      final clientMetadata = await _bodyMetadata();
       final json = <String, Object?>{
-        'events': batch.map((event) => event.toJson()).toList(),
+        'events': batch.map((event) {
+          return <String, Object?>{
+            ...event.toJson(),
+            if (clientMetadata != null) ...clientMetadata.toJson(),
+          };
+        }).toList(),
       };
       final uri = Uri.parse('${_apiConfig.baseUrl}/v1/telemetry/client-events');
-      await _send(uri, json);
+      await _send(uri, json).timeout(_deliveryTimeout);
     } on Object {
-      // Telemetry must never break the app. Drop the batch on failure.
+      _requeue(batch);
+      // Telemetry must never break the app.
+    } finally {
+      _flushInFlight = false;
     }
   }
 
@@ -180,11 +194,22 @@ class ClientTelemetryService {
 
   Future<void> _send(Uri uri, Map<String, Object?> json) async {
     final headers = await _headers();
-    await _httpSender(
+    final response = await _httpSender(
       uri,
       headers: headers,
       body: jsonEncode(json),
     );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw _TelemetryDeliveryException(response.statusCode);
+    }
+  }
+
+  void _requeue(List<ClientTelemetryEvent> batch) {
+    if (_disposed || batch.isEmpty) return;
+    _buffer.insertAll(0, batch);
+    while (_buffer.length > _maxBufferSize) {
+      _buffer.removeLast();
+    }
   }
 
   Future<Map<String, String>> _headers() async {
@@ -217,6 +242,55 @@ class ClientTelemetryService {
     }
     return headers;
   }
+
+  Future<_TelemetryBodyMetadata?> _bodyMetadata() async {
+    try {
+      final metadata = await _metadataProvider.read();
+      final provider = _sessionIdProvider;
+      final sessionId = provider != null
+          ? await provider()
+          : metadata.sessionId;
+      return _TelemetryBodyMetadata(
+        sessionId: sessionId?.isNotEmpty == true
+            ? sessionId!
+            : metadata.sessionId,
+        appVersion: metadata.appVersion,
+        appBuild: metadata.appBuild,
+        platform: metadata.platform,
+      );
+    } on Object {
+      return null;
+    }
+  }
+}
+
+class _TelemetryBodyMetadata {
+  const _TelemetryBodyMetadata({
+    required this.sessionId,
+    required this.appVersion,
+    required this.appBuild,
+    required this.platform,
+  });
+
+  final String sessionId;
+  final String appVersion;
+  final String appBuild;
+  final String platform;
+
+  Map<String, Object?> toJson() {
+    return <String, Object?>{
+      'sessionId': sessionId,
+      'appVersion': appVersion,
+      'appBuild': appBuild,
+      'platform': platform,
+    };
+  }
+}
+
+class _TelemetryDeliveryException implements Exception {
+  const _TelemetryDeliveryException(this.statusCode);
+
+  final int statusCode;
 }
 
 Future<http.Response> _defaultHttpSender(
@@ -225,7 +299,9 @@ Future<http.Response> _defaultHttpSender(
   Object? body,
 }) {
   // Late import: http package is always available on supported platforms.
-  return http.post(uri, headers: headers, body: body).timeout(
+  return http
+      .post(uri, headers: headers, body: body)
+      .timeout(
         const Duration(seconds: 5),
         onTimeout: () => http.Response('', 408),
       );

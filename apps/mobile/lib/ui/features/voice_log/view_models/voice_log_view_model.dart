@@ -179,10 +179,13 @@ class VoiceLogViewModel extends ChangeNotifier {
   VoiceLogViewModel({
     required NutritionRepository nutritionRepository,
     AudioRecorderService? audioRecorderService,
+    bool ownsAudioRecorderService = true,
     ClientTelemetryService? telemetryService,
     DateTime Function()? now,
   })  : _nutritionRepository = nutritionRepository,
         _audioRecorderService = audioRecorderService ?? AudioRecorderService(),
+        _ownsAudioRecorderService =
+            audioRecorderService == null || ownsAudioRecorderService,
         _telemetryService = telemetryService,
         _now = now ?? DateTime.now {
     _timers = VoiceLogTimers(
@@ -196,6 +199,7 @@ class VoiceLogViewModel extends ChangeNotifier {
 
   final NutritionRepository _nutritionRepository;
   final AudioRecorderService _audioRecorderService;
+  final bool _ownsAudioRecorderService;
   final ClientTelemetryService? _telemetryService;
   final DateTime Function() _now;
 
@@ -927,7 +931,9 @@ class VoiceLogViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
-    _audioRecorderService.dispose();
+    if (_ownsAudioRecorderService) {
+      _audioRecorderService.dispose();
+    }
     _timers.dispose();
     super.dispose();
   }

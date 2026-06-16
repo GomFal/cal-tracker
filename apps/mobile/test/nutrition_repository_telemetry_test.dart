@@ -1,19 +1,22 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:cal_tracker_mobile/data/repositories/nutrition_repository.dart';
+import 'package:cal_tracker_mobile/data/services/api_config.dart';
 import 'package:cal_tracker_mobile/data/services/client_metadata_provider.dart';
 import 'package:cal_tracker_mobile/data/services/client_telemetry_service.dart';
 import 'package:cal_tracker_mobile/data/services/secure_token_storage.dart';
-import 'package:cal_tracker_mobile/data/services/api_config.dart';
 import 'package:cal_tracker_mobile/generated/api/cal_tracker_api.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockCalTrackerApiClient extends Mock implements CalTrackerApiClient {}
 
 class _FixedMetadataProvider extends ClientMetadataProvider {
   _FixedMetadataProvider()
-      : super(
-          packageInfoLoader: () async => throw Exception('unused'),
-        );
+    : super(packageInfoLoader: () async => throw Exception('unused'));
 
   @override
   Future<ClientMetadata> read() async {
@@ -28,11 +31,11 @@ class _FixedMetadataProvider extends ClientMetadataProvider {
 
 class _RecordingTelemetryService extends ClientTelemetryService {
   _RecordingTelemetryService()
-      : super(
-          apiConfig: const ApiConfig(baseUrl: 'http://localhost'),
-          tokenStorage: _NoopTokenStorage(),
-          metadataProvider: _FixedMetadataProvider(),
-        );
+    : super(
+        apiConfig: const ApiConfig(baseUrl: 'http://localhost'),
+        tokenStorage: _NoopTokenStorage(),
+        metadataProvider: _FixedMetadataProvider(),
+      );
 
   final List<ClientTelemetryEvent> events = <ClientTelemetryEvent>[];
 
@@ -62,24 +65,26 @@ void main() {
         apiClient: apiClient,
         telemetryService: telemetry,
       );
-      when(() => apiClient.lastRequestId).thenReturn('req-1');
       when(
-        () => apiClient.searchFoods(query: 'rice', limit: 10),
+        () => apiClient.searchFoodsWithRequestId(query: 'rice', limit: 10),
       ).thenAnswer(
-        (_) async => <String, Object?>{
-          'items': [
-            <String, Object?>{
-              'name': 'White rice',
-              'quantity': 100,
-              'unit': 'g',
-              'calories': 130,
-              'proteinGrams': 2.7,
-              'carbsGrams': 28,
-              'fatGrams': 0.3,
-              'source': 'open_food_facts',
-            },
-          ],
-        },
+        (_) async => const ApiCallResult<Map<String, Object?>>(
+          requestId: 'req-1',
+          body: <String, Object?>{
+            'items': [
+              <String, Object?>{
+                'name': 'White rice',
+                'quantity': 100,
+                'unit': 'g',
+                'calories': 130,
+                'proteinGrams': 2.7,
+                'carbsGrams': 28,
+                'fatGrams': 0.3,
+                'source': 'open_food_facts',
+              },
+            ],
+          },
+        ),
       );
 
       final result = await repository.searchFoods('rice');
@@ -100,45 +105,45 @@ void main() {
       expect(event.metadata['queryLength'], 4);
     });
 
-    test('emits food_search_completed with zeroResults flag when empty',
-        () async {
+    test(
+      'emits food_search_completed with zeroResults flag when empty',
+      () async {
+        final apiClient = MockCalTrackerApiClient();
+        final telemetry = _RecordingTelemetryService();
+        final repository = NutritionRepository(
+          apiClient: apiClient,
+          telemetryService: telemetry,
+        );
+        when(
+          () => apiClient.searchFoodsWithRequestId(query: 'unknown', limit: 10),
+        ).thenAnswer(
+          (_) async => const ApiCallResult<Map<String, Object?>>(
+            requestId: 'req-empty',
+            body: <String, Object?>{'items': <Object?>[]},
+          ),
+        );
+
+        final result = await repository.searchFoods('unknown');
+
+        expect(result.items, isEmpty);
+        expect(telemetry.events, hasLength(1));
+        final event = telemetry.events.single;
+        expect(event.eventType, 'mobile.food_search_completed');
+        expect(event.metadata['resultCount'], 0);
+        expect(event.metadata['zeroResults'], isTrue);
+      },
+    );
+
+    test('emits food_search_failed with error code on API exception', () async {
       final apiClient = MockCalTrackerApiClient();
       final telemetry = _RecordingTelemetryService();
       final repository = NutritionRepository(
         apiClient: apiClient,
         telemetryService: telemetry,
       );
-      when(() => apiClient.lastRequestId).thenReturn(null);
       when(
-        () => apiClient.searchFoods(query: 'unknown', limit: 10),
-      ).thenAnswer(
-        (_) async => <String, Object?>{'items': <Object?>[]},
-      );
-
-      final result = await repository.searchFoods('unknown');
-
-      expect(result.items, isEmpty);
-      expect(telemetry.events, hasLength(1));
-      final event = telemetry.events.single;
-      expect(event.eventType, 'mobile.food_search_completed');
-      expect(event.metadata['resultCount'], 0);
-      expect(event.metadata['zeroResults'], isTrue);
-    });
-
-    test('emits food_search_failed with error code on API exception',
-        () async {
-      final apiClient = MockCalTrackerApiClient();
-      final telemetry = _RecordingTelemetryService();
-      final repository = NutritionRepository(
-        apiClient: apiClient,
-        telemetryService: telemetry,
-      );
-      // Simulate that the request id was set on the api client just before
-      // the call. The repository reads lastRequestId on both success and
-      // failure paths so the telemetry traceId reflects whatever the client
-      // last saw, which is exactly the request id sent on the wire.
-      when(() => apiClient.lastRequestId).thenReturn('req-fail-1234');
-      when(() => apiClient.searchFoods(query: 'rice', limit: 10)).thenThrow(
+        () => apiClient.searchFoodsWithRequestId(query: 'rice', limit: 10),
+      ).thenThrow(
         const ApiException(
           503,
           'Search temporarily unavailable',
@@ -158,8 +163,76 @@ void main() {
       expect(event.severity, 'error');
       expect(event.status, 'failure');
       expect(event.errorCode, 'search_unavailable');
-      expect(event.traceId, 'req-fail-1234');
+      expect(event.traceId, 'srv-trace-search');
       expect(event.durationMs, isNotNull);
     });
+
+    test(
+      'attributes concurrent food searches to their own request ids',
+      () async {
+        final telemetry = _RecordingTelemetryService();
+        final completers = <String, Completer<http.Response>>{
+          'rice': Completer<http.Response>(),
+          'beans': Completer<http.Response>(),
+        };
+        final requestIdsByQuery = <String, String>{};
+        final apiClient = CalTrackerApiClient(
+          config: const ApiConfig(baseUrl: 'http://localhost'),
+          tokenStorage: _NoopTokenStorage(),
+          metadataProvider: _FixedMetadataProvider(),
+          httpClient: MockClient((request) async {
+            final body = jsonDecode(request.body) as Map<String, Object?>;
+            final query = body['query'] as String;
+            requestIdsByQuery[query] = request.headers['X-Request-Id']!;
+            return completers[query]!.future;
+          }),
+        );
+        final repository = NutritionRepository(
+          apiClient: apiClient,
+          telemetryService: telemetry,
+        );
+
+        final rice = repository.searchFoods('rice');
+        final beans = repository.searchFoods('beans');
+        await Future<void>.delayed(Duration.zero);
+
+        completers['beans']!.complete(
+          http.Response(
+            jsonEncode(<String, Object?>{'items': <Object?>[]}),
+            200,
+          ),
+        );
+        completers['rice']!.complete(
+          http.Response(
+            jsonEncode(<String, Object?>{
+              'items': [
+                <String, Object?>{
+                  'name': 'White rice',
+                  'quantity': 100,
+                  'unit': 'g',
+                  'calories': 130,
+                  'proteinGrams': 2.7,
+                  'carbsGrams': 28,
+                  'fatGrams': 0.3,
+                  'source': 'open_food_facts',
+                },
+              ],
+            }),
+            200,
+          ),
+        );
+
+        await Future.wait(<Future<FoodSearchResult>>[rice, beans]);
+
+        expect(telemetry.events, hasLength(2));
+        final byQueryLength = <int, ClientTelemetryEvent>{
+          for (final event in telemetry.events)
+            event.metadata['queryLength'] as int: event,
+        };
+        expect(byQueryLength[4]!.traceId, requestIdsByQuery['rice']);
+        expect(byQueryLength[5]!.traceId, requestIdsByQuery['beans']);
+        expect(requestIdsByQuery['rice'], isNot(requestIdsByQuery['beans']));
+      },
+    );
   });
 }

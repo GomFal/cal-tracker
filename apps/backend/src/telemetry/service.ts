@@ -25,11 +25,13 @@ import type {
 } from "./telemetryService.js";
 
 const MAX_METADATA_BYTES = 4 * 1024;
-const MAX_QUERY_LENGTH = 120;
 const MAX_METADATA_VALUE_LENGTH = 200;
 const MAX_METADATA_KEY_LENGTH = 80;
 const MAX_METADATA_KEYS = 32;
+const MAX_METADATA_DEPTH = 3;
 const MAX_HISTORY_LIMIT = 200;
+const REDACTED_METADATA_VALUE = "[redacted]";
+const MAX_DEPTH_METADATA_VALUE = "[max_depth]";
 
 export type TelemetryEventInput = Omit<TelemetryEventRecord, "id" | "createdAt" | "metadata"> & {
   metadata?: Record<string, unknown>;
@@ -96,13 +98,13 @@ export class TelemetryService implements TelemetrySink {
   ): Promise<FoodSearchEventRecord | undefined> {
     if (!this.enabled) return undefined;
     const normalized = normalizeFoodSearchEvent(event);
-    const sanitizedQuery = truncateQuery(normalized.queryText);
-    const queryLength = normalized.queryLength ?? sanitizedQuery.length;
+    const query = summarizeQuery(normalized.queryText);
+    const queryLength = normalized.queryLength ?? query.length;
     try {
       return await this.repository.createFoodSearchEvent({
         ...normalized,
-        queryText: sanitizedQuery.text,
-        queryHash: normalized.queryHash ?? sanitizedQuery.hash,
+        queryText: undefined,
+        queryHash: normalized.queryHash ?? query.hash,
         queryLength,
         metadata: sanitizeMetadata(normalized.metadata),
       });
@@ -199,14 +201,16 @@ export class TelemetryService implements TelemetrySink {
     if (!this.enabled) return { accepted: 0 };
     let accepted = 0;
     for (const event of input.events) {
+      const eventType = normalizeClientEventType(event.eventType);
+      if (!eventType) continue;
       const traceId = event.traceId?.trim() || `client-${randomShortId()}`;
       const result = await this.recordEvent({
         traceId,
         userId: input.userId,
         sessionId: event.sessionId,
-        eventType: event.eventType,
+        eventType,
         flow: event.flow,
-        surface: event.surface,
+        surface: "mobile",
         severity: event.severity,
         status: event.status,
         route: event.route,
@@ -383,7 +387,7 @@ function sanitizeMetadata(metadata: Record<string, unknown> | undefined): Record
   for (const [rawKey, value] of Object.entries(metadata)) {
     if (Object.keys(result).length >= MAX_METADATA_KEYS) break;
     const key = rawKey.slice(0, MAX_METADATA_KEY_LENGTH);
-    const sanitized = sanitizeValue(value);
+    const sanitized = sanitizeValue(value, rawKey, 0);
     const cost = byteLength(key) + byteLength(JSON.stringify(sanitized));
     if (totalBytes + cost > MAX_METADATA_BYTES) break;
     totalBytes += cost;
@@ -397,7 +401,8 @@ function truncateString(value: string | undefined, maxLength: number): string | 
   return value.length > maxLength ? `${value.slice(0, maxLength)}…` : value;
 }
 
-function sanitizeValue(value: unknown): unknown {
+function sanitizeValue(value: unknown, keyHint = "", depth = 0): unknown {
+  if (isSensitiveMetadataKey(keyHint)) return REDACTED_METADATA_VALUE;
   if (value === null || value === undefined) return value;
   if (typeof value === "string") {
     return value.length > MAX_METADATA_VALUE_LENGTH
@@ -406,15 +411,17 @@ function sanitizeValue(value: unknown): unknown {
   }
   if (typeof value === "number" || typeof value === "boolean") return value;
   if (Array.isArray(value)) {
-    return value.slice(0, 16).map((entry) => sanitizeValue(entry));
+    if (depth >= MAX_METADATA_DEPTH) return MAX_DEPTH_METADATA_VALUE;
+    return value.slice(0, 16).map((entry) => sanitizeValue(entry, keyHint, depth + 1));
   }
   if (typeof value === "object") {
+    if (depth >= MAX_METADATA_DEPTH) return MAX_DEPTH_METADATA_VALUE;
     const result: Record<string, unknown> = {};
     let totalBytes = 0;
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
       if (Object.keys(result).length >= MAX_METADATA_KEYS) break;
       const key = k.slice(0, MAX_METADATA_KEY_LENGTH);
-      const sanitized = sanitizeValue(v);
+      const sanitized = sanitizeValue(v, k, depth + 1);
       const cost = byteLength(key) + byteLength(JSON.stringify(sanitized));
       if (totalBytes + cost > MAX_METADATA_VALUE_LENGTH * 2) break;
       totalBytes += cost;
@@ -425,18 +432,70 @@ function sanitizeValue(value: unknown): unknown {
   return String(value).slice(0, MAX_METADATA_VALUE_LENGTH);
 }
 
-function truncateQuery(query: string | undefined): { text: string | undefined; hash: string | undefined; length: number } {
+function summarizeQuery(query: string | undefined): { hash: string | undefined; length: number } {
   if (typeof query !== "string" || query.length === 0) {
-    return { text: undefined, hash: undefined, length: 0 };
+    return { hash: undefined, length: 0 };
   }
   const length = query.length;
-  const truncated = query.length > MAX_QUERY_LENGTH ? query.slice(0, MAX_QUERY_LENGTH) : query;
   return {
-    text: truncated,
     hash: createHash("sha256").update(query).digest("hex").slice(0, 32),
     length
   };
 }
+
+function normalizeClientEventType(eventType: string): string | undefined {
+  const trimmed = eventType.trim();
+  return trimmed.startsWith("mobile.") ? trimmed : undefined;
+}
+
+function isSensitiveMetadataKey(key: string): boolean {
+  const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (!normalized) return false;
+  if (isAlwaysSensitiveMetadataKey(normalized)) return true;
+  if (isTelemetryMetricKey(normalized)) return false;
+  return SENSITIVE_CONTENT_METADATA_KEY_TERMS.some((term) => normalized.includes(term));
+}
+
+function isAlwaysSensitiveMetadataKey(normalizedKey: string): boolean {
+  return (
+    normalizedKey === "token" ||
+    normalizedKey.endsWith("token") ||
+    SENSITIVE_SECRET_METADATA_KEY_TERMS.some((term) => normalizedKey.includes(term))
+  );
+}
+
+function isTelemetryMetricKey(normalizedKey: string): boolean {
+  return (
+    normalizedKey.endsWith("hash") ||
+    normalizedKey.endsWith("length") ||
+    normalizedKey.endsWith("count") ||
+    normalizedKey.endsWith("ms") ||
+    normalizedKey.endsWith("duration") ||
+    normalizedKey.endsWith("present") ||
+    normalizedKey.endsWith("enabled") ||
+    normalizedKey.endsWith("score") ||
+    normalizedKey.endsWith("rank")
+  );
+}
+
+const SENSITIVE_SECRET_METADATA_KEY_TERMS = [
+  "authorization",
+  "authheader",
+  "bearer",
+  "cookie",
+  "credential",
+  "passwd",
+  "password",
+  "secret",
+  "apikey",
+];
+
+const SENSITIVE_CONTENT_METADATA_KEY_TERMS = [
+  "email",
+  "originaltext",
+  "query",
+  "transcript",
+];
 
 function byteLength(value: string | undefined): number {
   if (value === undefined) return 0;

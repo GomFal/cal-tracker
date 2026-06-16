@@ -12,7 +12,9 @@ Object.assign(window.AdminTelemetry, {
   // Default API base URL used the first time the panel is opened.
   // Operators can override it from the form; the value is stored in
   // localStorage under the keys below.
-  defaultApiBase: "http://localhost:3000",
+  defaultApiBase: window.location.hostname === "localhost"
+    ? "http://localhost:3000"
+    : window.location.origin,
 
   // apiBase uses localStorage. apiToken and username use sessionStorage.
   storageKeys: {

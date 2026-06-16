@@ -115,65 +115,68 @@ void main() {
       final apiClient = MockCalTrackerApiClient();
       final repository = NutritionRepository(apiClient: apiClient);
       when(
-        () => apiClient.searchFoods(query: 'rice', limit: 10),
+        () => apiClient.searchFoodsWithRequestId(query: 'rice', limit: 10),
       ).thenAnswer(
-        (_) async => {
-          'items': [
-            {
-              'name': 'House rice',
-              'quantity': 100,
-              'unit': 'g',
-              'calories': 360,
-              'proteinGrams': 7,
-              'carbsGrams': 79,
-              'fatGrams': 1,
-              'source': 'user_custom',
-              'externalSource': 'user_custom',
-              'externalId': '550e8400-e29b-41d4-a716-446655440000',
-              'canonicalName': 'rice',
-              'originalText': 'rice',
-              'confidence': 0.95,
-            },
-            {
-              'name': 'Cooked rice',
-              'quantity': 100,
-              'unit': 'g',
-              'calories': 130,
-              'proteinGrams': 2.7,
-              'carbsGrams': 28,
-              'fatGrams': 0.3,
-              'source': 'test_fixture',
-              'externalId': 'cooked_rice_1',
-            },
-          ],
-          'candidateGroups': [
-            {
-              'mention': {
-                'originalText': 'rice',
-                'canonicalName': 'rice',
-                'canonicalEnglishName': 'rice',
+        (_) async => const ApiCallResult<Map<String, Object?>>(
+          requestId: 'req-rice',
+          body: {
+            'items': [
+              {
+                'name': 'House rice',
                 'quantity': 100,
                 'unit': 'g',
+                'calories': 360,
+                'proteinGrams': 7,
+                'carbsGrams': 79,
+                'fatGrams': 1,
+                'source': 'user_custom',
+                'externalSource': 'user_custom',
+                'externalId': '550e8400-e29b-41d4-a716-446655440000',
+                'canonicalName': 'rice',
+                'originalText': 'rice',
                 'confidence': 0.95,
-                'marketProduct': false,
               },
-              'candidates': [
-                {
-                  'name': 'House rice',
+              {
+                'name': 'Cooked rice',
+                'quantity': 100,
+                'unit': 'g',
+                'calories': 130,
+                'proteinGrams': 2.7,
+                'carbsGrams': 28,
+                'fatGrams': 0.3,
+                'source': 'test_fixture',
+                'externalId': 'cooked_rice_1',
+              },
+            ],
+            'candidateGroups': [
+              {
+                'mention': {
+                  'originalText': 'rice',
+                  'canonicalName': 'rice',
+                  'canonicalEnglishName': 'rice',
                   'quantity': 100,
                   'unit': 'g',
-                  'calories': 360,
-                  'proteinGrams': 7,
-                  'carbsGrams': 79,
-                  'fatGrams': 1,
-                  'source': 'user_custom',
-                  'externalSource': 'user_custom',
-                  'externalId': '550e8400-e29b-41d4-a716-446655440000',
+                  'confidence': 0.95,
+                  'marketProduct': false,
                 },
-              ],
-            },
-          ],
-        },
+                'candidates': [
+                  {
+                    'name': 'House rice',
+                    'quantity': 100,
+                    'unit': 'g',
+                    'calories': 360,
+                    'proteinGrams': 7,
+                    'carbsGrams': 79,
+                    'fatGrams': 1,
+                    'source': 'user_custom',
+                    'externalSource': 'user_custom',
+                    'externalId': '550e8400-e29b-41d4-a716-446655440000',
+                  },
+                ],
+              },
+            ],
+          },
+        ),
       );
 
       final result = await repository.searchFoods('rice');
@@ -198,49 +201,52 @@ void main() {
       final apiClient = MockCalTrackerApiClient();
       final repository = NutritionRepository(apiClient: apiClient);
       when(
-        () => apiClient.searchFoods(query: 'bread', limit: 10),
+        () => apiClient.searchFoodsWithRequestId(query: 'bread', limit: 10),
       ).thenAnswer(
-        (_) async => {
-          'items': [
-            {
-              'name': 'Bread',
-              'quantity': 100,
-              'unit': 'g',
-              'calories': 265,
-              'proteinGrams': 9,
-              'carbsGrams': 49,
-              'fatGrams': 3.2,
-              'source': 'test_fixture',
-              'externalId': 'bread_1',
-            },
-          ],
-          'candidateGroups': [
-            {
-              'mention': {
-                'originalText': 'bread',
-                'canonicalName': 'bread',
-                'canonicalEnglishName': 'bread',
+        (_) async => const ApiCallResult<Map<String, Object?>>(
+          requestId: 'req-bread',
+          body: {
+            'items': [
+              {
+                'name': 'Bread',
                 'quantity': 100,
                 'unit': 'g',
-                'confidence': 0.95,
-                'marketProduct': false,
+                'calories': 265,
+                'proteinGrams': 9,
+                'carbsGrams': 49,
+                'fatGrams': 3.2,
+                'source': 'test_fixture',
+                'externalId': 'bread_1',
               },
-              'candidates': [
-                {
-                  'name': 'Bread',
+            ],
+            'candidateGroups': [
+              {
+                'mention': {
+                  'originalText': 'bread',
+                  'canonicalName': 'bread',
+                  'canonicalEnglishName': 'bread',
                   'quantity': 100,
                   'unit': 'g',
-                  'calories': 265,
-                  'proteinGrams': 9,
-                  'carbsGrams': 49,
-                  'fatGrams': 3.2,
-                  'source': 'test_fixture',
-                  'externalId': 'bread_1',
+                  'confidence': 0.95,
+                  'marketProduct': false,
                 },
-              ],
-            },
-          ],
-        },
+                'candidates': [
+                  {
+                    'name': 'Bread',
+                    'quantity': 100,
+                    'unit': 'g',
+                    'calories': 265,
+                    'proteinGrams': 9,
+                    'carbsGrams': 49,
+                    'fatGrams': 3.2,
+                    'source': 'test_fixture',
+                    'externalId': 'bread_1',
+                  },
+                ],
+              },
+            ],
+          },
+        ),
       );
 
       final result = await repository.searchFoods('bread');

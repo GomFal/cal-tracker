@@ -38,7 +38,7 @@ void main() {
     );
   });
 
-  testWidgets('usuals explanation and add action use dark palette', (
+  testWidgets('usuals empty meal state and add action use dark palette', (
     tester,
   ) async {
     await _pumpScreen(
@@ -49,10 +49,8 @@ void main() {
 
     var addButton = _addActionButton(tester);
 
-    expect(
-      find.text('Usual meals are trusted meals you can log quickly.'),
-      findsOneWidget,
-    );
+    expect(find.text('No usual meals yet'), findsOneWidget);
+    expect(find.text('Saved meals will appear here.'), findsOneWidget);
     expect(
         find.byKey(const ValueKey('usuals_section_explanation')), findsNothing);
     expect(find.byKey(const ValueKey('usuals_explainer_card')), findsNothing);
@@ -61,9 +59,10 @@ void main() {
     await tester.tap(find.text('Ingredients').hitTestable());
     await tester.pumpAndSettle();
 
+    expect(find.text('No usual ingredients yet'), findsOneWidget);
     expect(
       find.text(
-        'Usual ingredients are foods you enter manually so they appear first in search and meal logging.',
+        'Add foods you use often so they appear first in search and meal logging.',
       ),
       findsOneWidget,
     );

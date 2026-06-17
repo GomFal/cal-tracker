@@ -204,9 +204,28 @@ extension FreshPaletteLookup on BuildContext {
   }) {
     final palette = freshPalette;
     final isDark = Theme.of(this).brightness == Brightness.dark;
-    return (isDark ? palette.appBg : palette.ink).withValues(
+    return (isDark ? Colors.black : palette.ink).withValues(
       alpha: isDark ? darkAlpha : lightAlpha,
     );
+  }
+
+  List<BoxShadow> freshElevationShadow({
+    required double lightAlpha,
+    required double darkAlpha,
+    required double blurRadius,
+    required Offset offset,
+  }) {
+    final isDark = Theme.of(this).brightness == Brightness.dark;
+    return [
+      BoxShadow(
+        color: freshShadowColor(
+          lightAlpha: lightAlpha,
+          darkAlpha: darkAlpha,
+        ),
+        blurRadius: isDark ? blurRadius * 0.65 : blurRadius,
+        offset: isDark ? Offset(offset.dx, offset.dy * 0.55) : offset,
+      ),
+    ];
   }
 }
 
@@ -240,7 +259,7 @@ const _lightSoftShadow = [
 
 const _darkSoftShadow = [
   BoxShadow(
-    color: Color(0x4d080b07),
+    color: Color(0x66000000),
     blurRadius: 12,
     offset: Offset(0, 7),
   ),

@@ -338,6 +338,25 @@ void main() {
       expect(find.text('Set calories first'), findsNothing);
     },
   );
+
+  testWidgets('Menu macro row uses a dark shadow in dark mode', (tester) async {
+    final preferencesRepository = _FakePreferencesRepository();
+    final themeModeViewModel = ThemeModeViewModel(
+      preferencesRepository: preferencesRepository,
+    );
+    await themeModeViewModel.setThemeMode(ThemeMode.dark);
+
+    await _pumpSettings(
+      tester,
+      themeModeViewModel: themeModeViewModel,
+    );
+
+    final decoration = _freshCardDecoration(tester, 'macro_distribution_row');
+
+    expect(decoration.boxShadow, isNotNull);
+    expect(decoration.boxShadow!.single.color, const Color(0x66000000));
+    expect(decoration.boxShadow!.single.color, isNot(const Color(0x14080907)));
+  });
 }
 
 Future<void> _pumpSettings(
@@ -415,6 +434,18 @@ class _SettingsTestApp extends StatelessWidget {
       home: const Scaffold(body: SettingsScreen()),
     );
   }
+}
+
+BoxDecoration _freshCardDecoration(WidgetTester tester, String cardKey) {
+  final decoratedBox = tester.widget<DecoratedBox>(
+    find
+        .descendant(
+          of: find.byKey(ValueKey(cardKey)),
+          matching: find.byType(DecoratedBox),
+        )
+        .first,
+  );
+  return decoratedBox.decoration as BoxDecoration;
 }
 
 class _FakePreferencesRepository implements AppPreferencesRepository {

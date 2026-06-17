@@ -112,6 +112,7 @@ class _MacroDistributionSheetState extends State<MacroDistributionSheet> {
                           padding:
                               const EdgeInsets.only(bottom: FreshSpacing.md),
                           child: _PersonalizedMacroCard(
+                            key: const ValueKey('macro_personalized_card'),
                             selected: _selectedPreset == null,
                             config: _personalizedConfig,
                             calories: widget.calories,
@@ -716,6 +717,7 @@ class _PersonalizedMacroSheetState extends State<_PersonalizedMacroSheet> {
 
 class _PersonalizedMacroCard extends StatelessWidget {
   const _PersonalizedMacroCard({
+    super.key,
     required this.selected,
     required this.config,
     required this.calories,
@@ -756,16 +758,12 @@ class _PersonalizedMacroCard extends StatelessWidget {
               color: selected ? palette.lime : palette.ruleSoft,
               width: selected ? 2 : 1,
             ),
-            boxShadow: [
-              BoxShadow(
-                color: context.freshShadowColor(
-                  lightAlpha: 0.09,
-                  darkAlpha: 0.42,
-                ),
-                blurRadius: 28,
-                offset: const Offset(0, 14),
-              ),
-            ],
+            boxShadow: context.freshElevationShadow(
+              lightAlpha: 0.09,
+              darkAlpha: 0.38,
+              blurRadius: 28,
+              offset: const Offset(0, 14),
+            ),
           ),
           child: Row(
             children: [
@@ -897,16 +895,12 @@ class MacroPresetCard extends StatelessWidget {
               color: selected ? palette.lime : palette.ruleSoft,
               width: selected ? 2 : 1,
             ),
-            boxShadow: [
-              BoxShadow(
-                color: context.freshShadowColor(
-                  lightAlpha: 0.09,
-                  darkAlpha: 0.42,
-                ),
-                blurRadius: 28,
-                offset: const Offset(0, 14),
-              ),
-            ],
+            boxShadow: context.freshElevationShadow(
+              lightAlpha: 0.09,
+              darkAlpha: 0.38,
+              blurRadius: 28,
+              offset: const Offset(0, 14),
+            ),
           ),
           child: Row(
             children: [

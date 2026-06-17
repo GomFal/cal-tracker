@@ -280,14 +280,45 @@ void main() {
     expect(find.text('Gramos'), findsOneWidget);
     expect(find.text('Guardar macros personalizados'), findsOneWidget);
   });
+
+  testWidgets('macro option cards use dark shadows in dark mode',
+      (tester) async {
+    await tester.pumpWidget(_testApp(
+      const MacroDistributionSheet(calories: 2000),
+      themeMode: ThemeMode.dark,
+    ));
+    await tester.pumpAndSettle();
+
+    final presetDecoration = _cardDecoration(tester, 'macro_preset_balanced');
+    final personalizedDecoration =
+        _cardDecoration(tester, 'macro_personalized_card');
+    final lightShadow = const Color(0x17080907);
+    final darkShadow = Colors.black.withValues(alpha: 0.38);
+
+    expect(presetDecoration.boxShadow, isNotNull);
+    expect(personalizedDecoration.boxShadow, isNotNull);
+    expect(presetDecoration.boxShadow!.single.color, darkShadow);
+    expect(personalizedDecoration.boxShadow!.single.color, darkShadow);
+    expect(presetDecoration.boxShadow!.single.color, isNot(lightShadow));
+    expect(personalizedDecoration.boxShadow!.single.color, isNot(lightShadow));
+    expect(presetDecoration.boxShadow!.single.blurRadius, 18.2);
+    expect(presetDecoration.boxShadow!.single.offset.dx, 0);
+    expect(presetDecoration.boxShadow!.single.offset.dy, closeTo(7.7, 0.01));
+  });
 }
 
-Widget _testApp(Widget child, {Locale? locale}) {
+Widget _testApp(
+  Widget child, {
+  Locale? locale,
+  ThemeMode themeMode = ThemeMode.light,
+}) {
   return MaterialApp(
     locale: locale,
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     theme: buildLightTheme(),
+    darkTheme: buildDarkTheme(),
+    themeMode: themeMode,
     home: Scaffold(body: child),
   );
 }
@@ -300,4 +331,16 @@ FilledButton _personalizedSaveButton(WidgetTester tester) {
   return tester.widget<FilledButton>(
     find.byKey(const ValueKey('personalized_macro_save_button')),
   );
+}
+
+BoxDecoration _cardDecoration(WidgetTester tester, String cardKey) {
+  final container = tester.widget<AnimatedContainer>(
+    find
+        .descendant(
+          of: find.byKey(ValueKey(cardKey)),
+          matching: find.byType(AnimatedContainer),
+        )
+        .first,
+  );
+  return container.decoration! as BoxDecoration;
 }

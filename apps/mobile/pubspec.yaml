@@ -1,7 +1,7 @@
 name: cal_tracker_mobile
 description: Agent-operable calorie and nutrition tracker MVP.
 publish_to: "none"
-version: 0.1.9+18
+version: 0.1.9+19
 
 environment:
   sdk: ">=3.4.0 <4.0.0"
@@ -43,23 +43,12 @@ dev_dependencies:
   patrol: ^4.5.0
   marionette_mcp: ^0.5.0
   shared_preferences_platform_interface: ^2.4.2
-  flutter_launcher_icons: ^0.14.4
-
-flutter_launcher_icons:
-  android: true
-  ios: true
-  image_path_android: assets/images/app_icon_android_legacy_general.png
-  image_path_ios: assets/images/app_icon_native_opaque.png
-  adaptive_icon_background: assets/images/app_icon_android_adaptive_background_general.png
-  adaptive_icon_foreground: assets/images/app_icon_android_adaptive_foreground_general.png
-  adaptive_icon_foreground_inset: 0
-  remove_alpha_ios: true
-  background_color_ios: "#46953C"
 
 flutter:
   generate: true
   uses-material-design: true
   assets:
+    - assets/logo.svg
     - assets/images/
     - assets/images/icons/
     - assets/images/icons/svg/

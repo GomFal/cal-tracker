@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../l10n/app_localizations_context.dart';
@@ -6,7 +7,7 @@ import '../../../../l10n/generated/app_localizations.dart';
 import '../../../core/design_system.dart';
 import '../view_models/auth_view_model.dart';
 
-const _brandIconAsset = 'assets/images/brand_icon.png';
+const _brandIconAsset = 'assets/logo.svg';
 const _googleContinueButtonAsset =
     'assets/google_brand/android_neutral_rd_ctn@4x.png';
 const _heroAssets = [
@@ -39,7 +40,6 @@ class _AuthScreenState extends State<AuthScreen> {
     super.didChangeDependencies();
     if (_preloadedAuthAssets) return;
     _preloadedAuthAssets = true;
-    precacheImage(const AssetImage(_brandIconAsset), context);
     precacheImage(const AssetImage(_googleContinueButtonAsset), context);
     for (final asset in _heroAssets) {
       precacheImage(AssetImage(asset), context);
@@ -270,13 +270,12 @@ class _AuthTopBar extends StatelessWidget {
       children: [
         ClipRRect(
           borderRadius: BorderRadius.circular(13),
-          child: Image.asset(
+          child: SvgPicture.asset(
             _brandIconAsset,
             key: const ValueKey('auth_brand_icon'),
             width: 42,
             height: 42,
             fit: BoxFit.cover,
-            filterQuality: FilterQuality.high,
           ),
         ),
         const SizedBox(width: FreshSpacing.sm),

@@ -9,6 +9,7 @@ import 'package:cal_tracker_mobile/data/repositories/nutrition_repository.dart';
 import 'package:cal_tracker_mobile/data/services/audio_recorder_service.dart';
 import 'package:cal_tracker_mobile/l10n/generated/app_localizations.dart';
 import 'package:cal_tracker_mobile/ui/core/app_shell.dart';
+import 'package:cal_tracker_mobile/ui/features/agent_chat/view_models/agent_chat_view_model.dart';
 import 'package:cal_tracker_mobile/ui/features/voice_log/view_models/voice_log_view_model.dart';
 
 class _MockNutritionRepository extends Mock implements NutritionRepository {}
@@ -17,27 +18,38 @@ class _MockAudioRecorderService extends Mock implements AudioRecorderService {}
 
 /// Builds a test app that wraps the mic bubble in a GoRouter route context.
 Widget _buildTestApp(String initialLocation) {
+  final nutritionRepository = _MockNutritionRepository();
   final audioRecorderService = _MockAudioRecorderService();
   when(() => audioRecorderService.stateStream)
       .thenAnswer((_) => const Stream.empty());
   when(() => audioRecorderService.dispose()).thenAnswer((_) async {});
 
-  final viewModel = VoiceLogViewModel(
-    nutritionRepository: _MockNutritionRepository(),
+  final voiceViewModel = VoiceLogViewModel(
+    nutritionRepository: nutritionRepository,
+    audioRecorderService: audioRecorderService,
+  );
+  final agentViewModel = AgentChatViewModel(
+    nutritionRepository: nutritionRepository,
     audioRecorderService: audioRecorderService,
   );
 
   final router = GoRouter(
     initialLocation: initialLocation,
     routes: [
+      GoRoute(
+        path: '/agent',
+        builder: (context, state) => const SizedBox(
+          key: ValueKey('agent_route_placeholder'),
+        ),
+      ),
       StatefulShellRoute(
         builder: (context, state, navigationShell) =>
             AppShell(navigationShell: navigationShell),
-        navigatorContainerBuilder:
-            (context, navigationShell, children) => IndexedStack(
-              index: navigationShell.currentIndex,
-              children: children,
-            ),
+        navigatorContainerBuilder: (context, navigationShell, children) =>
+            IndexedStack(
+          index: navigationShell.currentIndex,
+          children: children,
+        ),
         branches: [
           StatefulShellBranch(
             routes: [
@@ -96,7 +108,8 @@ Widget _buildTestApp(String initialLocation) {
 
   return MultiProvider(
     providers: [
-      ChangeNotifierProvider<VoiceLogViewModel>.value(value: viewModel),
+      ChangeNotifierProvider<VoiceLogViewModel>.value(value: voiceViewModel),
+      ChangeNotifierProvider<AgentChatViewModel>.value(value: agentViewModel),
     ],
     child: MaterialApp.router(
       routerConfig: router,
@@ -118,9 +131,9 @@ void _setPhoneViewport(WidgetTester tester) {
 }
 
 void main() {
-  const bubbleText = 'Use this mic to fill this screen';
+  const bubbleText = 'Hold the agent button to speak directly';
 
-  group('Bottom mic bubble tooltip', () {
+  group('Bottom agent bubble tooltip', () {
     testWidgets('appears on /templates/meals/new', (tester) async {
       _setPhoneViewport(tester);
       await tester.pumpWidget(_buildTestApp('/templates/meals/new'));
@@ -199,7 +212,8 @@ void main() {
       expect(find.text(bubbleText), findsOneWidget);
 
       // Tap the semantically-labeled mic button using the semantics finder
-      await tester.tap(find.byKey(const ValueKey('bottom_voice_action_button')));
+      await tester
+          .tap(find.byKey(const ValueKey('bottom_voice_action_button')));
       await tester.pump();
       await tester.pump();
 

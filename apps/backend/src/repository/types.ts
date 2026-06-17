@@ -212,6 +212,28 @@ export type AuditEventRecord = {
   createdAt: string;
 };
 
+export type AgentConversationRecord = {
+  id: string;
+  userId: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AgentConversationMessageRole = "user" | "assistant" | "tool";
+
+export type AgentConversationMessageRecord = {
+  id: string;
+  conversationId: string;
+  userId: string;
+  role: AgentConversationMessageRole;
+  content: string;
+  toolCalls?: unknown;
+  toolCallId?: string;
+  metadata?: unknown;
+  createdAt: string;
+};
+
 export interface AppRepository {
   createUser(input: { email: string; displayName: string; passwordHash?: string; scopes: PermissionScope[] }): Promise<StoredUser>;
   findUserByEmail(email: string): Promise<StoredUser | undefined>;
@@ -261,6 +283,13 @@ export interface AppRepository {
   deleteTemplate(userId: string, templateId: string): Promise<boolean>;
   queryMemory(userId: string, normalizedText: string): Promise<MemoryMatch[]>;
   createMemory(input: { userId: string; normalizedText: string; label: string; templateId?: string; confidence: number }): Promise<void>;
+
+  createAgentConversation(userId: string, input?: { title?: string }): Promise<AgentConversationRecord>;
+  getAgentConversation(userId: string, conversationId: string): Promise<AgentConversationRecord | undefined>;
+  listAgentConversations(userId: string, limit?: number): Promise<AgentConversationRecord[]>;
+  addAgentConversationMessage(userId: string, conversationId: string, input: Omit<AgentConversationMessageRecord, "id" | "conversationId" | "userId" | "createdAt">): Promise<AgentConversationMessageRecord>;
+  listAgentConversationMessages(userId: string, conversationId: string): Promise<AgentConversationMessageRecord[]>;
+  deleteAgentConversation(userId: string, conversationId: string): Promise<boolean>;
 
   recordActionCall(input: Omit<ActionCallRecord, "id" | "createdAt">): Promise<ActionCallRecord>;
   recordAuditEvent(input: Omit<AuditEventRecord, "id" | "createdAt">): Promise<AuditEventRecord>;

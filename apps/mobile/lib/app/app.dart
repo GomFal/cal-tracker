@@ -18,6 +18,7 @@ import '../generated/api/cal_tracker_api.dart';
 import '../l10n/generated/app_localizations.dart';
 import '../ui/core/mobile_update_dialog_host.dart';
 import '../ui/core/performance_overlay_strip.dart';
+import '../ui/features/agent_chat/view_models/agent_chat_view_model.dart';
 import '../ui/features/auth/view_models/auth_view_model.dart';
 import '../ui/features/dashboard/view_models/dashboard_view_model.dart';
 import '../ui/features/meal_history/view_models/meal_history_view_model.dart';
@@ -121,6 +122,12 @@ class CalTrackerBootstrap extends StatelessWidget {
         ),
         ChangeNotifierProvider(
           create: (_) => VoiceLogViewModel(
+            nutritionRepository: nutritionRepository,
+            audioRecorderService: audioRecorderService,
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => AgentChatViewModel(
             nutritionRepository: nutritionRepository,
             audioRecorderService: audioRecorderService,
           ),

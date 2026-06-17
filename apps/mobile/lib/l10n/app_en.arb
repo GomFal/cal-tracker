@@ -593,8 +593,7 @@
   "mealTemplateEditorTitleHint": "Gym lunch",
   "mealTemplateEditorAliasesLabel": "Aliases",
   "mealTemplateEditorAliasesHint": "Comma-separated phrases you use by voice",
-  "bottomMicFillEditorHint": "Use this mic to fill this screen",
-
+  "bottomMicFillEditorHint": "Hold the agent button to speak directly",
   "mealTemplateEditorCandidatesSection": "Food matches",
   "mealTemplateEditorCandidatesHelper": "Choose a candidate when the draft needs a database match.",
   "mealTemplateEditorNoCandidates": "No candidates returned for this ingredient.",
@@ -616,16 +615,15 @@
   "usualFoodsDraftHint": "Example: My rice per 100 g has 360 kcal, 79 g carbs, 7 g protein, 1 g fat and 0.01 g salt.",
   "usualFoodsDraftButton": "Fill fields",
   "usualFoodsDraftEmptyError": "Enter label text before filling fields.",
-
   "usualFoodsScanFromPhotoTooltip": "Scan nutrition label",
   "usualFoodsScanFromPhotoButton": "Scan nutrition label",
   "usualFoodsScanTitle": "Scan nutrition label",
-  "usualFoodsScanHint": "Frame the nutrition table inside the box.",
+  "usualFoodsScanHint": "Take a clear photo of the package, then select the nutrition table.",
   "usualFoodsScanFrameLabel": "Nutrition facts",
   "usualFoodsScanCapture": "Capture",
   "usualFoodsScanRetake": "Retake",
   "usualFoodsScanConfirmCapture": "Use this photo",
-  "usualFoodsScanPreviewHint": "Is the nutrition table clearly framed?",
+  "usualFoodsScanPreviewHint": "Drag the box around the nutrition table, then use this crop.",
   "usualFoodsScanCloseTooltip": "Close",
   "usualFoodsScanProcessingOcr": "Reading text…",
   "usualFoodsScanProcessingDraft": "Filling fields…",
@@ -635,14 +633,12 @@
   "usualFoodsScanCameraUnavailable": "No camera is available on this device.",
   "usualFoodsScanFailedTitle": "Could not interpret the label",
   "usualFoodsScanFailedMessage": "We could not turn that photo into a draft. Try a sharper, well-lit photo of the nutrition table.",
-
   "usualFoodsEditorSubtitle": "Review the label values before saving.",
   "usualFoodsIdentitySectionTitle": "Identity",
   "usualFoodsServingSectionTitle": "Serving",
   "usualFoodsMacrosSectionTitle": "Macros",
   "usualFoodsOptionalSectionTitle": "Optional nutrients",
   "usualFoodsOptionalSectionSubtitle": "Add label details only when you have them.",
-
   "usualFoodsSaveFailedTitle": "Could not save ingredient",
   "usualFoodsNotFoundTitle": "Ingredient not found",
   "usualFoodsNotFoundMessage": "This usual ingredient is no longer available.",
@@ -806,5 +802,44 @@
   "localToolkitPerformanceOverlayOff": "Overlay off",
   "localToolkitTrustedModeOn": "Trusted on",
   "localToolkitTrustedModeOff": "Trusted off",
-  "localToolkitCloseTooltip": "Close toolkit"
+  "localToolkitCloseTooltip": "Close toolkit",
+  "agentChatTitle": "Agent chat",
+  "agentChatSubtitle": "Ask, log, inspect, and correct with visible steps.",
+  "agentChatErrorTitle": "Agent stopped",
+  "agentChatWelcomeTitle": "Tell the agent what you need",
+  "agentChatWelcomeMessage": "It can look up meals, create proposals, check remaining targets, and show every action before the result.",
+  "agentChatPromptYesterday": "What did I eat yesterday?",
+  "agentChatPromptRemaining": "How many calories do I have left?",
+  "agentChatPromptUsual": "Log my usual breakfast",
+  "agentChatToolFallback": "Agent action",
+  "agentChatConsumedToday": "Consumed today",
+  "agentChatNoItems": "No ingredients to show.",
+  "agentChatNoMeals": "No meals to show.",
+  "agentChatNoTemplates": "No usual meals to show.",
+  "agentChatNoUsualFoods": "No usual ingredients to show.",
+  "agentChatUsualFoodDraftTitle": "Usual ingredient draft",
+  "agentChatUsualFoodDraftSubtitle": "Review the fields before saving it to your usual ingredients.",
+  "agentChatUsualFoodDraftUnnamed": "Untitled ingredient",
+  "agentChatUsualMealDraftTitle": "Usual meal draft",
+  "agentChatUsualMealDraftSubtitle": "Review the meal before saving it to your usual meals.",
+  "agentChatUsualMealDraftUnnamed": "Untitled usual meal",
+  "agentChatDraftMissingFields": "Missing fields: {fields}",
+  "@agentChatDraftMissingFields": {
+    "placeholders": {
+      "fields": {}
+    }
+  },
+  "agentChatReviewUsualFoodDraftAction": "Review and save ingredient",
+  "agentChatReviewUsualMealDraftAction": "Review and save usual meal",
+  "agentChatInputHint": "Ask or tell the agent what to do",
+  "agentChatScanLabelTooltip": "Scan nutrition label",
+  "agentChatScanLabelPrompt": "Create a usual ingredient draft from this nutrition label OCR text. Only use values explicitly visible in the text. If required nutrition fields are missing, ask me to complete them before saving.\n\nOCR text:\n{ocrText}",
+  "@agentChatScanLabelPrompt": {
+    "placeholders": {
+      "ocrText": {}
+    }
+  },
+  "agentChatStopRecording": "Stop recording",
+  "agentChatStartRecording": "Record voice message",
+  "agentChatOpenAction": "Open agent chat. Hold to speak"
 }

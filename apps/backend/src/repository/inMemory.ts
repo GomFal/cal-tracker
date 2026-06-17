@@ -20,6 +20,8 @@ import { subtractNutrition, sumNutrition } from "../utils/nutrition.js";
 import { fuzzyFoodScore, lexicalFoodScore } from "./foodSearchScoring.js";
 import type {
   ActionCallRecord,
+  AgentConversationMessageRecord,
+  AgentConversationRecord,
   AppRepository,
   AuditEventRecord,
   AuthIdentityProvider,
@@ -90,6 +92,11 @@ export class InMemoryRepository implements AppRepository {
   > = [];
   private actionCalls: ActionCallRecord[] = [];
   private auditEvents: AuditEventRecord[] = [];
+  private agentConversations = new Map<string, AgentConversationRecord>();
+  private agentConversationMessages = new Map<
+    string,
+    AgentConversationMessageRecord[]
+  >();
 
   static seeded(): InMemoryRepository {
     return new InMemoryRepository();
@@ -915,6 +922,90 @@ export class InMemoryRepository implements AppRepository {
       usageCount: 0,
       ...input,
     });
+  }
+
+  async createAgentConversation(
+    userId: string,
+    input: { title?: string } = {},
+  ): Promise<AgentConversationRecord> {
+    this.requireUser(userId);
+    const now = new Date().toISOString();
+    const conversation: AgentConversationRecord = {
+      id: newId(),
+      userId,
+      title: input.title?.trim() || 'New chat',
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.agentConversations.set(conversation.id, conversation);
+    this.agentConversationMessages.set(conversation.id, []);
+    return conversation;
+  }
+
+  async getAgentConversation(
+    userId: string,
+    conversationId: string,
+  ): Promise<AgentConversationRecord | undefined> {
+    const conversation = this.agentConversations.get(conversationId);
+    return conversation?.userId === userId ? conversation : undefined;
+  }
+
+  async listAgentConversations(
+    userId: string,
+    limit = 25,
+  ): Promise<AgentConversationRecord[]> {
+    return [...this.agentConversations.values()]
+      .filter((conversation) => conversation.userId === userId)
+      .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+      .slice(0, limit);
+  }
+
+  async addAgentConversationMessage(
+    userId: string,
+    conversationId: string,
+    input: Omit<
+      AgentConversationMessageRecord,
+      "id" | "conversationId" | "userId" | "createdAt"
+    >,
+  ): Promise<AgentConversationMessageRecord> {
+    const conversation = await this.getAgentConversation(userId, conversationId);
+    if (!conversation) throw new Error('agent_conversation_not_found');
+    const now = new Date().toISOString();
+    const message: AgentConversationMessageRecord = {
+      ...input,
+      id: newId(),
+      conversationId,
+      userId,
+      createdAt: now,
+    };
+    const messages = this.agentConversationMessages.get(conversationId) ?? [];
+    messages.push(message);
+    this.agentConversationMessages.set(conversationId, messages);
+    this.agentConversations.set(conversationId, {
+      ...conversation,
+      updatedAt: now,
+    });
+    return message;
+  }
+
+  async listAgentConversationMessages(
+    userId: string,
+    conversationId: string,
+  ): Promise<AgentConversationMessageRecord[]> {
+    const conversation = await this.getAgentConversation(userId, conversationId);
+    if (!conversation) return [];
+    return [...(this.agentConversationMessages.get(conversationId) ?? [])];
+  }
+
+  async deleteAgentConversation(
+    userId: string,
+    conversationId: string,
+  ): Promise<boolean> {
+    const conversation = await this.getAgentConversation(userId, conversationId);
+    if (!conversation) return false;
+    this.agentConversations.delete(conversationId);
+    this.agentConversationMessages.delete(conversationId);
+    return true;
   }
 
   async recordActionCall(

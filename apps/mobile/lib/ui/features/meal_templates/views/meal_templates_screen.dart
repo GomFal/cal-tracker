@@ -75,6 +75,16 @@ class _MealTemplatesScreenState extends State<MealTemplatesScreen> {
             },
           ),
           const SizedBox(height: FreshSpacing.lg),
+          Text(
+            _selectedSection == _UsualSection.meals
+                ? l10n.templatesExplainer
+                : l10n.usualFoodsExplainer,
+            style: Theme.of(context)
+                .textTheme
+                .bodyMedium
+                ?.copyWith(color: palette.inkMuted),
+          ),
+          const SizedBox(height: FreshSpacing.lg),
           if (viewModel.isLoading) ...[
             const LinearProgressIndicator(minHeight: 3),
             const SizedBox(height: FreshSpacing.md),

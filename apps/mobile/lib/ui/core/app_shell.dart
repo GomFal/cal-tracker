@@ -7,7 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../../data/repositories/nutrition_repository.dart';
 import '../../l10n/app_localizations_context.dart';
-import '../features/voice_log/view_models/voice_log_view_model.dart';
+import '../features/agent_chat/view_models/agent_chat_view_model.dart';
 import 'design_system.dart';
 import 'voice_action_button.dart';
 
@@ -376,10 +376,12 @@ class _CenterVoiceButton extends StatefulWidget {
 }
 
 class _CenterVoiceButtonState extends State<_CenterVoiceButton> {
-  bool _longPressRecording = false;
   Timer? _bubbleTimer;
   bool _showBubble = false;
   bool _bubbleUserDismissed = false;
+  bool _directVoicePressActive = false;
+  bool _directVoiceReleasePending = false;
+  bool _directVoiceOpenOnRelease = true;
 
   static const _bubbleCreateRoutes = <String>{
     '/templates/meals/new',
@@ -406,8 +408,8 @@ class _CenterVoiceButtonState extends State<_CenterVoiceButton> {
 
   void _initBubbleTimer() {
     final location = _currentLocation();
-    final shouldShow = _bubbleCreateRoutes.contains(location) &&
-        !_bubbleUserDismissed;
+    final shouldShow =
+        _bubbleCreateRoutes.contains(location) && !_bubbleUserDismissed;
     if (shouldShow == _showBubble) return;
     _bubbleTimer?.cancel();
     if (shouldShow) {
@@ -435,35 +437,83 @@ class _CenterVoiceButtonState extends State<_CenterVoiceButton> {
     setState(() => _showBubble = false);
   }
 
+  void _startDirectVoicePress(BuildContext context) {
+    final viewModel = context.read<AgentChatViewModel>();
+    if (viewModel.isBusy || viewModel.isRecording || _directVoicePressActive) {
+      return;
+    }
+    _dismissBubble();
+    _directVoicePressActive = true;
+    _directVoiceReleasePending = false;
+    _directVoiceOpenOnRelease = true;
+    VoiceActionHaptics.recordingStarted();
+    unawaited(_startDirectVoiceRecording(viewModel));
+  }
+
+  Future<void> _startDirectVoiceRecording(
+    AgentChatViewModel viewModel,
+  ) async {
+    await viewModel.startRecording();
+    if (!mounted) return;
+
+    if (!viewModel.isRecording) {
+      final shouldOpenChat =
+          _directVoiceReleasePending && _directVoiceOpenOnRelease;
+      _resetDirectVoicePress();
+      if (shouldOpenChat) _openAgentChat(context);
+      return;
+    }
+
+    if (_directVoiceReleasePending) {
+      _completeDirectVoicePress(
+        context,
+        viewModel,
+        openChat: _directVoiceOpenOnRelease,
+      );
+    }
+  }
+
+  void _requestFinishDirectVoicePress(
+    BuildContext context, {
+    required bool openChat,
+  }) {
+    if (!_directVoicePressActive) return;
+    _directVoiceReleasePending = true;
+    _directVoiceOpenOnRelease = openChat;
+    final viewModel = context.read<AgentChatViewModel>();
+    if (!viewModel.isRecording) return;
+    _completeDirectVoicePress(context, viewModel, openChat: openChat);
+  }
+
+  void _completeDirectVoicePress(
+    BuildContext context,
+    AgentChatViewModel viewModel, {
+    required bool openChat,
+  }) {
+    _resetDirectVoicePress();
+    VoiceActionHaptics.recordingStopped();
+    if (openChat) _openAgentChat(context);
+    unawaited(viewModel.stopRecording());
+  }
+
+  void _resetDirectVoicePress() {
+    _directVoicePressActive = false;
+    _directVoiceReleasePending = false;
+    _directVoiceOpenOnRelease = true;
+  }
+
+  void _openAgentChat(BuildContext context) {
+    if (_currentLocation() == '/agent') return;
+    context.push('/agent');
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
-    final viewModel = context.watch<VoiceLogViewModel>();
-    final isRecording = viewModel.state == VoiceLogState.recording;
-    final isBusy = viewModel.state == VoiceLogState.requestingPermission ||
-        viewModel.state == VoiceLogState.stopping ||
-        viewModel.state == VoiceLogState.transcribing ||
-        viewModel.state == VoiceLogState.agentRunning;
-    final hasError = viewModel.state == VoiceLogState.error;
-    final backgroundColor = isRecording
-        ? palette.coral
-        : hasError
-            ? palette.yellow
-            : isBusy
-                ? palette.surfaceMuted
-                : palette.lime;
-    final icon = isRecording
-        ? Icons.stop_rounded
-        : isBusy
-            ? Icons.graphic_eq_rounded
-            : hasError
-                ? Icons.error_outline_rounded
-                : Icons.mic_rounded;
-    final tooltip = isRecording
-        ? 'Stop recording'
-        : isBusy
-            ? 'Processing voice'
-            : 'Record meal';
+    final colorScheme = Theme.of(context).colorScheme;
+    final viewModel = context.watch<AgentChatViewModel>();
+    final isRecording = viewModel.isRecording;
+    final tooltip = context.l10n.agentChatOpenAction;
 
     final micButton = Semantics(
       key: const ValueKey('bottom_voice_action_button'),
@@ -473,26 +523,29 @@ class _CenterVoiceButtonState extends State<_CenterVoiceButton> {
         message: tooltip,
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: isBusy
-              ? null
-              : () {
-                  _dismissBubble();
-                  unawaited(_handleTap());
-                },
-          onLongPressStart: isBusy
-              ? null
-              : (details) => unawaited(_handleLongPressStart(details)),
-          onLongPressEnd: isBusy
-              ? null
-              : (details) => unawaited(_handleLongPressEnd(details)),
-          onLongPressCancel:
-              isBusy ? null : () => unawaited(_handleLongPressCancel()),
+          onTap: () {
+            _dismissBubble();
+            _openAgentChat(context);
+          },
+          onLongPressStart: (_) => _startDirectVoicePress(context),
+          onLongPressEnd: (_) => _requestFinishDirectVoicePress(
+            context,
+            openChat: true,
+          ),
+          onLongPressCancel: () => _requestFinishDirectVoicePress(
+            context,
+            openChat: false,
+          ),
           child: VoiceActionButtonChrome(
             dimension: 62,
-            backgroundColor: backgroundColor,
+            backgroundColor: isRecording ? palette.coral : palette.lime,
             isRecording: isRecording,
-            isProcessing: viewModel.isLoading,
-            child: Icon(icon, color: palette.ink, size: 28),
+            isProcessing: viewModel.isBusy && !isRecording,
+            child: Icon(
+              isRecording ? Icons.stop_rounded : Icons.support_agent_rounded,
+              color: isRecording ? colorScheme.onError : colorScheme.onPrimary,
+              size: 28,
+            ),
           ),
         ),
       ),
@@ -524,60 +577,6 @@ class _CenterVoiceButtonState extends State<_CenterVoiceButton> {
         ],
       ),
     );
-  }
-
-  Future<void> _handleTap() async {
-    final viewModel = context.read<VoiceLogViewModel>();
-    if (viewModel.canStartRecording) {
-      await viewModel.startRecording();
-      if (viewModel.state == VoiceLogState.recording) {
-        VoiceActionHaptics.recordingStarted();
-      }
-      return;
-    }
-    if (viewModel.canStopRecording) {
-      VoiceActionHaptics.recordingStopped();
-      await _stopAndOpen(viewModel);
-    }
-  }
-
-  Future<void> _handleLongPressStart(LongPressStartDetails details) async {
-    final viewModel = context.read<VoiceLogViewModel>();
-    if (!viewModel.canStartRecording) return;
-    _longPressRecording = true;
-    await viewModel.startRecording();
-    if (viewModel.state == VoiceLogState.recording) {
-      VoiceActionHaptics.recordingStarted();
-    }
-  }
-
-  Future<void> _handleLongPressEnd(LongPressEndDetails details) async {
-    await _stopLongPressRecording();
-  }
-
-  Future<void> _handleLongPressCancel() async {
-    await _stopLongPressRecording();
-  }
-
-  Future<void> _stopLongPressRecording() async {
-    if (!_longPressRecording) return;
-    _longPressRecording = false;
-    final viewModel = context.read<VoiceLogViewModel>();
-    if (viewModel.canStopRecording) {
-      VoiceActionHaptics.recordingStopped();
-      await _stopAndOpen(viewModel);
-    }
-  }
-
-  Future<void> _stopAndOpen(VoiceLogViewModel viewModel) async {
-    final result = await viewModel.stopRecording(
-      submitAfterTranscription: true,
-    );
-    if (!mounted) return;
-    final destination = globalVoiceRoutingDestinationFor(result);
-    if (destination != null) {
-      context.go(destination.location, extra: destination.extra);
-    }
   }
 }
 
@@ -617,8 +616,8 @@ class _BubbleTip extends StatelessWidget {
               child: Text(
                 message,
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: isDark ? palette.ink : palette.surfaceSoft,
-                ),
+                      color: isDark ? palette.ink : palette.surfaceSoft,
+                    ),
                 textAlign: TextAlign.center,
               ),
             ),

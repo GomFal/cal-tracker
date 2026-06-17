@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../app/performance_overlay_view_model.dart';
+import 'design_system.dart';
 
 class PerformanceOverlayHost extends StatelessWidget {
   const PerformanceOverlayHost({required this.child, super.key});
@@ -29,6 +30,7 @@ class _PerformanceOverlayStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.freshPalette;
     return Positioned(
       top: 0,
       left: 0,
@@ -41,10 +43,10 @@ class _PerformanceOverlayStrip extends StatelessWidget {
             width: double.infinity,
             child: DecoratedBox(
               decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.76),
+                color: palette.ink.withValues(alpha: 0.76),
                 border: Border(
                   bottom: BorderSide(
-                    color: Colors.white.withValues(alpha: 0.22),
+                    color: palette.surface.withValues(alpha: 0.22),
                   ),
                 ),
               ),

@@ -1055,7 +1055,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'Comma-separated phrases you use by voice';
 
   @override
-  String get bottomMicFillEditorHint => 'Use this mic to fill this screen';
+  String get bottomMicFillEditorHint =>
+      'Hold the agent button to speak directly';
 
   @override
   String get mealTemplateEditorCandidatesSection => 'Food matches';
@@ -1137,7 +1138,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get usualFoodsScanTitle => 'Scan nutrition label';
 
   @override
-  String get usualFoodsScanHint => 'Frame the nutrition table inside the box.';
+  String get usualFoodsScanHint =>
+      'Take a clear photo of the package, then select the nutrition table.';
 
   @override
   String get usualFoodsScanFrameLabel => 'Nutrition facts';
@@ -1153,7 +1155,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get usualFoodsScanPreviewHint =>
-      'Is the nutrition table clearly framed?';
+      'Drag the box around the nutrition table, then use this crop.';
 
   @override
   String get usualFoodsScanCloseTooltip => 'Close';
@@ -1659,4 +1661,101 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get localToolkitCloseTooltip => 'Close toolkit';
+
+  @override
+  String get agentChatTitle => 'Agent chat';
+
+  @override
+  String get agentChatSubtitle =>
+      'Ask, log, inspect, and correct with visible steps.';
+
+  @override
+  String get agentChatErrorTitle => 'Agent stopped';
+
+  @override
+  String get agentChatWelcomeTitle => 'Tell the agent what you need';
+
+  @override
+  String get agentChatWelcomeMessage =>
+      'It can look up meals, create proposals, check remaining targets, and show every action before the result.';
+
+  @override
+  String get agentChatPromptYesterday => 'What did I eat yesterday?';
+
+  @override
+  String get agentChatPromptRemaining => 'How many calories do I have left?';
+
+  @override
+  String get agentChatPromptUsual => 'Log my usual breakfast';
+
+  @override
+  String get agentChatToolFallback => 'Agent action';
+
+  @override
+  String get agentChatConsumedToday => 'Consumed today';
+
+  @override
+  String get agentChatNoItems => 'No ingredients to show.';
+
+  @override
+  String get agentChatNoMeals => 'No meals to show.';
+
+  @override
+  String get agentChatNoTemplates => 'No usual meals to show.';
+
+  @override
+  String get agentChatNoUsualFoods => 'No usual ingredients to show.';
+
+  @override
+  String get agentChatUsualFoodDraftTitle => 'Usual ingredient draft';
+
+  @override
+  String get agentChatUsualFoodDraftSubtitle =>
+      'Review the fields before saving it to your usual ingredients.';
+
+  @override
+  String get agentChatUsualFoodDraftUnnamed => 'Untitled ingredient';
+
+  @override
+  String get agentChatUsualMealDraftTitle => 'Usual meal draft';
+
+  @override
+  String get agentChatUsualMealDraftSubtitle =>
+      'Review the meal before saving it to your usual meals.';
+
+  @override
+  String get agentChatUsualMealDraftUnnamed => 'Untitled usual meal';
+
+  @override
+  String agentChatDraftMissingFields(Object fields) {
+    return 'Missing fields: $fields';
+  }
+
+  @override
+  String get agentChatReviewUsualFoodDraftAction =>
+      'Review and save ingredient';
+
+  @override
+  String get agentChatReviewUsualMealDraftAction =>
+      'Review and save usual meal';
+
+  @override
+  String get agentChatInputHint => 'Ask or tell the agent what to do';
+
+  @override
+  String get agentChatScanLabelTooltip => 'Scan nutrition label';
+
+  @override
+  String agentChatScanLabelPrompt(Object ocrText) {
+    return 'Create a usual ingredient draft from this nutrition label OCR text. Only use values explicitly visible in the text. If required nutrition fields are missing, ask me to complete them before saving.\n\nOCR text:\n$ocrText';
+  }
+
+  @override
+  String get agentChatStopRecording => 'Stop recording';
+
+  @override
+  String get agentChatStartRecording => 'Record voice message';
+
+  @override
+  String get agentChatOpenAction => 'Open agent chat. Hold to speak';
 }

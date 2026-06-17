@@ -535,6 +535,32 @@ export const auditEvents = pgTable("audit_events", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
 });
 
+export const agentConversations = pgTable("agent_conversations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  title: text("title").notNull().default("New chat"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
+}, (table) => [
+  index("agent_conversations_user_updated_idx").on(table.userId, table.updatedAt)
+]);
+
+export const agentMessages = pgTable("agent_messages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  conversationId: uuid("conversation_id").notNull().references(() => agentConversations.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  role: text("role").notNull(),
+  content: text("content").notNull().default(""),
+  toolCallsJson: jsonb("tool_calls_json").$type<unknown>(),
+  toolCallId: text("tool_call_id"),
+  metadataJson: jsonb("metadata_json").$type<unknown>(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+}, (table) => [
+  index("agent_messages_conversation_created_idx").on(table.conversationId, table.createdAt),
+  index("agent_messages_user_created_idx").on(table.userId, table.createdAt),
+  check("agent_messages_role_check", sql`${table.role} IN ('user','assistant','tool')`)
+]);
+
 export const agentConnections = pgTable("agent_connections", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -578,7 +604,9 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   templates: many(mealTemplates),
   memories: many(foodMemories),
   actionCalls: many(actionCalls),
-  auditEvents: many(auditEvents)
+  auditEvents: many(auditEvents),
+  agentConversations: many(agentConversations),
+  agentMessages: many(agentMessages)
 }));
 
 export const foodItemsRelations = relations(foodItems, ({ one, many }) => ({
@@ -610,4 +638,14 @@ export const mealTemplatesRelations = relations(mealTemplates, ({ one, many }) =
 export const foodMemoriesRelations = relations(foodMemories, ({ one }) => ({
   user: one(users, { fields: [foodMemories.userId], references: [users.id] }),
   template: one(mealTemplates, { fields: [foodMemories.mealTemplateId], references: [mealTemplates.id] })
+}));
+
+export const agentConversationsRelations = relations(agentConversations, ({ one, many }) => ({
+  user: one(users, { fields: [agentConversations.userId], references: [users.id] }),
+  messages: many(agentMessages)
+}));
+
+export const agentMessagesRelations = relations(agentMessages, ({ one }) => ({
+  user: one(users, { fields: [agentMessages.userId], references: [users.id] }),
+  conversation: one(agentConversations, { fields: [agentMessages.conversationId], references: [agentConversations.id] })
 }));

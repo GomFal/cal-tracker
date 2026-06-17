@@ -308,8 +308,7 @@
   "mealTemplateEditorTitleHint": "Comida de gimnasio",
   "mealTemplateEditorAliasesLabel": "Alias",
   "mealTemplateEditorAliasesHint": "Frases separadas por coma que usas por voz",
-  "bottomMicFillEditorHint": "Usa este micrófono para rellenar esta pantalla",
-
+  "bottomMicFillEditorHint": "Mantén pulsado el agente para hablar directamente",
   "mealTemplateEditorCandidatesSection": "Coincidencias de alimentos",
   "mealTemplateEditorCandidatesHelper": "Elige un candidato cuando el borrador necesite una coincidencia de base de datos.",
   "mealTemplateEditorNoCandidates": "No hay candidatos para este ingrediente.",
@@ -331,16 +330,15 @@
   "usualFoodsDraftHint": "Ejemplo: Mi arroz por 100 g tiene 360 kcal, 79 g de carbohidratos, 7 g de proteína, 1 g de grasa y 0,01 g de sal.",
   "usualFoodsDraftButton": "Rellenar campos",
   "usualFoodsDraftEmptyError": "Introduce el texto de la etiqueta antes de rellenar los campos.",
-
   "usualFoodsScanFromPhotoTooltip": "Escanear etiqueta",
   "usualFoodsScanFromPhotoButton": "Escanear etiqueta",
   "usualFoodsScanTitle": "Escanear etiqueta nutricional",
-  "usualFoodsScanHint": "Encuadra la tabla nutricional dentro del marco.",
+  "usualFoodsScanHint": "Haz una foto clara del paquete y después selecciona la tabla nutricional.",
   "usualFoodsScanFrameLabel": "Información nutricional",
   "usualFoodsScanCapture": "Capturar",
   "usualFoodsScanRetake": "Reintentar",
   "usualFoodsScanConfirmCapture": "Usar esta foto",
-  "usualFoodsScanPreviewHint": "¿Está bien encuadrada la tabla nutricional?",
+  "usualFoodsScanPreviewHint": "Arrastra el recuadro sobre la tabla nutricional y usa ese recorte.",
   "usualFoodsScanCloseTooltip": "Cerrar",
   "usualFoodsScanProcessingOcr": "Leyendo texto…",
   "usualFoodsScanProcessingDraft": "Rellenando campos…",
@@ -350,14 +348,12 @@
   "usualFoodsScanCameraUnavailable": "No hay cámara disponible en este dispositivo.",
   "usualFoodsScanFailedTitle": "No se pudo interpretar la etiqueta",
   "usualFoodsScanFailedMessage": "No pudimos convertir esa foto en un borrador. Prueba con una foto más nítida y bien iluminada de la tabla nutricional.",
-
   "usualFoodsEditorSubtitle": "Revisa los valores de la etiqueta antes de guardar.",
   "usualFoodsIdentitySectionTitle": "Identidad",
   "usualFoodsServingSectionTitle": "Ración",
   "usualFoodsMacrosSectionTitle": "Macros",
   "usualFoodsOptionalSectionTitle": "Nutrientes opcionales",
   "usualFoodsOptionalSectionSubtitle": "Añade detalles de etiqueta solo cuando los tengas.",
-
   "usualFoodsSaveFailedTitle": "No se pudo guardar el ingrediente",
   "usualFoodsNotFoundTitle": "Ingrediente no encontrado",
   "usualFoodsNotFoundMessage": "Este ingrediente habitual ya no está disponible.",
@@ -500,5 +496,44 @@
   "localToolkitPerformanceOverlayOff": "Overlay inactivo",
   "localToolkitTrustedModeOn": "Confianza activa",
   "localToolkitTrustedModeOff": "Confianza inactiva",
-  "localToolkitCloseTooltip": "Cerrar kit"
+  "localToolkitCloseTooltip": "Cerrar kit",
+  "agentChatTitle": "Chat agente",
+  "agentChatSubtitle": "Pregunta, registra, revisa y corrige con pasos visibles.",
+  "agentChatErrorTitle": "El agente se detuvo",
+  "agentChatWelcomeTitle": "Dile al agente qué necesitas",
+  "agentChatWelcomeMessage": "Puede consultar comidas, crear propuestas, revisar objetivos restantes y mostrar cada acción antes del resultado.",
+  "agentChatPromptYesterday": "¿Qué comí ayer?",
+  "agentChatPromptRemaining": "¿Cuántas calorías me quedan?",
+  "agentChatPromptUsual": "Registra mi desayuno habitual",
+  "agentChatToolFallback": "Acción del agente",
+  "agentChatConsumedToday": "Consumido hoy",
+  "agentChatNoItems": "No hay ingredientes que mostrar.",
+  "agentChatNoMeals": "No hay comidas que mostrar.",
+  "agentChatNoTemplates": "No hay comidas habituales que mostrar.",
+  "agentChatNoUsualFoods": "No hay ingredientes habituales que mostrar.",
+  "agentChatUsualFoodDraftTitle": "Borrador de ingrediente habitual",
+  "agentChatUsualFoodDraftSubtitle": "Revisa los campos antes de guardarlo en tus ingredientes habituales.",
+  "agentChatUsualFoodDraftUnnamed": "Ingrediente sin título",
+  "agentChatUsualMealDraftTitle": "Borrador de comida habitual",
+  "agentChatUsualMealDraftSubtitle": "Revisa la comida antes de guardarla en tus comidas habituales.",
+  "agentChatUsualMealDraftUnnamed": "Comida habitual sin título",
+  "agentChatDraftMissingFields": "Faltan campos: {fields}",
+  "@agentChatDraftMissingFields": {
+    "placeholders": {
+      "fields": {}
+    }
+  },
+  "agentChatReviewUsualFoodDraftAction": "Revisar y guardar ingrediente",
+  "agentChatReviewUsualMealDraftAction": "Revisar y guardar comida habitual",
+  "agentChatInputHint": "Pregunta o dile al agente qué hacer",
+  "agentChatScanLabelTooltip": "Escanear etiqueta nutricional",
+  "agentChatScanLabelPrompt": "Crea un borrador de ingrediente habitual a partir de este texto OCR de una etiqueta nutricional. Usa solo valores explícitamente visibles en el texto. Si faltan campos nutricionales obligatorios, pídeme completarlos antes de guardar.\n\nTexto OCR:\n{ocrText}",
+  "@agentChatScanLabelPrompt": {
+    "placeholders": {
+      "ocrText": {}
+    }
+  },
+  "agentChatStopRecording": "Detener grabación",
+  "agentChatStartRecording": "Grabar mensaje de voz",
+  "agentChatOpenAction": "Abrir chat con el agente. Mantén pulsado para hablar"
 }

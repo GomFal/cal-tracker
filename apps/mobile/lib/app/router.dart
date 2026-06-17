@@ -5,6 +5,7 @@ import '../domain/models/nutrition_models.dart';
 import '../l10n/app_localizations_context.dart';
 import '../ui/core/app_shell.dart';
 import '../ui/core/shell_modal_lock.dart';
+import '../ui/features/agent_chat/views/agent_chat_screen.dart';
 import '../ui/features/auth/view_models/auth_view_model.dart';
 import '../ui/features/auth/views/auth_screen.dart';
 import '../ui/features/dashboard/views/dashboard_screen.dart';
@@ -46,6 +47,13 @@ GoRouter buildRouter(
       GoRoute(
         path: '/auth',
         builder: (context, state) => const AuthScreen(),
+      ),
+      GoRoute(
+        path: '/agent',
+        builder: (context, state) => _AuthRestoreGate(
+          authViewModel: authViewModel,
+          child: const AgentChatScreen(),
+        ),
       ),
       GoRoute(
         path: '/meal/create',

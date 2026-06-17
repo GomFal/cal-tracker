@@ -1950,7 +1950,7 @@ abstract class AppLocalizations {
   /// No description provided for @bottomMicFillEditorHint.
   ///
   /// In en, this message translates to:
-  /// **'Use this mic to fill this screen'**
+  /// **'Hold the agent button to speak directly'**
   String get bottomMicFillEditorHint;
 
   /// No description provided for @mealTemplateEditorCandidatesSection.
@@ -2100,7 +2100,7 @@ abstract class AppLocalizations {
   /// No description provided for @usualFoodsScanHint.
   ///
   /// In en, this message translates to:
-  /// **'Frame the nutrition table inside the box.'**
+  /// **'Take a clear photo of the package, then select the nutrition table.'**
   String get usualFoodsScanHint;
 
   /// No description provided for @usualFoodsScanFrameLabel.
@@ -2130,7 +2130,7 @@ abstract class AppLocalizations {
   /// No description provided for @usualFoodsScanPreviewHint.
   ///
   /// In en, this message translates to:
-  /// **'Is the nutrition table clearly framed?'**
+  /// **'Drag the box around the nutrition table, then use this crop.'**
   String get usualFoodsScanPreviewHint;
 
   /// No description provided for @usualFoodsScanCloseTooltip.
@@ -3080,6 +3080,180 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Close toolkit'**
   String get localToolkitCloseTooltip;
+
+  /// No description provided for @agentChatTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent chat'**
+  String get agentChatTitle;
+
+  /// No description provided for @agentChatSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask, log, inspect, and correct with visible steps.'**
+  String get agentChatSubtitle;
+
+  /// No description provided for @agentChatErrorTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent stopped'**
+  String get agentChatErrorTitle;
+
+  /// No description provided for @agentChatWelcomeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tell the agent what you need'**
+  String get agentChatWelcomeTitle;
+
+  /// No description provided for @agentChatWelcomeMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'It can look up meals, create proposals, check remaining targets, and show every action before the result.'**
+  String get agentChatWelcomeMessage;
+
+  /// No description provided for @agentChatPromptYesterday.
+  ///
+  /// In en, this message translates to:
+  /// **'What did I eat yesterday?'**
+  String get agentChatPromptYesterday;
+
+  /// No description provided for @agentChatPromptRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'How many calories do I have left?'**
+  String get agentChatPromptRemaining;
+
+  /// No description provided for @agentChatPromptUsual.
+  ///
+  /// In en, this message translates to:
+  /// **'Log my usual breakfast'**
+  String get agentChatPromptUsual;
+
+  /// No description provided for @agentChatToolFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent action'**
+  String get agentChatToolFallback;
+
+  /// No description provided for @agentChatConsumedToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Consumed today'**
+  String get agentChatConsumedToday;
+
+  /// No description provided for @agentChatNoItems.
+  ///
+  /// In en, this message translates to:
+  /// **'No ingredients to show.'**
+  String get agentChatNoItems;
+
+  /// No description provided for @agentChatNoMeals.
+  ///
+  /// In en, this message translates to:
+  /// **'No meals to show.'**
+  String get agentChatNoMeals;
+
+  /// No description provided for @agentChatNoTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'No usual meals to show.'**
+  String get agentChatNoTemplates;
+
+  /// No description provided for @agentChatNoUsualFoods.
+  ///
+  /// In en, this message translates to:
+  /// **'No usual ingredients to show.'**
+  String get agentChatNoUsualFoods;
+
+  /// No description provided for @agentChatUsualFoodDraftTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Usual ingredient draft'**
+  String get agentChatUsualFoodDraftTitle;
+
+  /// No description provided for @agentChatUsualFoodDraftSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Review the fields before saving it to your usual ingredients.'**
+  String get agentChatUsualFoodDraftSubtitle;
+
+  /// No description provided for @agentChatUsualFoodDraftUnnamed.
+  ///
+  /// In en, this message translates to:
+  /// **'Untitled ingredient'**
+  String get agentChatUsualFoodDraftUnnamed;
+
+  /// No description provided for @agentChatUsualMealDraftTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Usual meal draft'**
+  String get agentChatUsualMealDraftTitle;
+
+  /// No description provided for @agentChatUsualMealDraftSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Review the meal before saving it to your usual meals.'**
+  String get agentChatUsualMealDraftSubtitle;
+
+  /// No description provided for @agentChatUsualMealDraftUnnamed.
+  ///
+  /// In en, this message translates to:
+  /// **'Untitled usual meal'**
+  String get agentChatUsualMealDraftUnnamed;
+
+  /// No description provided for @agentChatDraftMissingFields.
+  ///
+  /// In en, this message translates to:
+  /// **'Missing fields: {fields}'**
+  String agentChatDraftMissingFields(Object fields);
+
+  /// No description provided for @agentChatReviewUsualFoodDraftAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Review and save ingredient'**
+  String get agentChatReviewUsualFoodDraftAction;
+
+  /// No description provided for @agentChatReviewUsualMealDraftAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Review and save usual meal'**
+  String get agentChatReviewUsualMealDraftAction;
+
+  /// No description provided for @agentChatInputHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask or tell the agent what to do'**
+  String get agentChatInputHint;
+
+  /// No description provided for @agentChatScanLabelTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan nutrition label'**
+  String get agentChatScanLabelTooltip;
+
+  /// No description provided for @agentChatScanLabelPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a usual ingredient draft from this nutrition label OCR text. Only use values explicitly visible in the text. If required nutrition fields are missing, ask me to complete them before saving.\n\nOCR text:\n{ocrText}'**
+  String agentChatScanLabelPrompt(Object ocrText);
+
+  /// No description provided for @agentChatStopRecording.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop recording'**
+  String get agentChatStopRecording;
+
+  /// No description provided for @agentChatStartRecording.
+  ///
+  /// In en, this message translates to:
+  /// **'Record voice message'**
+  String get agentChatStartRecording;
+
+  /// No description provided for @agentChatOpenAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Open agent chat. Hold to speak'**
+  String get agentChatOpenAction;
 }
 
 class _AppLocalizationsDelegate

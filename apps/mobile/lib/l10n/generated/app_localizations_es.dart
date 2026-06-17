@@ -1067,7 +1067,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get bottomMicFillEditorHint =>
-      'Usa este micrófono para rellenar esta pantalla';
+      'Mantén pulsado el agente para hablar directamente';
 
   @override
   String get mealTemplateEditorCandidatesSection =>
@@ -1152,7 +1152,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get usualFoodsScanHint =>
-      'Encuadra la tabla nutricional dentro del marco.';
+      'Haz una foto clara del paquete y después selecciona la tabla nutricional.';
 
   @override
   String get usualFoodsScanFrameLabel => 'Información nutricional';
@@ -1168,7 +1168,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get usualFoodsScanPreviewHint =>
-      '¿Está bien encuadrada la tabla nutricional?';
+      'Arrastra el recuadro sobre la tabla nutricional y usa ese recorte.';
 
   @override
   String get usualFoodsScanCloseTooltip => 'Cerrar';
@@ -1679,4 +1679,103 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get localToolkitCloseTooltip => 'Cerrar kit';
+
+  @override
+  String get agentChatTitle => 'Chat agente';
+
+  @override
+  String get agentChatSubtitle =>
+      'Pregunta, registra, revisa y corrige con pasos visibles.';
+
+  @override
+  String get agentChatErrorTitle => 'El agente se detuvo';
+
+  @override
+  String get agentChatWelcomeTitle => 'Dile al agente qué necesitas';
+
+  @override
+  String get agentChatWelcomeMessage =>
+      'Puede consultar comidas, crear propuestas, revisar objetivos restantes y mostrar cada acción antes del resultado.';
+
+  @override
+  String get agentChatPromptYesterday => '¿Qué comí ayer?';
+
+  @override
+  String get agentChatPromptRemaining => '¿Cuántas calorías me quedan?';
+
+  @override
+  String get agentChatPromptUsual => 'Registra mi desayuno habitual';
+
+  @override
+  String get agentChatToolFallback => 'Acción del agente';
+
+  @override
+  String get agentChatConsumedToday => 'Consumido hoy';
+
+  @override
+  String get agentChatNoItems => 'No hay ingredientes que mostrar.';
+
+  @override
+  String get agentChatNoMeals => 'No hay comidas que mostrar.';
+
+  @override
+  String get agentChatNoTemplates => 'No hay comidas habituales que mostrar.';
+
+  @override
+  String get agentChatNoUsualFoods =>
+      'No hay ingredientes habituales que mostrar.';
+
+  @override
+  String get agentChatUsualFoodDraftTitle => 'Borrador de ingrediente habitual';
+
+  @override
+  String get agentChatUsualFoodDraftSubtitle =>
+      'Revisa los campos antes de guardarlo en tus ingredientes habituales.';
+
+  @override
+  String get agentChatUsualFoodDraftUnnamed => 'Ingrediente sin título';
+
+  @override
+  String get agentChatUsualMealDraftTitle => 'Borrador de comida habitual';
+
+  @override
+  String get agentChatUsualMealDraftSubtitle =>
+      'Revisa la comida antes de guardarla en tus comidas habituales.';
+
+  @override
+  String get agentChatUsualMealDraftUnnamed => 'Comida habitual sin título';
+
+  @override
+  String agentChatDraftMissingFields(Object fields) {
+    return 'Faltan campos: $fields';
+  }
+
+  @override
+  String get agentChatReviewUsualFoodDraftAction =>
+      'Revisar y guardar ingrediente';
+
+  @override
+  String get agentChatReviewUsualMealDraftAction =>
+      'Revisar y guardar comida habitual';
+
+  @override
+  String get agentChatInputHint => 'Pregunta o dile al agente qué hacer';
+
+  @override
+  String get agentChatScanLabelTooltip => 'Escanear etiqueta nutricional';
+
+  @override
+  String agentChatScanLabelPrompt(Object ocrText) {
+    return 'Crea un borrador de ingrediente habitual a partir de este texto OCR de una etiqueta nutricional. Usa solo valores explícitamente visibles en el texto. Si faltan campos nutricionales obligatorios, pídeme completarlos antes de guardar.\n\nTexto OCR:\n$ocrText';
+  }
+
+  @override
+  String get agentChatStopRecording => 'Detener grabación';
+
+  @override
+  String get agentChatStartRecording => 'Grabar mensaje de voz';
+
+  @override
+  String get agentChatOpenAction =>
+      'Abrir chat con el agente. Mantén pulsado para hablar';
 }

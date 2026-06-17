@@ -119,7 +119,7 @@ export class RemoteChatAgentProvider implements ChatAgentProvider {
   }): Promise<AgentToolDecision> {
     const requestBody = {
       model: input.model,
-      messages: input.messages,
+      messages: formatProviderMessages(input.messages),
       tools: input.tools,
       tool_choice: "auto",
       max_tokens: 2048,
@@ -394,6 +394,33 @@ function reasoningTextDelta(delta: Record<string, unknown>): string {
       .join("");
   }
   return "";
+}
+
+function formatProviderMessages(messages: AgentMessage[]): unknown[] {
+  return messages.map((message) => {
+    if (message.role === "assistant" && message.toolCalls?.length) {
+      return {
+        role: "assistant",
+        content: message.content.trim() ? message.content : null,
+        tool_calls: message.toolCalls.map((toolCall) => ({
+          id: toolCall.id,
+          type: "function",
+          function: {
+            name: toolCall.function.name,
+            arguments: toolCall.function.arguments,
+          },
+        })),
+      };
+    }
+    if (message.role === "tool") {
+      return {
+        role: "tool",
+        tool_call_id: message.toolCallId,
+        content: message.content,
+      };
+    }
+    return { role: message.role, content: message.content };
+  });
 }
 
 function providerTimeout(timeoutMs: number): {

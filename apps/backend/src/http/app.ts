@@ -1,4 +1,5 @@
 import {
+  agentChatRequestSchema,
   agentRunRequestSchema,
   calorieEstimateRequestSchema,
   dailyHydrationUpdateSchema,
@@ -32,6 +33,7 @@ import { getTraceId, requestIdMiddleware } from "../middleware/requestContext.js
 import type { AppRepository, StoredUser } from "../repository/types.js";
 import type { SpeechToTextProvider, TranscriptionResult } from "../stt/speechToTextProvider.js";
 import { readAudioBuffer, validateAudioUpload } from "../stt/audioValidation.js";
+import { AgentChatService, type AgentChatEvent } from "../agent/agentChatService.js";
 import { AgentService, type AgentRunResult } from "../agent/agentService.js";
 import type { ChatAgentProvider } from "../agent/chatAgentProvider.js";
 import { RemoteChatAgentProvider } from "../agent/chatAgentProvider.js";
@@ -74,6 +76,7 @@ export function createApp(input: {
     },
   );
   const agentService = new AgentService(resolvedAgentProvider, actionExecutor, config.OPENROUTER_MODEL, runLogger);
+  const agentChatService = new AgentChatService(resolvedAgentProvider, actionExecutor, repository, config.OPENROUTER_MODEL, runLogger);
 
   async function runMealInput(input: {
     c: Context;
@@ -299,6 +302,86 @@ export function createApp(input: {
       activeProposalId: body.activeProposalId,
     });
     return c.json(run.result);
+  });
+
+  app.post("/v1/agent/chat", async (c) => {
+    const user = c.get("authUser");
+    const body = agentChatRequestSchema.parse(await c.req.json());
+    return streamAgentChat(c, agentChatService.chat({
+      text: body.message,
+      context: buildActionContext(c, user, body.source),
+      conversationId: body.conversationId,
+      activeProposalId: body.activeProposalId,
+      inputMode: "text",
+    }));
+  });
+
+  app.post("/v1/agent/chat/audio", async (c) => {
+    const routeStarted = Date.now();
+    const user = c.get("authUser");
+    const traceId = getTraceId(c);
+    const upload = await parseAudioUpload(c, user, traceId, "agent.chat_audio", {
+      parseSource: true,
+    });
+    if (upload instanceof Response) return upload;
+
+    return streamAgentChat(c, (async function* () {
+      yield {
+        type: "thinking",
+        message: "Transcribing audio...",
+      } as AgentChatEvent;
+      let transcription: TranscriptionResult;
+      try {
+        transcription = await sttProvider.transcribe({
+          audio: upload.buffer,
+          filename: upload.filename,
+          mimeType: upload.mimeType,
+          userId: user.id,
+          traceId,
+        });
+      } catch (error) {
+        await logLocalRun(runLogger, {
+          type: "agent.chat_audio",
+          traceId,
+          userId: user.id,
+          source: upload.source ?? "flutter",
+          errorStage: "stt",
+          error: summarizeError(error),
+          timingsMs: { total: Date.now() - routeStarted },
+        });
+        yield {
+          type: "error",
+          error: error instanceof Error ? error.message : String(error),
+        } as AgentChatEvent;
+        return;
+      }
+      yield {
+        type: "transcription_completed",
+        transcript: transcription.text,
+      } as AgentChatEvent;
+      yield* agentChatService.chat({
+        text: transcription.text,
+        context: buildActionContext(c, user, upload.source ?? "flutter"),
+        conversationId: upload.conversationId,
+        activeProposalId: upload.activeProposalId,
+        inputMode: "voice",
+      });
+    })());
+  });
+
+  app.get("/v1/agent/conversations", async (c) => {
+    const user = c.get("authUser");
+    return c.json({ conversations: await repository.listAgentConversations(user.id) });
+  });
+
+  app.get("/v1/agent/conversations/:id", async (c) => {
+    const user = c.get("authUser");
+    return c.json({ messages: await repository.listAgentConversationMessages(user.id, c.req.param("id")) });
+  });
+
+  app.delete("/v1/agent/conversations/:id", async (c) => {
+    const user = c.get("authUser");
+    return c.json({ deleted: await repository.deleteAgentConversation(user.id, c.req.param("id")) });
   });
 
   app.post("/v1/stt/transcriptions", async (c) => {
@@ -552,6 +635,7 @@ type ParsedAudioUpload = {
   mimeType: string;
   source?: ActionSource;
   activeProposalId?: string;
+  conversationId?: string;
 };
 
 type MealInputMode = "text" | "voice";
@@ -620,6 +704,21 @@ async function parseAudioUpload(
       },
     }, 400);
   }
+  const conversationId = parseOptionalMultipartUuid(body.conversationId);
+  if (conversationId === null) {
+    console.warn(`${logPrefix}.invalid_conversation`, {
+      traceId,
+      userId: user.id,
+      conversationId: body.conversationId,
+    });
+    return c.json({
+      error: {
+        code: "validation_error",
+        message: "Invalid conversation id.",
+        traceId,
+      },
+    }, 400);
+  }
 
   const audioField = body.audio;
   if (!audioField || (Array.isArray(audioField) && audioField.length === 0)) {
@@ -656,7 +755,45 @@ async function parseAudioUpload(
     mimeType: validation.mimeType,
     source: source ?? undefined,
     activeProposalId: activeProposalId ?? undefined,
+    conversationId: conversationId ?? undefined,
   };
+}
+
+function streamAgentChat(
+  _c: Context,
+  events: AsyncIterable<AgentChatEvent>,
+): Response {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      try {
+        for await (const event of events) {
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify(event)}\n\n`),
+          );
+          if (event.type === "done" || event.type === "error") break;
+        }
+      } catch (error) {
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({
+              type: "error",
+              error: error instanceof Error ? error.message : String(error),
+            })}\n\n`,
+          ),
+        );
+      } finally {
+        controller.close();
+      }
+    },
+  });
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    },
+  });
 }
 
 function parseMultipartActionSource(value: unknown): ActionSource | null {

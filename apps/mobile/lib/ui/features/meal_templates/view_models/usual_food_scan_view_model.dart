@@ -83,9 +83,8 @@ class UsualFoodScanUiState {
       capturedFilePath: identical(capturedFilePath, _unchanged)
           ? this.capturedFilePath
           : capturedFilePath as String?,
-      ocrText: identical(ocrText, _unchanged)
-          ? this.ocrText
-          : ocrText as String?,
+      ocrText:
+          identical(ocrText, _unchanged) ? this.ocrText : ocrText as String?,
     );
   }
 }
@@ -114,8 +113,11 @@ class UsualFoodScanViewModel extends ChangeNotifier {
     required Future<void> Function() resumePreview,
     required Future<String> Function(String filePath) recognizeText,
     required Future<void> Function(String filePath) deleteCapturedFile,
+    Future<String?> Function(String filePath)? prepareImageForOcr,
     Future<bool> Function()? requestCameraPermission,
+    bool draftFromRecognizedText = true,
     void Function(UsualFoodDraft draft)? onDrafted,
+    void Function(String text)? onTextExtracted,
   })  : _nutritionRepository = nutritionRepository,
         _initializeCamera = initializeCamera,
         _takePicture = takePicture,
@@ -123,8 +125,11 @@ class UsualFoodScanViewModel extends ChangeNotifier {
         _resumePreview = resumePreview,
         _recognizeText = recognizeText,
         _deleteCapturedFile = deleteCapturedFile,
+        _prepareImageForOcr = prepareImageForOcr,
         _requestCameraPermission = requestCameraPermission,
-        _onDrafted = onDrafted;
+        _draftFromRecognizedText = draftFromRecognizedText,
+        _onDrafted = onDrafted,
+        _onTextExtracted = onTextExtracted;
 
   final NutritionRepository _nutritionRepository;
   final Future<void> Function() _initializeCamera;
@@ -133,8 +138,11 @@ class UsualFoodScanViewModel extends ChangeNotifier {
   final Future<void> Function() _resumePreview;
   final Future<String> Function(String filePath) _recognizeText;
   final Future<void> Function(String filePath) _deleteCapturedFile;
+  final Future<String?> Function(String filePath)? _prepareImageForOcr;
   final Future<bool> Function()? _requestCameraPermission;
+  final bool _draftFromRecognizedText;
   final void Function(UsualFoodDraft draft)? _onDrafted;
+  final void Function(String text)? _onTextExtracted;
 
   UsualFoodScanUiState _uiState = const UsualFoodScanUiState();
 
@@ -247,12 +255,22 @@ class UsualFoodScanViewModel extends ChangeNotifier {
     _setPhase(UsualFoodScanPhase.ocrProcessing);
 
     String text;
+    String? preparedFilePath;
     try {
-      text = await _recognizeText(filePath);
+      preparedFilePath = await _prepareImageForOcr?.call(filePath);
+      text = await _recognizeText(preparedFilePath ?? filePath);
       _setUiState(_uiState.copyWith(ocrText: text));
     } catch (_) {
       _setErrorCode(UsualFoodScanError.ocrFailed);
       return;
+    } finally {
+      if (preparedFilePath != null && preparedFilePath != filePath) {
+        try {
+          await _deleteCapturedFile(preparedFilePath);
+        } catch (_) {
+          // best effort
+        }
+      }
     }
 
     // Reject very short text — 20-char floor ensures we have at least
@@ -263,6 +281,12 @@ class UsualFoodScanViewModel extends ChangeNotifier {
     }
     if (text.trim().length < 20) {
       _setErrorCode(UsualFoodScanError.ocrTooShort);
+      return;
+    }
+
+    if (!_draftFromRecognizedText) {
+      _setPhase(UsualFoodScanPhase.drafted);
+      _onTextExtracted?.call(text.trim());
       return;
     }
 

@@ -1,0 +1,1023 @@
+import {
+  actionDefinitions,
+  type ActionContext,
+  type DailySummary,
+  type DraftUsualFoodOutput,
+  type DraftUsualMealOutput,
+  type Meal,
+  type MealItem,
+  type MealProposal,
+  type MealTemplate,
+  type NutritionSnapshot,
+  type UsualFood,
+} from "@cal-tracker/contracts";
+import {
+  ActionExecutor,
+  type ExecuteActionResult,
+} from "../actions/executor.js";
+import type {
+  AgentConversationMessageRecord,
+  AgentConversationRecord,
+  AppRepository,
+} from "../repository/types.js";
+import {
+  summarizeError,
+  type LocalRunLogger,
+} from "../observability/localRunLogger.js";
+import type {
+  AgentMessage,
+  AgentToolCall,
+  AgentToolDecision,
+  ChatAgentProvider,
+} from "./chatAgentProvider.js";
+import { buildChatSystemMessage } from "./agentMessages.js";
+import { buildToolSchemas } from "./toolSchemas.js";
+import { filterToolsByPolicy } from "./agentPolicy.js";
+
+const MAX_CHAT_ITERATIONS = 6;
+const MAX_TOOL_CALLS_PER_TURN = 8;
+const STORED_TOOL_RESULT_MAX_CHARS = 12000;
+const CHAT_OPTIONS_TOOL_NAME = "show_chat_options";
+
+type AgentChatSuggestion = {
+  label: string;
+  value: string;
+};
+
+export type AgentChatResultKind =
+  | "proposal"
+  | "meal_committed"
+  | "meal_corrected"
+  | "summary"
+  | "remaining_targets"
+  | "history"
+  | "food_memory"
+  | "nutrition_search"
+  | "usual_foods"
+  | "templates"
+  | "template_saved"
+  | "template_deleted"
+  | "usual_food_draft"
+  | "usual_meal_draft"
+  | "confirmation_required"
+  | "meal_deleted"
+  | "clarification_required";
+
+export type AgentChatMappedResult =
+  | {
+      kind: "proposal";
+      proposal: MealProposal;
+      message: string;
+      options?: unknown[];
+      candidateGroups?: unknown[];
+    }
+  | {
+      kind: "meal_committed";
+      meal: Meal;
+      message: string;
+      options?: unknown[];
+      candidateGroups?: unknown[];
+    }
+  | {
+      kind: "meal_corrected";
+      meal?: Meal;
+      proposal?: MealProposal;
+      message: string;
+    }
+  | { kind: "summary"; summary: DailySummary; message: string }
+  | { kind: "remaining_targets"; remaining: NutritionSnapshot; message: string }
+  | { kind: "history"; meals: Meal[]; message: string }
+  | {
+      kind: "food_memory";
+      matches: unknown[];
+      message: string;
+      options?: unknown[];
+    }
+  | {
+      kind: "nutrition_search";
+      items: MealItem[];
+      message: string;
+      options?: unknown[];
+    }
+  | { kind: "usual_foods"; usualFoods: UsualFood[]; message: string }
+  | { kind: "templates"; templates: MealTemplate[]; message: string }
+  | { kind: "template_saved"; template: MealTemplate; message: string }
+  | { kind: "template_deleted"; deleted: boolean; message: string }
+  | {
+      kind: "usual_food_draft";
+      usualFoodDraft: DraftUsualFoodOutput;
+      message: string;
+    }
+  | {
+      kind: "usual_meal_draft";
+      usualMealDraft: DraftUsualMealOutput;
+      message: string;
+      options?: unknown[];
+      candidateGroups?: unknown[];
+    }
+  | {
+      kind: "confirmation_required";
+      actionId: string;
+      input: unknown;
+      message: string;
+    }
+  | { kind: "meal_deleted"; message: string }
+  | {
+      kind: "clarification_required";
+      message: string;
+      proposal?: MealProposal;
+      options?: unknown[];
+      candidateGroups?: unknown[];
+      resolvedItems?: MealItem[];
+    };
+
+export type AgentToolFeedback = {
+  id: string;
+  actionId: string;
+  label: string;
+  summary: string;
+  input: unknown;
+};
+
+export type AgentWidgetPayload = {
+  kind: AgentChatResultKind;
+  title: string;
+  result: AgentChatMappedResult;
+};
+
+export type AgentChatEvent =
+  | { type: "conversation_started"; conversationId: string }
+  | { type: "thinking"; conversationId?: string; message: string }
+  | {
+      type: "transcription_completed";
+      conversationId?: string;
+      transcript: string;
+    }
+  | { type: "assistant_delta"; conversationId?: string; delta: string }
+  | {
+      type: "assistant_suggestions";
+      conversationId?: string;
+      suggestions: AgentChatSuggestion[];
+    }
+  | {
+      type: "tool_call_started";
+      conversationId: string;
+      toolCall: AgentToolFeedback;
+    }
+  | {
+      type: "tool_call_completed";
+      conversationId: string;
+      toolCall: AgentToolFeedback;
+      result: AgentChatMappedResult;
+      widget?: AgentWidgetPayload;
+    }
+  | {
+      type: "tool_call_failed";
+      conversationId: string;
+      toolCall: AgentToolFeedback;
+      error: string;
+    }
+  | { type: "done"; conversationId: string }
+  | { type: "error"; conversationId?: string; error: string };
+
+export class AgentChatService {
+  constructor(
+    private readonly agentProvider: ChatAgentProvider,
+    private readonly actionExecutor: ActionExecutor,
+    private readonly repository: AppRepository,
+    private readonly model: string,
+    private readonly runLogger?: LocalRunLogger,
+  ) {}
+
+  async *chat(input: {
+    text: string;
+    context: ActionContext;
+    conversationId?: string;
+    activeProposalId?: string;
+    activeProposal?: MealProposal | null;
+    inputMode?: "text" | "voice";
+  }): AsyncGenerator<AgentChatEvent> {
+    const runStarted = Date.now();
+    const conversation = await this.resolveConversation(
+      input.context.actorUserId,
+      input.conversationId,
+    );
+    yield { type: "conversation_started", conversationId: conversation.id };
+
+    const text = input.text.trim();
+    if (!text) {
+      yield {
+        type: "assistant_delta",
+        conversationId: conversation.id,
+        delta: "I could not understand enough input. Please try again.",
+      };
+      yield { type: "done", conversationId: conversation.id };
+      return;
+    }
+
+    await this.repository.addAgentConversationMessage(
+      input.context.actorUserId,
+      conversation.id,
+      { role: "user", content: text },
+    );
+
+    let currentActiveProposal = input.activeProposalId
+      ? input.activeProposal !== undefined
+        ? (input.activeProposal ?? undefined)
+        : await this.actionExecutor.getProposalForAgentContext(
+            input.context.actorUserId,
+            input.activeProposalId,
+          )
+      : undefined;
+
+    const allowedActions = filterToolsByPolicy(
+      actionDefinitions,
+      input.context,
+    );
+    const schemas = buildToolSchemas();
+    const tools = [
+      ...prioritizeDefaultTool(allowedActions).map((action) => ({
+        type: "function" as const,
+        function: {
+          name: action.id,
+          description:
+            schemas.find((tool) => tool.function.name === action.id)?.function
+              .description ?? `${action.title}. ${action.description}`,
+          parameters:
+            schemas.find((tool) => tool.function.name === action.id)?.function
+              .parameters ?? {},
+        },
+      })),
+      chatOptionsToolDefinition(),
+    ];
+
+    const messages = await this.messagesForModel(
+      input.context.actorUserId,
+      conversation.id,
+      input.context,
+      currentActiveProposal,
+    );
+    const executedSignatures = new Set<string>();
+    let iteration = 0;
+    let toolCallCount = 0;
+
+    while (iteration < MAX_CHAT_ITERATIONS) {
+      iteration++;
+      yield {
+        type: "thinking",
+        conversationId: conversation.id,
+        message: iteration === 1 ? "Thinking..." : "Checking the result...",
+      };
+
+      let decision: AgentToolDecision;
+      try {
+        decision = await this.agentProvider.runWithTools({
+          messages,
+          tools,
+          model: this.model,
+          traceId: input.context.traceId,
+        });
+      } catch (error) {
+        await this.logRun({
+          type: "agent.chat",
+          traceId: input.context.traceId,
+          userId: input.context.actorUserId,
+          conversationId: conversation.id,
+          inputText: text,
+          inputMode: input.inputMode ?? "text",
+          error: summarizeError(error),
+          timingsMs: { total: Date.now() - runStarted },
+        });
+        yield {
+          type: "error",
+          conversationId: conversation.id,
+          error: "The assistant is temporarily unavailable.",
+        };
+        return;
+      }
+
+      const assistantText =
+        decision.interaction?.assistantContent?.trim() ?? "";
+      if (decision.toolCalls.length === 0) {
+        const finalText = assistantText || "Done.";
+        await this.repository.addAgentConversationMessage(
+          input.context.actorUserId,
+          conversation.id,
+          { role: "assistant", content: finalText },
+        );
+        yield {
+          type: "assistant_delta",
+          conversationId: conversation.id,
+          delta: finalText,
+        };
+        await this.logRun({
+          type: "agent.chat",
+          traceId: input.context.traceId,
+          userId: input.context.actorUserId,
+          conversationId: conversation.id,
+          inputText: text,
+          inputMode: input.inputMode ?? "text",
+          resultKind: "assistant_message",
+          toolCallCount,
+          timingsMs: { total: Date.now() - runStarted },
+        });
+        yield { type: "done", conversationId: conversation.id };
+        return;
+      }
+
+      const toolCalls = decision.toolCalls.slice(
+        0,
+        MAX_TOOL_CALLS_PER_TURN - toolCallCount,
+      );
+      if (toolCalls.length === 0) {
+        yield {
+          type: "error",
+          conversationId: conversation.id,
+          error: "The assistant reached the tool-call limit for this turn.",
+        };
+        return;
+      }
+
+      const assistantToolMessage: AgentMessage = {
+        role: "assistant",
+        content: assistantText,
+        toolCalls,
+      };
+      messages.push(assistantToolMessage);
+      await this.repository.addAgentConversationMessage(
+        input.context.actorUserId,
+        conversation.id,
+        {
+          role: "assistant",
+          content: assistantText,
+          toolCalls,
+          metadata: { providerRouting: decision.providerRouting },
+        },
+      );
+
+      for (const toolCall of toolCalls) {
+        toolCallCount++;
+        const actionId = toolCall.function.name;
+
+        let parsedInput: unknown;
+        try {
+          parsedInput = JSON.parse(toolCall.function.arguments || "{}");
+        } catch {
+          const feedback = describeToolCall(toolCall, undefined);
+          const error = "The assistant sent invalid tool arguments.";
+          yield {
+            type: "tool_call_failed",
+            conversationId: conversation.id,
+            toolCall: feedback,
+            error,
+          };
+          await this.addToolErrorMessage(
+            input.context.actorUserId,
+            conversation.id,
+            messages,
+            toolCall,
+            actionId,
+            error,
+          );
+          continue;
+        }
+
+        if (actionId === CHAT_OPTIONS_TOOL_NAME) {
+          const quickReply = normalizeChatOptions(parsedInput, assistantText);
+          if (!quickReply) {
+            const feedback = describeToolCall(toolCall, parsedInput);
+            const error = "The assistant sent invalid chat options.";
+            yield {
+              type: "tool_call_failed",
+              conversationId: conversation.id,
+              toolCall: feedback,
+              error,
+            };
+            await this.addToolErrorMessage(
+              input.context.actorUserId,
+              conversation.id,
+              messages,
+              toolCall,
+              actionId,
+              error,
+            );
+            continue;
+          }
+
+          await this.repository.addAgentConversationMessage(
+            input.context.actorUserId,
+            conversation.id,
+            {
+              role: "assistant",
+              content: quickReply.message,
+              metadata: { suggestions: quickReply.suggestions },
+            },
+          );
+          yield {
+            type: "assistant_delta",
+            conversationId: conversation.id,
+            delta: quickReply.message,
+          };
+          yield {
+            type: "assistant_suggestions",
+            conversationId: conversation.id,
+            suggestions: quickReply.suggestions,
+          };
+          await this.logRun({
+            type: "agent.chat",
+            traceId: input.context.traceId,
+            userId: input.context.actorUserId,
+            conversationId: conversation.id,
+            inputText: text,
+            inputMode: input.inputMode ?? "text",
+            resultKind: "assistant_options",
+            toolCallCount,
+            timingsMs: { total: Date.now() - runStarted },
+          });
+          yield { type: "done", conversationId: conversation.id };
+          return;
+        }
+
+        if (!allowedActions.some((action) => action.id === actionId)) {
+          const feedback = describeToolCall(toolCall, parsedInput);
+          const error = `This action is not available: ${actionId}`;
+          yield {
+            type: "tool_call_failed",
+            conversationId: conversation.id,
+            toolCall: feedback,
+            error,
+          };
+          await this.addToolErrorMessage(
+            input.context.actorUserId,
+            conversation.id,
+            messages,
+            toolCall,
+            actionId,
+            error,
+          );
+          continue;
+        }
+
+        if (
+          currentActiveProposal &&
+          actionId === "revise_meal_proposal" &&
+          typeof parsedInput === "object" &&
+          parsedInput !== null &&
+          !Array.isArray(parsedInput) &&
+          !("proposalId" in parsedInput)
+        ) {
+          parsedInput = {
+            ...parsedInput,
+            proposalId: currentActiveProposal.id,
+          };
+        }
+
+        const signature = `${actionId}:${JSON.stringify(parsedInput)}`;
+        const feedback = describeToolCall(toolCall, parsedInput);
+        if (executedSignatures.has(signature)) {
+          const error = "Skipped a repeated tool call with the same arguments.";
+          yield {
+            type: "tool_call_failed",
+            conversationId: conversation.id,
+            toolCall: feedback,
+            error,
+          };
+          await this.addToolErrorMessage(
+            input.context.actorUserId,
+            conversation.id,
+            messages,
+            toolCall,
+            actionId,
+            error,
+          );
+          continue;
+        }
+        executedSignatures.add(signature);
+        yield {
+          type: "tool_call_started",
+          conversationId: conversation.id,
+          toolCall: feedback,
+        };
+
+        try {
+          const result = await this.actionExecutor.execute(
+            actionId,
+            parsedInput,
+            {
+              ...input.context,
+              source: "internal_agent",
+            },
+          );
+          const mapped = mapActionResult(actionId, result, text);
+          if ("proposal" in mapped && mapped.proposal) {
+            currentActiveProposal = mapped.proposal;
+          }
+          if (
+            mapped.kind === "meal_committed" ||
+            mapped.kind === "meal_deleted"
+          ) {
+            currentActiveProposal = undefined;
+          }
+          const widget = widgetForResult(mapped);
+          yield {
+            type: "tool_call_completed",
+            conversationId: conversation.id,
+            toolCall: feedback,
+            result: mapped,
+            widget,
+          };
+
+          const toolContent = safeToolContent({
+            actionId,
+            input: parsedInput,
+            result: mapped,
+            rawOutput: result.output,
+          });
+          const toolMessage: AgentMessage = {
+            role: "tool",
+            toolCallId: toolCall.id,
+            content: toolContent,
+          };
+          messages.push(toolMessage);
+          await this.repository.addAgentConversationMessage(
+            input.context.actorUserId,
+            conversation.id,
+            {
+              role: "tool",
+              content: toolContent,
+              toolCallId: toolCall.id,
+              metadata: { actionId, actionCallId: result.actionCallId },
+            },
+          );
+        } catch (error) {
+          const errorText =
+            error instanceof Error ? error.message : String(error);
+          yield {
+            type: "tool_call_failed",
+            conversationId: conversation.id,
+            toolCall: feedback,
+            error: errorText,
+          };
+          const toolMessage: AgentMessage = {
+            role: "tool",
+            toolCallId: toolCall.id,
+            content: JSON.stringify({ actionId, error: errorText }),
+          };
+          messages.push(toolMessage);
+          await this.repository.addAgentConversationMessage(
+            input.context.actorUserId,
+            conversation.id,
+            {
+              role: "tool",
+              content: toolMessage.content,
+              toolCallId: toolCall.id,
+              metadata: { actionId, error: errorText },
+            },
+          );
+        }
+      }
+    }
+
+    yield {
+      type: "error",
+      conversationId: conversation.id,
+      error: "The assistant stopped after the maximum number of steps.",
+    };
+  }
+
+  private async resolveConversation(
+    userId: string,
+    conversationId?: string,
+  ): Promise<AgentConversationRecord> {
+    if (!conversationId) {
+      return this.repository.createAgentConversation(userId, {
+        title: "Nutrition chat",
+      });
+    }
+    const existing = await this.repository.getAgentConversation(
+      userId,
+      conversationId,
+    );
+    if (!existing) throw new Error("agent_conversation_not_found");
+    return existing;
+  }
+
+  private async addToolErrorMessage(
+    userId: string,
+    conversationId: string,
+    messages: AgentMessage[],
+    toolCall: AgentToolCall,
+    actionId: string,
+    error: string,
+  ): Promise<void> {
+    const toolMessage: AgentMessage = {
+      role: "tool",
+      toolCallId: toolCall.id,
+      content: JSON.stringify({ actionId, error }),
+    };
+    messages.push(toolMessage);
+    await this.repository.addAgentConversationMessage(userId, conversationId, {
+      role: "tool",
+      content: toolMessage.content,
+      toolCallId: toolCall.id,
+      metadata: { actionId, error },
+    });
+  }
+
+  private async messagesForModel(
+    userId: string,
+    conversationId: string,
+    context: ActionContext,
+    activeProposal?: MealProposal,
+  ): Promise<AgentMessage[]> {
+    const stored = await this.repository.listAgentConversationMessages(
+      userId,
+      conversationId,
+    );
+    return [
+      buildChatSystemMessage(context, activeProposal),
+      ...stored.map(storedMessageToAgentMessage),
+    ];
+  }
+
+  private async logRun(event: Record<string, unknown>): Promise<void> {
+    try {
+      await this.runLogger?.log(event);
+    } catch (error) {
+      console.warn("agent.chat_log.failed", summarizeError(error));
+    }
+  }
+}
+
+function storedMessageToAgentMessage(
+  message: AgentConversationMessageRecord,
+): AgentMessage {
+  if (message.role === "assistant") {
+    return {
+      role: "assistant",
+      content: message.content,
+      toolCalls: Array.isArray(message.toolCalls)
+        ? (message.toolCalls as AgentToolCall[])
+        : undefined,
+    };
+  }
+  if (message.role === "tool") {
+    return {
+      role: "tool",
+      content: message.content,
+      toolCallId: message.toolCallId ?? "",
+    };
+  }
+  return { role: "user", content: message.content };
+}
+
+function chatOptionsToolDefinition() {
+  return {
+    type: "function" as const,
+    function: {
+      name: CHAT_OPTIONS_TOOL_NAME,
+      description: [
+        "Show concise quick-reply buttons in the mobile chat.",
+        "Use this only when asking the user to choose between 2 to 4 short interaction options, such as Yes/No or Save/Edit.",
+        "The message should ask one clear question. Button labels should be brief and mobile-friendly.",
+      ].join(" "),
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        required: ["message", "options"],
+        properties: {
+          message: {
+            type: "string",
+            description: "The assistant message shown above the buttons.",
+          },
+          options: {
+            type: "array",
+            minItems: 2,
+            maxItems: 4,
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["label"],
+              properties: {
+                label: {
+                  type: "string",
+                  description: "Short button label shown in chat.",
+                },
+                value: {
+                  type: "string",
+                  description:
+                    "Text to send if tapped. Defaults to label when omitted.",
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  };
+}
+
+function normalizeChatOptions(
+  input: unknown,
+  assistantText: string,
+): { message: string; suggestions: AgentChatSuggestion[] } | undefined {
+  if (!isRecord(input)) return undefined;
+  const message = textValue(input.message, assistantText).trim();
+  const options = Array.isArray(input.options) ? input.options : [];
+  if (!message || options.length < 2 || options.length > 4) return undefined;
+  const suggestions = options
+    .map((option) => {
+      if (!isRecord(option)) return undefined;
+      const label = textValue(option.label).trim();
+      const value = textValue(option.value, label).trim();
+      if (!label || !value) return undefined;
+      return { label: label.slice(0, 40), value: value.slice(0, 240) };
+    })
+    .filter((option): option is AgentChatSuggestion => option !== undefined);
+  if (suggestions.length < 2) return undefined;
+  return { message, suggestions: suggestions.slice(0, 4) };
+}
+
+function textValue(value: unknown, fallback = ""): string {
+  return typeof value === "string" && value.trim() ? value.trim() : fallback;
+}
+
+function describeToolCall(
+  toolCall: AgentToolCall,
+  parsedInput: unknown,
+): AgentToolFeedback {
+  const actionId = toolCall.function.name;
+  const definition = actionDefinitions.find((action) => action.id === actionId);
+  const input = isRecord(parsedInput) ? parsedInput : {};
+  const text = textValue;
+  const summaries: Record<string, string> = {
+    show_chat_options: "Preparing quick reply buttons",
+    query_food_memory: `Checking food memory for ${text(input.text, "this request")}`,
+    search_nutrition_database: `Searching nutrition data for ${text(input.query, "food")}`,
+    propose_meal_log: "Creating a meal proposal",
+    revise_meal_proposal: "Updating the current meal proposal",
+    create_meal_proposal_from_items:
+      "Creating a meal proposal from selected foods",
+    commit_meal: "Logging the confirmed meal",
+    correct_meal: "Correcting meal items",
+    delete_meal: "Preparing to delete a meal",
+    get_daily_summary: `Reading daily summary${text(input.date) ? ` for ${text(input.date)}` : ""}`,
+    get_remaining_targets: "Checking remaining calorie and macro targets",
+    get_meal_history: "Reading recent meal history",
+    get_usual_foods: "Reading usual ingredients",
+    get_usual_meals: "Reading usual meals",
+    draft_usual_food: "Preparing a usual ingredient draft",
+    draft_usual_meal: "Preparing a usual meal draft",
+  };
+  return {
+    id: toolCall.id,
+    actionId,
+    label: definition?.title ?? actionId,
+    summary: summaries[actionId] ?? `Running ${definition?.title ?? actionId}`,
+    input: parsedInput,
+  };
+}
+
+function mapActionResult(
+  actionId: string,
+  result: ExecuteActionResult,
+  originalText: string,
+): AgentChatMappedResult {
+  const output = result.output as Record<string, unknown>;
+  switch (actionId) {
+    case "query_food_memory": {
+      const matches = (output.matches as unknown[]) ?? [];
+      return {
+        kind: "food_memory",
+        matches,
+        options: matches,
+        message:
+          matches.length > 0
+            ? "I found matching food memories."
+            : "I couldn't find matching food memories.",
+      };
+    }
+    case "search_nutrition_database": {
+      const items = (output.items as MealItem[]) ?? [];
+      const options =
+        (output.candidateGroups as unknown[] | undefined) ??
+        (output.candidates as unknown[] | undefined) ??
+        [];
+      return {
+        kind: "nutrition_search",
+        items,
+        options,
+        message:
+          items.length > 0
+            ? "I found matching nutrition items."
+            : "I couldn't find matching nutrition items.",
+      };
+    }
+    case "propose_meal_log": {
+      if (output.clarificationRequired) {
+        return {
+          kind: "clarification_required",
+          proposal: output.proposal as MealProposal | undefined,
+          options: output.options as unknown[] | undefined,
+          candidateGroups: output.candidateGroups as unknown[] | undefined,
+          resolvedItems: output.resolvedItems as MealItem[] | undefined,
+          message:
+            typeof output.message === "string"
+              ? output.message
+              : "I could not confidently match every ingredient.",
+        };
+      }
+      const meal = output.autoCommittedMeal as Meal | undefined;
+      const candidateGroups =
+        (output.candidateGroups as unknown[] | undefined) ??
+        (output.options as unknown[] | undefined) ??
+        [];
+      if (meal) {
+        return {
+          kind: "meal_committed",
+          meal,
+          candidateGroups,
+          message: "Meal logged from trusted template.",
+        };
+      }
+      return {
+        kind: "proposal",
+        proposal: output.proposal as MealProposal,
+        candidateGroups,
+        message: "Meal proposal created.",
+      };
+    }
+    case "create_meal_proposal_from_items":
+      return {
+        kind: "proposal",
+        proposal: output.proposal as MealProposal,
+        message: "Meal proposal created.",
+      };
+    case "revise_meal_proposal":
+      if (output.clarificationRequired) {
+        return {
+          kind: "clarification_required",
+          proposal: output.proposal as MealProposal | undefined,
+          options: output.options as unknown[] | undefined,
+          candidateGroups: output.candidateGroups as unknown[] | undefined,
+          resolvedItems: output.resolvedItems as MealItem[] | undefined,
+          message:
+            typeof output.message === "string"
+              ? output.message
+              : "I need a food match before updating the meal proposal.",
+        };
+      }
+      return {
+        kind: "proposal",
+        proposal: output.proposal as MealProposal,
+        candidateGroups: output.candidateGroups as unknown[] | undefined,
+        message:
+          typeof output.message === "string"
+            ? output.message
+            : "Meal proposal updated.",
+      };
+    case "commit_meal":
+      return {
+        kind: "meal_committed",
+        meal: output.meal as Meal,
+        message: "Meal logged.",
+      };
+    case "correct_meal": {
+      const meal = output.meal as Meal | undefined;
+      const proposal = output.proposal as MealProposal | undefined;
+      return meal
+        ? { kind: "meal_corrected", meal, message: "Meal corrected." }
+        : {
+            kind: "meal_corrected",
+            proposal,
+            message: "Meal proposal corrected.",
+          };
+    }
+    case "get_daily_summary":
+      return {
+        kind: "summary",
+        summary: output.summary as DailySummary,
+        message: "Here is your daily summary.",
+      };
+    case "get_remaining_targets":
+      return {
+        kind: "remaining_targets",
+        remaining: output.remaining as NutritionSnapshot,
+        message: "Here are your remaining targets.",
+      };
+    case "get_meal_history":
+      return {
+        kind: "history",
+        meals: output.meals as Meal[],
+        message: "Here is your meal history.",
+      };
+    case "get_usual_foods":
+      return {
+        kind: "usual_foods",
+        usualFoods: output.usualFoods as UsualFood[],
+        message: "Here are your usual ingredients.",
+      };
+    case "get_usual_meals":
+      return {
+        kind: "templates",
+        templates: output.templates as MealTemplate[],
+        message: "Here are your usual meals.",
+      };
+    case "draft_usual_food":
+      return {
+        kind: "usual_food_draft",
+        usualFoodDraft: output as DraftUsualFoodOutput,
+        message:
+          typeof output.message === "string"
+            ? output.message
+            : "Usual ingredient draft created for review.",
+      };
+    case "draft_usual_meal":
+      return {
+        kind: "usual_meal_draft",
+        usualMealDraft: output as DraftUsualMealOutput,
+        options: output.options as unknown[] | undefined,
+        candidateGroups: output.candidateGroups as unknown[] | undefined,
+        message:
+          typeof output.message === "string"
+            ? output.message
+            : output.clarificationRequired
+              ? "Usual meal draft needs ingredient matches before saving."
+              : "Usual meal draft created for review.",
+      };
+    case "create_meal_template":
+    case "update_meal_template":
+      return {
+        kind: "template_saved",
+        template: output.template as MealTemplate,
+        message:
+          actionId === "create_meal_template"
+            ? "Usual meal created."
+            : "Usual meal updated.",
+      };
+    case "delete_meal_template":
+      return {
+        kind: "template_deleted",
+        deleted: Boolean(output.deleted),
+        message: output.deleted
+          ? "Usual meal deleted."
+          : "Usual meal was not found.",
+      };
+    case "delete_meal":
+      if ((output as { confirmationRequired?: boolean }).confirmationRequired) {
+        return {
+          kind: "confirmation_required",
+          actionId: "delete_meal",
+          input: { ...output, originalText },
+          message: "Please confirm deletion.",
+        };
+      }
+      return { kind: "meal_deleted", message: "Meal deleted." };
+    default:
+      return {
+        kind: "clarification_required",
+        message: "Action completed but I don't know how to display the result.",
+      };
+  }
+}
+
+function widgetForResult(result: AgentChatMappedResult): AgentWidgetPayload {
+  const titles: Record<AgentChatResultKind, string> = {
+    proposal: "Meal proposal",
+    meal_committed: "Meal logged",
+    meal_corrected: "Meal corrected",
+    summary: "Daily summary",
+    remaining_targets: "Remaining targets",
+    history: "Meal history",
+    food_memory: "Food memory",
+    nutrition_search: "Nutrition search",
+    usual_foods: "Usual ingredients",
+    templates: "Usual meals",
+    template_saved: "Usual meal saved",
+    template_deleted: "Usual meal deleted",
+    usual_food_draft: "Usual ingredient draft",
+    usual_meal_draft: "Usual meal draft",
+    confirmation_required: "Needs confirmation",
+    meal_deleted: "Meal deleted",
+    clarification_required: "Needs clarification",
+  };
+  return { kind: result.kind, title: titles[result.kind], result };
+}
+
+function safeToolContent(value: unknown): string {
+  const content = JSON.stringify(value);
+  if (content.length <= STORED_TOOL_RESULT_MAX_CHARS) return content;
+  return `${content.slice(0, STORED_TOOL_RESULT_MAX_CHARS)}...`;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function prioritizeDefaultTool<T extends { id: string }>(actions: T[]): T[] {
+  return [...actions].sort((a, b) => {
+    if (a.id === "propose_meal_log") return -1;
+    if (b.id === "propose_meal_log") return 1;
+    return 0;
+  });
+}

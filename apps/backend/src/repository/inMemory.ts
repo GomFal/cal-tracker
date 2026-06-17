@@ -20,6 +20,8 @@ import { subtractNutrition, sumNutrition } from "../utils/nutrition.js";
 import { fuzzyFoodScore, lexicalFoodScore } from "./foodSearchScoring.js";
 import type {
   ActionCallRecord,
+  AgentConversationMessageRecord,
+  AgentConversationRecord,
   AppRepository,
   AuditEventRecord,
   AuthIdentityProvider,
@@ -100,6 +102,11 @@ export class InMemoryRepository implements AppRepository {
   private telemetryEvents: TelemetryEventRecord[] = [];
   private llmRuns: LlmRunRecord[] = [];
   private foodSearchEvents: FoodSearchEventRecord[] = [];
+  private agentConversations = new Map<string, AgentConversationRecord>();
+  private agentConversationMessages = new Map<
+    string,
+    AgentConversationMessageRecord[]
+  >();
 
   static seeded(): InMemoryRepository {
     return new InMemoryRepository();
@@ -921,6 +928,99 @@ export class InMemoryRepository implements AppRepository {
     });
   }
 
+  async createAgentConversation(
+    userId: string,
+    input: { title?: string } = {},
+  ): Promise<AgentConversationRecord> {
+    this.requireUser(userId);
+    const now = new Date().toISOString();
+    const conversation: AgentConversationRecord = {
+      id: newId(),
+      userId,
+      title: input.title?.trim() || "New chat",
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.agentConversations.set(conversation.id, conversation);
+    this.agentConversationMessages.set(conversation.id, []);
+    return conversation;
+  }
+
+  async getAgentConversation(
+    userId: string,
+    conversationId: string,
+  ): Promise<AgentConversationRecord | undefined> {
+    const conversation = this.agentConversations.get(conversationId);
+    return conversation?.userId === userId ? conversation : undefined;
+  }
+
+  async listAgentConversations(
+    userId: string,
+    limit = 25,
+  ): Promise<AgentConversationRecord[]> {
+    return [...this.agentConversations.values()]
+      .filter((conversation) => conversation.userId === userId)
+      .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+      .slice(0, limit);
+  }
+
+  async addAgentConversationMessage(
+    userId: string,
+    conversationId: string,
+    input: Omit<
+      AgentConversationMessageRecord,
+      "id" | "conversationId" | "userId" | "createdAt"
+    >,
+  ): Promise<AgentConversationMessageRecord> {
+    const conversation = await this.getAgentConversation(
+      userId,
+      conversationId,
+    );
+    if (!conversation) throw new Error("agent_conversation_not_found");
+    const now = new Date().toISOString();
+    const message: AgentConversationMessageRecord = {
+      ...input,
+      id: newId(),
+      conversationId,
+      userId,
+      createdAt: now,
+    };
+    const messages = this.agentConversationMessages.get(conversationId) ?? [];
+    messages.push(message);
+    this.agentConversationMessages.set(conversationId, messages);
+    this.agentConversations.set(conversationId, {
+      ...conversation,
+      updatedAt: now,
+    });
+    return message;
+  }
+
+  async listAgentConversationMessages(
+    userId: string,
+    conversationId: string,
+  ): Promise<AgentConversationMessageRecord[]> {
+    const conversation = await this.getAgentConversation(
+      userId,
+      conversationId,
+    );
+    if (!conversation) return [];
+    return [...(this.agentConversationMessages.get(conversationId) ?? [])];
+  }
+
+  async deleteAgentConversation(
+    userId: string,
+    conversationId: string,
+  ): Promise<boolean> {
+    const conversation = await this.getAgentConversation(
+      userId,
+      conversationId,
+    );
+    if (!conversation) return false;
+    this.agentConversations.delete(conversationId);
+    this.agentConversationMessages.delete(conversationId);
+    return true;
+  }
+
   async recordActionCall(
     input: Omit<ActionCallRecord, "id" | "createdAt">,
   ): Promise<ActionCallRecord> {
@@ -970,7 +1070,8 @@ export class InMemoryRepository implements AppRepository {
   ): Promise<TelemetryEventRecord[]> {
     const rows = this.telemetryEvents.filter((event) => {
       if (filter.severity && event.severity !== filter.severity) return false;
-      if (filter.eventType && event.eventType !== filter.eventType) return false;
+      if (filter.eventType && event.eventType !== filter.eventType)
+        return false;
       if (filter.surface && event.surface !== filter.surface) return false;
       if (filter.traceId && event.traceId !== filter.traceId) return false;
       if (filter.userId && event.userId !== filter.userId) return false;
@@ -994,13 +1095,14 @@ export class InMemoryRepository implements AppRepository {
     return record;
   }
 
-  async listLlmRuns(
-    filter: LlmRunFilter,
-  ): Promise<LlmRunRecord[]> {
+  async listLlmRuns(filter: LlmRunFilter): Promise<LlmRunRecord[]> {
     const rows = this.llmRuns.filter((run) => {
-      if (filter.resultKind && run.resultKind !== filter.resultKind) return false;
-      if (filter.selectedTool && run.selectedTool !== filter.selectedTool) return false;
-      if (filter.executedTool && run.executedTool !== filter.executedTool) return false;
+      if (filter.resultKind && run.resultKind !== filter.resultKind)
+        return false;
+      if (filter.selectedTool && run.selectedTool !== filter.selectedTool)
+        return false;
+      if (filter.executedTool && run.executedTool !== filter.executedTool)
+        return false;
       if (filter.traceId && run.traceId !== filter.traceId) return false;
       if (filter.userId && run.userId !== filter.userId) return false;
       if (filter.from && run.createdAt < filter.from) return false;
@@ -1027,8 +1129,16 @@ export class InMemoryRepository implements AppRepository {
     filter: FoodSearchEventFilter,
   ): Promise<FoodSearchEventRecord[]> {
     const rows = this.foodSearchEvents.filter((event) => {
-      if (filter.zeroResults !== undefined && event.zeroResults !== filter.zeroResults) return false;
-      if (filter.lowConfidence !== undefined && event.lowConfidence !== filter.lowConfidence) return false;
+      if (
+        filter.zeroResults !== undefined &&
+        event.zeroResults !== filter.zeroResults
+      )
+        return false;
+      if (
+        filter.lowConfidence !== undefined &&
+        event.lowConfidence !== filter.lowConfidence
+      )
+        return false;
       if (filter.path && event.path !== filter.path) return false;
       if (filter.traceId && event.traceId !== filter.traceId) return false;
       if (filter.userId && event.userId !== filter.userId) return false;
@@ -1040,18 +1150,25 @@ export class InMemoryRepository implements AppRepository {
     return filter.limit !== undefined ? rows.slice(0, filter.limit) : rows;
   }
 
-  async getTelemetryOverview(input: { from: string; to: string }): Promise<TelemetryOverview> {
+  async getTelemetryOverview(input: {
+    from: string;
+    to: string;
+  }): Promise<TelemetryOverview> {
     const inRange = (iso: string) => iso >= input.from && iso <= input.to;
     const events = this.telemetryEvents.filter((e) => inRange(e.createdAt));
     const llmRuns = this.llmRuns.filter((r) => inRange(r.createdAt));
-    const foodSearches = this.foodSearchEvents.filter((s) => inRange(s.createdAt));
+    const foodSearches = this.foodSearchEvents.filter((s) =>
+      inRange(s.createdAt),
+    );
     const eventsBySeverity: Record<string, number> = {};
     const eventsBySurface: Record<string, number> = {};
     const userIds = new Set<string>();
     const traceIds = new Set<string>();
     for (const event of events) {
-      eventsBySeverity[event.severity] = (eventsBySeverity[event.severity] ?? 0) + 1;
-      eventsBySurface[event.surface] = (eventsBySurface[event.surface] ?? 0) + 1;
+      eventsBySeverity[event.severity] =
+        (eventsBySeverity[event.severity] ?? 0) + 1;
+      eventsBySurface[event.surface] =
+        (eventsBySurface[event.surface] ?? 0) + 1;
       traceIds.add(event.traceId);
       if (event.userId) userIds.add(event.userId);
     }
@@ -1066,11 +1183,14 @@ export class InMemoryRepository implements AppRepository {
     const recentResultKinds: Record<string, number> = {};
     for (const run of llmRuns) {
       if (!run.resultKind) continue;
-      recentResultKinds[run.resultKind] = (recentResultKinds[run.resultKind] ?? 0) + 1;
+      recentResultKinds[run.resultKind] =
+        (recentResultKinds[run.resultKind] ?? 0) + 1;
     }
     const denominator = foodSearches.length || 1;
     const zeroResultCount = foodSearches.filter((s) => s.zeroResults).length;
-    const lowConfidenceCount = foodSearches.filter((s) => s.lowConfidence).length;
+    const lowConfidenceCount = foodSearches.filter(
+      (s) => s.lowConfidence,
+    ).length;
     const providerErrorCount = llmRuns.filter((r) => r.providerError).length;
     const llmDenominator = llmRuns.length || 1;
     return {
@@ -1084,9 +1204,12 @@ export class InMemoryRepository implements AppRepository {
       eventsBySeverity,
       eventsBySurface,
       recentResultKinds,
-      zeroResultRate: foodSearches.length === 0 ? 0 : zeroResultCount / denominator,
-      lowConfidenceRate: foodSearches.length === 0 ? 0 : lowConfidenceCount / denominator,
-      providerErrorRate: llmRuns.length === 0 ? 0 : providerErrorCount / llmDenominator
+      zeroResultRate:
+        foodSearches.length === 0 ? 0 : zeroResultCount / denominator,
+      lowConfidenceRate:
+        foodSearches.length === 0 ? 0 : lowConfidenceCount / denominator,
+      providerErrorRate:
+        llmRuns.length === 0 ? 0 : providerErrorCount / llmDenominator,
     };
   }
 

@@ -25,6 +25,8 @@ import { subtractNutrition, sumNutrition } from "../utils/nutrition.js";
 import { lexicalFoodScore } from "./foodSearchScoring.js";
 import type {
   ActionCallRecord,
+  AgentConversationMessageRecord,
+  AgentConversationRecord,
   AppRepository,
   AuditEventRecord,
   AuthIdentityProvider,
@@ -1986,6 +1988,97 @@ export class PostgresRepository implements AppRepository {
     `);
   }
 
+  async createAgentConversation(
+    userId: string,
+    input: { title?: string } = {},
+  ): Promise<AgentConversationRecord> {
+    const [row] = await this.execute(dbSql`
+      INSERT INTO agent_conversations (user_id, title)
+      VALUES (${userId}, ${input.title?.trim() || "New chat"})
+      RETURNING *
+    `);
+    return mapAgentConversation(row);
+  }
+
+  async getAgentConversation(
+    userId: string,
+    conversationId: string,
+  ): Promise<AgentConversationRecord | undefined> {
+    const [row] = await this.execute(dbSql`
+      SELECT * FROM agent_conversations
+      WHERE id = ${conversationId} AND user_id = ${userId}
+      LIMIT 1
+    `);
+    return row ? mapAgentConversation(row) : undefined;
+  }
+
+  async listAgentConversations(
+    userId: string,
+    limit = 25,
+  ): Promise<AgentConversationRecord[]> {
+    const rows = await this.execute(dbSql`
+      SELECT * FROM agent_conversations
+      WHERE user_id = ${userId}
+      ORDER BY updated_at DESC
+      LIMIT ${Math.max(1, Math.min(100, Math.floor(limit)))}
+    `);
+    return rows.map(mapAgentConversation);
+  }
+
+  async addAgentConversationMessage(
+    userId: string,
+    conversationId: string,
+    input: Omit<
+      AgentConversationMessageRecord,
+      "id" | "conversationId" | "userId" | "createdAt"
+    >,
+  ): Promise<AgentConversationMessageRecord> {
+    const [row] = await this.execute(dbSql`
+      INSERT INTO agent_messages (conversation_id, user_id, role, content, tool_calls_json, tool_call_id, metadata_json)
+      SELECT ${conversationId}, ${userId}, ${input.role}, ${input.content}, ${jsonb(input.toolCalls ?? null)}, ${input.toolCallId ?? null}, ${jsonb(input.metadata ?? null)}
+      WHERE EXISTS (
+        SELECT 1 FROM agent_conversations
+        WHERE id = ${conversationId} AND user_id = ${userId}
+      )
+      RETURNING *
+    `);
+    if (!row) throw new Error("agent_conversation_not_found");
+    await this.execute(dbSql`
+      UPDATE agent_conversations
+      SET updated_at = now()
+      WHERE id = ${conversationId} AND user_id = ${userId}
+    `);
+    return mapAgentConversationMessage(row);
+  }
+
+  async listAgentConversationMessages(
+    userId: string,
+    conversationId: string,
+  ): Promise<AgentConversationMessageRecord[]> {
+    const rows = await this.execute(dbSql`
+      SELECT message.*
+      FROM agent_messages message
+      JOIN agent_conversations conversation
+        ON conversation.id = message.conversation_id
+      WHERE message.conversation_id = ${conversationId}
+        AND conversation.user_id = ${userId}
+      ORDER BY message.created_at, message.id
+    `);
+    return rows.map(mapAgentConversationMessage);
+  }
+
+  async deleteAgentConversation(
+    userId: string,
+    conversationId: string,
+  ): Promise<boolean> {
+    const rows = await this.execute(dbSql`
+      DELETE FROM agent_conversations
+      WHERE id = ${conversationId} AND user_id = ${userId}
+      RETURNING id
+    `);
+    return rows.length > 0;
+  }
+
   async recordActionCall(
     input: Omit<ActionCallRecord, "id" | "createdAt">,
   ): Promise<ActionCallRecord> {
@@ -2867,6 +2960,34 @@ function mapSession(row: Record<string, unknown>): StoredSession {
     revokedAt: row.revoked_at ? toIso(row.revoked_at) : undefined,
     createdAt: toIso(row.created_at),
     rotatedAt: row.rotated_at ? toIso(row.rotated_at) : undefined,
+  };
+}
+
+function mapAgentConversation(
+  row: Record<string, unknown>,
+): AgentConversationRecord {
+  return {
+    id: row.id as string,
+    userId: row.user_id as string,
+    title: row.title as string,
+    createdAt: toIso(row.created_at),
+    updatedAt: toIso(row.updated_at),
+  };
+}
+
+function mapAgentConversationMessage(
+  row: Record<string, unknown>,
+): AgentConversationMessageRecord {
+  return {
+    id: row.id as string,
+    conversationId: row.conversation_id as string,
+    userId: row.user_id as string,
+    role: row.role as AgentConversationMessageRecord["role"],
+    content: row.content as string,
+    toolCalls: row.tool_calls_json ?? undefined,
+    toolCallId: optionalString(row.tool_call_id),
+    metadata: row.metadata_json ?? undefined,
+    createdAt: toIso(row.created_at),
   };
 }
 

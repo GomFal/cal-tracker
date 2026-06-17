@@ -5,7 +5,24 @@ export function buildSystemMessage(
   context: ActionContext,
   activeProposal?: MealProposal,
 ): AgentMessage {
-  const today = new Date().toLocaleDateString(context.locale, { timeZone: context.timezone });
+  return buildNutritionSystemMessage(context, activeProposal, false);
+}
+
+export function buildChatSystemMessage(
+  context: ActionContext,
+  activeProposal?: MealProposal,
+): AgentMessage {
+  return buildNutritionSystemMessage(context, activeProposal, true);
+}
+
+function buildNutritionSystemMessage(
+  context: ActionContext,
+  activeProposal: MealProposal | undefined,
+  conversational: boolean,
+): AgentMessage {
+  const today = new Date().toLocaleDateString(context.locale, {
+    timeZone: context.timezone,
+  });
   const activeProposalText = activeProposal
     ? `
 
@@ -29,7 +46,7 @@ ${JSON.stringify({
     content: `You are the Cal Tracker nutrition assistant. Today is ${today}. The user's locale is ${context.locale} and timezone is ${context.timezone}.
 
 Rules:
-- Select exactly one tool to fulfill the user's request.
+${conversational ? "- You are in an interactive mobile chat. You may call tools, inspect their results, call another tool if needed, and then stop voluntarily with a concise answer. Do not call tools just to look busy.\n- The user can see every tool you call as a visible UI step, so choose tool calls deliberately and explain final outcomes clearly.\n- Format final chat answers for a narrow phone screen: prefer short sections and bullet lists. Do not use Markdown tables for summaries unless the user explicitly asks for a table.\n- When you need the user to choose between 2 to 4 short options, call show_chat_options instead of writing the options only as text. Examples: yes/no, save/edit, confirm/cancel.\n- If previous tool messages include a pending meal proposal, treat the next meal-related message as a correction to that proposal unless the user clearly starts over." : "- Select exactly one tool to fulfill the user's request."}
 - Treat propose_meal_log as the primary/default tool. Use it whenever the user is describing food to add, record, or turn into a meal proposal, including single-food and multi-food requests in any language.
 - When using propose_meal_log, include the user's full text and structured mentions for every food you can identify. For each mention, set originalText to the exact food phrase from the user's text or transcript without translating it, set canonicalName to the normalized searchable food name in the same language as that food phrase, including brand or product-line words when the user states them. Set canonicalEnglishName to the English generic food name when confidently known, and omit canonicalEnglishName when uncertain. Set language to the language code of the food phrase when clear, not the app locale. Do not output a separate brand field, do not invent translations, and do not include calories or macros. Include quantity/unit/unitKind and confidence.
 - For propose_meal_log, omit occurredAt unless the user clearly indicates when the food was consumed. Time indications can include an exact clock time, a date, a relative time, or informal part-of-day language in any language. If included, interpret it using the user's locale/timezone and output UTC ISO 8601 with Z. Do not output local offset datetimes.

@@ -15,7 +15,7 @@ import type {
   PermissionScope,
   CreateUsualFoodRequest,
   UpdateUsualFoodRequest,
-  UsualFood
+  UsualFood,
 } from "@cal-tracker/contracts";
 
 export type StoredUser = AuthUser & {
@@ -139,7 +139,12 @@ export type FoodSearchCandidate = FoodItemRecord & {
   finalScore: number;
 };
 
-export type FoodFeedbackAction = "selected" | "logged" | "corrected" | "dismissed" | "rejected";
+export type FoodFeedbackAction =
+  | "selected"
+  | "logged"
+  | "corrected"
+  | "dismissed"
+  | "rejected";
 
 export type FoodFeedbackRecord = {
   userId: string;
@@ -342,66 +347,208 @@ export type TelemetryOverview = {
   providerErrorRate: number;
 };
 
+export type AgentConversationRecord = {
+  id: string;
+  userId: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AgentConversationMessageRole = "user" | "assistant" | "tool";
+
+export type AgentConversationMessageRecord = {
+  id: string;
+  conversationId: string;
+  userId: string;
+  role: AgentConversationMessageRole;
+  content: string;
+  toolCalls?: unknown;
+  toolCallId?: string;
+  metadata?: unknown;
+  createdAt: string;
+};
+
 export interface AppRepository {
-  createUser(input: { email: string; displayName: string; passwordHash?: string; scopes: PermissionScope[] }): Promise<StoredUser>;
+  createUser(input: {
+    email: string;
+    displayName: string;
+    passwordHash?: string;
+    scopes: PermissionScope[];
+  }): Promise<StoredUser>;
   findUserByEmail(email: string): Promise<StoredUser | undefined>;
   findUserById(id: string): Promise<StoredUser | undefined>;
   updateTrustedMode(userId: string, enabled: boolean): Promise<StoredUser>;
-  findAuthIdentity(provider: AuthIdentityProvider, providerUserId: string): Promise<AuthIdentityRecord | undefined>;
-  linkAuthIdentity(input: { userId: string; provider: AuthIdentityProvider; providerUserId: string; email: string }): Promise<AuthIdentityRecord>;
+  findAuthIdentity(
+    provider: AuthIdentityProvider,
+    providerUserId: string,
+  ): Promise<AuthIdentityRecord | undefined>;
+  linkAuthIdentity(input: {
+    userId: string;
+    provider: AuthIdentityProvider;
+    providerUserId: string;
+    email: string;
+  }): Promise<AuthIdentityRecord>;
 
-  createSession(input: Omit<StoredSession, "createdAt">): Promise<StoredSession>;
-  findSessionByRefreshTokenHash(hash: string): Promise<StoredSession | undefined>;
+  createSession(
+    input: Omit<StoredSession, "createdAt">,
+  ): Promise<StoredSession>;
+  findSessionByRefreshTokenHash(
+    hash: string,
+  ): Promise<StoredSession | undefined>;
   revokeSession(sessionId: string): Promise<void>;
   revokeAllSessions(userId: string): Promise<void>;
-  rotateSession(sessionId: string, nextHash: string, expiresAt: string): Promise<StoredSession>;
+  rotateSession(
+    sessionId: string,
+    nextHash: string,
+    expiresAt: string,
+  ): Promise<StoredSession>;
 
-  createPasswordReset(input: { userId: string; tokenHash: string; expiresAt: string }): Promise<void>;
-  consumePasswordReset(tokenHash: string, newPasswordHash: string): Promise<boolean>;
+  createPasswordReset(input: {
+    userId: string;
+    tokenHash: string;
+    expiresAt: string;
+  }): Promise<void>;
+  consumePasswordReset(
+    tokenHash: string,
+    newPasswordHash: string,
+  ): Promise<boolean>;
 
   listFoods(userId: string): Promise<FoodItemRecord[]>;
-  searchFoods(userId: string, query: string, barcode?: string): Promise<FoodItemRecord[]>;
-  searchFoodsHybrid(userId: string, input: FoodHybridSearchInput): Promise<FoodSearchCandidate[]>;
+  searchFoods(
+    userId: string,
+    query: string,
+    barcode?: string,
+  ): Promise<FoodItemRecord[]>;
+  searchFoodsHybrid(
+    userId: string,
+    input: FoodHybridSearchInput,
+  ): Promise<FoodSearchCandidate[]>;
   upsertFoodItem(input: Omit<FoodItemRecord, "id">): Promise<FoodItemRecord>;
   listUsualFoods(userId: string): Promise<UsualFood[]>;
-  createUsualFood(userId: string, input: CreateUsualFoodRequest): Promise<UsualFood>;
-  updateUsualFood(userId: string, usualFoodId: string, input: UpdateUsualFoodRequest): Promise<UsualFood | undefined>;
+  createUsualFood(
+    userId: string,
+    input: CreateUsualFoodRequest,
+  ): Promise<UsualFood>;
+  updateUsualFood(
+    userId: string,
+    usualFoodId: string,
+    input: UpdateUsualFoodRequest,
+  ): Promise<UsualFood | undefined>;
   deleteUsualFood(userId: string, usualFoodId: string): Promise<boolean>;
-  recordFoodFeedback(input: FoodFeedbackRecord): Promise<UserFoodPreference | undefined>;
+  recordFoodFeedback(
+    input: FoodFeedbackRecord,
+  ): Promise<UserFoodPreference | undefined>;
   getUserFoodPreferences(userId: string): Promise<UserFoodPreference[]>;
-  upsertFoodItemEmbedding(input: UpsertFoodItemEmbeddingInput): Promise<FoodItemEmbeddingRecord>;
+  upsertFoodItemEmbedding(
+    input: UpsertFoodItemEmbeddingInput,
+  ): Promise<FoodItemEmbeddingRecord>;
 
   getNutritionTarget(userId: string): Promise<NutritionSnapshot>;
   getDailyGoals(userId: string, date: string): Promise<DailyGoals>;
-  updateDailyGoals(userId: string, input: UpdateDailyGoalsInput): Promise<DailyGoals>;
-  updateDailyHydration(userId: string, date: string, waterConsumedLiters: number): Promise<DailySummary>;
+  updateDailyGoals(
+    userId: string,
+    input: UpdateDailyGoalsInput,
+  ): Promise<DailyGoals>;
+  updateDailyHydration(
+    userId: string,
+    date: string,
+    waterConsumedLiters: number,
+  ): Promise<DailySummary>;
   listMeals(userId: string, limit?: number): Promise<Meal[]>;
   getMeal(userId: string, mealId: string): Promise<Meal | undefined>;
-  createProposal(userId: string, proposal: Omit<MealProposal, "id" | "createdAt">): Promise<MealProposal>;
-  getProposal(userId: string, proposalId: string): Promise<MealProposal | undefined>;
+  createProposal(
+    userId: string,
+    proposal: Omit<MealProposal, "id" | "createdAt">,
+  ): Promise<MealProposal>;
+  getProposal(
+    userId: string,
+    proposalId: string,
+  ): Promise<MealProposal | undefined>;
   updateProposal(userId: string, proposal: MealProposal): Promise<MealProposal>;
-  createMealFromProposal(userId: string, proposal: MealProposal, occurredAt: string, items?: MealItem[], mealLabel?: MealLabel | null): Promise<Meal>;
+  createMealFromProposal(
+    userId: string,
+    proposal: MealProposal,
+    occurredAt: string,
+    items?: MealItem[],
+    mealLabel?: MealLabel | null,
+  ): Promise<Meal>;
   updateMeal(userId: string, meal: Meal): Promise<Meal>;
   softDeleteMeal(userId: string, mealId: string): Promise<boolean>;
   getDailySummary(userId: string, date: string): Promise<DailySummary>;
 
   listTemplates(userId: string): Promise<MealTemplate[]>;
-  createTemplate(userId: string, input: Omit<MealTemplate, "id">): Promise<MealTemplate>;
+  createTemplate(
+    userId: string,
+    input: Omit<MealTemplate, "id">,
+  ): Promise<MealTemplate>;
   updateTemplate(userId: string, template: MealTemplate): Promise<MealTemplate>;
   deleteTemplate(userId: string, templateId: string): Promise<boolean>;
   queryMemory(userId: string, normalizedText: string): Promise<MemoryMatch[]>;
-  createMemory(input: { userId: string; normalizedText: string; label: string; templateId?: string; confidence: number }): Promise<void>;
+  createMemory(input: {
+    userId: string;
+    normalizedText: string;
+    label: string;
+    templateId?: string;
+    confidence: number;
+  }): Promise<void>;
 
-  recordActionCall(input: Omit<ActionCallRecord, "id" | "createdAt">): Promise<ActionCallRecord>;
-  recordAuditEvent(input: Omit<AuditEventRecord, "id" | "createdAt">): Promise<AuditEventRecord>;
+  createAgentConversation(
+    userId: string,
+    input?: { title?: string },
+  ): Promise<AgentConversationRecord>;
+  getAgentConversation(
+    userId: string,
+    conversationId: string,
+  ): Promise<AgentConversationRecord | undefined>;
+  listAgentConversations(
+    userId: string,
+    limit?: number,
+  ): Promise<AgentConversationRecord[]>;
+  addAgentConversationMessage(
+    userId: string,
+    conversationId: string,
+    input: Omit<
+      AgentConversationMessageRecord,
+      "id" | "conversationId" | "userId" | "createdAt"
+    >,
+  ): Promise<AgentConversationMessageRecord>;
+  listAgentConversationMessages(
+    userId: string,
+    conversationId: string,
+  ): Promise<AgentConversationMessageRecord[]>;
+  deleteAgentConversation(
+    userId: string,
+    conversationId: string,
+  ): Promise<boolean>;
+
+  recordActionCall(
+    input: Omit<ActionCallRecord, "id" | "createdAt">,
+  ): Promise<ActionCallRecord>;
+  recordAuditEvent(
+    input: Omit<AuditEventRecord, "id" | "createdAt">,
+  ): Promise<AuditEventRecord>;
   listActionCalls(userId: string): Promise<ActionCallRecord[]>;
   listAuditEvents(userId: string): Promise<AuditEventRecord[]>;
 
-  createTelemetryEvent(input: Omit<TelemetryEventRecord, "id" | "createdAt">): Promise<TelemetryEventRecord>;
-  listTelemetryEvents(filter: TelemetryEventFilter): Promise<TelemetryEventRecord[]>;
-  createLlmRun(input: Omit<LlmRunRecord, "id" | "createdAt">): Promise<LlmRunRecord>;
+  createTelemetryEvent(
+    input: Omit<TelemetryEventRecord, "id" | "createdAt">,
+  ): Promise<TelemetryEventRecord>;
+  listTelemetryEvents(
+    filter: TelemetryEventFilter,
+  ): Promise<TelemetryEventRecord[]>;
+  createLlmRun(
+    input: Omit<LlmRunRecord, "id" | "createdAt">,
+  ): Promise<LlmRunRecord>;
   listLlmRuns(filter: LlmRunFilter): Promise<LlmRunRecord[]>;
-  createFoodSearchEvent(input: Omit<FoodSearchEventRecord, "id" | "createdAt">): Promise<FoodSearchEventRecord>;
-  listFoodSearchEvents(filter: FoodSearchEventFilter): Promise<FoodSearchEventRecord[]>;
-  getTelemetryOverview(input: { from: string; to: string }): Promise<TelemetryOverview>;
+  createFoodSearchEvent(
+    input: Omit<FoodSearchEventRecord, "id" | "createdAt">,
+  ): Promise<FoodSearchEventRecord>;
+  listFoodSearchEvents(
+    filter: FoodSearchEventFilter,
+  ): Promise<FoodSearchEventRecord[]>;
+  getTelemetryOverview(input: {
+    from: string;
+    to: string;
+  }): Promise<TelemetryOverview>;
 }

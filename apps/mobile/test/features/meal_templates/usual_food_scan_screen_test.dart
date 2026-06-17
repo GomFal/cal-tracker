@@ -121,6 +121,31 @@ Widget buildAppWithVm(FakeUsualFoodScanViewModel vm) {
 
 void main() {
   group('UsualFoodScanScreen', () {
+    test('formats OCR lines into nutrition rows using bounding boxes', () {
+      final formatted = formatNutritionLabelOcrLines(
+        const [
+          NutritionLabelOcrLine(
+            text: 'Energy',
+            boundingBox: Rect.fromLTWH(10, 10, 70, 18),
+          ),
+          NutritionLabelOcrLine(
+            text: '360 kcal',
+            boundingBox: Rect.fromLTWH(220, 12, 90, 18),
+          ),
+          NutritionLabelOcrLine(
+            text: 'Protein',
+            boundingBox: Rect.fromLTWH(10, 42, 80, 18),
+          ),
+          NutritionLabelOcrLine(
+            text: '7 g',
+            boundingBox: Rect.fromLTWH(235, 43, 45, 18),
+          ),
+        ],
+      );
+
+      expect(formatted, 'Energy | 360 kcal\nProtein | 7 g');
+    });
+
     testWidgets('ready: shows close, capture button and viewfinder hint',
         (tester) async {
       final vm = FakeUsualFoodScanViewModel(
@@ -234,8 +259,7 @@ void main() {
       );
     });
 
-    testWidgets('error: shows card, retry and cancel buttons',
-        (tester) async {
+    testWidgets('error: shows card, retry and cancel buttons', (tester) async {
       final vm = FakeUsualFoodScanViewModel(
         overridePhase: UsualFoodScanPhase.error,
         overrideErrorCode: UsualFoodScanError.cameraDenied,

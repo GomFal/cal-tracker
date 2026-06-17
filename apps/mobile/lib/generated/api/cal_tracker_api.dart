@@ -163,6 +163,26 @@ class CalTrackerApiClient {
     });
   }
 
+  Stream<Map<String, Object?>> streamAgentChat(
+    String message, {
+    String? conversationId,
+    String? activeProposalId,
+  }) {
+    Future<http.BaseRequest> buildRequest() async {
+      final request = http.Request('POST', _uri('/v1/agent/chat'));
+      request.headers.addAll(await _headers());
+      request.body = jsonEncode({
+        'message': message,
+        'source': 'flutter',
+        if (conversationId != null) 'conversationId': conversationId,
+        if (activeProposalId != null) 'activeProposalId': activeProposalId,
+      });
+      return request;
+    }
+
+    return _sendSseRequest(buildRequest);
+  }
+
   Future<Map<String, Object?>> searchFoods({
     required String query,
     String? barcode,
@@ -342,6 +362,37 @@ class CalTrackerApiClient {
     }
   }
 
+  Stream<Map<String, Object?>> streamAgentChatAudio(
+    File audioFile, {
+    String? conversationId,
+    String? activeProposalId,
+  }) {
+    Future<http.BaseRequest> buildRequest() async {
+      final request = http.MultipartRequest(
+        'POST',
+        _uri('/v1/agent/chat/audio'),
+      );
+      request.headers.addAll(await _headers(includeContentType: false));
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'audio',
+          audioFile.path,
+          contentType: _detectContentType(audioFile.path),
+        ),
+      );
+      request.fields['source'] = 'flutter';
+      if (conversationId != null) {
+        request.fields['conversationId'] = conversationId;
+      }
+      if (activeProposalId != null) {
+        request.fields['activeProposalId'] = activeProposalId;
+      }
+      return request;
+    }
+
+    return _sendSseRequest(buildRequest);
+  }
+
   Future<Map<String, Object?>> runVoiceMeal(
     File audioFile, {
     String? source,
@@ -406,6 +457,73 @@ class CalTrackerApiClient {
     } finally {
       uploadClient.close();
     }
+  }
+
+  Stream<Map<String, Object?>> _sendSseRequest(
+    Future<http.BaseRequest> Function() buildRequest,
+  ) async* {
+    var response = await _httpClient.send(await buildRequest());
+    if (response.statusCode == 401) {
+      final tokens = await tokenStorage.read();
+      if (tokens != null) {
+        final refreshed = await refresh(tokens.refreshToken);
+        await tokenStorage.write(
+          StoredTokens(
+            accessToken: refreshed['accessToken'] as String,
+            refreshToken: refreshed['refreshToken'] as String,
+          ),
+        );
+        response = await _httpClient.send(await buildRequest());
+      }
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final body = await http.Response.fromStream(response);
+      await _decode(body);
+      return;
+    }
+
+    final pending = StringBuffer();
+    await for (final chunk in response.stream.transform(utf8.decoder)) {
+      for (final event in _parseSseEvents(chunk, pending)) {
+        yield event;
+      }
+    }
+    final lastEvent = _parsePendingSseEvent(pending);
+    if (lastEvent != null) yield lastEvent;
+  }
+
+  Iterable<Map<String, Object?>> _parseSseEvents(
+    String chunk,
+    StringBuffer pending,
+  ) sync* {
+    pending.write(chunk);
+    final raw = pending.toString();
+    final parts = raw.split('\n\n');
+    pending.clear();
+    if (parts.isNotEmpty) pending.write(parts.removeLast());
+    for (final part in parts) {
+      final event = _decodeSseEvent(part);
+      if (event != null) yield event;
+    }
+  }
+
+  Map<String, Object?>? _parsePendingSseEvent(StringBuffer pending) {
+    final raw = pending.toString();
+    pending.clear();
+    return _decodeSseEvent(raw);
+  }
+
+  Map<String, Object?>? _decodeSseEvent(String raw) {
+    final dataLines = raw
+        .split(RegExp(r'\r?\n'))
+        .map((line) => line.trim())
+        .where((line) => line.startsWith('data:'))
+        .map((line) => line.substring(5).trim())
+        .where((line) => line.isNotEmpty)
+        .toList();
+    if (dataLines.isEmpty) return null;
+    final decoded = jsonDecode(dataLines.join('\n'));
+    return decoded is Map<String, Object?> ? decoded : null;
   }
 
   Future<Map<String, Object?>> _get(String path) async {

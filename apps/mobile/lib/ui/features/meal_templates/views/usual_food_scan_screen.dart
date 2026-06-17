@@ -1,8 +1,13 @@
+import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+import 'package:image/image.dart' as img;
+import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 
@@ -10,19 +15,26 @@ import '../../../../data/repositories/nutrition_repository.dart';
 import '../../../../l10n/app_localizations_context.dart';
 import '../../../../l10n/generated/app_localizations.dart';
 import '../view_models/usual_food_scan_view_model.dart';
-import '../widgets/scan_viewfinder_overlay.dart';
+
+enum UsualFoodScanResultMode { usualFoodDraft, ocrText }
 
 /// Full-screen camera viewfinder for scanning a nutrition label.
 ///
-/// Opens the camera, displays a target rectangle. On capture, pauses the live
-/// preview and shows a still image so the user can confirm or retake. After
-/// confirmation, runs on-device OCR on the still image, sends the extracted
-/// text to the [NutritionRepository]'s existing [draftUsualFood] endpoint,
-/// and pops with the resulting [UsualFoodDraft].
+/// Opens a simple live camera preview. On capture, pauses the live preview
+/// and shows a still image so the user can select the nutrition table crop. After
+/// confirmation, runs on-device OCR on the still image. It can either send the
+/// extracted text to the [NutritionRepository]'s existing [draftUsualFood]
+/// endpoint and pop with a [UsualFoodDraft], or pop with the raw OCR text so
+/// another flow, such as agent chat, can decide how to use it.
 class UsualFoodScanScreen extends StatefulWidget {
-  const UsualFoodScanScreen({super.key});
+  const UsualFoodScanScreen({
+    super.key,
+    this.resultMode = UsualFoodScanResultMode.usualFoodDraft,
+  });
 
   static const route = '/templates/ingredients/scan';
+
+  final UsualFoodScanResultMode resultMode;
 
   @override
   State<UsualFoodScanScreen> createState() => _UsualFoodScanScreenState();
@@ -34,6 +46,11 @@ class _UsualFoodScanScreenState extends State<UsualFoodScanScreen>
   TextRecognizer? _textRecognizer;
   late UsualFoodScanViewModel _viewModel;
   bool _popped = false;
+  Rect? _cropRect;
+  ui.Size? _capturedImageSize;
+  String? _loadedCapturedImagePath;
+
+  static const _defaultCropRect = Rect.fromLTWH(0.08, 0.24, 0.84, 0.48);
 
   @override
   void initState() {
@@ -86,14 +103,22 @@ class _UsualFoodScanScreenState extends State<UsualFoodScanScreen>
       resumePreview: _resumePreview,
       recognizeText: _recognizeText,
       deleteCapturedFile: _deleteCapturedFile,
+      prepareImageForOcr: _cropImageForOcr,
       requestCameraPermission: () async {
         final status = await Permission.camera.request();
         return status.isGranted;
       },
+      draftFromRecognizedText:
+          widget.resultMode == UsualFoodScanResultMode.usualFoodDraft,
       onDrafted: (draft) {
         if (!mounted || _popped) return;
         _popped = true;
         Navigator.of(context).pop(draft);
+      },
+      onTextExtracted: (text) {
+        if (!mounted || _popped) return;
+        _popped = true;
+        Navigator.of(context).pop(text);
       },
     );
   }
@@ -118,11 +143,30 @@ class _UsualFoodScanScreenState extends State<UsualFoodScanScreen>
       imageFormatGroup: ImageFormatGroup.jpeg,
     );
     await controller.initialize();
+    await _configureStillPhotoCamera(controller);
     if (!mounted) {
       controller.dispose();
       return;
     }
     setState(() => _cameraController = controller);
+  }
+
+  Future<void> _configureStillPhotoCamera(CameraController controller) async {
+    try {
+      await controller.setFlashMode(FlashMode.off);
+    } catch (_) {
+      // Unsupported on some devices/backends.
+    }
+    try {
+      await controller.setFocusMode(FocusMode.auto);
+    } catch (_) {
+      // Unsupported on some devices/backends.
+    }
+    try {
+      await controller.setExposureMode(ExposureMode.auto);
+    } catch (_) {
+      // Unsupported on some devices/backends.
+    }
   }
 
   Future<String> _takePicture() async {
@@ -132,6 +176,51 @@ class _UsualFoodScanScreenState extends State<UsualFoodScanScreen>
     }
     final xfile = await controller.takePicture();
     return xfile.path;
+  }
+
+  Future<void> _loadCapturedImageSize(String filePath) async {
+    try {
+      final bytes = await File(filePath).readAsBytes();
+      final codec = await ui.instantiateImageCodec(bytes);
+      final frame = await codec.getNextFrame();
+      if (!mounted) return;
+      setState(() {
+        _capturedImageSize = ui.Size(
+          frame.image.width.toDouble(),
+          frame.image.height.toDouble(),
+        );
+        _cropRect = _defaultCropRect;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _capturedImageSize = null;
+        _cropRect = _defaultCropRect;
+      });
+    }
+  }
+
+  Future<String?> _cropImageForOcr(String filePath) async {
+    final cropRect = _cropRect ?? _defaultCropRect;
+    final bytes = await File(filePath).readAsBytes();
+    final source = img.decodeImage(bytes);
+    if (source == null) return null;
+
+    final x = (cropRect.left * source.width).round().clamp(0, source.width - 1);
+    final y =
+        (cropRect.top * source.height).round().clamp(0, source.height - 1);
+    final width =
+        (cropRect.width * source.width).round().clamp(1, source.width - x);
+    final height =
+        (cropRect.height * source.height).round().clamp(1, source.height - y);
+    final cropped =
+        img.copyCrop(source, x: x, y: y, width: width, height: height);
+    final directory = await getTemporaryDirectory();
+    final output = File(
+      '${directory.path}/nutrition_label_crop_${DateTime.now().microsecondsSinceEpoch}.jpg',
+    );
+    await output.writeAsBytes(img.encodeJpg(cropped, quality: 92));
+    return output.path;
   }
 
   Future<void> _pausePreview() async {
@@ -155,7 +244,7 @@ class _UsualFoodScanScreenState extends State<UsualFoodScanScreen>
     }
     final input = InputImage.fromFilePath(filePath);
     final result = await recognizer.processImage(input);
-    return result.text;
+    return formatNutritionLabelOcrText(result);
   }
 
   Future<void> _deleteCapturedFile(String filePath) async {
@@ -169,6 +258,16 @@ class _UsualFoodScanScreenState extends State<UsualFoodScanScreen>
 
   void _onViewModelChanged() {
     if (!mounted) return;
+    final capturedPath = _viewModel.capturedFilePath;
+    if (capturedPath != null && capturedPath != _loadedCapturedImagePath) {
+      _loadedCapturedImagePath = capturedPath;
+      unawaited(_loadCapturedImageSize(capturedPath));
+    }
+    if (capturedPath == null && _loadedCapturedImagePath != null) {
+      _loadedCapturedImagePath = null;
+      _capturedImageSize = null;
+      _cropRect = null;
+    }
     setState(() {});
   }
 
@@ -202,14 +301,6 @@ class _UsualFoodScanScreenState extends State<UsualFoodScanScreen>
               // Bottom: live camera preview OR still image preview
               _buildCameraSurface(context),
 
-              // Middle: viewfinder overlay (only on live preview, not on
-              // still preview where the user is reviewing their shot).
-              if (_viewModel.phase == UsualFoodScanPhase.ready ||
-                  _viewModel.phase ==
-                      UsualFoodScanPhase.requestingPermission ||
-                  _viewModel.phase == UsualFoodScanPhase.capturing)
-                const ScanViewfinderOverlay(),
-
               // Top-left: close button
               Positioned(
                 top: 12,
@@ -232,18 +323,20 @@ class _UsualFoodScanScreenState extends State<UsualFoodScanScreen>
 
     // Once we have a captured file, show the still image (the live preview
     // is paused by the VM at this point).
-    final hasStillImage =
-        capturedFilePath != null &&
+    final hasStillImage = capturedFilePath != null &&
         (phase == UsualFoodScanPhase.previewing ||
             phase == UsualFoodScanPhase.ocrProcessing ||
             phase == UsualFoodScanPhase.drafting ||
             phase == UsualFoodScanPhase.drafted ||
             phase == UsualFoodScanPhase.error);
     if (hasStillImage) {
-      return Image.file(
-        File(capturedFilePath),
-        fit: BoxFit.cover,
+      return _CropSelectionPreview(
         key: const ValueKey('usual_food_scan_still_preview'),
+        filePath: capturedFilePath,
+        imageSize: _capturedImageSize,
+        cropRect: _cropRect ?? _defaultCropRect,
+        enabled: phase == UsualFoodScanPhase.previewing,
+        onChanged: (rect) => setState(() => _cropRect = rect),
       );
     }
 
@@ -294,6 +387,181 @@ class _UsualFoodScanScreenState extends State<UsualFoodScanScreen>
         ],
       ),
     );
+  }
+}
+
+class _CropSelectionPreview extends StatefulWidget {
+  const _CropSelectionPreview({
+    super.key,
+    required this.filePath,
+    required this.imageSize,
+    required this.cropRect,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final String filePath;
+  final ui.Size? imageSize;
+  final Rect? cropRect;
+  final bool enabled;
+  final ValueChanged<Rect> onChanged;
+
+  @override
+  State<_CropSelectionPreview> createState() => _CropSelectionPreviewState();
+}
+
+class _CropSelectionPreviewState extends State<_CropSelectionPreview> {
+  Offset? _dragStart;
+
+  static const _defaultCrop = Rect.fromLTWH(0.08, 0.24, 0.84, 0.48);
+  static const _minimumCropSide = 0.08;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final imageRect = _imageRectFor(constraints.biggest);
+        final crop = widget.cropRect ?? _defaultCrop;
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            ColoredBox(
+              color: Colors.black,
+              child: Image.file(
+                File(widget.filePath),
+                fit: BoxFit.contain,
+              ),
+            ),
+            Positioned.fromRect(
+              rect: imageRect,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onPanStart: widget.enabled
+                    ? (details) {
+                        _dragStart = _normalizedPoint(
+                          details.localPosition,
+                          imageRect.size,
+                        );
+                        widget.onChanged(
+                          Rect.fromLTWH(
+                            _dragStart!.dx,
+                            _dragStart!.dy,
+                            _minimumCropSide,
+                            _minimumCropSide,
+                          ),
+                        );
+                      }
+                    : null,
+                onPanUpdate: widget.enabled
+                    ? (details) {
+                        final start = _dragStart;
+                        if (start == null) return;
+                        final current = _normalizedPoint(
+                          details.localPosition,
+                          imageRect.size,
+                        );
+                        widget.onChanged(_normalizedRect(start, current));
+                      }
+                    : null,
+                onPanEnd: (_) => _dragStart = null,
+                onPanCancel: () => _dragStart = null,
+                child: CustomPaint(
+                  key: const ValueKey('usual_food_scan_crop_selector'),
+                  painter: _CropSelectionPainter(crop: crop),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Rect _imageRectFor(Size bounds) {
+    final imageSize = widget.imageSize;
+    if (imageSize == null || imageSize.width <= 0 || imageSize.height <= 0) {
+      return Offset.zero & bounds;
+    }
+    final fitted = applyBoxFit(
+      BoxFit.contain,
+      Size(imageSize.width, imageSize.height),
+      bounds,
+    );
+    final size = fitted.destination;
+    return Rect.fromLTWH(
+      (bounds.width - size.width) / 2,
+      (bounds.height - size.height) / 2,
+      size.width,
+      size.height,
+    );
+  }
+
+  Offset _normalizedPoint(Offset localPosition, Size size) {
+    final dx = size.width <= 0 ? 0.0 : localPosition.dx / size.width;
+    final dy = size.height <= 0 ? 0.0 : localPosition.dy / size.height;
+    return Offset(dx.clamp(0, 1).toDouble(), dy.clamp(0, 1).toDouble());
+  }
+
+  Rect _normalizedRect(Offset start, Offset current) {
+    final left = math.min(start.dx, current.dx);
+    final top = math.min(start.dy, current.dy);
+    final right = math.max(start.dx, current.dx);
+    final bottom = math.max(start.dy, current.dy);
+    final width = math.max(right - left, _minimumCropSide);
+    final height = math.max(bottom - top, _minimumCropSide);
+    return Rect.fromLTWH(
+      math.min(left, 1 - width),
+      math.min(top, 1 - height),
+      width,
+      height,
+    );
+  }
+}
+
+class _CropSelectionPainter extends CustomPainter {
+  const _CropSelectionPainter({required this.crop});
+
+  final Rect crop;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cropRect = Rect.fromLTWH(
+      crop.left * size.width,
+      crop.top * size.height,
+      crop.width * size.width,
+      crop.height * size.height,
+    );
+    final overlay = Path()..addRect(Offset.zero & size);
+    final hole = Path()
+      ..addRRect(RRect.fromRectAndRadius(cropRect, const Radius.circular(14)));
+    final overlayPaint = Paint()..color = Colors.black.withValues(alpha: 0.46);
+    canvas.drawPath(
+      Path.combine(PathOperation.difference, overlay, hole),
+      overlayPaint,
+    );
+
+    final borderPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(cropRect, const Radius.circular(14)),
+      borderPaint,
+    );
+
+    final accentPaint = Paint()
+      ..color = const Color(0xffc8f05a)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(cropRect.deflate(5), const Radius.circular(10)),
+      accentPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _CropSelectionPainter oldDelegate) {
+    return oldDelegate.crop != crop;
   }
 }
 
@@ -384,7 +652,8 @@ class _StateCard extends StatelessWidget {
                   children: [
                     if (onCancel != null)
                       TextButton(
-                        key: const ValueKey('usual_food_scan_cancel_error_button'),
+                        key: const ValueKey(
+                            'usual_food_scan_cancel_error_button'),
                         onPressed: onCancel,
                         child: Text(
                           l10n.commonCancel,
@@ -589,6 +858,124 @@ class _ConfirmRetakeBar extends StatelessWidget {
       ),
     );
   }
+}
+
+class NutritionLabelOcrLine {
+  const NutritionLabelOcrLine({required this.text, required this.boundingBox});
+
+  final String text;
+  final Rect boundingBox;
+
+  double get centerY => boundingBox.top + boundingBox.height / 2;
+  double get centerX => boundingBox.left + boundingBox.width / 2;
+}
+
+String formatNutritionLabelOcrText(RecognizedText recognizedText) {
+  final lines = [
+    for (final block in recognizedText.blocks)
+      for (final line in block.lines)
+        if (line.text.trim().isNotEmpty)
+          NutritionLabelOcrLine(
+            text: _normalizeOcrCell(line.text),
+            boundingBox: line.boundingBox,
+          ),
+  ];
+  return formatNutritionLabelOcrLines(
+    lines,
+    fallbackText: recognizedText.text,
+  );
+}
+
+@visibleForTesting
+String formatNutritionLabelOcrLines(
+  List<NutritionLabelOcrLine> lines, {
+  String fallbackText = '',
+}) {
+  final cleaned = lines
+      .map(
+        (line) => NutritionLabelOcrLine(
+          text: _normalizeOcrCell(line.text),
+          boundingBox: line.boundingBox,
+        ),
+      )
+      .where((line) => line.text.isNotEmpty)
+      .toList()
+    ..sort((a, b) {
+      final vertical = a.centerY.compareTo(b.centerY);
+      if ((a.centerY - b.centerY).abs() > _rowTolerance(a, b)) {
+        return vertical;
+      }
+      return a.boundingBox.left.compareTo(b.boundingBox.left);
+    });
+
+  if (cleaned.isEmpty) return fallbackText.trim();
+
+  final rows = <List<NutritionLabelOcrLine>>[];
+  for (final line in cleaned) {
+    if (rows.isEmpty) {
+      rows.add([line]);
+      continue;
+    }
+    final row = rows.last;
+    final rowCenter = row
+            .map((item) => item.centerY)
+            .reduce((value, element) => value + element) /
+        row.length;
+    final rowHeight = row
+            .map((item) => item.boundingBox.height)
+            .reduce((value, element) => value + element) /
+        row.length;
+    final tolerance =
+        math.max(8, math.max(rowHeight, line.boundingBox.height) * 0.72);
+    if ((line.centerY - rowCenter).abs() <= tolerance) {
+      row.add(line);
+    } else {
+      rows.add([line]);
+    }
+  }
+
+  final formattedRows = rows
+      .map((row) {
+        row.sort((a, b) => a.boundingBox.left.compareTo(b.boundingBox.left));
+        return _mergeRowCells(row);
+      })
+      .where((row) => row.isNotEmpty)
+      .toList();
+
+  final formatted = formattedRows.join('\n').trim();
+  if (formatted.isEmpty) return fallbackText.trim();
+  return formatted;
+}
+
+String _mergeRowCells(List<NutritionLabelOcrLine> row) {
+  if (row.isEmpty) return '';
+  if (row.length == 1) return row.single.text;
+  final cells = <String>[];
+  var current = row.first.text;
+  var previous = row.first;
+  for (final cell in row.skip(1)) {
+    final gap = cell.boundingBox.left - previous.boundingBox.right;
+    final averageHeight =
+        (cell.boundingBox.height + previous.boundingBox.height) / 2;
+    if (gap > math.max(12, averageHeight * 0.65)) {
+      cells.add(current.trim());
+      current = cell.text;
+    } else {
+      current = '$current ${cell.text}';
+    }
+    previous = cell;
+  }
+  cells.add(current.trim());
+  return cells.where((cell) => cell.isNotEmpty).join(' | ');
+}
+
+String _normalizeOcrCell(String value) {
+  return value.replaceAll(RegExp(r'\s+'), ' ').replaceAll('：', ':').trim();
+}
+
+double _rowTolerance(NutritionLabelOcrLine a, NutritionLabelOcrLine b) {
+  return math.max(
+      8, math.max(a.boundingBox.height, b.boundingBox.height) * 0.72);
 }
 
 /// Exists solely for testing — allows widget tests to inject a fake VM.

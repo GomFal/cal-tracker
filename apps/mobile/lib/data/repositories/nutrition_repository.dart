@@ -21,6 +21,7 @@ class AgentRunResult {
     this.items,
     this.templates,
     this.template,
+    this.usualFoods,
     this.resolvedItems,
     this.deleted,
     this.actionId,
@@ -41,6 +42,7 @@ class AgentRunResult {
   final List<MealItem>? items;
   final List<MealTemplate>? templates;
   final MealTemplate? template;
+  final List<UsualFood>? usualFoods;
   final List<MealItem>? resolvedItems;
   final bool? deleted;
   final String? actionId;
@@ -67,6 +69,69 @@ class VoiceMealRunResult {
   final AgentRunResult result;
 }
 
+class AgentChatSuggestion {
+  const AgentChatSuggestion({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  factory AgentChatSuggestion.fromJson(Map<String, Object?> json) {
+    final label = (json['label'] as String? ?? '').trim();
+    final value = (json['value'] as String? ?? label).trim();
+    return AgentChatSuggestion(label: label, value: value);
+  }
+}
+
+class AgentToolCallFeedback {
+  const AgentToolCallFeedback({
+    required this.id,
+    required this.actionId,
+    required this.label,
+    required this.summary,
+    this.input,
+  });
+
+  final String id;
+  final String actionId;
+  final String label;
+  final String summary;
+  final dynamic input;
+
+  factory AgentToolCallFeedback.fromJson(Map<String, Object?> json) {
+    return AgentToolCallFeedback(
+      id: json['id'] as String? ?? '',
+      actionId: json['actionId'] as String? ?? '',
+      label: json['label'] as String? ?? json['actionId'] as String? ?? '',
+      summary: json['summary'] as String? ?? '',
+      input: json['input'],
+    );
+  }
+}
+
+class AgentChatStreamEvent {
+  const AgentChatStreamEvent({
+    required this.type,
+    this.conversationId,
+    this.message,
+    this.delta,
+    this.transcript,
+    this.error,
+    this.toolCall,
+    this.result,
+    this.suggestions = const [],
+  });
+
+  final String type;
+  final String? conversationId;
+  final String? message;
+  final String? delta;
+  final String? transcript;
+  final String? error;
+  final AgentToolCallFeedback? toolCall;
+  final AgentRunResult? result;
+  final List<AgentChatSuggestion> suggestions;
+}
+
 class FoodSearchResult {
   const FoodSearchResult({required this.items, this.candidateGroups});
 
@@ -82,12 +147,12 @@ class NutritionRepository {
     ClientTelemetryService? telemetryService,
     Duration backgroundRefreshCooldown = const Duration(seconds: 15),
     DateTime Function()? now,
-  }) : _apiClient = apiClient,
-       _cacheStore = cacheStore,
-       _healthMonitor = healthMonitor ?? BackendHealthMonitor(now: now),
-       _telemetryService = telemetryService,
-       _backgroundRefreshCooldown = backgroundRefreshCooldown,
-       _now = now ?? DateTime.now;
+  })  : _apiClient = apiClient,
+        _cacheStore = cacheStore,
+        _healthMonitor = healthMonitor ?? BackendHealthMonitor(now: now),
+        _telemetryService = telemetryService,
+        _backgroundRefreshCooldown = backgroundRefreshCooldown,
+        _now = now ?? DateTime.now;
 
   final CalTrackerApiClient _apiClient;
   final NutritionCacheStore? _cacheStore;
@@ -306,6 +371,42 @@ class NutritionRepository {
     );
   }
 
+  Stream<AgentChatStreamEvent> streamAgentChat(
+    String message, {
+    String? conversationId,
+    String? activeProposalId,
+  }) async* {
+    await for (final json in _apiClient.streamAgentChat(
+      message,
+      conversationId: conversationId,
+      activeProposalId: activeProposalId,
+    )) {
+      final event = _parseAgentChatStreamEvent(json);
+      final result = event.result;
+      if (result != null) await _cacheAgentResult(result);
+      yield event;
+    }
+    _healthMonitor.recordSuccess();
+  }
+
+  Stream<AgentChatStreamEvent> streamAgentChatAudio(
+    File audioFile, {
+    String? conversationId,
+    String? activeProposalId,
+  }) async* {
+    await for (final json in _apiClient.streamAgentChatAudio(
+      audioFile,
+      conversationId: conversationId,
+      activeProposalId: activeProposalId,
+    )) {
+      final event = _parseAgentChatStreamEvent(json);
+      final result = event.result;
+      if (result != null) await _cacheAgentResult(result);
+      yield event;
+    }
+    _healthMonitor.recordSuccess();
+  }
+
   Future<FoodSearchResult> searchFoods(
     String query, {
     int limit = 10,
@@ -348,14 +449,43 @@ class NutritionRepository {
         limit: limit,
         result: const FoodSearchResult(items: []),
         duration: stopwatch.elapsed,
-        requestId: error is ApiException
-            ? error.traceId ?? requestId
-            : requestId,
+        requestId:
+            error is ApiException ? error.traceId ?? requestId : requestId,
         status: 'failure',
         error: error,
       );
       rethrow;
     }
+  }
+
+  AgentChatStreamEvent _parseAgentChatStreamEvent(
+    Map<String, Object?> json,
+  ) {
+    final toolCallJson = json['toolCall'];
+    final resultJson = json['result'];
+    final suggestionsJson = json['suggestions'];
+    return AgentChatStreamEvent(
+      type: json['type'] as String? ?? 'unknown',
+      conversationId: json['conversationId'] as String?,
+      message: json['message'] as String?,
+      delta: json['delta'] as String?,
+      transcript: json['transcript'] as String?,
+      error: json['error'] as String?,
+      toolCall: toolCallJson is Map<String, Object?>
+          ? AgentToolCallFeedback.fromJson(toolCallJson)
+          : null,
+      result: resultJson is Map<String, Object?>
+          ? _parseAgentRunResult(resultJson)
+          : null,
+      suggestions: suggestionsJson is List<Object?>
+          ? suggestionsJson
+              .whereType<Map<String, Object?>>()
+              .map(AgentChatSuggestion.fromJson)
+              .where((suggestion) =>
+                  suggestion.label.isNotEmpty && suggestion.value.isNotEmpty)
+              .toList()
+          : const [],
+    );
   }
 
   AgentRunResult _parseAgentRunResult(Map<String, Object?> json) {
@@ -380,36 +510,41 @@ class NutritionRepository {
       meals: json['meals'] == null
           ? null
           : (json['meals'] as List<Object?>)
-                .cast<Map<String, Object?>>()
-                .map(Meal.fromJson)
-                .toList(),
+              .cast<Map<String, Object?>>()
+              .map(Meal.fromJson)
+              .toList(),
       items: json['items'] == null
           ? null
           : (json['items'] as List<Object?>)
-                .cast<Map<String, Object?>>()
-                .map(MealItem.fromJson)
-                .toList(),
+              .cast<Map<String, Object?>>()
+              .map(MealItem.fromJson)
+              .toList(),
       templates: json['templates'] == null
           ? null
           : (json['templates'] as List<Object?>)
-                .cast<Map<String, Object?>>()
-                .map(MealTemplate.fromJson)
-                .toList(),
+              .cast<Map<String, Object?>>()
+              .map(MealTemplate.fromJson)
+              .toList(),
       template: json['template'] == null
           ? null
           : MealTemplate.fromJson(json['template'] as Map<String, Object?>),
+      usualFoods: json['usualFoods'] == null
+          ? null
+          : (json['usualFoods'] as List<Object?>)
+              .cast<Map<String, Object?>>()
+              .map(UsualFood.fromJson)
+              .toList(),
       resolvedItems: json['resolvedItems'] == null
           ? null
           : (json['resolvedItems'] as List<Object?>)
-                .cast<Map<String, Object?>>()
-                .map(MealItem.fromJson)
-                .toList(),
+              .cast<Map<String, Object?>>()
+              .map(MealItem.fromJson)
+              .toList(),
       deleted: json['deleted'] as bool?,
       actionId: json['actionId'] as String?,
       input: json['input'],
       clarificationOptions: _parseCandidateGroups(json['options']),
-      candidateGroups:
-          _parseCandidateGroups(json['candidateGroups']) ??
+      candidateGroups: _parseCandidateGroups(json['candidateGroups']) ??
           _parseCandidateGroups(json['options']),
       usualFoodDraft: json['usualFoodDraft'] == null
           ? _parseTopLevelUsualFoodDraft(json)
@@ -466,12 +601,12 @@ class NutritionRepository {
     required List<MealItem> items,
     String? title,
   }) async {
-    final json = await _apiClient
-        .executeAction('create_meal_proposal_from_items', {
-          'phrase': phrase,
-          if (title != null) 'title': title,
-          'items': items.map((item) => item.toJson()).toList(),
-        });
+    final json =
+        await _apiClient.executeAction('create_meal_proposal_from_items', {
+      'phrase': phrase,
+      if (title != null) 'title': title,
+      'items': items.map((item) => item.toJson()).toList(),
+    });
     _healthMonitor.recordSuccess();
     final output = json['output'] as Map<String, Object?>;
     return MealProposal.fromJson(output['proposal'] as Map<String, Object?>);
@@ -800,8 +935,8 @@ class NutritionRepository {
     final hasTemplate = cached.value.any((item) => item.id == template.id);
     final templates = hasTemplate
         ? cached.value
-              .map((item) => item.id == template.id ? template : item)
-              .toList()
+            .map((item) => item.id == template.id ? template : item)
+            .toList()
         : [...cached.value, template];
     await putCachedTemplates(templates);
   }

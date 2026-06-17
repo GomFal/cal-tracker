@@ -1,5 +1,6 @@
 import {
   adminLoginRequestSchema,
+  agentChatRequestSchema,
   agentRunRequestSchema,
   calorieEstimateRequestSchema,
   dailyHydrationUpdateSchema,
@@ -30,10 +31,23 @@ import { AuthService } from "../auth/service.js";
 import type { AppConfig } from "../config/env.js";
 import { authMiddleware } from "../middleware/auth.js";
 import { formatErrorResponse } from "../middleware/errors.js";
-import { getTraceId, requestIdMiddleware } from "../middleware/requestContext.js";
+import {
+  getTraceId,
+  requestIdMiddleware,
+} from "../middleware/requestContext.js";
 import type { AppRepository, StoredUser } from "../repository/types.js";
-import type { SpeechToTextProvider, TranscriptionResult } from "../stt/speechToTextProvider.js";
-import { readAudioBuffer, validateAudioUpload } from "../stt/audioValidation.js";
+import type {
+  SpeechToTextProvider,
+  TranscriptionResult,
+} from "../stt/speechToTextProvider.js";
+import {
+  readAudioBuffer,
+  validateAudioUpload,
+} from "../stt/audioValidation.js";
+import {
+  AgentChatService,
+  type AgentChatEvent,
+} from "../agent/agentChatService.js";
 import { AgentService, type AgentRunResult } from "../agent/agentService.js";
 import type { ChatAgentProvider } from "../agent/chatAgentProvider.js";
 import { RemoteChatAgentProvider } from "../agent/chatAgentProvider.js";
@@ -70,39 +84,58 @@ export function createApp(input: {
   runLogger?: LocalRunLogger;
   telemetryService?: TelemetryService;
 }) {
-  const app = new Hono<{ Variables: { authUser: StoredUser; traceId: string } }>();
-  const { config, repository, authService, actionExecutor, sttProvider, agentProvider, runLogger } = input;
+  const app = new Hono<{
+    Variables: { authUser: StoredUser; traceId: string };
+  }>();
+  const {
+    config,
+    repository,
+    authService,
+    actionExecutor,
+    sttProvider,
+    agentProvider,
+    runLogger,
+  } = input;
   const telemetry = new DbTelemetryService(repository, { enabled: true });
   const telemetryService: TelemetryService = new FireAndForgetTelemetryService(
     input.telemetryService ?? telemetry,
   );
   const adminAuthService = new AdminAuthService(config);
 
-  const resolvedAgentProvider = agentProvider ?? new RemoteChatAgentProvider(
-    config.OPENROUTER_API_KEY,
-    "https://openrouter.ai/api/v1",
-    30000,
-    {
-      sort: config.OPENROUTER_PROVIDER_SORT,
-      preferred_max_latency: {
-        p50: config.OPENROUTER_PROVIDER_MAX_LATENCY_P50,
-        p90: config.OPENROUTER_PROVIDER_MAX_LATENCY_P90,
-        p99: config.OPENROUTER_PROVIDER_MAX_LATENCY_P99,
+  const resolvedAgentProvider =
+    agentProvider ??
+    new RemoteChatAgentProvider(
+      config.OPENROUTER_API_KEY,
+      "https://openrouter.ai/api/v1",
+      30000,
+      {
+        sort: config.OPENROUTER_PROVIDER_SORT,
+        preferred_max_latency: {
+          p50: config.OPENROUTER_PROVIDER_MAX_LATENCY_P50,
+          p90: config.OPENROUTER_PROVIDER_MAX_LATENCY_P90,
+          p99: config.OPENROUTER_PROVIDER_MAX_LATENCY_P99,
+        },
+        preferred_min_throughput: {
+          p50: config.OPENROUTER_PROVIDER_MIN_THROUGHPUT_P50,
+          p90: config.OPENROUTER_PROVIDER_MIN_THROUGHPUT_P90,
+        },
+        require_parameters: config.OPENROUTER_PROVIDER_REQUIRE_PARAMETERS,
+        allow_fallbacks: config.OPENROUTER_PROVIDER_ALLOW_FALLBACKS,
       },
-      preferred_min_throughput: {
-        p50: config.OPENROUTER_PROVIDER_MIN_THROUGHPUT_P50,
-        p90: config.OPENROUTER_PROVIDER_MIN_THROUGHPUT_P90,
-      },
-      require_parameters: config.OPENROUTER_PROVIDER_REQUIRE_PARAMETERS,
-      allow_fallbacks: config.OPENROUTER_PROVIDER_ALLOW_FALLBACKS,
-    },
-  );
+    );
   const agentService = new AgentService(
     resolvedAgentProvider,
     actionExecutor,
     config.OPENROUTER_MODEL,
     runLogger,
     telemetryService,
+  );
+  const agentChatService = new AgentChatService(
+    resolvedAgentProvider,
+    actionExecutor,
+    repository,
+    config.OPENROUTER_MODEL,
+    runLogger,
   );
 
   async function runMealInput(input: {
@@ -133,7 +166,7 @@ export function createApp(input: {
 
     const activeProposal = input.activeProposalId
       ? input.activeProposal !== undefined
-        ? input.activeProposal ?? undefined
+        ? (input.activeProposal ?? undefined)
         : await actionExecutor.getProposalForAgentContext(
             input.user.id,
             input.activeProposalId,
@@ -147,7 +180,7 @@ export function createApp(input: {
       input.activeProposalId,
       {
         activeProposal: input.activeProposalId
-          ? activeProposal ?? null
+          ? (activeProposal ?? null)
           : undefined,
         inputMode: input.inputMode,
       },
@@ -162,14 +195,25 @@ export function createApp(input: {
   }
 
   app.use("*", requestIdMiddleware);
-  app.use("*", cors({
-    origin: (origin) => {
-      if (!origin) return "";
-      return config.corsAllowedOrigins.includes(origin) ? origin : "";
-    },
-    allowHeaders: ["Authorization", "Content-Type", "X-Request-Id", "X-App-Version", "X-App-Build", "X-Client-Platform", "X-Client-Session-Id"],
-    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-  }));
+  app.use(
+    "*",
+    cors({
+      origin: (origin) => {
+        if (!origin) return "";
+        return config.corsAllowedOrigins.includes(origin) ? origin : "";
+      },
+      allowHeaders: [
+        "Authorization",
+        "Content-Type",
+        "X-Request-Id",
+        "X-App-Version",
+        "X-App-Build",
+        "X-Client-Platform",
+        "X-Client-Session-Id",
+      ],
+      allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    }),
+  );
 
   app.use("*", async (c, next) => {
     const path = new URL(c.req.url).pathname;
@@ -220,8 +264,12 @@ export function createApp(input: {
           route: path,
           method: c.req.method,
           durationMs: Date.now() - started,
-          errorCode: error instanceof HTTPException ? httpErrorCodeForTelemetry(error.status) : undefined,
-          errorMessage: typeof summary.message === "string" ? summary.message : undefined,
+          errorCode:
+            error instanceof HTTPException
+              ? httpErrorCodeForTelemetry(error.status)
+              : undefined,
+          errorMessage:
+            typeof summary.message === "string" ? summary.message : undefined,
           appVersion: c.req.header("x-app-version"),
           appBuild: c.req.header("x-app-build"),
           platform: c.req.header("x-client-platform"),
@@ -240,17 +288,37 @@ export function createApp(input: {
     return formatErrorResponse(c, err);
   });
 
-  app.get("/v1/health", (c) => c.json({ ok: true, service: "cal-tracker-backend" }));
+  app.get("/v1/health", (c) =>
+    c.json({ ok: true, service: "cal-tracker-backend" }),
+  );
 
-  app.post("/v1/auth/register", async (c) => c.json(await authService.register(registerRequestSchema.parse(await c.req.json()))));
-  app.post("/v1/auth/login", async (c) => c.json(await authService.login(loginRequestSchema.parse(await c.req.json()))));
-  app.post("/v1/auth/google/login", async (c) => c.json(await authService.loginWithGoogle(googleLoginRequestSchema.parse(await c.req.json()))));
+  app.post("/v1/auth/register", async (c) =>
+    c.json(
+      await authService.register(
+        registerRequestSchema.parse(await c.req.json()),
+      ),
+    ),
+  );
+  app.post("/v1/auth/login", async (c) =>
+    c.json(
+      await authService.login(loginRequestSchema.parse(await c.req.json())),
+    ),
+  );
+  app.post("/v1/auth/google/login", async (c) =>
+    c.json(
+      await authService.loginWithGoogle(
+        googleLoginRequestSchema.parse(await c.req.json()),
+      ),
+    ),
+  );
   app.post("/v1/auth/refresh", async (c) => {
     const body = refreshRequestSchema.parse(await c.req.json());
     return c.json(await authService.refresh(body.refreshToken));
   });
   app.post("/v1/auth/logout", async (c) => {
-    const body = logoutRequestSchema.parse(await c.req.json().catch(() => ({})));
+    const body = logoutRequestSchema.parse(
+      await c.req.json().catch(() => ({})),
+    );
     await authService.logout(body.refreshToken);
     return c.json({ ok: true });
   });
@@ -260,7 +328,9 @@ export function createApp(input: {
   });
   app.post("/v1/auth/password-reset/confirm", async (c) => {
     const body = passwordResetConfirmSchema.parse(await c.req.json());
-    return c.json({ ok: await authService.confirmPasswordReset(body.token, body.newPassword) });
+    return c.json({
+      ok: await authService.confirmPasswordReset(body.token, body.newPassword),
+    });
   });
   app.post("/v1/admin/auth/login", async (c) => {
     const body = adminLoginRequestSchema.parse(await c.req.json());
@@ -269,8 +339,19 @@ export function createApp(input: {
 
   app.use("/v1/*", async (c, next) => {
     const path = new URL(c.req.url).pathname;
-    const publicPaths = ["/v1/health", "/v1/auth/register", "/v1/auth/login", "/v1/auth/google/login", "/v1/auth/refresh", "/v1/auth/logout", "/v1/auth/password-reset/request", "/v1/auth/password-reset/confirm", "/v1/admin/auth/login"];
-    if (publicPaths.includes(path) || path.startsWith("/v1/admin/telemetry/")) return next();
+    const publicPaths = [
+      "/v1/health",
+      "/v1/auth/register",
+      "/v1/auth/login",
+      "/v1/auth/google/login",
+      "/v1/auth/refresh",
+      "/v1/auth/logout",
+      "/v1/auth/password-reset/request",
+      "/v1/auth/password-reset/confirm",
+      "/v1/admin/auth/login",
+    ];
+    if (publicPaths.includes(path) || path.startsWith("/v1/admin/telemetry/"))
+      return next();
     return authMiddleware(config, repository)(c, next);
   });
 
@@ -283,7 +364,14 @@ export function createApp(input: {
   app.put("/v1/settings", async (c) => {
     const user = c.get("authUser");
     const body = settingsUpdateSchema.parse(await c.req.json());
-    return c.json({ user: publicUser(await repository.updateTrustedMode(user.id, body.trustedModeEnabled ?? false)) });
+    return c.json({
+      user: publicUser(
+        await repository.updateTrustedMode(
+          user.id,
+          body.trustedModeEnabled ?? false,
+        ),
+      ),
+    });
   });
   app.put("/v1/goals", async (c) => {
     const user = c.get("authUser");
@@ -295,11 +383,13 @@ export function createApp(input: {
         !currentGoals.calorieTargetConfigured &&
         body.calories === undefined
       ) {
-        throw new HTTPException(400, { message: "calories must be configured before macros" });
+        throw new HTTPException(400, {
+          message: "calories must be configured before macros",
+        });
       }
       const validationError = validateMacroGoalUpdate(
         body,
-        body.calories ?? currentGoals.target.calories
+        body.calories ?? currentGoals.target.calories,
       );
       if (validationError != null) {
         throw new HTTPException(400, { message: validationError });
@@ -320,7 +410,7 @@ export function createApp(input: {
       carbsGrams: body.carbsGrams,
       fatGrams: body.fatGrams,
       macroCalories: body.macroCalories,
-      calorieDeltaKcal: body.calorieDeltaKcal
+      calorieDeltaKcal: body.calorieDeltaKcal,
     });
     const summary = await repository.getDailySummary(user.id, date);
     return c.json({ goals, summary });
@@ -329,7 +419,11 @@ export function createApp(input: {
     const user = c.get("authUser");
     const body = dailyHydrationUpdateSchema.parse(await c.req.json());
     const date = body.date ?? new Date().toISOString().slice(0, 10);
-    const summary = await repository.updateDailyHydration(user.id, date, body.waterConsumedLiters);
+    const summary = await repository.updateDailyHydration(
+      user.id,
+      date,
+      body.waterConsumedLiters,
+    );
     return c.json({ summary });
   });
   app.post("/v1/goals/calorie-estimate", async (c) => {
@@ -337,7 +431,9 @@ export function createApp(input: {
     return c.json(estimateCalories(body));
   });
 
-  app.get("/v1/actions", (c) => c.json({ actions: actionExecutor.listActions() }));
+  app.get("/v1/actions", (c) =>
+    c.json({ actions: actionExecutor.listActions() }),
+  );
   app.post("/v1/actions/:actionId/execute", async (c) => {
     const user = c.get("authUser");
     const actionId = c.req.param("actionId");
@@ -384,7 +480,10 @@ export function createApp(input: {
         topExternalSource: extractTopExternalSource(limited.items),
         topResultType: extractTopResultType(limited.items),
         zeroResults: limited.items.length === 0,
-        lowConfidence: isLowConfidenceSearch(limited.items, config.FOOD_RESOLVER_MIN_CONFIDENCE),
+        lowConfidence: isLowConfidenceSearch(
+          limited.items,
+          config.FOOD_RESOLVER_MIN_CONFIDENCE,
+        ),
         durationMs: Date.now() - startedAt,
         metadata: {
           limit: body.limit,
@@ -431,10 +530,119 @@ export function createApp(input: {
     return c.json(run.result);
   });
 
+  app.post("/v1/agent/chat", async (c) => {
+    const user = c.get("authUser");
+    const body = agentChatRequestSchema.parse(await c.req.json());
+    return streamAgentChat(
+      c,
+      agentChatService.chat({
+        text: body.message,
+        context: buildActionContext(c, user, body.source),
+        conversationId: body.conversationId,
+        activeProposalId: body.activeProposalId,
+        inputMode: "text",
+      }),
+    );
+  });
+
+  app.post("/v1/agent/chat/audio", async (c) => {
+    const routeStarted = Date.now();
+    const user = c.get("authUser");
+    const traceId = getTraceId(c);
+    const upload = await parseAudioUpload(
+      c,
+      user,
+      traceId,
+      "agent.chat_audio",
+      {
+        parseSource: true,
+      },
+    );
+    if (upload instanceof Response) return upload;
+
+    return streamAgentChat(
+      c,
+      (async function* () {
+        yield {
+          type: "thinking",
+          message: "Transcribing audio...",
+        } as AgentChatEvent;
+        let transcription: TranscriptionResult;
+        try {
+          transcription = await sttProvider.transcribe({
+            audio: upload.buffer,
+            filename: upload.filename,
+            mimeType: upload.mimeType,
+            userId: user.id,
+            traceId,
+          });
+        } catch (error) {
+          await logLocalRun(runLogger, {
+            type: "agent.chat_audio",
+            traceId,
+            userId: user.id,
+            source: upload.source ?? "flutter",
+            errorStage: "stt",
+            error: summarizeError(error),
+            timingsMs: { total: Date.now() - routeStarted },
+          });
+          yield {
+            type: "error",
+            error: error instanceof Error ? error.message : String(error),
+          } as AgentChatEvent;
+          return;
+        }
+        yield {
+          type: "transcription_completed",
+          transcript: transcription.text,
+        } as AgentChatEvent;
+        yield* agentChatService.chat({
+          text: transcription.text,
+          context: buildActionContext(c, user, upload.source ?? "flutter"),
+          conversationId: upload.conversationId,
+          activeProposalId: upload.activeProposalId,
+          inputMode: "voice",
+        });
+      })(),
+    );
+  });
+
+  app.get("/v1/agent/conversations", async (c) => {
+    const user = c.get("authUser");
+    return c.json({
+      conversations: await repository.listAgentConversations(user.id),
+    });
+  });
+
+  app.get("/v1/agent/conversations/:id", async (c) => {
+    const user = c.get("authUser");
+    return c.json({
+      messages: await repository.listAgentConversationMessages(
+        user.id,
+        c.req.param("id"),
+      ),
+    });
+  });
+
+  app.delete("/v1/agent/conversations/:id", async (c) => {
+    const user = c.get("authUser");
+    return c.json({
+      deleted: await repository.deleteAgentConversation(
+        user.id,
+        c.req.param("id"),
+      ),
+    });
+  });
+
   app.post("/v1/stt/transcriptions", async (c) => {
     const user = c.get("authUser");
     const traceId = getTraceId(c);
-    const upload = await parseAudioUpload(c, user, traceId, "stt.transcription");
+    const upload = await parseAudioUpload(
+      c,
+      user,
+      traceId,
+      "stt.transcription",
+    );
     if (upload instanceof Response) return upload;
     console.info("stt.transcription.started", {
       traceId,
@@ -558,7 +766,10 @@ export function createApp(input: {
         bytes: upload.buffer.byteLength,
         source: upload.source ?? "flutter",
         metadata: upload.activeProposalId
-          ? { hasActiveProposal: true, activeProposalId: upload.activeProposalId }
+          ? {
+              hasActiveProposal: true,
+              activeProposalId: upload.activeProposalId,
+            }
           : undefined,
       },
     });
@@ -709,75 +920,149 @@ export function createApp(input: {
   app.post("/v1/meals/proposals", async (c) => {
     const user = c.get("authUser");
     const body = await c.req.json();
-    return c.json(await actionExecutor.execute("propose_meal_log", body, buildActionContext(c, user, "flutter")));
+    return c.json(
+      await actionExecutor.execute(
+        "propose_meal_log",
+        body,
+        buildActionContext(c, user, "flutter"),
+      ),
+    );
   });
   app.post("/v1/meals/proposals/:id/commit", async (c) => {
     const user = c.get("authUser");
-    return c.json(await actionExecutor.execute("commit_meal", { ...(await c.req.json().catch(() => ({}))), proposalId: c.req.param("id") }, buildActionContext(c, user, "flutter")));
+    return c.json(
+      await actionExecutor.execute(
+        "commit_meal",
+        {
+          ...(await c.req.json().catch(() => ({}))),
+          proposalId: c.req.param("id"),
+        },
+        buildActionContext(c, user, "flutter"),
+      ),
+    );
   });
   app.post("/v1/meals/:id/correct", async (c) => {
     const user = c.get("authUser");
-    return c.json(await actionExecutor.execute("correct_meal", { ...(await c.req.json()), mealId: c.req.param("id") }, buildActionContext(c, user, "flutter")));
+    return c.json(
+      await actionExecutor.execute(
+        "correct_meal",
+        { ...(await c.req.json()), mealId: c.req.param("id") },
+        buildActionContext(c, user, "flutter"),
+      ),
+    );
   });
   app.delete("/v1/meals/:id", async (c) => {
     const user = c.get("authUser");
-    return c.json(await actionExecutor.execute("delete_meal", { mealId: c.req.param("id"), confirmationToken: c.req.query("confirmationToken") }, buildActionContext(c, user, "flutter")));
+    return c.json(
+      await actionExecutor.execute(
+        "delete_meal",
+        {
+          mealId: c.req.param("id"),
+          confirmationToken: c.req.query("confirmationToken"),
+        },
+        buildActionContext(c, user, "flutter"),
+      ),
+    );
   });
   app.get("/v1/summary/daily", async (c) => {
     const user = c.get("authUser");
-    return c.json(await actionExecutor.execute("get_daily_summary", { date: c.req.query("date") }, buildActionContext(c, user, "flutter")));
+    return c.json(
+      await actionExecutor.execute(
+        "get_daily_summary",
+        { date: c.req.query("date") },
+        buildActionContext(c, user, "flutter"),
+      ),
+    );
   });
   app.get("/v1/meals", async (c) => {
     const user = c.get("authUser");
-    return c.json(await actionExecutor.execute("get_meal_history", { limit: Number(c.req.query("limit") ?? 25) }, buildActionContext(c, user, "flutter")));
+    return c.json(
+      await actionExecutor.execute(
+        "get_meal_history",
+        { limit: Number(c.req.query("limit") ?? 25) },
+        buildActionContext(c, user, "flutter"),
+      ),
+    );
   });
   app.get("/v1/meal-templates", async (c) => {
     const user = c.get("authUser");
-    return c.json(await actionExecutor.execute("get_usual_meals", {}, buildActionContext(c, user, "flutter")));
+    return c.json(
+      await actionExecutor.execute(
+        "get_usual_meals",
+        {},
+        buildActionContext(c, user, "flutter"),
+      ),
+    );
   });
   app.get("/v1/usual-foods", async (c) => {
     const user = c.get("authUser");
-    return c.json(await actionExecutor.execute("get_usual_foods", {}, buildActionContext(c, user, "flutter")));
+    return c.json(
+      await actionExecutor.execute(
+        "get_usual_foods",
+        {},
+        buildActionContext(c, user, "flutter"),
+      ),
+    );
   });
   app.post("/v1/usual-foods", async (c) => {
     const user = c.get("authUser");
-    return c.json(await actionExecutor.execute("create_usual_food", await c.req.json(), buildActionContext(c, user, "flutter")));
+    return c.json(
+      await actionExecutor.execute(
+        "create_usual_food",
+        await c.req.json(),
+        buildActionContext(c, user, "flutter"),
+      ),
+    );
   });
   app.put("/v1/usual-foods/:id", async (c) => {
     const user = c.get("authUser");
-    return c.json(await actionExecutor.execute(
-      "update_usual_food",
-      { ...(await c.req.json()), usualFoodId: c.req.param("id") },
-      buildActionContext(c, user, "flutter")
-    ));
+    return c.json(
+      await actionExecutor.execute(
+        "update_usual_food",
+        { ...(await c.req.json()), usualFoodId: c.req.param("id") },
+        buildActionContext(c, user, "flutter"),
+      ),
+    );
   });
   app.delete("/v1/usual-foods/:id", async (c) => {
     const user = c.get("authUser");
-    return c.json(await actionExecutor.execute(
-      "delete_usual_food",
-      { usualFoodId: c.req.param("id") },
-      buildActionContext(c, user, "flutter")
-    ));
+    return c.json(
+      await actionExecutor.execute(
+        "delete_usual_food",
+        { usualFoodId: c.req.param("id") },
+        buildActionContext(c, user, "flutter"),
+      ),
+    );
   });
   app.post("/v1/meal-templates", async (c) => {
     const user = c.get("authUser");
-    return c.json(await actionExecutor.execute("create_meal_template", await c.req.json(), buildActionContext(c, user, "flutter")));
+    return c.json(
+      await actionExecutor.execute(
+        "create_meal_template",
+        await c.req.json(),
+        buildActionContext(c, user, "flutter"),
+      ),
+    );
   });
   app.put("/v1/meal-templates/:id", async (c) => {
     const user = c.get("authUser");
-    return c.json(await actionExecutor.execute(
-      "update_meal_template",
-      { ...(await c.req.json()), templateId: c.req.param("id") },
-      buildActionContext(c, user, "flutter")
-    ));
+    return c.json(
+      await actionExecutor.execute(
+        "update_meal_template",
+        { ...(await c.req.json()), templateId: c.req.param("id") },
+        buildActionContext(c, user, "flutter"),
+      ),
+    );
   });
   app.delete("/v1/meal-templates/:id", async (c) => {
     const user = c.get("authUser");
-    return c.json(await actionExecutor.execute(
-      "delete_meal_template",
-      { templateId: c.req.param("id") },
-      buildActionContext(c, user, "flutter")
-    ));
+    return c.json(
+      await actionExecutor.execute(
+        "delete_meal_template",
+        { templateId: c.req.param("id") },
+        buildActionContext(c, user, "flutter"),
+      ),
+    );
   });
 
   registerClientTelemetryRoutes({ app, telemetry });
@@ -792,6 +1077,7 @@ type ParsedAudioUpload = {
   mimeType: string;
   source?: ActionSource;
   activeProposalId?: string;
+  conversationId?: string;
 };
 
 type MealInputMode = "text" | "voice";
@@ -819,13 +1105,16 @@ async function parseAudioUpload(
       userId: user.id,
       error: error instanceof Error ? error.message : String(error),
     });
-    return c.json({
-      error: {
-        code: "validation_error",
-        message: "Invalid multipart/form-data request.",
-        traceId,
+    return c.json(
+      {
+        error: {
+          code: "validation_error",
+          message: "Invalid multipart/form-data request.",
+          traceId,
+        },
       },
-    }, 400);
+      400,
+    );
   }
 
   const source = options.parseSource
@@ -837,13 +1126,16 @@ async function parseAudioUpload(
       userId: user.id,
       source: body.source,
     });
-    return c.json({
-      error: {
-        code: "validation_error",
-        message: "Invalid source.",
-        traceId,
+    return c.json(
+      {
+        error: {
+          code: "validation_error",
+          message: "Invalid source.",
+          traceId,
+        },
       },
-    }, 400);
+      400,
+    );
   }
   const activeProposalId = parseOptionalMultipartUuid(body.activeProposalId);
   if (activeProposalId === null) {
@@ -852,13 +1144,34 @@ async function parseAudioUpload(
       userId: user.id,
       activeProposalId: body.activeProposalId,
     });
-    return c.json({
-      error: {
-        code: "validation_error",
-        message: "Invalid active proposal id.",
-        traceId,
+    return c.json(
+      {
+        error: {
+          code: "validation_error",
+          message: "Invalid active proposal id.",
+          traceId,
+        },
       },
-    }, 400);
+      400,
+    );
+  }
+  const conversationId = parseOptionalMultipartUuid(body.conversationId);
+  if (conversationId === null) {
+    console.warn(`${logPrefix}.invalid_conversation`, {
+      traceId,
+      userId: user.id,
+      conversationId: body.conversationId,
+    });
+    return c.json(
+      {
+        error: {
+          code: "validation_error",
+          message: "Invalid conversation id.",
+          traceId,
+        },
+      },
+      400,
+    );
   }
 
   const audioField = body.audio;
@@ -867,13 +1180,16 @@ async function parseAudioUpload(
       traceId,
       userId: user.id,
     });
-    return c.json({
-      error: {
-        code: "validation_error",
-        message: "Missing audio file.",
-        traceId,
+    return c.json(
+      {
+        error: {
+          code: "validation_error",
+          message: "Missing audio file.",
+          traceId,
+        },
       },
-    }, 400);
+      400,
+    );
   }
   const file = Array.isArray(audioField) ? audioField[0] : audioField;
 
@@ -885,9 +1201,12 @@ async function parseAudioUpload(
       status: validation.status,
       error: validation.error,
     });
-    return c.json({
-      error: { code: "validation_error", message: validation.error, traceId },
-    }, validation.status);
+    return c.json(
+      {
+        error: { code: "validation_error", message: validation.error, traceId },
+      },
+      validation.status,
+    );
   }
 
   return {
@@ -896,7 +1215,45 @@ async function parseAudioUpload(
     mimeType: validation.mimeType,
     source: source ?? undefined,
     activeProposalId: activeProposalId ?? undefined,
+    conversationId: conversationId ?? undefined,
   };
+}
+
+function streamAgentChat(
+  _c: Context,
+  events: AsyncIterable<AgentChatEvent>,
+): Response {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      try {
+        for await (const event of events) {
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify(event)}\n\n`),
+          );
+          if (event.type === "done" || event.type === "error") break;
+        }
+      } catch (error) {
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({
+              type: "error",
+              error: error instanceof Error ? error.message : String(error),
+            })}\n\n`,
+          ),
+        );
+      } finally {
+        controller.close();
+      }
+    },
+  });
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    },
+  });
 }
 
 function parseMultipartActionSource(value: unknown): ActionSource | null {
@@ -931,7 +1288,10 @@ async function logLocalRun(
   }
 }
 
-function limitFoodSearchOutput(output: unknown, limit: number): {
+function limitFoodSearchOutput(
+  output: unknown,
+  limit: number,
+): {
   items: unknown[];
   candidateGroups?: unknown[];
 } {
@@ -992,7 +1352,11 @@ function httpErrorCodeForTelemetry(status: number): string {
   return `http_${status}`;
 }
 
-function buildActionContext(c: Context, user: StoredUser, source: ActionSource): ActionContext {
+function buildActionContext(
+  c: Context,
+  user: StoredUser,
+  source: ActionSource,
+): ActionContext {
   return {
     actorUserId: user.id,
     actorType: source === "internal_agent" ? "internal_agent" : "user",
@@ -1001,17 +1365,19 @@ function buildActionContext(c: Context, user: StoredUser, source: ActionSource):
     timezone: c.req.header("x-user-timezone") ?? "UTC",
     locale: c.req.header("accept-language")?.split(",")[0] ?? "en-US",
     trustedModeEnabled: false,
-    traceId: getTraceId(c)
+    traceId: getTraceId(c),
   };
 }
 
 function isReviewedUsualWriteAction(actionId: string): boolean {
-  return actionId === "create_usual_food" ||
+  return (
+    actionId === "create_usual_food" ||
     actionId === "update_usual_food" ||
     actionId === "delete_usual_food" ||
     actionId === "create_meal_template" ||
     actionId === "update_meal_template" ||
-    actionId === "delete_meal_template";
+    actionId === "delete_meal_template"
+  );
 }
 
 function publicUser(user: StoredUser) {
@@ -1023,28 +1389,36 @@ function recordBackendTelemetry(input: {
   telemetry: DbTelemetryService;
   event: TelemetryEventInput;
 }): void {
-  recordTelemetry("backend_event", () => input.telemetry.recordEvent(input.event));
+  recordTelemetry("backend_event", () =>
+    input.telemetry.recordEvent(input.event),
+  );
 }
 
 function recordFoodSearchTelemetry(input: {
   telemetryService: TelemetryService;
   event: FoodSearchTelemetryEvent;
 }): void {
-  recordTelemetry("food_search", () => input.telemetryService.recordFoodSearchEvent(input.event));
+  recordTelemetry("food_search", () =>
+    input.telemetryService.recordFoodSearchEvent(input.event),
+  );
 }
 
 function recordSttTelemetry(input: {
   telemetryService: TelemetryService;
   event: SttTelemetryEvent;
 }): void {
-  recordTelemetry("stt", () => input.telemetryService.recordSttEvent(input.event));
+  recordTelemetry("stt", () =>
+    input.telemetryService.recordSttEvent(input.event),
+  );
 }
 
 function recordVoiceMealRunTelemetry(input: {
   telemetryService: TelemetryService;
   event: VoiceMealRunTelemetryEvent;
 }): void {
-  recordTelemetry("voice_meal_run", () => input.telemetryService.recordVoiceMealRunEvent(input.event));
+  recordTelemetry("voice_meal_run", () =>
+    input.telemetryService.recordVoiceMealRunEvent(input.event),
+  );
 }
 
 function recordTelemetry(label: string, emit: () => Promise<unknown>): void {
@@ -1063,11 +1437,12 @@ function isLowConfidenceSearch(
 ): boolean {
   if (items.length === 0) return false;
   const top = items[0] as { confidence?: unknown; matchScore?: unknown };
-  const confidence = typeof top.confidence === "number"
-    ? top.confidence
-    : typeof top.matchScore === "number"
-      ? top.matchScore
-      : undefined;
+  const confidence =
+    typeof top.confidence === "number"
+      ? top.confidence
+      : typeof top.matchScore === "number"
+        ? top.matchScore
+        : undefined;
   if (typeof confidence !== "number") return false;
   return confidence < minConfidence;
 }

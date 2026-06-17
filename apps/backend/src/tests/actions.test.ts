@@ -28,7 +28,6 @@ function mention(
     rawUnitText,
     unitKind: overrides.unitKind ?? (unit === "g" ? "metric" : "unknown"),
     confidence: overrides.confidence ?? 0.95,
-    marketProduct: overrides.marketProduct ?? false,
     ...overrides,
   };
 }
@@ -92,7 +91,6 @@ function redMeatMention(): FoodMention {
     rawUnitText: "grams",
     unitKind: "metric",
     confidence: 0.9,
-    marketProduct: false,
   };
 }
 
@@ -257,7 +255,6 @@ describe("action loop", () => {
                   rawUnitText: "grams",
                   unitKind: "metric",
                   confidence: 0.9,
-                  marketProduct: false,
                 },
               },
             ],
@@ -1124,7 +1121,6 @@ describe("action loop", () => {
                 rawUnitText: "gramos",
                 unitKind: "metric",
                 confidence: 0.95,
-                marketProduct: false,
               },
               {
                 originalText: "100 gramos de arroz",
@@ -1136,7 +1132,6 @@ describe("action loop", () => {
                 rawUnitText: "gramos",
                 unitKind: "metric",
                 confidence: 0.95,
-                marketProduct: false,
               },
             ],
           },

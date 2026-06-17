@@ -33,7 +33,6 @@ void main() {
                 'quantity': 100,
                 'unit': 'g',
                 'confidence': 0.92,
-                'marketProduct': false,
               },
               'candidates': [
                 for (var index = 0; index < 10; index++)
@@ -114,9 +113,7 @@ void main() {
     test('parses user-custom usual food item from search results', () async {
       final apiClient = MockCalTrackerApiClient();
       final repository = NutritionRepository(apiClient: apiClient);
-      when(
-        () => apiClient.searchFoods(query: 'rice', limit: 10),
-      ).thenAnswer(
+      when(() => apiClient.searchFoods(query: 'rice', limit: 10)).thenAnswer(
         (_) async => {
           'items': [
             {
@@ -155,7 +152,6 @@ void main() {
                 'quantity': 100,
                 'unit': 'g',
                 'confidence': 0.95,
-                'marketProduct': false,
               },
               'candidates': [
                 {
@@ -197,9 +193,7 @@ void main() {
     test('searches foods and parses candidate groups', () async {
       final apiClient = MockCalTrackerApiClient();
       final repository = NutritionRepository(apiClient: apiClient);
-      when(
-        () => apiClient.searchFoods(query: 'bread', limit: 10),
-      ).thenAnswer(
+      when(() => apiClient.searchFoods(query: 'bread', limit: 10)).thenAnswer(
         (_) async => {
           'items': [
             {
@@ -223,7 +217,6 @@ void main() {
                 'quantity': 100,
                 'unit': 'g',
                 'confidence': 0.95,
-                'marketProduct': false,
               },
               'candidates': [
                 {

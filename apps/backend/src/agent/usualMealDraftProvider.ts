@@ -77,7 +77,7 @@ function usualMealDraftSystemPrompt(locale: string): string {
     "Use the return_usual_meal_draft tool exactly once.",
     "Extract a concise meal title only when the user explicitly names the saved meal or the title is directly stated in the request.",
     "Extract aliases only when the user explicitly provides alternate names.",
-    "Extract structured ingredient mentions for foods the user explicitly lists, preserving originalText, canonicalName in the user's language when possible, quantity, unit, rawUnitText, unitKind, brand/barcode when stated, confidence, and marketProduct.",
+    "Extract structured ingredient mentions for foods the user explicitly lists, preserving originalText, canonicalName in the user's language when possible, quantity, unit, rawUnitText, unitKind, barcode when explicitly stated, and confidence. Include stated brand or product-line words in canonicalName; do not output a separate brand field.",
     "Do not invent nutrition facts, ingredients, translations, titles, aliases, quantities, or units.",
     "Do not infer missing ingredients from meal names or habits. If ingredients are missing, return an empty mentions array.",
     "Never save a meal template and never claim that missing ingredients are ready to save.",

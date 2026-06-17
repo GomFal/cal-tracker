@@ -61,10 +61,23 @@ type FoodSearchProfile = {
   scope: "generic" | "market";
   locales: string[];
   continueAfterLimit?: boolean;
+  scopeRank: number;
 };
 
 type NormalizedFoodSearchProfile = {
   locales: string[];
+};
+
+type FoodSearchRowCandidate = {
+  row: Record<string, unknown>;
+  lexicalScore: number;
+  vectorScore?: number;
+  scopeRank?: number;
+};
+
+type FoodSearchRankedCandidate = {
+  candidate: FoodSearchCandidate;
+  scopeRank: number;
 };
 
 type DbExecutor = {
@@ -322,7 +335,6 @@ export class PostgresRepository implements AppRepository {
         query: input.query,
         hasBarcode: Boolean(input.barcode),
         hasEmbedding: Boolean(input.embedding),
-        excludeBranded: Boolean(input.excludeBranded),
         limit: input.limit,
       },
       () => this.searchFoodsHybridInternal(userId, input),
@@ -341,16 +353,16 @@ export class PostgresRepository implements AppRepository {
 
     const candidateRows = new Map<
       string,
-      {
-        row: Record<string, unknown>;
-        lexicalScore: number;
-        vectorScore?: number;
-      }
+      FoodSearchRowCandidate
     >();
     if (this.normalizedSearchEnabled) {
       const rows = await this.searchNormalizedFoodDocuments(userId, input, normalized, limit);
       for (const row of rows) {
-        candidateRows.set(row.id as string, { row, lexicalScore: clampScore(Number(row.search_score ?? 0)) });
+        mergeFoodSearchRowCandidate(candidateRows, {
+          row,
+          lexicalScore: clampScore(Number(row.search_score ?? 0)),
+          scopeRank: foodSearchScopeRankFromRow(row),
+        });
       }
       if (candidateRows.size > 0) {
         return this.rankFoodSearchRows(userId, input, normalized, limit, candidateRows, cacheKey, true);
@@ -358,8 +370,6 @@ export class PostgresRepository implements AppRepository {
       // Fall through to legacy search path when normalized search finds nothing
       // This ensures user-custom foods (usual foods) in food_search_documents are found
     }
-
-    const includeBranded = !input.excludeBranded;
 
     if (input.barcode) {
       const barcode = input.barcode;
@@ -375,7 +385,11 @@ export class PostgresRepository implements AppRepository {
       `),
       );
       for (const row of rows) {
-        candidateRows.set(row.id as string, { row, lexicalScore: 1 });
+        mergeFoodSearchRowCandidate(candidateRows, {
+          row,
+          lexicalScore: 1,
+          scopeRank: foodSearchScopeRankFromRow(row),
+        });
       }
     } else if (normalized.length > 0) {
       const rows = await this.searchFoodDocuments(
@@ -383,12 +397,12 @@ export class PostgresRepository implements AppRepository {
         input,
         normalized,
         limit,
-        includeBranded,
       );
       for (const row of rows) {
-        candidateRows.set(row.id as string, {
+        mergeFoodSearchRowCandidate(candidateRows, {
           row,
           lexicalScore: clampScore(Number(row.search_score ?? 0)),
+          scopeRank: foodSearchScopeRankFromRow(row),
         });
       }
     }
@@ -397,7 +411,7 @@ export class PostgresRepository implements AppRepository {
       const vectorLiteral = toVectorLiteral(input.embedding);
       const rows = await withSpan(
         "PostgresRepository.searchFoodsHybrid.vectorQuery",
-        { limit: Math.max(limit, DEFAULT_FOOD_SEARCH_LIMIT), includeBranded },
+        { limit: Math.max(limit, DEFAULT_FOOD_SEARCH_LIMIT) },
         () =>
           this.execute(dbSql`
         SELECT food_items.*,
@@ -406,11 +420,6 @@ export class PostgresRepository implements AppRepository {
         JOIN food_items ON food_items.id = food_item_embeddings.food_item_id
         WHERE food_items.deleted_at IS NULL
           AND (food_items.user_id IS NULL OR food_items.user_id = ${userId})
-          AND (${includeBranded} OR (
-            food_items.data_type IS DISTINCT FROM 'Branded'
-            AND food_items.source IS DISTINCT FROM 'usda_branded'
-            AND food_items.source IS DISTINCT FROM 'openfoodfacts'
-          ))
         ORDER BY food_item_embeddings.embedding <=> ${vectorLiteral}::vector
         LIMIT ${Math.max(limit, DEFAULT_FOOD_SEARCH_LIMIT)}
       `),
@@ -442,7 +451,7 @@ export class PostgresRepository implements AppRepository {
     input: FoodHybridSearchInput,
     normalized: string,
     limit: number,
-    candidateRows: Map<string, { row: Record<string, unknown>; lexicalScore: number; vectorScore?: number }>,
+    candidateRows: Map<string, FoodSearchRowCandidate>,
     cacheKey: string,
     useStoredLexicalScore: boolean,
   ): Promise<FoodSearchCandidate[]> {
@@ -470,7 +479,7 @@ export class PostgresRepository implements AppRepository {
       { foodCount: foods.length, limit },
       () =>
         foods
-          .map((food) => {
+          .map<FoodSearchRankedCandidate>((food) => {
             const scores = scoresByFoodId.get(food.id);
             const computedLexicalScore =
               normalized.length > 0 && !input.barcode
@@ -502,25 +511,22 @@ export class PostgresRepository implements AppRepository {
                 ? USER_FOOD_SCORE_BOOST
                 : 0;
             return {
-              ...food,
-              lexicalScore,
-              vectorScore,
-              preferenceScore,
-              finalScore: clampScore(
-                baseScore +
-                  preferenceScore * PREFERENCE_SCORE_WEIGHT +
-                  userFoodBoost,
-              ),
+              candidate: {
+                ...food,
+                lexicalScore,
+                vectorScore,
+                preferenceScore,
+                finalScore: clampScore(
+                  baseScore +
+                    preferenceScore * PREFERENCE_SCORE_WEIGHT +
+                    userFoodBoost,
+                ),
+              },
+              scopeRank: foodSearchScopeRankForSort(input, scores?.scopeRank),
             };
           })
-          .sort(
-            (a, b) =>
-              b.finalScore - a.finalScore ||
-              b.lexicalScore - a.lexicalScore ||
-              (b.vectorScore ?? 0) - (a.vectorScore ?? 0) ||
-              Number(Boolean(b.userId)) - Number(Boolean(a.userId)) ||
-              a.name.localeCompare(b.name),
-          )
+          .sort(compareFoodSearchRankedCandidates)
+          .map((entry) => entry.candidate)
           .slice(0, limit),
     );
     this.setCachedFoodSearch(cacheKey, ranked);
@@ -536,7 +542,7 @@ export class PostgresRepository implements AppRepository {
     if (input.barcode) {
       const rows = await withSpan(
         "PostgresRepository.searchFoodsHybrid.normalizedBarcodeQuery",
-        { limit, scope: this.normalizedSearchScope, sampleSet: this.normalizedSearchSampleSet },
+        { limit, sampleSet: this.normalizedSearchSampleSet },
         () => this.execute(dbSql`
           SELECT food_items.*,
                  food_normalized_search_documents.display_name AS search_display_name,
@@ -552,6 +558,7 @@ export class PostgresRepository implements AppRepository {
                  food_normalized_search_documents.primary_entity_category_coherence AS search_primary_entity_category_coherence,
                  food_normalized_search_documents.primary_entity_representativeness AS search_primary_entity_representativeness,
                  food_normalized_search_documents.metadata AS search_normalized_metadata,
+                 0::int AS search_scope_rank,
                  1::float AS search_score
           FROM food_normalized_search_documents
           JOIN food_items ON food_items.id = food_normalized_search_documents.food_item_id
@@ -578,7 +585,11 @@ export class PostgresRepository implements AppRepository {
     const profile = normalizedFoodSearchProfile(input);
     return withSpan(
       "PostgresRepository.searchFoodsHybrid.normalizedDocumentQuery",
-      { limit: normalizedFoodSearchLimit(limit), locales: profile.locales, scope: this.normalizedSearchScope, sampleSet: this.normalizedSearchSampleSet },
+      {
+        limit: normalizedFoodSearchLimit(limit),
+        locales: profile.locales,
+        sampleSet: this.normalizedSearchSampleSet,
+      },
       () => this.queryNormalizedFoodDocuments(userId, normalized, profile, limit),
     );
   }
@@ -717,10 +728,10 @@ export class PostgresRepository implements AppRepository {
                row_number() OVER (
                  PARTITION BY lower(search_display_name)
                  ORDER BY
+                   search_result_type_rank,
                    search_score DESC,
                    search_user_rank,
                    search_locale_rank,
-                   search_result_type_rank,
                    search_rank_bucket,
                    search_normalization_confidence DESC,
                    id
@@ -732,9 +743,9 @@ export class PostgresRepository implements AppRepository {
       WHERE search_display_rank = 1
       ORDER BY
         search_user_rank,
+        search_result_type_rank,
         search_score DESC,
         search_locale_rank,
-        search_result_type_rank,
         search_rank_bucket,
         char_length(search_display_name),
         search_display_name
@@ -817,10 +828,10 @@ export class PostgresRepository implements AppRepository {
                row_number() OVER (
                  PARTITION BY lower(search_display_name)
                  ORDER BY
+                   search_result_type_rank,
                    search_score DESC,
                    search_user_rank,
                    search_locale_rank,
-                   search_result_type_rank,
                    search_rank_bucket,
                    search_normalization_confidence DESC,
                    id
@@ -832,9 +843,9 @@ export class PostgresRepository implements AppRepository {
       WHERE search_display_rank = 1
       ORDER BY
         search_user_rank,
+        search_result_type_rank,
         search_score DESC,
         search_locale_rank,
-        search_result_type_rank,
         search_rank_bucket,
         char_length(search_display_name),
         search_display_name
@@ -925,10 +936,10 @@ export class PostgresRepository implements AppRepository {
                row_number() OVER (
                  PARTITION BY lower(search_display_name)
                  ORDER BY
+                   search_result_type_rank,
                    search_score DESC,
                    search_user_rank,
                    search_locale_rank,
-                   search_result_type_rank,
                    search_rank_bucket,
                    search_normalization_confidence DESC,
                    id
@@ -940,9 +951,9 @@ export class PostgresRepository implements AppRepository {
       WHERE search_display_rank = 1
       ORDER BY
         search_user_rank,
+        search_result_type_rank,
         search_score DESC,
         search_locale_rank,
-        search_result_type_rank,
         search_rank_bucket,
         char_length(search_display_name),
         search_display_name
@@ -955,11 +966,10 @@ export class PostgresRepository implements AppRepository {
     input: FoodHybridSearchInput,
     normalized: string,
     limit: number,
-    includeBranded: boolean,
   ): Promise<Record<string, unknown>[]> {
     const rows: Record<string, unknown>[] = [];
     const seen = new Set<string>();
-    const profiles = foodSearchProfiles(input, includeBranded);
+    const profiles = foodSearchProfiles(input);
     for (const profile of profiles) {
       const profileRows = await withSpan(
         "PostgresRepository.searchFoodsHybrid.documentQuery",
@@ -974,7 +984,6 @@ export class PostgresRepository implements AppRepository {
             normalized,
             profile,
             limit,
-            includeBranded,
           ),
       );
       for (const row of profileRows) {
@@ -993,14 +1002,12 @@ export class PostgresRepository implements AppRepository {
     normalized: string,
     profile: FoodSearchProfile,
     limit: number,
-    includeBranded: boolean,
   ): Promise<Record<string, unknown>[]> {
     const textRows = await this.queryFoodSearchDocumentsText(
       userId,
       normalized,
       profile,
       limit,
-      includeBranded,
     );
     if (textRows.length >= limit) return textRows;
     const seen = new Set(textRows.map((row) => row.id as string));
@@ -1009,7 +1016,6 @@ export class PostgresRepository implements AppRepository {
       normalized,
       profile,
       limit,
-      includeBranded,
     );
     return [
       ...textRows,
@@ -1022,7 +1028,6 @@ export class PostgresRepository implements AppRepository {
     normalized: string,
     profile: FoodSearchProfile,
     limit: number,
-    includeBranded: boolean,
   ): Promise<Record<string, unknown>[]> {
     const searchLimit = Math.max(limit * 4, DEFAULT_FOOD_SEARCH_LIMIT);
     const searchScore = foodTextSearchScoreSql(normalized);
@@ -1032,6 +1037,7 @@ export class PostgresRepository implements AppRepository {
     const locale3 = profile.locales[3] ?? locale2;
     return this.execute(dbSql`
       SELECT food_items.*,
+             ${profile.scopeRank}::int AS search_scope_rank,
              ${searchScore} AS search_score
       FROM food_search_documents
       JOIN food_items ON food_items.id = food_search_documents.food_item_id
@@ -1039,7 +1045,6 @@ export class PostgresRepository implements AppRepository {
         AND food_items.deleted_at IS NULL
         AND food_search_documents.scope = ${profile.scope}
         AND food_search_documents.locale IN ${sqlList(profile.locales)}
-        AND (${includeBranded} OR (food_items.data_type IS DISTINCT FROM 'Branded' AND food_items.source IS DISTINCT FROM 'usda_branded'))
         AND (${foodTextSearchPredicateSql(normalized)})
       ORDER BY
         CASE WHEN food_search_documents.user_id = ${userId} THEN 0 ELSE 1 END,
@@ -1063,7 +1068,6 @@ export class PostgresRepository implements AppRepository {
     normalized: string,
     profile: FoodSearchProfile,
     limit: number,
-    includeBranded: boolean,
   ): Promise<Record<string, unknown>[]> {
     const searchLimit = Math.max(limit * 4, DEFAULT_FOOD_SEARCH_LIMIT);
     const locale0 = profile.locales[0] ?? "any";
@@ -1072,6 +1076,7 @@ export class PostgresRepository implements AppRepository {
     const locale3 = profile.locales[3] ?? locale2;
     return this.execute(dbSql`
       SELECT food_items.*,
+             ${profile.scopeRank}::int AS search_scope_rank,
              GREATEST(
                similarity(food_search_documents.search_text, ${normalized}),
                word_similarity(${normalized}, food_search_documents.search_text),
@@ -1084,7 +1089,6 @@ export class PostgresRepository implements AppRepository {
         AND food_items.deleted_at IS NULL
         AND food_search_documents.scope = ${profile.scope}
         AND food_search_documents.locale IN ${sqlList(profile.locales)}
-        AND (${includeBranded} OR (food_items.data_type IS DISTINCT FROM 'Branded' AND food_items.source IS DISTINCT FROM 'usda_branded'))
         AND (
           food_search_documents.search_text % ${normalized}
           OR ${normalized} <% food_search_documents.search_text
@@ -2712,6 +2716,77 @@ function cloneFoodSearchCandidate(
   };
 }
 
+function mergeFoodSearchRowCandidate(
+  candidates: Map<string, FoodSearchRowCandidate>,
+  next: FoodSearchRowCandidate,
+): void {
+  const foodId = optionalString(next.row.id);
+  if (!foodId) return;
+  const existing = candidates.get(foodId);
+  if (!existing) {
+    candidates.set(foodId, next);
+    return;
+  }
+
+  const existingRank = existing.scopeRank ?? Number.MAX_SAFE_INTEGER;
+  const nextRank = next.scopeRank ?? Number.MAX_SAFE_INTEGER;
+  if (
+    nextRank < existingRank ||
+    (nextRank === existingRank && next.lexicalScore > existing.lexicalScore)
+  ) {
+    candidates.set(foodId, {
+      ...next,
+      vectorScore: maxOptionalScore(existing.vectorScore, next.vectorScore),
+    });
+    return;
+  }
+  if (nextRank === existingRank) {
+    existing.lexicalScore = Math.max(existing.lexicalScore, next.lexicalScore);
+    existing.vectorScore = maxOptionalScore(existing.vectorScore, next.vectorScore);
+  }
+}
+
+function maxOptionalScore(
+  a: number | undefined,
+  b: number | undefined,
+): number | undefined {
+  if (a == null) return b;
+  if (b == null) return a;
+  return Math.max(a, b);
+}
+
+function foodSearchScopeRankFromRow(row: Record<string, unknown>): number | undefined {
+  const value = row.search_scope_rank;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  const resultTypeRank = row.search_result_type_rank;
+  if (typeof resultTypeRank === "number" && Number.isFinite(resultTypeRank)) {
+    return resultTypeRank;
+  }
+  return undefined;
+}
+
+function foodSearchScopeRankForSort(
+  input: FoodHybridSearchInput,
+  scopeRank: number | undefined,
+): number {
+  if (input.barcode) return 0;
+  return scopeRank ?? 0;
+}
+
+function compareFoodSearchRankedCandidates(
+  a: FoodSearchRankedCandidate,
+  b: FoodSearchRankedCandidate,
+): number {
+  return (
+    a.scopeRank - b.scopeRank ||
+    b.candidate.finalScore - a.candidate.finalScore ||
+    b.candidate.lexicalScore - a.candidate.lexicalScore ||
+    (b.candidate.vectorScore ?? 0) - (a.candidate.vectorScore ?? 0) ||
+    Number(Boolean(b.candidate.userId)) - Number(Boolean(a.candidate.userId)) ||
+    a.candidate.name.localeCompare(b.candidate.name)
+  );
+}
+
 function mergeNormalizedFoodDocumentRows(
   limit: number,
   ...rowGroups: Record<string, unknown>[][]
@@ -2759,8 +2834,6 @@ function foodSearchCacheKey(
     query: normalized,
     barcode: input.barcode,
     locale: normalizeSearchLocale(input.locale),
-    scope: input.scope,
-    excludeBranded: input.excludeBranded,
     limit,
   });
 }
@@ -3315,45 +3388,50 @@ function normalizedFoodSearchLimit(limit: number): number {
   return limit;
 }
 
-function foodSearchProfiles(
-  input: FoodHybridSearchInput,
-  includeBranded: boolean,
-): FoodSearchProfile[] {
+function foodSearchProfiles(input: FoodHybridSearchInput): FoodSearchProfile[] {
   const locale = normalizeSearchLocale(input.locale);
-  const scope = input.scope ?? (includeBranded ? "market" : "generic");
   const marketLocales = uniqueStrings(
     [locale, "en", "es", "any"].filter(Boolean) as string[],
   );
-  if (scope === "market") {
-    return [
-      {
-        scope: "market",
-        locales: marketLocales,
-        continueAfterLimit: true,
-      },
-      {
-        scope: "generic",
-        locales: marketLocales,
-      },
-    ];
-  }
+  const genericProfiles = genericFoodSearchProfiles(locale);
+  return [
+    ...genericProfiles.map((profile) => ({
+      ...profile,
+      continueAfterLimit: true,
+    })),
+    {
+      scope: "market",
+      locales: marketLocales,
+      scopeRank: 1,
+    },
+  ];
+}
+
+function genericFoodSearchProfiles(locale: "es" | "en" | undefined): FoodSearchProfile[] {
   if (locale === "es") {
     return [
-      { scope: "generic", locales: ["es", "any"] },
-      { scope: "generic", locales: ["en"] },
+      { scope: "generic", locales: ["es", "any"], scopeRank: 0 },
+      { scope: "generic", locales: ["en"], scopeRank: 0 },
     ];
   }
   if (locale === "en") {
     return [
-      { scope: "generic", locales: ["en", "any"] },
-      { scope: "generic", locales: ["es"] },
+      { scope: "generic", locales: ["en", "any"], scopeRank: 0 },
+      { scope: "generic", locales: ["es"], scopeRank: 0 },
     ];
   }
   return [
-    { scope: "generic", locales: ["en", "any"] },
-    { scope: "generic", locales: ["es"] },
+    { scope: "generic", locales: ["en", "any"], scopeRank: 0 },
+    { scope: "generic", locales: ["es"], scopeRank: 0 },
   ];
 }
+
+export const postgresFoodSearchTesting = {
+  normalizedFoodSearchProfile,
+  foodSearchProfiles,
+  foodSearchScopeRankForSort,
+  compareFoodSearchRankedCandidates,
+};
 
 function foodSearchDocumentForFood(
   food: FoodItemRecord,

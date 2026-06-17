@@ -381,7 +381,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-          find.byKey(const ValueKey('manual_food_search_clear')), findsNothing);
+        find.byKey(const ValueKey('manual_food_search_clear')),
+        findsNothing,
+      );
       expect(
         find.byKey(const ValueKey('manual_food_search_result_button_0')),
         findsNothing,
@@ -1602,7 +1604,6 @@ FoodCandidateGroup _candidateGroup({
       quantity: 100,
       unit: 'g',
       confidence: 0.9,
-      marketProduct: false,
     ),
     candidates: candidates,
   );

@@ -22,10 +22,13 @@ describe("agent meal proposal language prompt schema", () => {
       "set originalText to the exact food phrase",
     );
     expect(message.content).toContain(
-      "set canonicalName to the normalized food name in the same language as that food phrase",
+      "set canonicalName to the normalized searchable food name in the same language as that food phrase",
     );
     expect(message.content).toContain(
-      "set canonicalEnglishName to the English generic food name when confidently known",
+      "including brand or product-line words when the user states them",
+    );
+    expect(message.content).toContain(
+      "Set canonicalEnglishName to the English generic food name when confidently known",
     );
     expect(message.content).toContain(
       "omit canonicalEnglishName when uncertain",
@@ -34,7 +37,7 @@ describe("agent meal proposal language prompt schema", () => {
       "Set language to the language code of the food phrase when clear, not the app locale",
     );
     expect(message.content).toContain(
-      "Preserve brand and product names as stated; do not invent translations",
+      "Do not output a separate brand field",
     );
   });
 
@@ -50,7 +53,7 @@ describe("agent meal proposal language prompt schema", () => {
       "English generic food name when confidently known; omit when uncertain and do not invent translations.",
     );
     expect(parameters).toContain(
-      "Normalized food name in the same language as originalText.",
+      "Normalized searchable food name in the same language as originalText; include stated brand or product-line words in this name.",
     );
     expect(parameters).toContain(
       "Language code of originalText when clear; this is the food phrase language, not the app locale.",

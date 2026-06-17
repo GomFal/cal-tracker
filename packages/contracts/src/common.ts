@@ -167,7 +167,7 @@ export const mealItemSchema = z.object({
 
 export const foodMentionFieldDescriptions = {
   originalText: "Exact food phrase from the user's text or transcript; do not translate.",
-  canonicalName: "Normalized food name in the same language as originalText.",
+  canonicalName: "Normalized searchable food name in the same language as originalText; include stated brand or product-line words in this name.",
   canonicalEnglishName: "English generic food name when confidently known; omit when uncertain and do not invent translations.",
   language: "Language code of originalText when clear; this is the food phrase language, not the app locale."
 } as const;
@@ -183,10 +183,8 @@ export const foodMentionSchema = z.object({
   unitKind: z.enum(["metric", "household", "implicit_count", "unknown"]).optional(),
   portionDescriptorRaw: z.string().min(1).optional(),
   portionDescriptor: z.string().min(1).optional(),
-  brand: z.string().optional(),
   barcode: z.string().optional(),
-  confidence: z.number().min(0).max(1),
-  marketProduct: z.boolean().default(false)
+  confidence: z.number().min(0).max(1)
 }).superRefine((mention, ctx) => {
   if (!mention.canonicalName && !mention.canonicalEnglishName) {
     ctx.addIssue({

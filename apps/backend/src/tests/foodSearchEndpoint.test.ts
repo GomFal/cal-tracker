@@ -76,6 +76,71 @@ describe("food search endpoint", () => {
     expect(body.candidateGroups?.[0]?.candidates.map((candidate) => candidate.name)).toContain("Honey Pork Ribs");
   });
 
+  it("uses the same full-corpus search for broad and brand-token ingredient queries", async () => {
+    const { request, repository } = buildTestApp();
+    const { authHeader } = await registerAndAuth(request);
+    await repository.upsertFoodItem({
+      name: "Arroz",
+      normalizedName: "arroz",
+      canonicalName: "arroz",
+      source: "usda_fdc",
+      externalSource: "usda_fdc",
+      externalId: "generic-arroz",
+      dataType: "SR Legacy",
+      foodKey: "es",
+      servingGrams: 100,
+      calories: 130,
+      proteinGrams: 2.7,
+      carbsGrams: 28,
+      fatGrams: 0.3,
+    });
+    await repository.upsertFoodItem({
+      name: "Arroz Hacendado",
+      normalizedName: "arroz hacendado",
+      canonicalName: "arroz hacendado",
+      brand: "Hacendado",
+      barcode: "8480000000017",
+      source: "openfoodfacts",
+      externalSource: "openfoodfacts",
+      externalId: "arroz-hacendado",
+      dataType: "Open Food Facts",
+      foodKey: "es",
+      servingGrams: 100,
+      calories: 131,
+      proteinGrams: 2.6,
+      carbsGrams: 28.1,
+      fatGrams: 0.4,
+    });
+
+    const broadResponse = await request("http://localhost/v1/foods/search", {
+      method: "POST",
+      headers: { ...authHeader, "accept-language": "es-ES" },
+      body: JSON.stringify({ query: "arroz", limit: 5 }),
+    });
+    const broadBody = (await broadResponse.json()) as {
+      items: Array<{ name: string }>;
+      candidateGroups?: Array<{ candidates: Array<{ name: string }> }>;
+    };
+
+    expect(broadResponse.status).toBe(200);
+    expect(broadBody.items[0]?.name).toBe("Arroz");
+    expect(broadBody.candidateGroups?.[0]?.candidates.map((candidate) => candidate.name)).toContain("Arroz Hacendado");
+
+    const brandResponse = await request("http://localhost/v1/foods/search", {
+      method: "POST",
+      headers: { ...authHeader, "accept-language": "es-ES" },
+      body: JSON.stringify({ query: "arroz hacendado", limit: 5 }),
+    });
+    const brandBody = (await brandResponse.json()) as {
+      items: Array<{ name: string }>;
+      candidateGroups?: Array<{ candidates: Array<{ name: string }> }>;
+    };
+
+    expect(brandResponse.status).toBe(200);
+    expect(brandBody.items[0]?.name).toBe("Arroz Hacendado");
+    expect(brandBody.candidateGroups?.[0]?.candidates[0]?.name).toBe("Arroz Hacendado");
+  });
+
   it("rejects empty search queries", async () => {
     const { request } = buildTestApp();
     const { authHeader } = await registerAndAuth(request);

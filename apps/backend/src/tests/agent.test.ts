@@ -106,7 +106,6 @@ function mention(
     rawUnitText,
     unitKind: overrides.unitKind ?? (unit === "g" ? "metric" : "unknown"),
     confidence: overrides.confidence ?? 0.95,
-    marketProduct: overrides.marketProduct ?? false,
     ...overrides,
   };
 }
@@ -188,7 +187,6 @@ describe("AgentService", () => {
                     rawUnitText: "grams",
                     unitKind: "metric",
                     confidence: 0.95,
-                    marketProduct: false,
                   },
                   {
                     originalText: "100 grams of rice",
@@ -198,7 +196,6 @@ describe("AgentService", () => {
                     rawUnitText: "grams",
                     unitKind: "metric",
                     confidence: 0.95,
-                    marketProduct: false,
                   },
                 ],
               }),
@@ -415,14 +412,12 @@ describe("AgentService", () => {
                     rawUnitText: "grams",
                     unitKind: "metric",
                     confidence: 0.95,
-                    marketProduct: false,
                   },
                   {
                     originalText: "50 of ham",
                     canonicalEnglishName: "ham",
                     quantity: 50,
                     confidence: 0.9,
-                    marketProduct: false,
                   },
                 ],
               }),
@@ -972,7 +967,6 @@ describe("AgentService", () => {
                   rawUnitText: "grams",
                   unitKind: "metric",
                   confidence: 0.95,
-                  marketProduct: false,
                 },
                 {
                   originalText: "20 grams of butter",
@@ -983,7 +977,6 @@ describe("AgentService", () => {
                   rawUnitText: "grams",
                   unitKind: "metric",
                   confidence: 0.95,
-                  marketProduct: false,
                 },
               ],
             }),
@@ -1075,7 +1068,6 @@ describe("AgentService", () => {
                     rawUnitText: "grams",
                     unitKind: "metric",
                     confidence: 0.95,
-                    marketProduct: false,
                   },
                 },
               ],

@@ -1746,7 +1746,7 @@
                     "canonicalName": {
                       "type": "string",
                       "minLength": 1,
-                      "description": "Normalized food name in the same language as originalText."
+                      "description": "Normalized searchable food name in the same language as originalText; include stated brand or product-line words in this name."
                     },
                     "canonicalEnglishName": {
                       "type": "string",
@@ -1788,9 +1788,6 @@
                       "type": "string",
                       "minLength": 1
                     },
-                    "brand": {
-                      "type": "string"
-                    },
                     "barcode": {
                       "type": "string"
                     },
@@ -1798,10 +1795,6 @@
                       "type": "number",
                       "minimum": 0,
                       "maximum": 1
-                    },
-                    "marketProduct": {
-                      "type": "boolean",
-                      "default": false
                     }
                   },
                   "required": [
@@ -2846,7 +2839,7 @@
                 "canonicalName": {
                   "type": "string",
                   "minLength": 1,
-                  "description": "Normalized food name in the same language as originalText."
+                  "description": "Normalized searchable food name in the same language as originalText; include stated brand or product-line words in this name."
                 },
                 "canonicalEnglishName": {
                   "type": "string",
@@ -2888,9 +2881,6 @@
                   "type": "string",
                   "minLength": 1
                 },
-                "brand": {
-                  "type": "string"
-                },
                 "barcode": {
                   "type": "string"
                 },
@@ -2898,10 +2888,6 @@
                   "type": "number",
                   "minimum": 0,
                   "maximum": 1
-                },
-                "marketProduct": {
-                  "type": "boolean",
-                  "default": false
                 }
               },
               "required": [
@@ -2929,7 +2915,7 @@
                     "canonicalName": {
                       "type": "string",
                       "minLength": 1,
-                      "description": "Normalized food name in the same language as originalText."
+                      "description": "Normalized searchable food name in the same language as originalText; include stated brand or product-line words in this name."
                     },
                     "canonicalEnglishName": {
                       "type": "string",
@@ -2971,9 +2957,6 @@
                       "type": "string",
                       "minLength": 1
                     },
-                    "brand": {
-                      "type": "string"
-                    },
                     "barcode": {
                       "type": "string"
                     },
@@ -2981,10 +2964,6 @@
                       "type": "number",
                       "minimum": 0,
                       "maximum": 1
-                    },
-                    "marketProduct": {
-                      "type": "boolean",
-                      "default": false
                     }
                   },
                   "required": [
@@ -3212,7 +3191,7 @@
                     "canonicalName": {
                       "type": "string",
                       "minLength": 1,
-                      "description": "Normalized food name in the same language as originalText."
+                      "description": "Normalized searchable food name in the same language as originalText; include stated brand or product-line words in this name."
                     },
                     "canonicalEnglishName": {
                       "type": "string",
@@ -3254,9 +3233,6 @@
                       "type": "string",
                       "minLength": 1
                     },
-                    "brand": {
-                      "type": "string"
-                    },
                     "barcode": {
                       "type": "string"
                     },
@@ -3264,10 +3240,6 @@
                       "type": "number",
                       "minimum": 0,
                       "maximum": 1
-                    },
-                    "marketProduct": {
-                      "type": "boolean",
-                      "default": false
                     }
                   },
                   "required": [
@@ -5632,7 +5604,7 @@
                     "canonicalName": {
                       "type": "string",
                       "minLength": 1,
-                      "description": "Normalized food name in the same language as originalText."
+                      "description": "Normalized searchable food name in the same language as originalText; include stated brand or product-line words in this name."
                     },
                     "canonicalEnglishName": {
                       "type": "string",
@@ -5674,9 +5646,6 @@
                       "type": "string",
                       "minLength": 1
                     },
-                    "brand": {
-                      "type": "string"
-                    },
                     "barcode": {
                       "type": "string"
                     },
@@ -5684,10 +5653,6 @@
                       "type": "number",
                       "minimum": 0,
                       "maximum": 1
-                    },
-                    "marketProduct": {
-                      "type": "boolean",
-                      "default": false
                     }
                   },
                   "required": [
@@ -5715,7 +5680,7 @@
                         "canonicalName": {
                           "type": "string",
                           "minLength": 1,
-                          "description": "Normalized food name in the same language as originalText."
+                          "description": "Normalized searchable food name in the same language as originalText; include stated brand or product-line words in this name."
                         },
                         "canonicalEnglishName": {
                           "type": "string",
@@ -5757,9 +5722,6 @@
                           "type": "string",
                           "minLength": 1
                         },
-                        "brand": {
-                          "type": "string"
-                        },
                         "barcode": {
                           "type": "string"
                         },
@@ -5767,10 +5729,6 @@
                           "type": "number",
                           "minimum": 0,
                           "maximum": 1
-                        },
-                        "marketProduct": {
-                          "type": "boolean",
-                          "default": false
                         }
                       },
                       "required": [
@@ -5998,7 +5956,7 @@
                         "canonicalName": {
                           "type": "string",
                           "minLength": 1,
-                          "description": "Normalized food name in the same language as originalText."
+                          "description": "Normalized searchable food name in the same language as originalText; include stated brand or product-line words in this name."
                         },
                         "canonicalEnglishName": {
                           "type": "string",
@@ -6040,9 +5998,6 @@
                           "type": "string",
                           "minLength": 1
                         },
-                        "brand": {
-                          "type": "string"
-                        },
                         "barcode": {
                           "type": "string"
                         },
@@ -6050,10 +6005,6 @@
                           "type": "number",
                           "minimum": 0,
                           "maximum": 1
-                        },
-                        "marketProduct": {
-                          "type": "boolean",
-                          "default": false
                         }
                       },
                       "required": [
@@ -6304,7 +6255,7 @@
                         "canonicalName": {
                           "type": "string",
                           "minLength": 1,
-                          "description": "Normalized food name in the same language as originalText."
+                          "description": "Normalized searchable food name in the same language as originalText; include stated brand or product-line words in this name."
                         },
                         "canonicalEnglishName": {
                           "type": "string",
@@ -6346,9 +6297,6 @@
                           "type": "string",
                           "minLength": 1
                         },
-                        "brand": {
-                          "type": "string"
-                        },
                         "barcode": {
                           "type": "string"
                         },
@@ -6356,10 +6304,6 @@
                           "type": "number",
                           "minimum": 0,
                           "maximum": 1
-                        },
-                        "marketProduct": {
-                          "type": "boolean",
-                          "default": false
                         }
                       },
                       "required": [
@@ -6592,7 +6536,7 @@
                         "canonicalName": {
                           "type": "string",
                           "minLength": 1,
-                          "description": "Normalized food name in the same language as originalText."
+                          "description": "Normalized searchable food name in the same language as originalText; include stated brand or product-line words in this name."
                         },
                         "canonicalEnglishName": {
                           "type": "string",
@@ -6634,9 +6578,6 @@
                           "type": "string",
                           "minLength": 1
                         },
-                        "brand": {
-                          "type": "string"
-                        },
                         "barcode": {
                           "type": "string"
                         },
@@ -6644,10 +6585,6 @@
                           "type": "number",
                           "minimum": 0,
                           "maximum": 1
-                        },
-                        "marketProduct": {
-                          "type": "boolean",
-                          "default": false
                         }
                       },
                       "required": [
@@ -7332,7 +7269,7 @@
                     "canonicalName": {
                       "type": "string",
                       "minLength": 1,
-                      "description": "Normalized food name in the same language as originalText."
+                      "description": "Normalized searchable food name in the same language as originalText; include stated brand or product-line words in this name."
                     },
                     "canonicalEnglishName": {
                       "type": "string",
@@ -7374,9 +7311,6 @@
                       "type": "string",
                       "minLength": 1
                     },
-                    "brand": {
-                      "type": "string"
-                    },
                     "barcode": {
                       "type": "string"
                     },
@@ -7384,10 +7318,6 @@
                       "type": "number",
                       "minimum": 0,
                       "maximum": 1
-                    },
-                    "marketProduct": {
-                      "type": "boolean",
-                      "default": false
                     }
                   },
                   "required": [
@@ -7615,7 +7545,7 @@
                     "canonicalName": {
                       "type": "string",
                       "minLength": 1,
-                      "description": "Normalized food name in the same language as originalText."
+                      "description": "Normalized searchable food name in the same language as originalText; include stated brand or product-line words in this name."
                     },
                     "canonicalEnglishName": {
                       "type": "string",
@@ -7657,9 +7587,6 @@
                       "type": "string",
                       "minLength": 1
                     },
-                    "brand": {
-                      "type": "string"
-                    },
                     "barcode": {
                       "type": "string"
                     },
@@ -7667,10 +7594,6 @@
                       "type": "number",
                       "minimum": 0,
                       "maximum": 1
-                    },
-                    "marketProduct": {
-                      "type": "boolean",
-                      "default": false
                     }
                   },
                   "required": [
@@ -7908,7 +7831,7 @@
                 "canonicalName": {
                   "type": "string",
                   "minLength": 1,
-                  "description": "Normalized food name in the same language as originalText."
+                  "description": "Normalized searchable food name in the same language as originalText; include stated brand or product-line words in this name."
                 },
                 "canonicalEnglishName": {
                   "type": "string",
@@ -7950,9 +7873,6 @@
                   "type": "string",
                   "minLength": 1
                 },
-                "brand": {
-                  "type": "string"
-                },
                 "barcode": {
                   "type": "string"
                 },
@@ -7960,10 +7880,6 @@
                   "type": "number",
                   "minimum": 0,
                   "maximum": 1
-                },
-                "marketProduct": {
-                  "type": "boolean",
-                  "default": false
                 }
               },
               "required": [
@@ -8579,7 +8495,7 @@
                 "canonicalName": {
                   "type": "string",
                   "minLength": 1,
-                  "description": "Normalized food name in the same language as originalText."
+                  "description": "Normalized searchable food name in the same language as originalText; include stated brand or product-line words in this name."
                 },
                 "canonicalEnglishName": {
                   "type": "string",
@@ -8621,9 +8537,6 @@
                   "type": "string",
                   "minLength": 1
                 },
-                "brand": {
-                  "type": "string"
-                },
                 "barcode": {
                   "type": "string"
                 },
@@ -8631,10 +8544,6 @@
                   "type": "number",
                   "minimum": 0,
                   "maximum": 1
-                },
-                "marketProduct": {
-                  "type": "boolean",
-                  "default": false
                 }
               },
               "required": [
@@ -8662,7 +8571,7 @@
                     "canonicalName": {
                       "type": "string",
                       "minLength": 1,
-                      "description": "Normalized food name in the same language as originalText."
+                      "description": "Normalized searchable food name in the same language as originalText; include stated brand or product-line words in this name."
                     },
                     "canonicalEnglishName": {
                       "type": "string",
@@ -8704,9 +8613,6 @@
                       "type": "string",
                       "minLength": 1
                     },
-                    "brand": {
-                      "type": "string"
-                    },
                     "barcode": {
                       "type": "string"
                     },
@@ -8714,10 +8620,6 @@
                       "type": "number",
                       "minimum": 0,
                       "maximum": 1
-                    },
-                    "marketProduct": {
-                      "type": "boolean",
-                      "default": false
                     }
                   },
                   "required": [
@@ -8945,7 +8847,7 @@
                     "canonicalName": {
                       "type": "string",
                       "minLength": 1,
-                      "description": "Normalized food name in the same language as originalText."
+                      "description": "Normalized searchable food name in the same language as originalText; include stated brand or product-line words in this name."
                     },
                     "canonicalEnglishName": {
                       "type": "string",
@@ -8987,9 +8889,6 @@
                       "type": "string",
                       "minLength": 1
                     },
-                    "brand": {
-                      "type": "string"
-                    },
                     "barcode": {
                       "type": "string"
                     },
@@ -8997,10 +8896,6 @@
                       "type": "number",
                       "minimum": 0,
                       "maximum": 1
-                    },
-                    "marketProduct": {
-                      "type": "boolean",
-                      "default": false
                     }
                   },
                   "required": [
@@ -10626,7 +10521,7 @@
                         "canonicalName": {
                           "type": "string",
                           "minLength": 1,
-                          "description": "Normalized food name in the same language as originalText."
+                          "description": "Normalized searchable food name in the same language as originalText; include stated brand or product-line words in this name."
                         },
                         "canonicalEnglishName": {
                           "type": "string",
@@ -10668,9 +10563,6 @@
                           "type": "string",
                           "minLength": 1
                         },
-                        "brand": {
-                          "type": "string"
-                        },
                         "barcode": {
                           "type": "string"
                         },
@@ -10678,10 +10570,6 @@
                           "type": "number",
                           "minimum": 0,
                           "maximum": 1
-                        },
-                        "marketProduct": {
-                          "type": "boolean",
-                          "default": false
                         }
                       },
                       "required": [
@@ -10746,7 +10634,7 @@
                         "canonicalName": {
                           "type": "string",
                           "minLength": 1,
-                          "description": "Normalized food name in the same language as originalText."
+                          "description": "Normalized searchable food name in the same language as originalText; include stated brand or product-line words in this name."
                         },
                         "canonicalEnglishName": {
                           "type": "string",
@@ -10788,9 +10676,6 @@
                           "type": "string",
                           "minLength": 1
                         },
-                        "brand": {
-                          "type": "string"
-                        },
                         "barcode": {
                           "type": "string"
                         },
@@ -10798,10 +10683,6 @@
                           "type": "number",
                           "minimum": 0,
                           "maximum": 1
-                        },
-                        "marketProduct": {
-                          "type": "boolean",
-                          "default": false
                         }
                       },
                       "required": [
@@ -11223,7 +11104,7 @@
                 "canonicalName": {
                   "type": "string",
                   "minLength": 1,
-                  "description": "Normalized food name in the same language as originalText."
+                  "description": "Normalized searchable food name in the same language as originalText; include stated brand or product-line words in this name."
                 },
                 "canonicalEnglishName": {
                   "type": "string",
@@ -11265,9 +11146,6 @@
                   "type": "string",
                   "minLength": 1
                 },
-                "brand": {
-                  "type": "string"
-                },
                 "barcode": {
                   "type": "string"
                 },
@@ -11275,10 +11153,6 @@
                   "type": "number",
                   "minimum": 0,
                   "maximum": 1
-                },
-                "marketProduct": {
-                  "type": "boolean",
-                  "default": false
                 }
               },
               "required": [
@@ -11306,7 +11180,7 @@
                     "canonicalName": {
                       "type": "string",
                       "minLength": 1,
-                      "description": "Normalized food name in the same language as originalText."
+                      "description": "Normalized searchable food name in the same language as originalText; include stated brand or product-line words in this name."
                     },
                     "canonicalEnglishName": {
                       "type": "string",
@@ -11348,9 +11222,6 @@
                       "type": "string",
                       "minLength": 1
                     },
-                    "brand": {
-                      "type": "string"
-                    },
                     "barcode": {
                       "type": "string"
                     },
@@ -11358,10 +11229,6 @@
                       "type": "number",
                       "minimum": 0,
                       "maximum": 1
-                    },
-                    "marketProduct": {
-                      "type": "boolean",
-                      "default": false
                     }
                   },
                   "required": [
@@ -11589,7 +11456,7 @@
                     "canonicalName": {
                       "type": "string",
                       "minLength": 1,
-                      "description": "Normalized food name in the same language as originalText."
+                      "description": "Normalized searchable food name in the same language as originalText; include stated brand or product-line words in this name."
                     },
                     "canonicalEnglishName": {
                       "type": "string",
@@ -11631,9 +11498,6 @@
                       "type": "string",
                       "minLength": 1
                     },
-                    "brand": {
-                      "type": "string"
-                    },
                     "barcode": {
                       "type": "string"
                     },
@@ -11641,10 +11505,6 @@
                       "type": "number",
                       "minimum": 0,
                       "maximum": 1
-                    },
-                    "marketProduct": {
-                      "type": "boolean",
-                      "default": false
                     }
                   },
                   "required": [
@@ -13728,7 +13588,7 @@
                 "canonicalName": {
                   "type": "string",
                   "minLength": 1,
-                  "description": "Normalized food name in the same language as originalText."
+                  "description": "Normalized searchable food name in the same language as originalText; include stated brand or product-line words in this name."
                 },
                 "canonicalEnglishName": {
                   "type": "string",
@@ -13770,9 +13630,6 @@
                   "type": "string",
                   "minLength": 1
                 },
-                "brand": {
-                  "type": "string"
-                },
                 "barcode": {
                   "type": "string"
                 },
@@ -13780,10 +13637,6 @@
                   "type": "number",
                   "minimum": 0,
                   "maximum": 1
-                },
-                "marketProduct": {
-                  "type": "boolean",
-                  "default": false
                 }
               },
               "required": [
@@ -13811,7 +13664,7 @@
                     "canonicalName": {
                       "type": "string",
                       "minLength": 1,
-                      "description": "Normalized food name in the same language as originalText."
+                      "description": "Normalized searchable food name in the same language as originalText; include stated brand or product-line words in this name."
                     },
                     "canonicalEnglishName": {
                       "type": "string",
@@ -13853,9 +13706,6 @@
                       "type": "string",
                       "minLength": 1
                     },
-                    "brand": {
-                      "type": "string"
-                    },
                     "barcode": {
                       "type": "string"
                     },
@@ -13863,10 +13713,6 @@
                       "type": "number",
                       "minimum": 0,
                       "maximum": 1
-                    },
-                    "marketProduct": {
-                      "type": "boolean",
-                      "default": false
                     }
                   },
                   "required": [
@@ -14094,7 +13940,7 @@
                     "canonicalName": {
                       "type": "string",
                       "minLength": 1,
-                      "description": "Normalized food name in the same language as originalText."
+                      "description": "Normalized searchable food name in the same language as originalText; include stated brand or product-line words in this name."
                     },
                     "canonicalEnglishName": {
                       "type": "string",
@@ -14136,9 +13982,6 @@
                       "type": "string",
                       "minLength": 1
                     },
-                    "brand": {
-                      "type": "string"
-                    },
                     "barcode": {
                       "type": "string"
                     },
@@ -14146,10 +13989,6 @@
                       "type": "number",
                       "minimum": 0,
                       "maximum": 1
-                    },
-                    "marketProduct": {
-                      "type": "boolean",
-                      "default": false
                     }
                   },
                   "required": [

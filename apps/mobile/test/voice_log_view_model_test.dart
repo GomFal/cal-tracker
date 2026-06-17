@@ -107,8 +107,9 @@ void main() {
     });
 
     group('toggleRecording', () {
-      testWidgets('tracks recording duration from elapsed wall time',
-          (tester) async {
+      testWidgets('tracks recording duration from elapsed wall time', (
+        tester,
+      ) async {
         recreateViewModel(now: tester.binding.clock.now);
         when(() => mockAudioRecorderService.start()).thenAnswer((_) async {});
 
@@ -127,66 +128,68 @@ void main() {
       });
 
       testWidgets(
-          'ignores duplicate start requests while starting or recording',
-          (tester) async {
-        recreateViewModel(now: tester.binding.clock.now);
-        final startCompleter = Completer<void>();
-        when(
-          () => mockAudioRecorderService.start(),
-        ).thenAnswer((_) => startCompleter.future);
+        'ignores duplicate start requests while starting or recording',
+        (tester) async {
+          recreateViewModel(now: tester.binding.clock.now);
+          final startCompleter = Completer<void>();
+          when(
+            () => mockAudioRecorderService.start(),
+          ).thenAnswer((_) => startCompleter.future);
 
-        unawaited(viewModel.startRecording());
-        expect(viewModel.state, VoiceLogState.requestingPermission);
+          unawaited(viewModel.startRecording());
+          expect(viewModel.state, VoiceLogState.requestingPermission);
 
-        unawaited(viewModel.startRecording());
-        await tester.pump();
-        expect(viewModel.state, VoiceLogState.requestingPermission);
+          unawaited(viewModel.startRecording());
+          await tester.pump();
+          expect(viewModel.state, VoiceLogState.requestingPermission);
 
-        startCompleter.complete();
-        await tester.pump();
-        expect(viewModel.state, VoiceLogState.recording);
+          startCompleter.complete();
+          await tester.pump();
+          expect(viewModel.state, VoiceLogState.recording);
 
-        unawaited(viewModel.startRecording());
-        await tester.pump();
+          unawaited(viewModel.startRecording());
+          await tester.pump();
 
-        await tester.pump(const Duration(seconds: 2));
-        expect(viewModel.recordingDuration, const Duration(seconds: 2));
+          await tester.pump(const Duration(seconds: 2));
+          expect(viewModel.recordingDuration, const Duration(seconds: 2));
 
-        viewModel.clearResult();
+          viewModel.clearResult();
 
-        verify(() => mockAudioRecorderService.start()).called(1);
-      });
+          verify(() => mockAudioRecorderService.start()).called(1);
+        },
+      );
 
       testWidgets(
-          'clearResult cancels active recording timer before next recording',
-          (tester) async {
-        recreateViewModel(now: tester.binding.clock.now);
-        when(() => mockAudioRecorderService.start()).thenAnswer((_) async {});
+        'clearResult cancels active recording timer before next recording',
+        (tester) async {
+          recreateViewModel(now: tester.binding.clock.now);
+          when(() => mockAudioRecorderService.start()).thenAnswer((_) async {});
 
-        await viewModel.startRecording();
-        expect(viewModel.state, VoiceLogState.recording);
+          await viewModel.startRecording();
+          expect(viewModel.state, VoiceLogState.recording);
 
-        await tester.pump(const Duration(seconds: 2));
-        expect(viewModel.recordingDuration, const Duration(seconds: 2));
+          await tester.pump(const Duration(seconds: 2));
+          expect(viewModel.recordingDuration, const Duration(seconds: 2));
 
-        viewModel.clearResult();
-        expect(viewModel.state, VoiceLogState.idle);
-        expect(viewModel.recordingDuration, Duration.zero);
+          viewModel.clearResult();
+          expect(viewModel.state, VoiceLogState.idle);
+          expect(viewModel.recordingDuration, Duration.zero);
 
-        await tester.pump(const Duration(seconds: 5));
-        expect(viewModel.recordingDuration, Duration.zero);
+          await tester.pump(const Duration(seconds: 5));
+          expect(viewModel.recordingDuration, Duration.zero);
 
-        await viewModel.startRecording();
-        expect(viewModel.state, VoiceLogState.recording);
-        expect(viewModel.recordingDuration, Duration.zero);
+          await viewModel.startRecording();
+          expect(viewModel.state, VoiceLogState.recording);
+          expect(viewModel.recordingDuration, Duration.zero);
 
-        await tester.pump(const Duration(seconds: 1));
-        expect(viewModel.recordingDuration, const Duration(seconds: 1));
+          await tester.pump(const Duration(seconds: 1));
+          expect(viewModel.recordingDuration, const Duration(seconds: 1));
 
-        viewModel.clearResult();
+          viewModel.clearResult();
 
-        verify(() => mockAudioRecorderService.start()).called(2);
-      });
+          verify(() => mockAudioRecorderService.start()).called(2);
+        },
+      );
 
       test('starts recording when idle', () async {
         when(
@@ -714,7 +717,6 @@ void main() {
               quantity: 100,
               unit: 'g',
               confidence: 0.92,
-              marketProduct: false,
             ),
             candidates: [],
           ),
@@ -876,136 +878,139 @@ void main() {
         ).called(1);
       });
 
-      test('does not show change success for materially unchanged edits',
-          () async {
-        const initialItems = [
-          MealItem(
-            name: 'Chicken breast',
+      test(
+        'does not show change success for materially unchanged edits',
+        () async {
+          const initialItems = [
+            MealItem(
+              name: 'Chicken breast',
+              quantity: 100,
+              unit: 'g',
+              calories: 165,
+              proteinGrams: 31,
+              carbsGrams: 0,
+              fatGrams: 3.6,
+              source: 'generic_usda',
+              externalSource: 'usda_fdc',
+              externalId: '171477',
+            ),
+          ];
+          const initialProposal = MealProposal(
+            id: 'prop_1',
+            title: 'Chicken',
+            confidence: 0.85,
+            requiresConfirmation: true,
+            trustedAutoCommitEligible: false,
+            nutrition: NutritionSnapshot(
+              calories: 165,
+              proteinGrams: 31,
+              carbsGrams: 0,
+              fatGrams: 3.6,
+            ),
+            items: initialItems,
+          );
+          const editedItems = [
+            MealItem(
+              name: 'Chicken breast',
+              quantity: 100,
+              unit: 'g',
+              calories: 165,
+              proteinGrams: 31,
+              carbsGrams: 0,
+              fatGrams: 3.6,
+              source: 'generic_usda:manual_edit',
+              externalSource: 'usda_fdc',
+              externalId: '171477',
+            ),
+          ];
+          const updatedProposal = MealProposal(
+            id: 'prop_1',
+            title: 'Chicken',
+            confidence: 0.85,
+            requiresConfirmation: true,
+            trustedAutoCommitEligible: false,
+            nutrition: NutritionSnapshot(
+              calories: 165,
+              proteinGrams: 31,
+              carbsGrams: 0,
+              fatGrams: 3.6,
+            ),
+            items: editedItems,
+          );
+          when(() => mockNutritionRepository.logText('chicken')).thenAnswer(
+            (_) async => const AgentRunResult(
+              kind: 'proposal',
+              proposal: initialProposal,
+              message: 'Meal proposal created.',
+            ),
+          );
+          when(
+            () => mockNutritionRepository.updateProposalItems(
+              'prop_1',
+              editedItems,
+            ),
+          ).thenAnswer((_) async => updatedProposal);
+
+          await viewModel.submitText('chicken');
+          await viewModel.updateProposalItems(editedItems);
+
+          expect(viewModel.state, VoiceLogState.proposalReady);
+          expect(viewModel.proposal, updatedProposal);
+          expect(viewModel.message, isNull);
+          expect(viewModel.showProposalChangeSuccess, isFalse);
+        },
+      );
+
+      test(
+        'creates proposal from edited items when no proposal exists',
+        () async {
+          const bread = MealItem(
+            name: 'Bread',
             quantity: 100,
             unit: 'g',
-            calories: 165,
-            proteinGrams: 31,
-            carbsGrams: 0,
-            fatGrams: 3.6,
-            source: 'generic_usda',
-            externalSource: 'usda_fdc',
-            externalId: '171477',
-          ),
-        ];
-        const initialProposal = MealProposal(
-          id: 'prop_1',
-          title: 'Chicken',
-          confidence: 0.85,
-          requiresConfirmation: true,
-          trustedAutoCommitEligible: false,
-          nutrition: NutritionSnapshot(
-            calories: 165,
-            proteinGrams: 31,
-            carbsGrams: 0,
-            fatGrams: 3.6,
-          ),
-          items: initialItems,
-        );
-        const editedItems = [
-          MealItem(
-            name: 'Chicken breast',
-            quantity: 100,
-            unit: 'g',
-            calories: 165,
-            proteinGrams: 31,
-            carbsGrams: 0,
-            fatGrams: 3.6,
-            source: 'generic_usda:manual_edit',
-            externalSource: 'usda_fdc',
-            externalId: '171477',
-          ),
-        ];
-        const updatedProposal = MealProposal(
-          id: 'prop_1',
-          title: 'Chicken',
-          confidence: 0.85,
-          requiresConfirmation: true,
-          trustedAutoCommitEligible: false,
-          nutrition: NutritionSnapshot(
-            calories: 165,
-            proteinGrams: 31,
-            carbsGrams: 0,
-            fatGrams: 3.6,
-          ),
-          items: editedItems,
-        );
-        when(
-          () => mockNutritionRepository.logText('chicken'),
-        ).thenAnswer(
-          (_) async => const AgentRunResult(
-            kind: 'proposal',
-            proposal: initialProposal,
-            message: 'Meal proposal created.',
-          ),
-        );
-        when(
-          () => mockNutritionRepository.updateProposalItems(
-            'prop_1',
-            editedItems,
-          ),
-        ).thenAnswer((_) async => updatedProposal);
-
-        await viewModel.submitText('chicken');
-        await viewModel.updateProposalItems(editedItems);
-
-        expect(viewModel.state, VoiceLogState.proposalReady);
-        expect(viewModel.proposal, updatedProposal);
-        expect(viewModel.message, isNull);
-        expect(viewModel.showProposalChangeSuccess, isFalse);
-      });
-
-      test('creates proposal from edited items when no proposal exists',
-          () async {
-        const bread = MealItem(
-          name: 'Bread',
-          quantity: 100,
-          unit: 'g',
-          calories: 265,
-          proteinGrams: 7,
-          carbsGrams: 1,
-          fatGrams: 8,
-          source: 'off:manual_edit',
-        );
-        const createdProposal = MealProposal(
-          id: 'manual_prop',
-          title: 'Bread',
-          confidence: 0.9,
-          requiresConfirmation: true,
-          trustedAutoCommitEligible: false,
-          nutrition: NutritionSnapshot(
             calories: 265,
             proteinGrams: 7,
             carbsGrams: 1,
             fatGrams: 8,
-          ),
-          items: [bread],
-        );
-        when(
-          () => mockNutritionRepository.createProposalFromItems(
-            phrase: any(named: 'phrase'),
-            items: any(named: 'items'),
-          ),
-        ).thenAnswer((_) async => createdProposal);
+            source: 'off:manual_edit',
+          );
+          const createdProposal = MealProposal(
+            id: 'manual_prop',
+            title: 'Bread',
+            confidence: 0.9,
+            requiresConfirmation: true,
+            trustedAutoCommitEligible: false,
+            nutrition: NutritionSnapshot(
+              calories: 265,
+              proteinGrams: 7,
+              carbsGrams: 1,
+              fatGrams: 8,
+            ),
+            items: [bread],
+          );
+          when(
+            () => mockNutritionRepository.createProposalFromItems(
+              phrase: any(named: 'phrase'),
+              items: any(named: 'items'),
+            ),
+          ).thenAnswer((_) async => createdProposal);
 
-        await viewModel.updateProposalItems([bread]);
+          await viewModel.updateProposalItems([bread]);
 
-        expect(viewModel.state, VoiceLogState.proposalReady);
-        expect(viewModel.proposal, createdProposal);
-        final captured = verify(
-          () => mockNutritionRepository.createProposalFromItems(
-            phrase: any(named: 'phrase'),
-            items: captureAny(named: 'items'),
-          ),
-        ).captured.single as List<MealItem>;
-        expect(captured, [bread]);
-        verifyNever(
-            () => mockNutritionRepository.updateProposalItems(any(), any()));
-      });
+          expect(viewModel.state, VoiceLogState.proposalReady);
+          expect(viewModel.proposal, createdProposal);
+          final captured = verify(
+            () => mockNutritionRepository.createProposalFromItems(
+              phrase: any(named: 'phrase'),
+              items: captureAny(named: 'items'),
+            ),
+          ).captured.single as List<MealItem>;
+          expect(captured, [bread]);
+          verifyNever(
+            () => mockNutritionRepository.updateProposalItems(any(), any()),
+          );
+        },
+      );
     });
 
     group('candidate selection', () {
@@ -1206,7 +1211,10 @@ void main() {
           final riceGroup = _candidateGroup(
             originalText: '100 grams of rice',
             canonicalEnglishName: 'rice',
-            candidates: [rice, _mealItem(name: 'Rice 2', externalId: 'rice_2')],
+            candidates: [
+              rice,
+              _mealItem(name: 'Rice 2', externalId: 'rice_2'),
+            ],
           );
           final beefGroup = _candidateGroup(
             originalText: '100 grams of beef',
@@ -1329,7 +1337,6 @@ FoodCandidateGroup _candidateGroup({
       quantity: 100,
       unit: 'g',
       confidence: 0.92,
-      marketProduct: false,
     ),
     candidates: candidates,
   );

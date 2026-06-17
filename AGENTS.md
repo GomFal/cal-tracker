@@ -10,10 +10,6 @@ Do not hardcode ingredients, ingredient translations, meal names, meal proposal 
 
 ---
 
-## Branch Workflow
-
-Always do development work on the `develop` branch. Before making code or documentation changes, switch to `develop` and update it from the remote when possible. Use `main` only when explicitly asked to sync, release, or inspect production-aligned history.
-
 ## Worktree Convention
 
 Create and keep new Git worktrees under the top-level `.worktrees/` directory in this repository unless the user explicitly asks for a different location. Prefer reusing that directory for parallel branch work instead of creating sibling worktrees next to the repo root.

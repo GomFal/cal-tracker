@@ -1103,7 +1103,6 @@ FoodCandidateGroup _seedCandidateGroup(List<MealItem> catalog) {
       quantity: 1,
       unit: 'serving',
       confidence: 0.77,
-      marketProduct: false,
     ),
     candidates: [
       catalog[3],

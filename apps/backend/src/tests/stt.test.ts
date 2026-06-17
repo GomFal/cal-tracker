@@ -120,7 +120,6 @@ describe("STT endpoint", () => {
                     rawUnitText: "grams",
                     unitKind: "metric",
                     confidence: 0.95,
-                    marketProduct: false,
                   },
                 ],
               }),

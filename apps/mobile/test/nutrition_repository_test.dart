@@ -33,7 +33,6 @@ void main() {
                 'quantity': 100,
                 'unit': 'g',
                 'confidence': 0.92,
-                'marketProduct': false,
               },
               'candidates': [
                 for (var index = 0; index < 10; index++)
@@ -157,7 +156,6 @@ void main() {
                   'quantity': 100,
                   'unit': 'g',
                   'confidence': 0.95,
-                  'marketProduct': false,
                 },
                 'candidates': [
                   {
@@ -228,7 +226,6 @@ void main() {
                   'quantity': 100,
                   'unit': 'g',
                   'confidence': 0.95,
-                  'marketProduct': false,
                 },
                 'candidates': [
                   {

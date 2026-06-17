@@ -105,7 +105,6 @@ function makeMention(): FoodMention {
     rawUnitText: "grams",
     unitKind: "metric",
     confidence: 0.95,
-    marketProduct: false,
   };
 }
 void makeMention;

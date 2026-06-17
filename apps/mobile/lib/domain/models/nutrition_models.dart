@@ -23,11 +23,11 @@ class NutritionSnapshot {
   }
 
   Map<String, Object?> toJson() => {
-    'calories': calories,
-    'proteinGrams': proteinGrams,
-    'carbsGrams': carbsGrams,
-    'fatGrams': fatGrams,
-  };
+        'calories': calories,
+        'proteinGrams': proteinGrams,
+        'carbsGrams': carbsGrams,
+        'fatGrams': fatGrams,
+      };
 }
 
 class UsualFoodInput {
@@ -52,16 +52,17 @@ class UsualFoodInput {
   final Map<String, Object?> nutrients;
 
   Map<String, Object?> toJson({bool includeEmptyOptional = false}) => {
-    'name': name,
-    if (includeEmptyOptional || canonicalName != null)
-      'canonicalName': canonicalName,
-    if (includeEmptyOptional || brand != null) 'brand': brand,
-    if (includeEmptyOptional || barcode != null) 'barcode': barcode,
-    'servingGrams': servingGrams,
-    'nutrition': nutrition.toJson(),
-    if (includeEmptyOptional || aliases.isNotEmpty) 'aliases': aliases,
-    if (includeEmptyOptional || nutrients.isNotEmpty) 'nutrients': nutrients,
-  };
+        'name': name,
+        if (includeEmptyOptional || canonicalName != null)
+          'canonicalName': canonicalName,
+        if (includeEmptyOptional || brand != null) 'brand': brand,
+        if (includeEmptyOptional || barcode != null) 'barcode': barcode,
+        'servingGrams': servingGrams,
+        'nutrition': nutrition.toJson(),
+        if (includeEmptyOptional || aliases.isNotEmpty) 'aliases': aliases,
+        if (includeEmptyOptional || nutrients.isNotEmpty)
+          'nutrients': nutrients,
+      };
 }
 
 class UsualFoodDraft {
@@ -172,18 +173,18 @@ class UsualFood {
   }
 
   Map<String, Object?> toJson() => {
-    'id': id,
-    'name': name,
-    if (canonicalName != null) 'canonicalName': canonicalName,
-    if (brand != null) 'brand': brand,
-    if (barcode != null) 'barcode': barcode,
-    'servingGrams': servingGrams,
-    'nutrition': nutrition.toJson(),
-    if (aliases.isNotEmpty) 'aliases': aliases,
-    if (nutrients.isNotEmpty) 'nutrients': nutrients,
-    if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
-    if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
-  };
+        'id': id,
+        'name': name,
+        if (canonicalName != null) 'canonicalName': canonicalName,
+        if (brand != null) 'brand': brand,
+        if (barcode != null) 'barcode': barcode,
+        'servingGrams': servingGrams,
+        'nutrition': nutrition.toJson(),
+        if (aliases.isNotEmpty) 'aliases': aliases,
+        if (nutrients.isNotEmpty) 'nutrients': nutrients,
+        if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
+        if (updatedAt != null) 'updatedAt': updatedAt!.toIso8601String(),
+      };
 
   UsualFoodInput toInput() {
     return UsualFoodInput(
@@ -241,8 +242,8 @@ class DailyGoals {
       target: NutritionSnapshot.fromJson(
         json['target'] as Map<String, Object?>,
       ),
-      hydrationGoalLiters: (json['hydrationGoalLiters'] as num? ?? 0)
-          .toDouble(),
+      hydrationGoalLiters:
+          (json['hydrationGoalLiters'] as num? ?? 0).toDouble(),
       calorieTargetConfigured: json['calorieTargetConfigured'] as bool? ?? true,
       calorieTargetSource: json['calorieTargetSource'] as String? ?? 'manual',
       macroMode: MacroMode.fromApi(json['macroMode'] as String?),
@@ -257,20 +258,20 @@ class DailyGoals {
   }
 
   Map<String, Object?> toJson() => {
-    'date': date,
-    'target': target.toJson(),
-    'hydrationGoalLiters': hydrationGoalLiters,
-    'calorieTargetConfigured': calorieTargetConfigured,
-    'calorieTargetSource': calorieTargetSource,
-    if (macroMode != null) 'macroMode': macroMode!.apiValue,
-    if (macroSource != null) 'macroSource': macroSource!.apiValue,
-    if (macroPreset != null) 'macroPreset': macroPreset!.apiValue,
-    if (proteinPct != null) 'proteinPct': proteinPct,
-    if (carbsPct != null) 'carbsPct': carbsPct,
-    if (fatPct != null) 'fatPct': fatPct,
-    if (macroCalories != null) 'macroCalories': macroCalories,
-    if (calorieDeltaKcal != null) 'calorieDeltaKcal': calorieDeltaKcal,
-  };
+        'date': date,
+        'target': target.toJson(),
+        'hydrationGoalLiters': hydrationGoalLiters,
+        'calorieTargetConfigured': calorieTargetConfigured,
+        'calorieTargetSource': calorieTargetSource,
+        if (macroMode != null) 'macroMode': macroMode!.apiValue,
+        if (macroSource != null) 'macroSource': macroSource!.apiValue,
+        if (macroPreset != null) 'macroPreset': macroPreset!.apiValue,
+        if (proteinPct != null) 'proteinPct': proteinPct,
+        if (carbsPct != null) 'carbsPct': carbsPct,
+        if (fatPct != null) 'fatPct': fatPct,
+        if (macroCalories != null) 'macroCalories': macroCalories,
+        if (calorieDeltaKcal != null) 'calorieDeltaKcal': calorieDeltaKcal,
+      };
 }
 
 class CalorieEstimate {
@@ -382,34 +383,35 @@ class MealItem {
       portionDescription: json['portionDescription'] as String?,
       displayDetails:
           (json['displayDetails'] as List?)?.whereType<String>().toList(
-            growable: false,
-          ) ??
-          const [],
+                    growable: false,
+                  ) ??
+              const [],
     );
   }
 
   Map<String, Object?> toJson() => {
-    'name': name,
-    'quantity': quantity,
-    'unit': unit,
-    'calories': calories,
-    'proteinGrams': proteinGrams,
-    'carbsGrams': carbsGrams,
-    'fatGrams': fatGrams,
-    'source': source,
-    if (originalText != null) 'originalText': originalText,
-    if (canonicalName != null) 'canonicalName': canonicalName,
-    if (language != null) 'language': language,
-    if (externalSource != null) 'externalSource': externalSource,
-    if (externalId != null) 'externalId': externalId,
-    if (sourceUrl != null) 'sourceUrl': sourceUrl,
-    if (license != null) 'license': license,
-    if (confidence != null) 'confidence': confidence,
-    if (needsReview != null) 'needsReview': needsReview,
-    if (resolvedGrams != null) 'resolvedGrams': resolvedGrams,
-    if (portionDescription != null) 'portionDescription': portionDescription,
-    if (displayDetails.isNotEmpty) 'displayDetails': displayDetails,
-  };
+        'name': name,
+        'quantity': quantity,
+        'unit': unit,
+        'calories': calories,
+        'proteinGrams': proteinGrams,
+        'carbsGrams': carbsGrams,
+        'fatGrams': fatGrams,
+        'source': source,
+        if (originalText != null) 'originalText': originalText,
+        if (canonicalName != null) 'canonicalName': canonicalName,
+        if (language != null) 'language': language,
+        if (externalSource != null) 'externalSource': externalSource,
+        if (externalId != null) 'externalId': externalId,
+        if (sourceUrl != null) 'sourceUrl': sourceUrl,
+        if (license != null) 'license': license,
+        if (confidence != null) 'confidence': confidence,
+        if (needsReview != null) 'needsReview': needsReview,
+        if (resolvedGrams != null) 'resolvedGrams': resolvedGrams,
+        if (portionDescription != null)
+          'portionDescription': portionDescription,
+        if (displayDetails.isNotEmpty) 'displayDetails': displayDetails,
+      };
 
   MealItem copyWith({
     String? name,
@@ -514,12 +516,10 @@ class FoodMention {
     required this.quantity,
     required this.unit,
     required this.confidence,
-    required this.marketProduct,
     this.rawUnitText,
     this.unitKind,
     this.portionDescriptorRaw,
     this.portionDescriptor,
-    this.brand,
     this.barcode,
   }) : canonicalName = canonicalName ?? canonicalEnglishName ?? originalText;
 
@@ -530,12 +530,10 @@ class FoodMention {
   final double quantity;
   final String unit;
   final double confidence;
-  final bool marketProduct;
   final String? rawUnitText;
   final String? unitKind;
   final String? portionDescriptorRaw;
   final String? portionDescriptor;
-  final String? brand;
   final String? barcode;
 
   factory FoodMention.fromJson(Map<String, Object?> json) {
@@ -550,12 +548,10 @@ class FoodMention {
       quantity: (json['quantity'] as num).toDouble(),
       unit: json['unit'] as String,
       confidence: (json['confidence'] as num).toDouble(),
-      marketProduct: json['marketProduct'] as bool? ?? false,
       rawUnitText: json['rawUnitText'] as String?,
       unitKind: json['unitKind'] as String?,
       portionDescriptorRaw: json['portionDescriptorRaw'] as String?,
       portionDescriptor: json['portionDescriptor'] as String?,
-      brand: json['brand'] as String?,
       barcode: json['barcode'] as String?,
     );
   }
@@ -585,9 +581,9 @@ class FoodCandidateGroup {
       portionOptions: json['portionOptions'] == null
           ? null
           : (json['portionOptions'] as List<Object?>)
-                .cast<Map<String, Object?>>()
-                .map(FoodPortionChoice.fromJson)
-                .toList(),
+              .cast<Map<String, Object?>>()
+              .map(FoodPortionChoice.fromJson)
+              .toList(),
     );
   }
 }
@@ -706,13 +702,13 @@ class Meal {
   }
 
   Map<String, Object?> toJson() => {
-    'id': id,
-    'title': title,
-    'occurredAt': occurredAt.toIso8601String(),
-    if (mealLabel != null) 'mealLabel': mealLabel!.toJson(),
-    'nutrition': nutrition.toJson(),
-    'items': items.map((item) => item.toJson()).toList(),
-  };
+        'id': id,
+        'title': title,
+        'occurredAt': occurredAt.toIso8601String(),
+        if (mealLabel != null) 'mealLabel': mealLabel!.toJson(),
+        'nutrition': nutrition.toJson(),
+        'items': items.map((item) => item.toJson()).toList(),
+      };
 }
 
 class DailySummary {
@@ -766,10 +762,10 @@ class DailySummary {
       remaining: NutritionSnapshot.fromJson(
         json['remaining'] as Map<String, Object?>,
       ),
-      hydrationGoalLiters: (json['hydrationGoalLiters'] as num? ?? 0)
-          .toDouble(),
-      waterConsumedLiters: (json['waterConsumedLiters'] as num? ?? 0)
-          .toDouble(),
+      hydrationGoalLiters:
+          (json['hydrationGoalLiters'] as num? ?? 0).toDouble(),
+      waterConsumedLiters:
+          (json['waterConsumedLiters'] as num? ?? 0).toDouble(),
       calorieTargetConfigured: json['calorieTargetConfigured'] as bool? ?? true,
       calorieTargetSource: json['calorieTargetSource'] as String? ?? 'manual',
       macroMode: MacroMode.fromApi(json['macroMode'] as String?),
@@ -788,24 +784,24 @@ class DailySummary {
   }
 
   Map<String, Object?> toJson() => {
-    'date': date,
-    'consumed': consumed.toJson(),
-    'target': target.toJson(),
-    'remaining': remaining.toJson(),
-    'hydrationGoalLiters': hydrationGoalLiters,
-    'waterConsumedLiters': waterConsumedLiters,
-    'calorieTargetConfigured': calorieTargetConfigured,
-    'calorieTargetSource': calorieTargetSource,
-    if (macroMode != null) 'macroMode': macroMode!.apiValue,
-    if (macroSource != null) 'macroSource': macroSource!.apiValue,
-    if (macroPreset != null) 'macroPreset': macroPreset!.apiValue,
-    if (proteinPct != null) 'proteinPct': proteinPct,
-    if (carbsPct != null) 'carbsPct': carbsPct,
-    if (fatPct != null) 'fatPct': fatPct,
-    if (macroCalories != null) 'macroCalories': macroCalories,
-    if (calorieDeltaKcal != null) 'calorieDeltaKcal': calorieDeltaKcal,
-    'meals': meals.map((meal) => meal.toJson()).toList(),
-  };
+        'date': date,
+        'consumed': consumed.toJson(),
+        'target': target.toJson(),
+        'remaining': remaining.toJson(),
+        'hydrationGoalLiters': hydrationGoalLiters,
+        'waterConsumedLiters': waterConsumedLiters,
+        'calorieTargetConfigured': calorieTargetConfigured,
+        'calorieTargetSource': calorieTargetSource,
+        if (macroMode != null) 'macroMode': macroMode!.apiValue,
+        if (macroSource != null) 'macroSource': macroSource!.apiValue,
+        if (macroPreset != null) 'macroPreset': macroPreset!.apiValue,
+        if (proteinPct != null) 'proteinPct': proteinPct,
+        if (carbsPct != null) 'carbsPct': carbsPct,
+        if (fatPct != null) 'fatPct': fatPct,
+        if (macroCalories != null) 'macroCalories': macroCalories,
+        if (calorieDeltaKcal != null) 'calorieDeltaKcal': calorieDeltaKcal,
+        'meals': meals.map((meal) => meal.toJson()).toList(),
+      };
 }
 
 class MealTemplate {
@@ -842,20 +838,20 @@ class MealTemplate {
   }
 
   Map<String, Object?> toJson() => {
-    'id': id,
-    'title': title,
-    'trustedAutoCommitEnabled': trustedAutoCommitEnabled,
-    'nutrition': nutrition.toJson(),
-    'items': items.map((item) => item.toJson()).toList(),
-    'aliases': aliases,
-  };
+        'id': id,
+        'title': title,
+        'trustedAutoCommitEnabled': trustedAutoCommitEnabled,
+        'nutrition': nutrition.toJson(),
+        'items': items.map((item) => item.toJson()).toList(),
+        'aliases': aliases,
+      };
 
   Map<String, Object?> toUpdateJson() => {
-    'title': title,
-    'trustedAutoCommitEnabled': trustedAutoCommitEnabled,
-    'items': items.map((item) => item.toJson()).toList(),
-    'aliases': aliases,
-  };
+        'title': title,
+        'trustedAutoCommitEnabled': trustedAutoCommitEnabled,
+        'items': items.map((item) => item.toJson()).toList(),
+        'aliases': aliases,
+      };
 }
 
 class UsualMealDraft {
@@ -877,8 +873,7 @@ class UsualMealDraft {
     final draft = _objectMap(json['draft']);
     final proposal = _objectMap(json['proposal']);
     final source = draft ?? proposal ?? json;
-    final itemValues =
-        source['items'] ??
+    final itemValues = source['items'] ??
         proposal?['items'] ??
         json['resolvedItems'] ??
         json['items'];
@@ -886,8 +881,7 @@ class UsualMealDraft {
         source['candidateGroups'] ?? json['candidateGroups'] ?? json['options'];
     return UsualMealDraft(
       title: _optionalString(source['title']) ?? _optionalString(json['title']),
-      message:
-          _optionalString(json['message']) ??
+      message: _optionalString(json['message']) ??
           _optionalString(source['message']),
       aliases: (source['aliases'] as List<Object?>? ?? const [])
           .map((value) => value.toString().trim())

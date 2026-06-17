@@ -377,7 +377,6 @@ describe("usual foods", () => {
               rawUnitText: "g",
               unitKind: "metric",
               confidence: 0.95,
-              marketProduct: false,
             },
           ],
         }),

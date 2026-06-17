@@ -99,7 +99,6 @@ export function buildTestApp(options?: {
                 rawUnitText: "grams",
                 unitKind: "metric",
                 confidence: 0.95,
-                marketProduct: false,
               },
             ],
           }),

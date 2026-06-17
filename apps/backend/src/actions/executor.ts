@@ -964,7 +964,6 @@ export class ActionExecutor {
               unitKind: operation.unit === "g" ? "metric" : "unknown",
               language: current.language,
               confidence: current.confidence ?? 0.8,
-              marketProduct: false,
             },
             context.locale,
           );

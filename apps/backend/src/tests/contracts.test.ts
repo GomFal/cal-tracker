@@ -72,7 +72,6 @@ describe("contracts", () => {
               quantity: 100,
               unit: "g",
               confidence: 0.95,
-              marketProduct: false,
             },
             candidates: [item],
           },
@@ -85,7 +84,6 @@ describe("contracts", () => {
               quantity: 100,
               unit: "g",
               confidence: 0.95,
-              marketProduct: false,
             },
             candidates: [item],
           },
@@ -103,7 +101,6 @@ describe("contracts", () => {
         quantity: 100,
         unit: "g",
         confidence: 0.95,
-        marketProduct: false,
       }).canonicalName,
     ).toBe("pan");
 
@@ -114,9 +111,35 @@ describe("contracts", () => {
         quantity: 100,
         unit: "g",
         confidence: 0.95,
-        marketProduct: false,
       }).canonicalEnglishName,
     ).toBe("bread");
+  });
+
+  it("strips legacy marketProduct mention fields", () => {
+    const parsed = foodMentionSchema.parse({
+      originalText: "bread",
+      canonicalEnglishName: "bread",
+      quantity: 100,
+      unit: "g",
+      confidence: 0.95,
+      marketProduct: false,
+    });
+
+    expect(parsed).not.toHaveProperty("marketProduct");
+  });
+
+  it("strips legacy brand mention fields", () => {
+    const parsed = foodMentionSchema.parse({
+      originalText: "Hacendado arroz bomba",
+      canonicalName: "Hacendado arroz bomba",
+      quantity: 100,
+      unit: "g",
+      confidence: 0.95,
+      brand: "Hacendado",
+    });
+
+    expect(parsed).not.toHaveProperty("brand");
+    expect(parsed.canonicalName).toBe("Hacendado arroz bomba");
   });
 
   it("normalizes offset occurredAt values for meal proposals", () => {

@@ -40,7 +40,6 @@ function mention(
     rawUnitText,
     unitKind: overrides.unitKind ?? (unit === "g" ? "metric" : "unknown"),
     confidence: overrides.confidence ?? 0.95,
-    marketProduct: overrides.marketProduct ?? false,
     ...overrides,
   };
 }

@@ -37,7 +37,6 @@ function mention(
     rawUnitText: "g",
     unitKind: "metric",
     confidence: 0.95,
-    marketProduct: false,
     ...overrides,
   };
 }
@@ -448,7 +447,6 @@ describe("FoodResolver", () => {
           quantity: 100,
           unit: "g",
           confidence: 0.95,
-          marketProduct: false,
         },
       ],
       "en-US",
@@ -456,6 +454,134 @@ describe("FoodResolver", () => {
 
     expect(result.candidateGroups[0]?.candidates[0]?.name).toBe("Oat Drink - Sample Brand");
     expect(result.candidateGroups[0]?.candidates[0]?.matchReason).toBe("normalized_search");
+  });
+
+  it.each([
+    {
+      query: "Hacendado arroz bomba",
+      expected: "Arroz Bomba - Hacendado",
+      baseName: "Arroz Bomba",
+      brand: "Hacendado",
+      barcode: "8580000001082",
+      calories: 356,
+    },
+    {
+      query: "Heineken 0.0 beer",
+      expected: "0.0 Beer - Heineken",
+      baseName: "0.0 Beer",
+      brand: "Heineken",
+      barcode: "8712000056544",
+      calories: 21,
+    },
+    {
+      query: "Aldi rolled oats",
+      expected: "Rolled Oats - Aldi",
+      baseName: "Rolled Oats",
+      brand: "Aldi",
+      barcode: "4099100078398",
+      calories: 379,
+    },
+    {
+      query: "Iga chicken broth",
+      expected: "Chicken Broth - Iga",
+      baseName: "Chicken Broth",
+      brand: "Iga",
+      barcode: "041270895163",
+      calories: 7,
+    },
+    {
+      query: "Best Foods mayonnaise dressing with olive oil",
+      expected: "Mayonnaise Dressing With Olive Oil - Best Foods",
+      baseName: "Mayonnaise Dressing With Olive Oil",
+      brand: "Best Foods",
+      barcode: "048001427839",
+      calories: 333,
+    },
+    {
+      query: "Burger King iced coffee mocha medium",
+      expected: "Iced Coffee Mocha Medium - Burger King",
+      baseName: "Iced Coffee Mocha Medium",
+      brand: "Burger King",
+      barcode: "573957406464508226008",
+      calories: 90,
+    },
+    {
+      query: "Lipton ice tea manga zero açúcar",
+      expected: "Ice Tea Manga Zero Açúcar - Lipton",
+      baseName: "Ice Tea Manga Zero Açúcar",
+      brand: "Lipton",
+      barcode: "8711327587632",
+      calories: 1,
+    },
+  ])(
+    "resolves marketed product when canonicalName includes brand tokens: $query",
+    async ({ query, expected, baseName, brand, barcode, calories }) => {
+      const resolver = resolverWithNormalizedCandidates([
+        normalizedCandidate({
+          name: expected,
+          normalizedBaseName: baseName,
+          normalizedBrandDisplay: brand,
+          normalizedResultType: "product",
+          source: "openfoodfacts",
+          externalSource: "openfoodfacts",
+          dataType: "Open Food Facts",
+          brand,
+          barcode,
+          finalScore: 0.96,
+          calories,
+        }),
+      ]);
+
+      const result = await resolver.resolveMealMentions("user-1", [
+        mention(query, `100 grams ${query}`),
+      ]);
+
+      expect(result.clarificationRequired).toBe(false);
+      expect(result.items[0]).toEqual(
+        expect.objectContaining({
+          name: expected,
+          matchReason: "normalized_search",
+        }),
+      );
+    },
+  );
+
+  it("does not resolve a brand-only normalized product query to an arbitrary product", async () => {
+    const resolver = resolverWithNormalizedCandidates([
+      normalizedCandidate({
+        name: "Arroz Bomba - Hacendado",
+        normalizedBaseName: "Arroz Bomba",
+        normalizedBrandDisplay: "Hacendado",
+        normalizedResultType: "product",
+        source: "openfoodfacts",
+        externalSource: "openfoodfacts",
+        dataType: "Open Food Facts",
+        brand: "Hacendado",
+        barcode: "8580000001082",
+        finalScore: 0.96,
+        calories: 356,
+      }),
+      normalizedCandidate({
+        name: "Nachos - Hacendado",
+        normalizedBaseName: "Nachos",
+        normalizedBrandDisplay: "Hacendado",
+        normalizedResultType: "product",
+        source: "openfoodfacts",
+        externalSource: "openfoodfacts",
+        dataType: "Open Food Facts",
+        brand: "Hacendado",
+        barcode: "0040660336408",
+        finalScore: 0.94,
+        calories: 489,
+      }),
+    ]);
+
+    const result = await resolver.resolveMealMentions("user-1", [
+      mention("Hacendado", "100 grams Hacendado"),
+    ]);
+
+    expect(result.clarificationRequired).toBe(true);
+    expect(result.items).toEqual([]);
   });
 
   it("allows longer normalized candidates when the query includes their extra tokens", async () => {
@@ -483,7 +609,7 @@ describe("FoodResolver", () => {
     expect(result.items[0]?.displayDetails).toEqual(["Dry"]);
   });
 
-  it("keeps Open Food Facts products out of generic search and available in market search", async () => {
+  it("searches the full food corpus while preferring generic matches for broad food queries", async () => {
     const repository = InMemoryRepository.seeded();
     await repository.upsertFoodItem({
       name: "Arroz",
@@ -538,26 +664,63 @@ describe("FoodResolver", () => {
       repository.searchFoodsHybrid("user-1", {
         query: "arroz",
         locale: "es-ES",
-        scope: "generic",
-      }),
-    ).resolves.toEqual([]);
-    await expect(
-      repository.searchFoodsHybrid("user-1", {
-        query: "arroz",
-        locale: "es-ES",
-        scope: "market",
       }),
     ).resolves.toEqual([
       expect.objectContaining({ externalId: "es-arroz", foodKey: "es" }),
     ]);
-    await expect(
-      repository.searchFoodsHybrid("user-1", {
-        query: "rice",
-        locale: "en-US",
-        scope: "generic",
-      }),
-    ).resolves.toEqual([
+    const allRice = await repository.searchFoodsHybrid("user-1", {
+      query: "rice",
+      locale: "en-US",
+    });
+    expect(allRice[0]).toEqual(
       expect.objectContaining({ externalId: "usda-rice" }),
+    );
+    expect(allRice).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ externalId: "en-rice-product" }),
+      ]),
+    );
+  });
+
+  it("resolves brand-token canonical names to matching products without a brand or scope flag", async () => {
+    const resolver = resolverWithNormalizedCandidates([
+      normalizedCandidate({
+        name: "Arroz",
+        normalizedBaseName: "Arroz",
+        finalScore: 0.98,
+        calories: 130,
+      }),
+      normalizedCandidate({
+        name: "Arroz - Hacendado",
+        normalizedBaseName: "Arroz",
+        normalizedBrandDisplay: "Hacendado",
+        normalizedResultType: "product",
+        source: "openfoodfacts",
+        externalSource: "openfoodfacts",
+        dataType: "Open Food Facts",
+        brand: "Hacendado",
+        barcode: "8480000000017",
+        finalScore: 0.89,
+        calories: 131,
+      }),
+    ]);
+
+    const result = await resolver.resolveMealMentions("user-1", [
+      mention("Arroz Hacendado", "100 gramos de arroz de marca Hacendado", {
+        canonicalEnglishName: undefined,
+        language: "es",
+      }),
+    ]);
+
+    expect(result.clarificationRequired).toBe(false);
+    expect(result.items[0]).toEqual(
+      expect.objectContaining({
+        name: "Arroz - Hacendado",
+        externalSource: "openfoodfacts",
+      }),
+    );
+    expect(result.candidateGroups[0]?.candidates.map((candidate) => candidate.name)).toEqual([
+      "Arroz - Hacendado",
     ]);
   });
 
@@ -609,7 +772,6 @@ describe("FoodResolver", () => {
     const riceResults = await repository.searchFoodsHybrid("user-1", {
       query: "rice",
       locale: "en-US",
-      scope: "generic",
     });
     expect(riceResults.map((food) => food.externalId)).toEqual([
       "usda-rice-grain",
@@ -620,7 +782,6 @@ describe("FoodResolver", () => {
     const noodleResults = await repository.searchFoodsHybrid("user-1", {
       query: "rice noodles",
       locale: "en-US",
-      scope: "generic",
     });
     expect(noodleResults[0]).toEqual(
       expect.objectContaining({ externalId: "usda-rice-noodles" }),
@@ -664,7 +825,6 @@ describe("FoodResolver", () => {
       repository.searchFoodsHybrid("user-1", {
         query: "pechga pollo",
         locale: "es-ES",
-        scope: "generic",
       }),
     ).resolves.toEqual([
       expect.objectContaining({ externalId: "es-pechuga-pollo" }),
@@ -673,7 +833,6 @@ describe("FoodResolver", () => {
       repository.searchFoodsHybrid("user-1", {
         query: "iogur",
         locale: "es-ES",
-        scope: "generic",
       }),
     ).resolves.toEqual([
       expect.objectContaining({ externalId: "es-yogur-natural" }),
@@ -682,7 +841,6 @@ describe("FoodResolver", () => {
       repository.searchFoodsHybrid("user-1", {
         query: "yog",
         locale: "es-ES",
-        scope: "generic",
       }),
     ).resolves.toEqual([
       expect.objectContaining({ externalId: "es-yogur-natural" }),
@@ -1016,8 +1174,22 @@ describe("FoodResolver", () => {
     );
   });
 
-  it("does not use branded USDA rows for generic searches but allows barcode intent", async () => {
+  it("includes branded rows in broad searches while preferring generic matches", async () => {
     const repository = InMemoryRepository.seeded();
+    await repository.upsertFoodItem({
+      name: "Cheese",
+      normalizedName: "cheese",
+      canonicalName: "cheese",
+      source: "usda_fdc",
+      externalSource: "usda_fdc",
+      externalId: "generic-cheese",
+      dataType: "SR Legacy",
+      servingGrams: 100,
+      calories: 402,
+      proteinGrams: 25,
+      carbsGrams: 1.3,
+      fatGrams: 33,
+    });
     await repository.upsertFoodItem({
       name: "Cheese Crackers",
       normalizedName: "cheese",
@@ -1042,8 +1214,15 @@ describe("FoodResolver", () => {
     const generic = await resolver.resolveMealMentions("user-1", [
       mention("cheese", "100 grams cheese"),
     ]);
-    expect(generic.clarificationRequired).toBe(true);
-    expect(generic.items).toHaveLength(0);
+    expect(generic.clarificationRequired).toBe(false);
+    expect(generic.items[0]).toEqual(
+      expect.objectContaining({ externalId: "generic-cheese" }),
+    );
+    expect(generic.candidateGroups[0]?.candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ externalId: "4001" }),
+      ]),
+    );
 
     const barcode = await resolver.search("user-1", "cheese", "000111222333");
     expect(barcode.items[0]).toEqual(

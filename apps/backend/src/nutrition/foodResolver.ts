@@ -173,7 +173,7 @@ export class FoodResolver {
             originalText: mention.originalText,
             canonicalName: canonicalNameForMention(mention),
             unitKind: mention.unitKind,
-            marketProduct: Boolean(mention.marketProduct || mention.brand || mention.barcode),
+            productIdentity: hasProductIdentity(mention),
           },
           () => this.resolveMention(userId, mention),
         ),
@@ -240,7 +240,6 @@ export class FoodResolver {
       language: languageFromLocale(locale),
       barcode,
       confidence: 0.95,
-      marketProduct: true,
     };
     const { candidates, reason, portionOptions } = await this.resolveMention(
       userId,
@@ -362,7 +361,7 @@ export class LocalFoodDataProvider implements FoodDataProvider {
       "LocalFoodDataProvider.resolve",
       {
         canonicalName: canonicalNameForMention(mention),
-        marketProduct: hasMarketProductIntent(mention),
+        productIdentity: hasProductIdentity(mention),
       },
       () => this.resolveInternal(userId, mention),
     );
@@ -488,10 +487,7 @@ export class LocalFoodDataProvider implements FoodDataProvider {
   ): Promise<Array<FoodItemRecord & Partial<FoodSearchCandidate>>> {
     return withSpan(
       "LocalFoodDataProvider.searchFoods",
-      {
-        query,
-        excludeBranded: !hasMarketProductIntent(mention),
-      },
+      { query },
       () => this.searchFoodsInternal(userId, mention, query),
     );
   }
@@ -502,21 +498,18 @@ export class LocalFoodDataProvider implements FoodDataProvider {
     query: string,
   ): Promise<Array<FoodItemRecord & Partial<FoodSearchCandidate>>> {
     const locale = mention.language;
-    const marketIntent = hasMarketProductIntent(mention);
-    const cacheKey = JSON.stringify({ userId, query, barcode: mention.barcode, locale, marketIntent });
+    const cacheKey = JSON.stringify({ userId, query, barcode: mention.barcode, locale });
     const cached = this.searchCache.get(cacheKey);
     if (cached) return cached.map(cloneLocalFoodCandidate);
 
     const lexical = await withSpan(
       "Repository.searchFoodsHybrid",
-      { query, mode: "lexical", locale, marketIntent },
+      { query, mode: "lexical", locale },
       () => this.repository.searchFoodsHybrid(userId, {
         query,
         barcode: mention.barcode,
-        excludeBranded: !marketIntent,
         limit: 50,
         locale,
-        scope: marketIntent ? "market" : "generic",
       }),
     );
     if (lexical.length > 0 || mention.barcode) {
@@ -546,7 +539,6 @@ function cachedFoodIsCompatible(
 ): boolean {
   if (isNormalizedSearchFood(food))
     return normalizedFoodFit(food, mention).compatible;
-  if (isBrandedFood(food) && !hasMarketProductIntent(mention)) return false;
   if (food.externalSource !== "usda_fdc") return true;
   return Boolean(scoreUsdaCandidate(usdaFoodFromRecord(food), mention));
 }
@@ -558,8 +550,8 @@ function cloneLocalFoodCandidate<T extends FoodItemRecord & Partial<FoodSearchCa
   };
 }
 
-function hasMarketProductIntent(mention: FoodMention): boolean {
-  return Boolean(mention.barcode || mention.brand || mention.marketProduct);
+function hasProductIdentity(mention: FoodMention): boolean {
+  return Boolean(mention.barcode);
 }
 
 function isBrandedFood(food: FoodItemRecord): boolean {
@@ -568,7 +560,7 @@ function isBrandedFood(food: FoodItemRecord): boolean {
 
 function localFoodPriority(food: FoodItemRecord, mention: FoodMention): number {
   if (food.userId) return 0;
-  if (hasMarketProductIntent(mention) && isBrandedFood(food)) return 1;
+  if (hasProductIdentity(mention) && isBrandedFood(food)) return 1;
   if (food.dataType === "SR Legacy") return 2;
   if (food.dataType === "Foundation") return 3;
   if (isBrandedFood(food)) return 6;
@@ -705,6 +697,17 @@ function normalizedFoodFit(food: FoodItemRecord, mention: FoodMention): Normaliz
   ].filter((value): value is string => Boolean(value)).join(" "));
   const candidateTokens = uniqueTokens(meaningfulFoodTokens(candidateText));
   if (candidateTokens.length === 0) return { compatible: false, confidence: 0.1 };
+
+  const productTokens = uniqueTokens(meaningfulFoodTokens(normalizeText([
+    food.normalizedBaseName,
+    food.normalizedVariantName,
+  ].filter((value): value is string => Boolean(value)).join(" "))));
+  if (
+    productTokens.length > 0 &&
+    !queryTokens.some((token) => productTokens.includes(token))
+  ) {
+    return { compatible: false, confidence: 0.2 };
+  }
 
   const candidateTokenSet = new Set(candidateTokens);
   const missingTokens = queryTokens.filter((token) => !candidateTokenSet.has(token));

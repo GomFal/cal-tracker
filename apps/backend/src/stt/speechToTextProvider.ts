@@ -12,8 +12,6 @@ export type SpeechToTextInput = {
   mimeType: string;
   userId: string;
   traceId: string;
-  language?: string;
-  prompt?: string;
 };
 
 export interface SpeechToTextProvider {
@@ -39,8 +37,6 @@ export class RemoteSpeechToTextProvider implements SpeechToTextProvider {
     form.append("model", this.model);
     form.append("response_format", "json");
     form.append("temperature", "0");
-    if (input.language) form.append("language", input.language);
-    if (input.prompt) form.append("prompt", input.prompt);
 
     const res = await fetch(`${this.baseUrl}/audio/transcriptions`, {
       method: "POST",
@@ -68,7 +64,6 @@ export class RemoteSpeechToTextProvider implements SpeechToTextProvider {
       traceId: input.traceId,
       provider: "groq",
       model: this.model,
-      language: input.language,
       durationMs: Date.now() - startedAt,
       transcriptLength: json.text.length,
     });

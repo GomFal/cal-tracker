@@ -183,7 +183,7 @@ describe("STT endpoint", () => {
     );
   });
 
-  it("biases correction transcriptions with the active proposal language", async () => {
+  it("transcribes active proposal corrections without language hints", async () => {
     const sttProvider = new FakeSpeechToTextProvider(
       "cambia el pan a 50 gramos",
     );
@@ -244,12 +244,8 @@ describe("STT endpoint", () => {
     });
 
     expect(res.status).toBe(200);
-    expect(sttProvider.inputs[0]).toEqual(
-      expect.objectContaining({
-        language: "es",
-        prompt: expect.stringContaining("Comando de correccion"),
-      }),
-    );
+    expect(sttProvider.inputs[0]).not.toHaveProperty("language");
+    expect(sttProvider.inputs[0]).not.toHaveProperty("prompt");
   });
 
   it("returns clarification for empty transcripts without calling the agent", async () => {

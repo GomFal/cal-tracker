@@ -574,16 +574,12 @@ export function createApp(input: {
             upload.activeProposalId,
           )
         : undefined;
-      const speechHint = upload.activeProposalId
-        ? speechHintForProposal(activeProposal)
-        : {};
       transcription = await sttProvider.transcribe({
         audio: upload.buffer,
         filename: upload.filename,
         mimeType: upload.mimeType,
         userId: user.id,
         traceId,
-        ...speechHint,
       });
       sttMs = Date.now() - sttStarted;
     } catch (error) {
@@ -1016,110 +1012,6 @@ function isReviewedUsualWriteAction(actionId: string): boolean {
     actionId === "create_meal_template" ||
     actionId === "update_meal_template" ||
     actionId === "delete_meal_template";
-}
-
-function speechHintForProposal(proposal?: MealProposal): {
-  language?: string;
-  prompt?: string;
-} {
-  const language = speechLanguageFromProposal(proposal);
-  return {
-    ...(language ? { language } : {}),
-    ...(language ? { prompt: speechCorrectionPrompt(language) } : {}),
-  };
-}
-
-function speechLanguageFromProposal(
-  proposal?: MealProposal,
-): "es" | "en" | undefined {
-  if (!proposal) return undefined;
-  return inferSpeechLanguage(
-    [
-      proposal.phrase,
-      proposal.title,
-      ...proposal.items.flatMap((item) => [
-        item.originalText,
-        item.canonicalName,
-        item.name,
-      ]),
-    ]
-      .filter((value): value is string => Boolean(value))
-      .join(" "),
-  );
-}
-
-function inferSpeechLanguage(text: string): "es" | "en" | undefined {
-  const normalized = text
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  const spanishScore = scoreLanguageTerms(normalized, [
-    "anade",
-    "agrega",
-    "apunta",
-    "registra",
-    "cambia",
-    "corrige",
-    "gramo",
-    "gramos",
-    "kilo",
-    "kilos",
-    "taza",
-    "tazas",
-    "cucharada",
-    "cucharadas",
-    "desayuno",
-    "almuerzo",
-    "comida",
-    "cena",
-    "merienda",
-    "de",
-    "con",
-    "sin",
-  ]);
-  const englishScore = scoreLanguageTerms(normalized, [
-    "add",
-    "log",
-    "record",
-    "change",
-    "correct",
-    "gram",
-    "grams",
-    "kilogram",
-    "kilograms",
-    "cup",
-    "cups",
-    "tablespoon",
-    "tablespoons",
-    "breakfast",
-    "lunch",
-    "dinner",
-    "snack",
-    "of",
-    "with",
-    "without",
-  ]);
-  if (spanishScore > englishScore) return "es";
-  if (englishScore > spanishScore) return "en";
-  return undefined;
-}
-
-function scoreLanguageTerms(text: string, terms: string[]): number {
-  return terms.reduce(
-    (score, term) =>
-      score + (new RegExp(`\\b${term}\\b`, "g").exec(text) ? 1 : 0),
-    0,
-  );
-}
-
-function speechCorrectionPrompt(language: "es" | "en"): string {
-  if (language === "es") {
-    return "Comando de correccion de comida. Transcribe exactamente lo que se dice; no traduzcas. Conserva alimentos, unidades y numeros.";
-  }
-  return "Meal correction command. Transcribe exactly what is spoken; do not translate. Preserve foods, units, and numbers.";
 }
 
 function publicUser(user: StoredUser) {

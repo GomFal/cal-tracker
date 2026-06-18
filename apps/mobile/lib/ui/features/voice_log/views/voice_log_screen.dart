@@ -35,8 +35,8 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
       if (!mounted || _initialItemsRequested) return;
       _initialItemsRequested = true;
       context.read<VoiceLogViewModel>().createProposalFromManualItems(
-            widget.initialItems,
-          );
+        widget.initialItems,
+      );
     });
   }
 
@@ -120,7 +120,8 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
                 FreshStatusBanner(
                   icon: Icons.help_outline_rounded,
                   title: 'Needs a little more detail',
-                  message: viewModel.message ??
+                  message:
+                      viewModel.message ??
                       'I am not sure what you would like to do. Could you rephrase?',
                   color: palette.orange,
                 ),
@@ -219,7 +220,8 @@ const _candidateDisplayLimit = 10;
 const _foodSearchResultLimit = 10;
 
 bool _shouldShowManualFoodSearch(VoiceLogViewModel viewModel) {
-  final hasPrimaryResult = viewModel.proposal != null ||
+  final hasPrimaryResult =
+      viewModel.proposal != null ||
       viewModel.autoCommittedMeal != null ||
       viewModel.summary != null ||
       viewModel.remaining != null ||
@@ -236,7 +238,8 @@ bool _shouldShowManualFoodSearch(VoiceLogViewModel viewModel) {
 }
 
 bool _canStartOver(VoiceLogViewModel viewModel) {
-  final hasResettableResult = viewModel.transcript.isNotEmpty ||
+  final hasResettableResult =
+      viewModel.transcript.isNotEmpty ||
       viewModel.proposal != null ||
       viewModel.autoCommittedMeal != null;
   if (!hasResettableResult) return false;
@@ -245,8 +248,7 @@ bool _canStartOver(VoiceLogViewModel viewModel) {
     VoiceLogState.recording ||
     VoiceLogState.stopping ||
     VoiceLogState.transcribing ||
-    VoiceLogState.agentRunning =>
-      false,
+    VoiceLogState.agentRunning => false,
     _ => true,
   };
 }
@@ -261,18 +263,17 @@ class _VoiceTranscriptCard extends StatelessWidget {
     final palette = context.freshPalette;
     final textTheme = Theme.of(context).textTheme;
 
-    return FreshCard(
+    return Padding(
       key: const ValueKey('voice_transcript_card'),
       padding: const EdgeInsets.symmetric(
-        horizontal: FreshSpacing.md,
-        vertical: FreshSpacing.sm,
+        horizontal: FreshSpacing.xs,
+        vertical: FreshSpacing.xs,
       ),
-      radius: FreshRadii.md,
-      color: palette.limeWash,
-      shadow: false,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Icon(Icons.graphic_eq_rounded, color: palette.limeDeep, size: 18),
+          const SizedBox(width: FreshSpacing.sm),
           Text(
             context.l10n.voiceTranscriptHeardLabel,
             style: textTheme.labelLarge?.copyWith(
@@ -323,8 +324,9 @@ class _ManualFoodSearchPanelState extends State<_ManualFoodSearchPanel> {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final palette = context.freshPalette;
-    return FreshCard(
+    return Padding(
       key: const ValueKey('manual_food_search_panel'),
+      padding: const EdgeInsets.symmetric(horizontal: FreshSpacing.xs),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -334,24 +336,19 @@ class _ManualFoodSearchPanelState extends State<_ManualFoodSearchPanel> {
                 context.push('/agent');
               } catch (_) {}
             },
-            borderRadius: BorderRadius.circular(FreshRadii.md),
             child: Padding(
-              padding: const EdgeInsets.all(FreshSpacing.md),
+              padding: const EdgeInsets.symmetric(vertical: FreshSpacing.sm),
               child: Row(
                 children: [
-                  FreshIconChip(
-                    icon: Icons.support_agent_rounded,
-                    color: palette.lime,
-                    backgroundColor: palette.surfaceSoft,
-                  ),
-                  const SizedBox(width: FreshSpacing.md),
+                  Icon(Icons.support_agent_rounded, color: palette.limeDeep),
+                  const SizedBox(width: FreshSpacing.sm),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           'Faster with the agent',
-                          style: textTheme.bodyLarge?.copyWith(
+                          style: textTheme.bodyMedium?.copyWith(
                             color: palette.ink,
                             fontWeight: FontWeight.w600,
                           ),
@@ -369,22 +366,17 @@ class _ManualFoodSearchPanelState extends State<_ManualFoodSearchPanel> {
                   Icon(
                     Icons.arrow_forward_ios_rounded,
                     color: palette.inkMuted,
-                    size: 16,
+                    size: 14,
                   ),
                 ],
               ),
             ),
           ),
-          Divider(color: palette.rule, height: 1),
-          const SizedBox(height: FreshSpacing.md),
+          Divider(color: palette.ruleSoft, height: FreshSpacing.lg),
           Row(
             children: [
-              FreshIconChip(
-                icon: Icons.search_rounded,
-                color: palette.limeDeep,
-                backgroundColor: palette.limeWash,
-              ),
-              const SizedBox(width: FreshSpacing.md),
+              Icon(Icons.search_rounded, color: palette.inkMuted, size: 20),
+              const SizedBox(width: FreshSpacing.sm),
               Expanded(
                 child: Text(
                   context.l10n.foodSearchTitle,
@@ -525,13 +517,10 @@ class _ManualDraftIngredientRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = context.freshPalette;
     final nutrition = item.currentNutrition();
     final hasWarning = nutrition.hasCalorieMismatch;
-    return FreshCard(
-      padding: const EdgeInsets.all(16),
-      shadow: true,
-      color: palette.surface,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: FreshSpacing.sm),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -624,9 +613,9 @@ class _ManualDraftIngredientRow extends StatelessWidget {
           NutritionMacroSummaryText(
             nutrition: nutrition,
             baseStyle: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: context.freshPalette.inkMuted,
-                  letterSpacing: 0,
-                ),
+              color: context.freshPalette.inkMuted,
+              letterSpacing: 0,
+            ),
             overflow: TextOverflow.ellipsis,
             macroColors: {
               NutritionMacroKind.protein: context.freshPalette.coral,
@@ -695,36 +684,34 @@ class _ProposalChangeSuccessToast extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final palette = context.freshPalette;
-    return FreshCard(
+    return DecoratedBox(
       key: const ValueKey('proposal_change_success_toast'),
-      color: palette.limeWash,
-      radius: FreshRadii.lg,
-      padding: const EdgeInsets.symmetric(
-        horizontal: FreshSpacing.lg,
-        vertical: FreshSpacing.md,
+      decoration: BoxDecoration(
+        border: Border(left: BorderSide(color: palette.limeDeep, width: 3)),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.check_rounded,
-            color: palette.limeDeep,
-            size: 20,
-          ),
-          const SizedBox(width: FreshSpacing.sm),
-          Flexible(
-            child: Text(
-              context.l10n.voiceChangesApplied,
-              style: textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: palette.ink,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: FreshSpacing.md,
+          vertical: FreshSpacing.sm,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.check_rounded, color: palette.limeDeep, size: 20),
+            const SizedBox(width: FreshSpacing.sm),
+            Flexible(
+              child: Text(
+                context.l10n.voiceChangesApplied,
+                style: textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: palette.ink,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -740,9 +727,9 @@ class _ResolverClarificationCard extends StatefulWidget {
 
   final List<FoodCandidateGroup> groups;
   final bool Function(FoodCandidateGroup group, MealItem candidate)
-      isCandidateSelected;
+  isCandidateSelected;
   final Future<void> Function(FoodCandidateGroup group, MealItem candidate)
-      onCandidateSelected;
+  onCandidateSelected;
   final ValueChanged<FoodPortionChoice> onPortionSelected;
 
   @override
@@ -759,8 +746,9 @@ class _ResolverClarificationCardState
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final palette = context.freshPalette;
-    return FreshCard(
+    return Padding(
       key: const ValueKey('resolver_clarification_card'),
+      padding: const EdgeInsets.symmetric(horizontal: FreshSpacing.xs),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -779,9 +767,11 @@ class _ResolverClarificationCardState
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  for (var index = 0;
-                      index < group.portionOptions!.length;
-                      index++)
+                  for (
+                    var index = 0;
+                    index < group.portionOptions!.length;
+                    index++
+                  )
                     _PortionChoiceChip(
                       key: ValueKey(
                         'portion_option_${group.mention.canonicalName}_$index',
@@ -796,9 +786,7 @@ class _ResolverClarificationCardState
             if (group.candidates.isEmpty)
               Text(
                 context.l10n.voiceNoDatabaseMatch,
-                style: textTheme.bodyMedium?.copyWith(
-                  color: palette.inkMuted,
-                ),
+                style: textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
               )
             else
               _CandidateList(
@@ -811,7 +799,8 @@ class _ResolverClarificationCardState
             const SizedBox(height: FreshSpacing.sm),
             _ClarificationFoodSearch(
               group: group,
-              expanded: group.candidates.isEmpty ||
+              expanded:
+                  group.candidates.isEmpty ||
                   _searchExpandedGroups.contains(_groupKey(group)),
               onToggleExpanded: () => _toggleSearchExpanded(group),
               onSelected: (candidate) async {
@@ -821,7 +810,10 @@ class _ResolverClarificationCardState
                 );
               },
             ),
-            const SizedBox(height: FreshSpacing.md),
+            if (group != widget.groups.last)
+              Divider(color: palette.ruleSoft, height: FreshSpacing.lg)
+            else
+              const SizedBox(height: FreshSpacing.md),
           ],
         ],
       ),
@@ -1118,9 +1110,9 @@ class _FoodSearchBoxState extends State<_FoodSearchBox> {
     });
     try {
       final result = await context.read<VoiceLogViewModel>().searchFoods(
-            query,
-            limit: _foodSearchResultLimit,
-          );
+        query,
+        limit: _foodSearchResultLimit,
+      );
       if (!mounted || serial != _requestSerial) return;
       setState(() {
         _results = result.items.take(_foodSearchResultLimit).toList();
@@ -1213,9 +1205,9 @@ class _CandidateList extends StatelessWidget {
   final FoodCandidateGroup group;
   final bool expanded;
   final bool Function(FoodCandidateGroup group, MealItem candidate)
-      isCandidateSelected;
+  isCandidateSelected;
   final Future<void> Function(FoodCandidateGroup group, MealItem candidate)
-      onCandidateSelected;
+  onCandidateSelected;
   final VoidCallback onToggleExpanded;
 
   @override
@@ -1311,9 +1303,11 @@ class _FoodCandidateStrip extends StatelessWidget {
     }
 
     final indexes = <int>{};
-    for (var index = 0;
-        index < visibleCandidates.length && index < _candidatePreviewCount;
-        index++) {
+    for (
+      var index = 0;
+      index < visibleCandidates.length && index < _candidatePreviewCount;
+      index++
+    ) {
       indexes.add(index);
     }
 
@@ -1345,31 +1339,27 @@ class _CandidateMealLine extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final palette = context.freshPalette;
     final metadata = _candidateMetadata(candidate);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: palette.ruleSoft)),
+      ),
       child: Material(
-        color: selected
-            ? palette.lime.withValues(alpha: 0.16)
-            : palette.surfaceSoft,
-        borderRadius: BorderRadius.circular(FreshRadii.md),
+        color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(FreshRadii.md),
           onTap: onSelected,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            padding: const EdgeInsets.symmetric(vertical: FreshSpacing.sm),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                FreshIconChip(
-                  icon: selected
+                Icon(
+                  selected
                       ? Icons.check_circle_rounded
                       : Icons.radio_button_unchecked_rounded,
                   color: selected ? palette.limeDeep : palette.inkMuted,
-                  backgroundColor:
-                      selected ? palette.limeSoft : palette.surface,
-                  size: 36,
+                  size: 22,
                 ),
-                const SizedBox(width: FreshSpacing.md),
+                const SizedBox(width: FreshSpacing.sm),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1553,6 +1543,31 @@ class _LoggedMealBanner extends StatelessWidget {
   }
 }
 
+class _OpenSection extends StatelessWidget {
+  const _OpenSection({required this.title, required this.child});
+
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.freshPalette;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: FreshSpacing.xs),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          FreshSectionTitle(title: title),
+          const SizedBox(height: FreshSpacing.sm),
+          Divider(color: palette.ruleSoft, height: 1),
+          const SizedBox(height: FreshSpacing.sm),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
 class _SummaryCard extends StatelessWidget {
   const _SummaryCard({required this.summary});
 
@@ -1562,12 +1577,11 @@ class _SummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
     final l10n = context.l10n;
-    return FreshCard(
+    return _OpenSection(
+      title: l10n.commonToday,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          FreshSectionTitle(title: l10n.commonToday),
-          const SizedBox(height: FreshSpacing.md),
           Row(
             children: [
               Expanded(
@@ -1602,12 +1616,11 @@ class _MealsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FreshCard(
+    return _OpenSection(
+      title: 'Meals',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const FreshSectionTitle(title: 'Meals'),
-          const SizedBox(height: FreshSpacing.sm),
           if (meals.isEmpty)
             const FreshEmptyState(
               icon: Icons.restaurant_rounded,
@@ -1634,12 +1647,11 @@ class _NutritionItemsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FreshCard(
+    return _OpenSection(
+      title: 'Nutrition matches',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const FreshSectionTitle(title: 'Nutrition matches'),
-          const SizedBox(height: FreshSpacing.sm),
           for (final item in items)
             _MealLine(
               title: item.name,
@@ -1659,12 +1671,11 @@ class _TemplatesCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FreshCard(
+    return _OpenSection(
+      title: 'Usual meals',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const FreshSectionTitle(title: 'Usual meals'),
-          const SizedBox(height: FreshSpacing.sm),
           for (final template in templates)
             _MealLine(
               title: template.title,
@@ -1686,12 +1697,11 @@ class _RemainingCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
     final l10n = context.l10n;
-    return FreshCard(
+    return _OpenSection(
+      title: l10n.commonRemaining,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          FreshSectionTitle(title: l10n.commonRemaining),
-          const SizedBox(height: FreshSpacing.md),
           Row(
             children: [
               Expanded(
@@ -1869,34 +1879,16 @@ class _ProposalCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final palette = context.freshPalette;
-    return FreshCard(
-      radius: FreshRadii.xl,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: FreshSpacing.xs),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              FreshIconChip(
-                icon: Icons.local_fire_department_rounded,
-                color: palette.orange,
-                backgroundColor: palette.yellow,
-              ),
-              const SizedBox(width: FreshSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(proposal.title, style: textTheme.titleLarge),
-                    Text(
-                      context.l10n.mealProposalReadyToLog,
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: palette.inkMuted,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          Text(proposal.title, style: textTheme.titleLarge),
+          const SizedBox(height: FreshSpacing.xs),
+          Text(
+            context.l10n.mealProposalReadyToLog,
+            style: textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
           ),
           const SizedBox(height: FreshSpacing.lg),
           _MetricBlock(
@@ -1906,14 +1898,33 @@ class _ProposalCard extends StatelessWidget {
             color: palette.lime,
           ),
           const SizedBox(height: FreshSpacing.md),
-          for (final item in proposal.items)
+          Divider(color: palette.ruleSoft, height: 1),
+          for (final item in proposal.items) ...[
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Text(
-                '${_mealItemDisplayName(item)} ${formatQuantity(item.quantity)} ${item.unit}',
-                style: textTheme.bodyMedium,
+              padding: const EdgeInsets.symmetric(vertical: FreshSpacing.sm),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _mealItemDisplayName(item),
+                      style: textTheme.bodyMedium,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: FreshSpacing.sm),
+                  Text(
+                    '${formatQuantity(item.quantity)} ${item.unit}',
+                    style: textTheme.labelMedium?.copyWith(
+                      color: palette.inkMuted,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ],
               ),
             ),
+            Divider(color: palette.ruleSoft, height: 1),
+          ],
           const SizedBox(height: FreshSpacing.lg),
           Row(
             children: [
@@ -2149,13 +2160,10 @@ class _EditableIngredientRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = context.freshPalette;
     final nutrition = item.currentNutrition();
     final hasWarning = nutrition.hasCalorieMismatch;
-    return FreshCard(
-      padding: const EdgeInsets.all(16),
-      shadow: true,
-      color: palette.surface,
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: FreshSpacing.sm),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -2259,9 +2267,9 @@ class _EditableIngredientRow extends StatelessWidget {
           NutritionMacroSummaryText(
             nutrition: nutrition,
             baseStyle: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: context.freshPalette.inkMuted,
-                  letterSpacing: 0,
-                ),
+              color: context.freshPalette.inkMuted,
+              letterSpacing: 0,
+            ),
             overflow: TextOverflow.ellipsis,
             macroColors: {
               NutritionMacroKind.protein: context.freshPalette.coral,
@@ -2460,35 +2468,28 @@ class _MetricBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(FreshRadii.md),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: textTheme.labelMedium),
-          const SizedBox(height: FreshSpacing.sm),
-          Wrap(
-            crossAxisAlignment: WrapCrossAlignment.end,
-            spacing: 4,
-            children: [
-              Text(
-                value,
-                style: textTheme.headlineMedium?.copyWith(
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: textTheme.labelMedium?.copyWith(color: color)),
+        const SizedBox(height: FreshSpacing.xs),
+        Wrap(
+          crossAxisAlignment: WrapCrossAlignment.end,
+          spacing: 4,
+          children: [
+            Text(
+              value,
+              style: textTheme.headlineMedium?.copyWith(
+                fontFeatures: const [FontFeature.tabularFigures()],
               ),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 5),
-                child: Text(unit, style: textTheme.bodyMedium),
-              ),
-            ],
-          ),
-        ],
-      ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 5),
+              child: Text(unit, style: textTheme.bodyMedium),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -2508,40 +2509,40 @@ class _MealLine extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final palette = context.freshPalette;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          FreshIconChip(
-            icon: Icons.local_fire_department_rounded,
-            color: palette.orange,
-            backgroundColor: palette.yellow,
-            size: 36,
-          ),
-          const SizedBox(width: FreshSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: textTheme.bodyLarge),
-                if (subtitle.isNotEmpty)
-                  Text(
-                    subtitle,
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: palette.inkMuted,
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: palette.ruleSoft)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: textTheme.bodyLarge),
+                  if (subtitle.isNotEmpty)
+                    Text(
+                      subtitle,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: palette.inkMuted,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-              ],
+                ],
+              ),
             ),
-          ),
-          Text(
-            '$calories Kcal',
-            style: textTheme.labelLarge?.copyWith(
-              fontFeatures: const [FontFeature.tabularFigures()],
+            const SizedBox(width: FreshSpacing.sm),
+            Text(
+              '$calories Kcal',
+              style: textTheme.labelLarge?.copyWith(
+                color: palette.orange,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

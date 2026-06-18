@@ -155,10 +155,11 @@ class CalTrackerApiClient {
   Future<Map<String, Object?>> runAgent(
     String text, {
     String? activeProposalId,
+    String source = 'flutter',
   }) {
     return _post('/v1/agent/runs', {
       'text': text,
-      'source': 'flutter',
+      'source': source,
       if (activeProposalId != null) 'activeProposalId': activeProposalId,
     });
   }
@@ -296,11 +297,12 @@ class CalTrackerApiClient {
 
   Future<Map<String, Object?>> executeAction(
     String actionId,
-    Map<String, Object?> input,
-  ) {
+    Map<String, Object?> input, {
+    String source = 'flutter',
+  }) {
     return _post('/v1/actions/$actionId/execute', {
       'input': input,
-      'source': 'flutter',
+      'source': source,
     });
   }
 

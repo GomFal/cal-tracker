@@ -1,8 +1,10 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.util.Properties
 
 plugins {
     id("com.android.application")
     id("kotlin-android")
+    id("com.google.devtools.ksp")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
@@ -20,8 +22,12 @@ fun signingProperty(name: String): String =
 
 android {
     namespace = "com.example.cal_tracker_mobile"
-    compileSdk = 36
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
+
+    buildFeatures {
+        resValues = true
+    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -36,8 +42,8 @@ android {
         applicationId = "app.bettercalories"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = 29
-        targetSdk = 36
+        minSdk = 36
+        targetSdk = 37
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         testInstrumentationRunner = "pl.leancode.patrol.PatrolJUnitRunner"
@@ -92,6 +98,12 @@ android {
     }
 }
 
+kotlin {
+    compilerOptions {
+        jvmTarget = JvmTarget.JVM_17
+    }
+}
+
 androidComponents {
     beforeVariants(selector().withBuildType("release").withFlavor("env" to "local")) { variant ->
         variant.enable = false
@@ -102,7 +114,14 @@ flutter {
     source = "../.."
 }
 
+ksp {
+    arg("appfunctions:aggregateAppFunctions", "true")
+}
+
 dependencies {
+    implementation("androidx.appfunctions:appfunctions:1.0.0-alpha09")
+    implementation("androidx.appfunctions:appfunctions-service:1.0.0-alpha09")
+    ksp("androidx.appfunctions:appfunctions-compiler:1.0.0-alpha09")
     androidTestUtil("androidx.test:orchestrator:1.5.1")
     androidTestUtil("androidx.test.services:test-services:1.5.0")
 }

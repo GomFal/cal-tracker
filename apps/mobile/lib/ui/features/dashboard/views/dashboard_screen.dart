@@ -559,8 +559,8 @@ class _MacroProgressRow extends StatelessWidget {
           SvgPicture.asset(
             assetPath,
             key: iconKey,
-            width: 18,
-            height: 18,
+            width: 24,
+            height: 24,
             colorFilter: ColorFilter.mode(palette.lime, BlendMode.srcIn),
           ),
           const SizedBox(height: FreshSpacing.sm),

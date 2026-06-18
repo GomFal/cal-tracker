@@ -50,9 +50,18 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
 
-    expect(find.byKey(LocalToolkitOverlay.floatingButtonKey), findsOneWidget);
+    final toolkitButton = find.byKey(LocalToolkitOverlay.floatingButtonKey);
+    expect(toolkitButton, findsOneWidget);
 
-    await tester.tap(find.byKey(LocalToolkitOverlay.floatingButtonKey));
+    final initialButtonCenter = tester.getCenter(toolkitButton);
+    await tester.drag(toolkitButton, const Offset(-120, -180));
+    await tester.pumpAndSettle();
+
+    final draggedButtonCenter = tester.getCenter(toolkitButton);
+    expect(draggedButtonCenter.dx, lessThan(initialButtonCenter.dx));
+    expect(draggedButtonCenter.dy, lessThan(initialButtonCenter.dy));
+
+    await tester.tap(toolkitButton);
     await tester.pumpAndSettle();
 
     expect(find.byKey(LocalToolkitOverlay.panelKey), findsOneWidget);

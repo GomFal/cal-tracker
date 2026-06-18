@@ -505,7 +505,7 @@ class _MacroSection extends StatelessWidget {
                 label: l10n.commonFat,
                 consumedGrams: consumed.fatGrams,
                 targetGrams: target.fatGrams,
-                iconSize: 36,
+                iconSize: 40,
               ),
             ),
           ],

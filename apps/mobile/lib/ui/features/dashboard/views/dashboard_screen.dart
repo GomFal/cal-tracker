@@ -559,8 +559,8 @@ class _MacroProgressRow extends StatelessWidget {
           SvgPicture.asset(
             assetPath,
             key: iconKey,
-            width: 24,
-            height: 24,
+            width: 30,
+            height: 30,
             colorFilter: ColorFilter.mode(palette.lime, BlendMode.srcIn),
           ),
           const SizedBox(height: FreshSpacing.sm),
@@ -873,25 +873,25 @@ class _DashboardEmptyMealsCard extends StatelessWidget {
               color: palette.inkMuted,
             ),
           ),
-        const SizedBox(height: FreshSpacing.md),
-        TextButton.icon(
-          onPressed: () {
-            try {
-              context.push('/meal/create');
-            } catch (_) {}
-          },
-          icon: Icon(Icons.add_rounded, size: 18, color: palette.lime),
-          label: Text('${l10n.foodSearchAddAction} ${l10n.commonMeal}'),
-          style: TextButton.styleFrom(
-            foregroundColor: palette.lime,
-            textStyle: textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
+          const SizedBox(height: FreshSpacing.md),
+          TextButton.icon(
+            onPressed: () {
+              try {
+                context.push('/meal/create');
+              } catch (_) {}
+            },
+            icon: Icon(Icons.add_rounded, size: 18, color: palette.lime),
+            label: Text('${l10n.foodSearchAddAction} ${l10n.commonMeal}'),
+            style: TextButton.styleFrom(
+              foregroundColor: palette.lime,
+              textStyle: textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
-        ),
-          ],
-        ),
-      );
+        ],
+      ),
+    );
   }
 }
 

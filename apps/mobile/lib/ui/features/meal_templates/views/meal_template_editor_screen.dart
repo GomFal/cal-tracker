@@ -238,8 +238,9 @@ class _MealTemplateEditorScreenState extends State<MealTemplateEditorScreen> {
     setState(() => _validationError = null);
     final title = _titleController.text.trim();
     if (title.isEmpty) {
-      setState(() =>
-          _validationError = context.l10n.mealTemplateEditorTitleRequired);
+      setState(
+        () => _validationError = context.l10n.mealTemplateEditorTitleRequired,
+      );
       return;
     }
     final items = _validItems();
@@ -338,43 +339,31 @@ class _MealTemplateBasicsSection extends StatelessWidget {
         Text(
           l10n.mealTemplateEditorDetailsSection,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: palette.ink,
-                fontWeight: FontWeight.w700,
-              ),
+            color: palette.ink,
+            fontWeight: FontWeight.w700,
+          ),
         ),
         const SizedBox(height: FreshSpacing.md),
-        Container(
-          decoration: BoxDecoration(
-            color: palette.surface,
-            borderRadius: BorderRadius.circular(FreshRadii.md),
+        TextField(
+          key: const ValueKey('meal_template_title_field'),
+          controller: titleController,
+          textInputAction: TextInputAction.next,
+          decoration: InputDecoration(
+            labelText: l10n.mealTemplateEditorTitleLabel,
+            hintText: l10n.mealTemplateEditorTitleHint,
+            filled: true,
+            fillColor: palette.surfaceSoft,
           ),
-          padding: const EdgeInsets.all(FreshSpacing.lg),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextField(
-                key: const ValueKey('meal_template_title_field'),
-                controller: titleController,
-                textInputAction: TextInputAction.next,
-                decoration: InputDecoration(
-                  labelText: l10n.mealTemplateEditorTitleLabel,
-                  hintText: l10n.mealTemplateEditorTitleHint,
-                  filled: true,
-                  fillColor: palette.surfaceSoft,
-                ),
-              ),
-              const SizedBox(height: FreshSpacing.md),
-              TextField(
-                key: const ValueKey('meal_template_aliases_field'),
-                controller: aliasesController,
-                decoration: InputDecoration(
-                  labelText: l10n.mealTemplateEditorAliasesLabel,
-                  hintText: l10n.mealTemplateEditorAliasesHint,
-                  filled: true,
-                  fillColor: palette.surfaceSoft,
-                ),
-              ),
-            ],
+        ),
+        const SizedBox(height: FreshSpacing.md),
+        TextField(
+          key: const ValueKey('meal_template_aliases_field'),
+          controller: aliasesController,
+          decoration: InputDecoration(
+            labelText: l10n.mealTemplateEditorAliasesLabel,
+            hintText: l10n.mealTemplateEditorAliasesHint,
+            filled: true,
+            fillColor: palette.surfaceSoft,
           ),
         ),
         Divider(height: 24, color: palette.rule),
@@ -384,8 +373,10 @@ class _MealTemplateBasicsSection extends StatelessWidget {
 }
 
 class _CandidateGroupsSection extends StatelessWidget {
-  const _CandidateGroupsSection(
-      {required this.groups, required this.onSelected});
+  const _CandidateGroupsSection({
+    required this.groups,
+    required this.onSelected,
+  });
 
   final List<FoodCandidateGroup> groups;
   final void Function(FoodCandidateGroup group, MealItem candidate) onSelected;
@@ -401,9 +392,9 @@ class _CandidateGroupsSection extends StatelessWidget {
         Text(
           l10n.mealTemplateEditorCandidatesSection,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: palette.ink,
-                fontWeight: FontWeight.w700,
-              ),
+            color: palette.ink,
+            fontWeight: FontWeight.w700,
+          ),
         ),
         const SizedBox(height: FreshSpacing.xs),
         Text(
@@ -483,8 +474,9 @@ class _TemplateItemsSectionState extends State<_TemplateItemsSection> {
               ? FoodSearchPanel(
                   key: const ValueKey('meal_template_food_search_panel'),
                   keyPrefix: 'meal_template_food_search',
-                  searchFoods:
-                      context.read<MealTemplatesViewModel>().searchFoods,
+                  searchFoods: context
+                      .read<MealTemplatesViewModel>()
+                      .searchFoods,
                   onSelected: (item) {
                     widget.onAddFood(item);
                     setState(() => _searchExpanded = false);
@@ -548,12 +540,8 @@ class _TemplateItemCardState extends State<_TemplateItemCard> {
     final l10n = context.l10n;
     final palette = context.freshPalette;
     final nutrition = widget.item.previewNutrition;
-    return Container(
-      decoration: BoxDecoration(
-        color: palette.surface,
-        borderRadius: BorderRadius.circular(FreshRadii.md),
-      ),
-      padding: const EdgeInsets.all(16),
+    return Padding(
+      padding: const EdgeInsets.only(top: FreshSpacing.sm),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -561,11 +549,11 @@ class _TemplateItemCardState extends State<_TemplateItemCard> {
             children: [
               Expanded(
                 child: Text(
-                  l10n.commonIngredient,
+                  '${l10n.commonIngredient} ${widget.index + 1}',
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: palette.inkMuted,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    color: palette.ink,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
               IconButton(
@@ -573,6 +561,7 @@ class _TemplateItemCardState extends State<_TemplateItemCard> {
                 onPressed: widget.onDelete,
                 tooltip: l10n.commonDeleteIngredient,
                 icon: const Icon(Icons.delete_outline_rounded),
+                color: palette.inkMuted,
               ),
             ],
           ),
@@ -690,6 +679,8 @@ class _TemplateItemCardState extends State<_TemplateItemCard> {
               ),
             ),
           ],
+          const SizedBox(height: FreshSpacing.md),
+          Divider(height: 1, color: palette.rule),
         ],
       ),
     );
@@ -737,12 +728,11 @@ class _SaveBar extends StatelessWidget {
     return DecoratedBox(
       key: const ValueKey('meal_template_save_bar'),
       decoration: BoxDecoration(
-        color: palette.surface,
-        borderRadius: BorderRadius.circular(FreshRadii.md),
-        border: Border.all(color: palette.rule),
+        color: palette.screen,
+        border: Border(top: BorderSide(color: palette.rule)),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(FreshSpacing.lg),
+        padding: const EdgeInsets.fromLTRB(0, FreshSpacing.lg, 0, 0),
         child: LayoutBuilder(
           builder: (context, constraints) {
             final compact = constraints.maxWidth < 420;
@@ -840,13 +830,13 @@ class _TemplateMealItemController {
     this.needsReview,
     this.resolvedGrams,
     this.portionDescription,
-  })  : nameController = TextEditingController(text: name),
-        quantityController = TextEditingController(text: quantity),
-        unitController = TextEditingController(text: unit),
-        caloriesController = TextEditingController(text: calories),
-        proteinController = TextEditingController(text: protein),
-        carbsController = TextEditingController(text: carbs),
-        fatController = TextEditingController(text: fat);
+  }) : nameController = TextEditingController(text: name),
+       quantityController = TextEditingController(text: quantity),
+       unitController = TextEditingController(text: unit),
+       caloriesController = TextEditingController(text: calories),
+       proteinController = TextEditingController(text: protein),
+       carbsController = TextEditingController(text: carbs),
+       fatController = TextEditingController(text: fat);
 
   factory _TemplateMealItemController.empty() {
     return _TemplateMealItemController(

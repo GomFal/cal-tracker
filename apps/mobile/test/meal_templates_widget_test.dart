@@ -16,8 +16,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 void main() {
-  testWidgets('renders meals and ingredients tabs with empty ingredient state',
-      (
+  testWidgets('renders meals and ingredients tabs with empty ingredient state', (
     tester,
   ) async {
     await _pumpScreen(tester, _FakeNutritionRepository());
@@ -52,7 +51,9 @@ void main() {
     expect(find.text('No saved meals yet'), findsOneWidget);
     expect(find.text('Saved meals will appear here.'), findsOneWidget);
     expect(
-        find.byKey(const ValueKey('usuals_section_explanation')), findsNothing);
+      find.byKey(const ValueKey('usuals_section_explanation')),
+      findsNothing,
+    );
     expect(find.byKey(const ValueKey('usuals_explainer_card')), findsNothing);
     expect(addButton.backgroundColor, FreshPalette.dark.lime);
 
@@ -119,8 +120,11 @@ void main() {
 
     expect(find.text('New saved ingredient'), findsOneWidget);
     expect(find.byType(AlertDialog), findsNothing);
+    expect(find.byType(Card), findsNothing);
     expect(
-        find.byKey(const ValueKey('usual_food_canonical_field')), findsNothing);
+      find.byKey(const ValueKey('usual_food_canonical_field')),
+      findsNothing,
+    );
   });
 
   testWidgets('tapping a usual meal opens create meal with template items', (
@@ -259,8 +263,10 @@ void main() {
 }
 
 Future<void> _pumpScreen(
-    WidgetTester tester, _FakeNutritionRepository repository,
-    {ThemeMode themeMode = ThemeMode.light}) async {
+  WidgetTester tester,
+  _FakeNutritionRepository repository, {
+  ThemeMode themeMode = ThemeMode.light,
+}) async {
   await tester.pumpWidget(
     ChangeNotifierProvider(
       create: (_) => MealTemplatesViewModel(nutritionRepository: repository),
@@ -381,9 +387,9 @@ class _FakeNutritionRepository extends NutritionRepository {
   _FakeNutritionRepository({
     List<MealTemplate> templates = const [],
     List<UsualFood> usualFoods = const [],
-  })  : templates = List.of(templates),
-        usualFoods = List.of(usualFoods),
-        super(apiClient: _unusedApiClient());
+  }) : templates = List.of(templates),
+       usualFoods = List.of(usualFoods),
+       super(apiClient: _unusedApiClient());
 
   List<MealTemplate> templates;
   List<UsualFood> usualFoods;
@@ -418,8 +424,9 @@ class _FakeNutritionRepository extends NutritionRepository {
   @override
   Future<bool> deleteUsualFood(String foodId) async {
     deletedIds.add(foodId);
-    usualFoods =
-        usualFoods.where((item) => item.id != foodId).toList(growable: false);
+    usualFoods = usualFoods
+        .where((item) => item.id != foodId)
+        .toList(growable: false);
     return true;
   }
 

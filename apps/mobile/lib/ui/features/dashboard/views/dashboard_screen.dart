@@ -612,8 +612,8 @@ class _MacroSummaryPill extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              width: 30,
-              height: 30,
+              width: 34,
+              height: 34,
               decoration: BoxDecoration(
                 color: color.withValues(alpha: 0.2),
                 shape: BoxShape.circle,
@@ -621,8 +621,8 @@ class _MacroSummaryPill extends StatelessWidget {
               child: SvgPicture.asset(
                 assetPath,
                 key: iconKey,
-                width: 22,
-                height: 22,
+                width: 28,
+                height: 28,
                 fit: BoxFit.contain,
                 excludeFromSemantics: true,
               ),

@@ -222,9 +222,14 @@ class _CaloriesChartCard extends StatelessWidget {
     final bars = _weeklyBars(summaries, selectedDate, l10n);
     final textTheme = Theme.of(context).textTheme;
     final palette = context.freshPalette;
-    return FreshCard(
-      radius: FreshRadii.xl,
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
       padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isDark ? palette.surfaceSoft : palette.surface,
+        borderRadius: BorderRadius.circular(FreshRadii.xl),
+        border: Border.all(color: palette.rule),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -375,37 +380,52 @@ class _HistoryMealCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final palette = context.freshPalette;
-    return FreshCard(
-      onTap: onTap,
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          FreshIconChip(
-            icon: Icons.local_fire_department_rounded,
-            color: palette.orange,
-            backgroundColor: palette.yellow,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(FreshRadii.lg),
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: FreshSpacing.md,
+            vertical: FreshSpacing.md,
           ),
-          const SizedBox(width: FreshSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(meal.title, style: textTheme.titleMedium),
-                Text(
-                  _formatDate(meal.occurredAt),
-                  style:
-                      textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: palette.rule, width: 1),
+            ),
+          ),
+          child: Row(
+            children: [
+              FreshIconChip(
+                icon: Icons.local_fire_department_rounded,
+                color: palette.orange,
+                backgroundColor: palette.yellow,
+              ),
+              const SizedBox(width: FreshSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(meal.title, style: textTheme.titleMedium),
+                    Text(
+                      _formatDate(meal.occurredAt),
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: palette.inkMuted,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              Text(
+                context.l10n.caloriesValue(meal.nutrition.calories),
+                style: textTheme.titleMedium?.copyWith(
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ],
           ),
-          Text(
-            context.l10n.caloriesValue(meal.nutrition.calories),
-            style: textTheme.titleMedium?.copyWith(
-              fontFeatures: const [FontFeature.tabularFigures()],
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

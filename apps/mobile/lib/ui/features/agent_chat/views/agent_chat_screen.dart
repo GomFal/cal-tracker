@@ -49,78 +49,83 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
     _scheduleScrollToBottom(viewModel);
     return Scaffold(
       backgroundColor: palette.screen,
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 760),
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
-                  child: FreshHeader(
-                    title: context.l10n.agentChatTitle,
-                    subtitle: context.l10n.agentChatSubtitle,
-                    leading: FreshIconButton(
-                      icon: Icons.arrow_back_rounded,
-                      tooltip: context.l10n.commonBack,
-                      onPressed: () => context.canPop()
-                          ? context.pop()
-                          : context.go('/dashboard'),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: ListView(
-                    key: const ValueKey('agent_chat_timeline'),
-                    controller: _scrollController,
-                    padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
-                    children: [
-                      if (viewModel.errorMessage != null) ...[
-                        _FadeIn(
-                          child: FreshStatusBanner(
-                            icon: Icons.error_outline_rounded,
-                            title: context.l10n.agentChatErrorTitle,
-                            message: viewModel.errorMessage,
-                            color: palette.coral,
-                          ),
+      body: Stack(
+        children: [
+          const Positioned.fill(child: FreshScreenBackdrop()),
+          SafeArea(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 760),
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+                      child: FreshHeader(
+                        title: context.l10n.agentChatTitle,
+                        subtitle: context.l10n.agentChatSubtitle,
+                        leading: FreshIconButton(
+                          icon: Icons.arrow_back_rounded,
+                          tooltip: context.l10n.commonBack,
+                          onPressed: () => context.canPop()
+                              ? context.pop()
+                              : context.go('/dashboard'),
                         ),
-                        const SizedBox(height: FreshSpacing.md),
-                      ],
-                      if (viewModel.entries.isEmpty) ...[
-                        _FadeIn(
-                          child:
-                              _AgentWelcomeCard(onPromptSelected: _sendPrompt),
-                        ),
-                      ] else ...[
-                        for (final entry in viewModel.entries) ...[
-                          _FadeIn(
-                            key: ValueKey('agent_timeline_${entry.id}'),
-                            child: _AgentTimelineEntry(entry: entry),
-                          ),
-                          const SizedBox(height: FreshSpacing.md),
-                        ],
-                      ],
-                      if (viewModel.statusMessage != null &&
-                          viewModel.isBusy) ...[
-                        _FadeIn(
-                          key: ValueKey(
-                              'agent_status_${viewModel.statusMessage}'),
-                          child: _AgentStatusCard(
-                              message: viewModel.statusMessage!),
-                        ),
-                        const SizedBox(height: FreshSpacing.md),
-                      ],
-                      const SizedBox(
-                        key: ValueKey('agent_chat_bottom_breathing_room'),
-                        height: 72,
                       ),
-                    ],
-                  ),
+                    ),
+                    Expanded(
+                      child: ListView(
+                        key: const ValueKey('agent_chat_timeline'),
+                        controller: _scrollController,
+                        padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+                        children: [
+                          if (viewModel.errorMessage != null) ...[
+                            _FadeIn(
+                              child: FreshStatusBanner(
+                                icon: Icons.error_outline_rounded,
+                                title: context.l10n.agentChatErrorTitle,
+                                message: viewModel.errorMessage,
+                                color: palette.coral,
+                              ),
+                            ),
+                            const SizedBox(height: FreshSpacing.md),
+                          ],
+                          if (viewModel.entries.isEmpty) ...[
+                            _FadeIn(
+                              child: _AgentWelcomeCard(
+                                  onPromptSelected: _sendPrompt),
+                            ),
+                          ] else ...[
+                            for (final entry in viewModel.entries) ...[
+                              _FadeIn(
+                                key: ValueKey('agent_timeline_${entry.id}'),
+                                child: _AgentTimelineEntry(entry: entry),
+                              ),
+                              const SizedBox(height: FreshSpacing.md),
+                            ],
+                          ],
+                          if (viewModel.statusMessage != null &&
+                              viewModel.isBusy) ...[
+                            _FadeIn(
+                              key: ValueKey(
+                                  'agent_status_${viewModel.statusMessage}'),
+                              child: _AgentStatusCard(
+                                  message: viewModel.statusMessage!),
+                            ),
+                            const SizedBox(height: FreshSpacing.md),
+                          ],
+                          const SizedBox(
+                            key: ValueKey('agent_chat_bottom_breathing_room'),
+                            height: 72,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
-        ),
+        ],
       ),
       bottomNavigationBar: _AgentInputBar(
         controller: _messageController,
@@ -236,8 +241,15 @@ class _AgentWelcomeCard extends StatelessWidget {
       context.l10n.agentChatPromptRemaining,
       context.l10n.agentChatPromptUsual,
     ];
-    return FreshCard(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
       key: const ValueKey('agent_chat_welcome_card'),
+      padding: const EdgeInsets.all(FreshSpacing.xl),
+      decoration: BoxDecoration(
+        color: isDark ? palette.surfaceSoft : palette.surface,
+        borderRadius: BorderRadius.circular(FreshRadii.xl),
+        border: Border.all(color: palette.rule),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -301,15 +313,23 @@ class _UserBubble extends StatelessWidget {
       alignment: Alignment.centerRight,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 320),
-        child: FreshCard(
+        child: Container(
           key: const ValueKey('agent_user_message'),
-          color: palette.lime,
-          shadow: false,
           padding: const EdgeInsets.symmetric(
             horizontal: FreshSpacing.lg,
             vertical: FreshSpacing.md,
           ),
-          child: Text(text, style: Theme.of(context).textTheme.bodyMedium),
+          decoration: BoxDecoration(
+            color: palette.lime,
+            borderRadius: BorderRadius.circular(FreshRadii.lg),
+          ),
+          child: Text(
+            text,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onPrimary,
+                  fontWeight: FontWeight.w600,
+                ),
+          ),
         ),
       ),
     );
@@ -328,13 +348,16 @@ class _AssistantBubble extends StatelessWidget {
       alignment: Alignment.centerLeft,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 360),
-        child: FreshCard(
+        child: Container(
           key: const ValueKey('agent_assistant_message'),
-          color: palette.surface,
-          shadow: false,
           padding: const EdgeInsets.symmetric(
             horizontal: FreshSpacing.lg,
             vertical: FreshSpacing.md,
+          ),
+          decoration: BoxDecoration(
+            color: palette.surfaceSoft,
+            borderRadius: BorderRadius.circular(FreshRadii.lg),
+            border: Border.all(color: palette.rule),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -477,10 +500,14 @@ class _ToolCallCard extends StatelessWidget {
       AgentChatToolStatus.completed => palette.limeDeep,
       AgentChatToolStatus.failed => palette.coral,
     };
-    return FreshCard(
+    return Container(
       key: ValueKey('agent_tool_${toolCall?.id ?? entry.id}'),
-      shadow: false,
-      color: palette.surfaceSoft,
+      padding: const EdgeInsets.all(FreshSpacing.lg),
+      decoration: BoxDecoration(
+        color: palette.surfaceSoft,
+        borderRadius: BorderRadius.circular(FreshRadii.lg),
+        border: Border.all(color: palette.rule),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

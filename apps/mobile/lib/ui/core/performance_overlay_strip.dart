@@ -43,10 +43,10 @@ class _PerformanceOverlayStrip extends StatelessWidget {
             width: double.infinity,
             child: DecoratedBox(
               decoration: BoxDecoration(
-                color: palette.ink.withValues(alpha: 0.76),
+                color: palette.surfaceSoft.withValues(alpha: 0.92),
                 border: Border(
                   bottom: BorderSide(
-                    color: palette.surface.withValues(alpha: 0.22),
+                    color: palette.rule,
                   ),
                 ),
               ),

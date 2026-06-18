@@ -234,10 +234,15 @@ class _FreshBottomNav extends StatelessWidget {
     return SafeArea(
       top: false,
       child: Container(
-        color: palette.screen,
-        padding: const EdgeInsets.fromLTRB(18, 8, 18, 8),
+        decoration: BoxDecoration(
+          color: palette.screen,
+          border: Border(
+            top: BorderSide(color: palette.rule, width: 1),
+          ),
+        ),
+        padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             _NavButton(
               key: _navButtonKey(items, 0),
@@ -286,25 +291,22 @@ class _FreshSideNav extends StatelessWidget {
         width: 112,
         padding: const EdgeInsets.all(16),
         color: palette.screen,
-        child: FreshCard(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Column(
-            children: [
-              const _BrandMark(compact: true),
-              const SizedBox(height: FreshSpacing.xl),
-              for (var index = 0; index < items.length; index++)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: _NavButton(
-                    key: _navButtonKey(items, index),
-                    item: items[index],
-                    selected: selectedIndex == index,
-                    vertical: true,
-                    onTap: () => onSelected(index),
-                  ),
+        child: Column(
+          children: [
+            const _BrandMark(compact: true),
+            const SizedBox(height: FreshSpacing.xl),
+            for (var index = 0; index < items.length; index++)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: _NavButton(
+                  key: _navButtonKey(items, index),
+                  item: items[index],
+                  selected: selectedIndex == index,
+                  vertical: true,
+                  onTap: () => onSelected(index),
                 ),
-            ],
-          ),
+              ),
+          ],
         ),
       ),
     );
@@ -328,29 +330,21 @@ class _NavButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
-    final labelStyle = Theme.of(context).textTheme.labelMedium?.copyWith(
-          color: selected ? palette.ink : palette.inkSoft,
-          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+    final labelStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: selected ? palette.lime : palette.inkMuted,
+          fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
         );
-    final icon = Container(
-      width: 38,
-      height: 38,
-      decoration: BoxDecoration(
-        color: selected ? palette.limeWash : Colors.transparent,
-        shape: BoxShape.circle,
-      ),
-      child: Icon(
-        item.icon,
-        color: selected ? palette.limeDeep : palette.ink,
-        size: 22,
-      ),
+    final icon = Icon(
+      item.icon,
+      color: selected ? palette.lime : palette.inkMuted,
+      size: vertical ? 26 : 24,
     );
     return InkWell(
       borderRadius: BorderRadius.circular(FreshRadii.lg),
       onTap: onTap,
       child: SizedBox(
-        width: vertical ? 78 : 56,
-        height: vertical ? 64 : 58,
+        width: vertical ? 78 : 64,
+        height: vertical ? 64 : 56,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -510,12 +504,11 @@ class _CenterVoiceButtonState extends State<_CenterVoiceButton> {
   @override
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
-    final colorScheme = Theme.of(context).colorScheme;
     final viewModel = context.watch<AgentChatViewModel>();
     final isRecording = viewModel.isRecording;
     final tooltip = context.l10n.agentChatOpenAction;
 
-    final micButton = Semantics(
+    final addButton = Semantics(
       key: const ValueKey('bottom_voice_action_button'),
       button: true,
       label: tooltip,
@@ -536,43 +529,72 @@ class _CenterVoiceButtonState extends State<_CenterVoiceButton> {
             context,
             openChat: false,
           ),
-          child: VoiceActionButtonChrome(
-            dimension: 62,
-            backgroundColor: isRecording ? palette.coral : palette.lime,
-            isRecording: isRecording,
-            isProcessing: viewModel.isBusy && !isRecording,
-            child: Icon(
-              isRecording ? Icons.stop_rounded : Icons.support_agent_rounded,
-              color: isRecording ? colorScheme.onError : colorScheme.onPrimary,
-              size: 28,
+          child: Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: Colors.transparent,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: isRecording ? palette.coral : palette.lime,
+                width: 1.5,
+              ),
+            ),
+            child: Center(
+              child: Icon(
+                isRecording ? Icons.stop_rounded : Icons.add_rounded,
+                color: isRecording ? palette.coral : palette.lime,
+                size: 28,
+              ),
             ),
           ),
         ),
       ),
     );
 
-    if (!_showBubble) return micButton;
+    final agentButton = _showBubble
+        ? SizedBox(
+            width: 48,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                addButton,
+                Positioned(
+                  bottom: 56,
+                  left: 0,
+                  right: 0,
+                  child: OverflowBox(
+                    fit: OverflowBoxFit.deferToChild,
+                    maxWidth: 300,
+                    maxHeight: 120,
+                    alignment: Alignment.topCenter,
+                    child: _BubbleTip(
+                      message: context.l10n.bottomMicFillEditorHint,
+                      onDismiss: _dismissBubble,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )
+        : addButton;
+
+    final labelStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: palette.inkMuted,
+          fontWeight: FontWeight.w500,
+        );
 
     return SizedBox(
-      width: 62,
-      child: Stack(
-        clipBehavior: Clip.none,
+      width: 64,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          micButton,
-          Positioned(
-            bottom: 68,
-            left: 0,
-            right: 0,
-            child: OverflowBox(
-              fit: OverflowBoxFit.deferToChild,
-              maxWidth: 300,
-              maxHeight: 120,
-              alignment: Alignment.topCenter,
-              child: _BubbleTip(
-                message: context.l10n.bottomMicFillEditorHint,
-                onDismiss: _dismissBubble,
-              ),
-            ),
+          agentButton,
+          const SizedBox(height: 4),
+          Text(
+            context.l10n.navAgent,
+            style: labelStyle,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -669,13 +691,17 @@ class _BrandMark extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
     return Container(
-      width: compact ? 46 : 52,
-      height: compact ? 46 : 52,
+      width: compact ? 40 : 48,
+      height: compact ? 40 : 48,
       decoration: BoxDecoration(
-        color: palette.limeWash,
+        color: palette.surfaceSoft,
         shape: BoxShape.circle,
       ),
-      child: Icon(Icons.local_fire_department, color: palette.limeDeep),
+      child: Icon(
+        Icons.local_fire_department,
+        color: palette.lime,
+        size: compact ? 22 : 26,
+      ),
     );
   }
 }

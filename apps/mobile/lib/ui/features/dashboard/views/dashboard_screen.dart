@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../domain/models/macro_distribution.dart';
 import '../../../../domain/models/nutrition_models.dart';
 import '../../../../l10n/app_localizations_context.dart';
+import '../../../../l10n/generated/app_localizations.dart';
 import '../../../../l10n/meal_label_localizations.dart';
 import '../../../core/content_frame.dart';
 import '../../../core/design_system.dart';
@@ -46,7 +48,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
         : l10n.fallbackUserName;
     return ContentFrame(
       title: displayName,
+      subtitle: l10n.dashboardGreeting,
       leading: const _Avatar(),
+      actions: [
+        _DashboardDatePill(
+          label: dashboardDayMonthLabel(DateTime.now(), l10n),
+        ),
+      ],
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -68,14 +76,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             const SizedBox(height: FreshSpacing.md),
           ],
-          _DailyProgressCard(
+          _HeroCalorieSection(
             summary: summary,
             onSetup: () => _showCalorieTargetSheet(context, viewModel),
           ),
-          const SizedBox(height: FreshSpacing.md),
-          _MacroSummaryRow(summary: summary),
-          const SizedBox(height: FreshSpacing.md),
-          _WaterIntakeCard(
+          const SizedBox(height: FreshSpacing.lg),
+          _MacroSection(summary: summary),
+          const SizedBox(height: FreshSpacing.lg),
+          _WaterSection(
             summary: summary,
             enabled: !viewModel.isLoading,
             onUpdate: viewModel.updateDailyWater,
@@ -87,6 +95,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             onDeleteMeal: (meal) =>
                 _confirmDeleteMeal(context, viewModel, meal),
           ),
+          const SizedBox(height: FreshSpacing.lg),
         ],
       ),
     );
@@ -225,24 +234,49 @@ class _Avatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
     return Container(
-      width: 54,
-      height: 54,
+      width: 48,
+      height: 48,
       decoration: BoxDecoration(
-        color: palette.limeWash,
+        color: palette.surfaceSoft,
         shape: BoxShape.circle,
-        border: Border.all(color: palette.surface, width: 3),
       ),
       child: Icon(
         Icons.person_rounded,
-        color: palette.limeDeep,
-        size: 28,
+        color: palette.lime,
+        size: 20,
       ),
     );
   }
 }
 
-class _DailyProgressCard extends StatelessWidget {
-  const _DailyProgressCard({required this.summary, required this.onSetup});
+class _DashboardDatePill extends StatelessWidget {
+  const _DashboardDatePill({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.freshPalette;
+    final textTheme = Theme.of(context).textTheme;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.calendar_today_outlined, color: palette.inkMuted, size: 16),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: textTheme.bodyMedium?.copyWith(
+            color: palette.inkSoft,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _HeroCalorieSection extends StatelessWidget {
+  const _HeroCalorieSection({required this.summary, required this.onSetup});
 
   final DailySummary? summary;
   final VoidCallback onSetup;
@@ -256,112 +290,87 @@ class _DailyProgressCard extends StatelessWidget {
     final target = summary?.target.calories ?? 2200;
     final hasConfiguredTarget = summary?.calorieTargetConfigured ?? true;
     if (!hasConfiguredTarget) {
-      return _CalorieSetupProgressCard(onTap: onSetup);
+      return _CalorieSetupHero(onTap: onSetup);
     }
     final remaining = (summary?.remaining.calories ?? target - consumed)
         .clamp(0, target)
         .toInt();
     final progress =
         target <= 0 ? 0.0 : (consumed / target).clamp(0, 1).toDouble();
-    final screenWidth = MediaQuery.sizeOf(context).width;
-    final compact = screenWidth < 380;
-    final ringSize = compact ? 118.0 : 132.0;
-    final cardHeight = compact ? 124.0 : 136.0;
-    return FreshCard(
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       key: const ValueKey('dashboard_progress_card'),
-      color: palette.limeSoft,
-      radius: FreshRadii.xl,
-      padding: EdgeInsets.fromLTRB(
-        compact ? 20 : 24,
-        compact ? 22 : 26,
-        compact ? 18 : 22,
-        compact ? 22 : 26,
-      ),
-      child: SizedBox(
-        height: cardHeight,
-        child: Row(
+      children: [
+        Text(
+          l10n.commonCalories.toUpperCase(),
+          style: textTheme.labelMedium?.copyWith(
+            color: palette.inkMuted,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.4,
+          ),
+        ),
+        const SizedBox(height: FreshSpacing.md),
+        Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Expanded(
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    l10n.dashboardTodayCalories,
-                    key: const ValueKey('dashboard_today_calories_label'),
-                    style: textTheme.titleSmall?.copyWith(
-                      color: palette.inkSoft,
-                      fontSize: compact ? 19 : 21,
-                      fontWeight: FontWeight.w800,
-                      height: 1.1,
+                    '$remaining',
+                    key: const ValueKey('dashboard_remaining_calories'),
+                    style: textTheme.displayLarge?.copyWith(
+                      fontSize: 42,
+                      height: 0.95,
+                      fontWeight: FontWeight.w700,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                      color: palette.lime,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${l10n.commonKcal} ${l10n.dashboardCaloriesLeft}',
+                    style: textTheme.bodyLarge?.copyWith(
+                      color: palette.ink,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                   const SizedBox(height: 8),
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          '$consumed',
-                          key: const ValueKey('dashboard_consumed_calories'),
-                          style: textTheme.displayLarge?.copyWith(
-                            fontSize: compact ? 56 : 64,
-                            height: 0.92,
-                            fontWeight: FontWeight.w800,
-                            fontFeatures: const [FontFeature.tabularFigures()],
-                          ),
-                        ),
-                        const SizedBox(width: 7),
-                        Padding(
-                          padding: EdgeInsets.only(bottom: compact ? 8 : 9),
-                          child: Text(
-                            l10n.commonKcal,
-                            style: textTheme.titleMedium?.copyWith(
-                              color: palette.inkSoft,
-                              fontSize: compact ? 16 : 18,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
+                  Text(
+                    _consumedTargetMeta(l10n, consumed, target),
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: palette.inkMuted,
+                      fontWeight: FontWeight.w400,
+                      fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: FreshSpacing.lg),
+            const SizedBox(width: FreshSpacing.md),
             FreshProgressRing(
               progress: progress,
-              size: ringSize,
-              trackColor: palette.surface,
+              size: 116,
+              strokeWidth: 11.5,
+              trackColor: palette.rule,
+              color: palette.lime,
               center: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      '$remaining',
-                      key: const ValueKey('dashboard_remaining_calories'),
-                      style: textTheme.headlineMedium?.copyWith(
-                        fontSize: compact ? 23 : 27,
-                        height: 1,
-                        fontWeight: FontWeight.w900,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                      ),
+                  Text(
+                    '${(progress * 100).round()}%',
+                    style: textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: palette.ink,
+                      fontFeatures: const [FontFeature.tabularFigures()],
                     ),
                   ),
                   Text(
-                    '${l10n.commonKcal} ${l10n.dashboardCaloriesLeft}',
-                    key: const ValueKey('dashboard_remaining_label'),
-                    textAlign: TextAlign.center,
-                    style: textTheme.labelSmall?.copyWith(
-                      color: palette.inkSoft,
-                      fontSize: compact ? 10 : 11,
-                      fontWeight: FontWeight.w700,
-                      height: 1.1,
+                    l10n.dashboardOfGoal,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: palette.inkMuted,
                     ),
                   ),
                 ],
@@ -369,13 +378,17 @@ class _DailyProgressCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
+      ],
     );
+  }
+
+  String _consumedTargetMeta(AppLocalizations l10n, int consumed, int target) {
+    return '${l10n.commonConsumed} $consumed · ${l10n.settingsCalorieTarget} $target';
   }
 }
 
-class _CalorieSetupProgressCard extends StatelessWidget {
-  const _CalorieSetupProgressCard({required this.onTap});
+class _CalorieSetupHero extends StatelessWidget {
+  const _CalorieSetupHero({required this.onTap});
 
   final VoidCallback onTap;
 
@@ -384,292 +397,227 @@ class _CalorieSetupProgressCard extends StatelessWidget {
     final palette = context.freshPalette;
     final textTheme = Theme.of(context).textTheme;
     final l10n = context.l10n;
-    final screenWidth = MediaQuery.sizeOf(context).width;
-    final cardHeight = (screenWidth * 0.48).clamp(184.0, 206.0);
-    final titleStyle = textTheme.headlineSmall?.copyWith(
-      color: palette.ink,
-      fontSize: screenWidth < 380 ? 31 : 35,
-      height: 1.12,
-      fontWeight: FontWeight.w800,
-      letterSpacing: 0,
-    );
-    return FreshCard(
-      key: const ValueKey('dashboard_progress_card'),
-      onTap: onTap,
-      color: palette.limeSoft,
-      radius: 30,
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
-      child: SizedBox(
-        height: cardHeight,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Positioned(
-              top: 0,
-              left: 0,
-              child: _SetupDatePill(
-                label: dashboardDayMonthLabel(DateTime.now(), l10n),
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(FreshRadii.lg),
+        key: const ValueKey('dashboard_progress_card'),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: FreshSpacing.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                l10n.calorieSetupHeadlinePrefix,
+                style: textTheme.headlineMedium?.copyWith(
+                  color: palette.ink,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-            ),
-            Positioned(
-              top: 78,
-              left: 0,
-              right: 0,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      l10n.calorieSetupHeadlinePrefix,
-                      style: titleStyle,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Text(
-                          l10n.calorieSetupHeadlineMain,
-                          style: titleStyle,
-                        ),
-                        const SizedBox(width: 10),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: palette.limeWash.withValues(
-                              alpha: 0.86,
-                            ),
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                          child: Text(
-                            l10n.calorieSetupHeadlineBadge,
-                            style: titleStyle?.copyWith(
-                              color: palette.leaf,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+              const SizedBox(height: FreshSpacing.xs),
+              Text(
+                l10n.calorieSetupHeadlineMain,
+                style: textTheme.headlineMedium?.copyWith(
+                  color: palette.lime,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: FreshSpacing.sm),
+              Text(
+                l10n.calorieSetupHeadlineBadge,
+                style: textTheme.bodyLarge?.copyWith(
+                  color: palette.inkMuted,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _SetupDatePill extends StatelessWidget {
-  const _SetupDatePill({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.freshPalette;
-    final textTheme = Theme.of(context).textTheme;
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        height: 36,
-        padding: const EdgeInsets.only(left: 0, right: 17),
-        decoration: BoxDecoration(
-          color: palette.surface.withValues(alpha: 0.4),
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: palette.surface,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.bolt_rounded,
-                color: palette.limeDeep,
-                size: 21,
-              ),
-            ),
-            const SizedBox(width: 13),
-            Text(
-              label,
-              style: textTheme.titleMedium?.copyWith(
-                color: palette.ink,
-                fontSize: 17,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MacroSummaryRow extends StatelessWidget {
-  const _MacroSummaryRow({required this.summary});
+class _MacroSection extends StatelessWidget {
+  const _MacroSection({required this.summary});
 
   final DailySummary? summary;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
+    final textTheme = Theme.of(context).textTheme;
     final l10n = context.l10n;
-    final consumedNutrition = summary?.consumed ?? _emptyNutrition;
-    final targetNutrition = summary?.target ?? _emptyNutrition;
-    final hasConfiguredMacros = summary?.macroMode != null;
-    return Row(
+    final consumed = summary?.consumed ?? _emptyNutrition;
+    final target = summary?.target ?? _emptyNutrition;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: _MacroSummaryPill(
-            assetPath: 'assets/images/icons/svg/carbs_icon.svg',
-            iconKey: const ValueKey('dashboard_macro_carbs_icon'),
-            label: l10n.commonCarbs,
-            value: hasConfiguredMacros
-                ? _macroRatio(
-                    consumedNutrition.carbsGrams,
-                    targetNutrition.carbsGrams,
-                  )
-                : '',
-            color: palette.orange,
-          ),
+        Row(
+          children: [
+            Text(
+              l10n.usualFoodsMacrosSectionTitle.toUpperCase(),
+              style: textTheme.labelMedium?.copyWith(
+                color: palette.inkMuted,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.4,
+              ),
+            ),
+            const SizedBox(width: FreshSpacing.sm),
+            Expanded(
+              child: Divider(color: palette.rule, height: 1, thickness: 1),
+            ),
+          ],
         ),
-        const SizedBox(width: FreshSpacing.sm),
-        Expanded(
-          child: _MacroSummaryPill(
-            assetPath: 'assets/images/icons/svg/protein_icon.svg',
-            iconKey: const ValueKey('dashboard_macro_protein_icon'),
-            label: l10n.localeName.startsWith('es') ? 'Proteínas' : 'Proteins',
-            value: hasConfiguredMacros
-                ? _macroRatio(
-                    consumedNutrition.proteinGrams,
-                    targetNutrition.proteinGrams,
-                  )
-                : '',
-            color: palette.mint,
-          ),
-        ),
-        const SizedBox(width: FreshSpacing.sm),
-        Expanded(
-          child: _MacroSummaryPill(
-            assetPath: 'assets/images/icons/svg/fats_icon.svg',
-            iconKey: const ValueKey('dashboard_macro_fats_icon'),
-            label: l10n.localeName.startsWith('es') ? 'Grasas' : 'Fats',
-            value: hasConfiguredMacros
-                ? _macroRatio(
-                    consumedNutrition.fatGrams,
-                    targetNutrition.fatGrams,
-                  )
-                : '',
-            color: palette.yellow,
-          ),
+        const SizedBox(height: FreshSpacing.md),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _MacroProgressRow(
+                assetPath: 'assets/images/icons/svg/carbs_icon.svg',
+                iconKey: const ValueKey('dashboard_macro_carbs_icon'),
+                label: l10n.commonCarbs,
+                consumedGrams: consumed.carbsGrams,
+                targetGrams: target.carbsGrams,
+              ),
+            ),
+            _VerticalRule(color: palette.rule),
+            Expanded(
+              child: _MacroProgressRow(
+                assetPath: 'assets/images/icons/svg/protein_icon.svg',
+                iconKey: const ValueKey('dashboard_macro_protein_icon'),
+                label: l10n.commonProtein,
+                consumedGrams: consumed.proteinGrams,
+                targetGrams: target.proteinGrams,
+              ),
+            ),
+            _VerticalRule(color: palette.rule),
+            Expanded(
+              child: _MacroProgressRow(
+                assetPath: 'assets/images/icons/svg/fats_icon.svg',
+                iconKey: const ValueKey('dashboard_macro_fats_icon'),
+                label: l10n.commonFat,
+                consumedGrams: consumed.fatGrams,
+                targetGrams: target.fatGrams,
+              ),
+            ),
+          ],
         ),
       ],
     );
   }
 }
 
-class _MacroSummaryPill extends StatelessWidget {
-  const _MacroSummaryPill({
+class _VerticalRule extends StatelessWidget {
+  const _VerticalRule({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 1,
+      height: 88,
+      margin: const EdgeInsets.symmetric(horizontal: FreshSpacing.sm),
+      color: color,
+    );
+  }
+}
+
+class _MacroProgressRow extends StatelessWidget {
+  const _MacroProgressRow({
     required this.assetPath,
     required this.iconKey,
     required this.label,
-    required this.value,
-    required this.color,
+    required this.consumedGrams,
+    required this.targetGrams,
   });
 
   final String assetPath;
   final Key iconKey;
   final String label;
-  final String value;
-  final Color color;
+  final double consumedGrams;
+  final double targetGrams;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final palette = context.freshPalette;
-    return FreshCard(
-      color: palette.surface,
-      radius: FreshRadii.lg,
-      shadow: false,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 42),
-        child: Row(
-          children: [
-            Container(
-              width: 30,
-              height: 30,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.2),
-                shape: BoxShape.circle,
-              ),
-              child: SvgPicture.asset(
-                assetPath,
-                key: iconKey,
-                width: 22,
-                height: 22,
-                fit: BoxFit.contain,
-                excludeFromSemantics: true,
-              ),
+    final progress = targetGrams <= 0
+        ? 0.0
+        : (consumedGrams / targetGrams).clamp(0, 1).toDouble();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: FreshSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SvgPicture.asset(
+            assetPath,
+            key: iconKey,
+            width: 18,
+            height: 18,
+            colorFilter: ColorFilter.mode(palette.lime, BlendMode.srcIn),
+          ),
+          const SizedBox(height: FreshSpacing.sm),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.bodyMedium?.copyWith(
+              color: palette.inkSoft,
+              fontWeight: FontWeight.w500,
             ),
-            const SizedBox(width: 7),
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.labelSmall?.copyWith(
-                      color: palette.inkSoft,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  if (value.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        value,
-                        maxLines: 1,
-                        style: textTheme.labelLarge?.copyWith(
-                          color: palette.ink,
-                          fontWeight: FontWeight.w800,
-                          fontFeatures: const [FontFeature.tabularFigures()],
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
+          ),
+          const SizedBox(height: FreshSpacing.xs),
+          RichText(
+            text: TextSpan(
+              style: textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                fontFeatures: const [FontFeature.tabularFigures()],
               ),
+              children: [
+                TextSpan(
+                  text: _formatMacro(consumedGrams),
+                  style: TextStyle(color: palette.lime),
+                ),
+                TextSpan(
+                  text: ' / ${_formatMacro(targetGrams)} g',
+                  style: TextStyle(color: palette.inkSoft),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: FreshSpacing.sm),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: progress,
+              backgroundColor: palette.rule,
+              valueColor: AlwaysStoppedAnimation(palette.lime),
+              minHeight: 4,
+            ),
+          ),
+          const SizedBox(height: FreshSpacing.xs),
+          Text(
+            '${(progress * 100).round()}%',
+            style: textTheme.bodySmall?.copyWith(
+              color: palette.inkMuted,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _WaterIntakeCard extends StatelessWidget {
-  const _WaterIntakeCard({
+class _WaterSection extends StatelessWidget {
+  const _WaterSection({
     required this.summary,
     required this.enabled,
     required this.onUpdate,
@@ -688,86 +636,93 @@ class _WaterIntakeCard extends StatelessWidget {
     final goal = roundHydrationLiters(summary?.hydrationGoalLiters ?? 0);
     final canDecrease = enabled && consumed > 0;
     final canIncrease = enabled && goal > 0 && consumed < goal;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final waterCardColor =
-        isDark ? const Color(0xff18343a) : const Color(0xffd5f2f8);
-    final shadows = [
-      BoxShadow(
-        color: (isDark ? palette.appBg : palette.water).withValues(
-          alpha: isDark ? 0.38 : 0.14,
-        ),
-        blurRadius: 10,
-        offset: const Offset(0, 6),
-      ),
-    ];
-    return Container(
-      key: const ValueKey('dashboard_water_intake_card'),
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-      decoration: BoxDecoration(
-        color: waterCardColor,
-        borderRadius: BorderRadius.circular(26),
-        boxShadow: shadows,
-      ),
-      child: Row(
-        children: [
-          FreshIconChip(
-            icon: Icons.water_drop_rounded,
-            color: palette.water,
-            backgroundColor: palette.water.withValues(alpha: 0.14),
-            size: 48,
-          ),
-          const SizedBox(width: FreshSpacing.md),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  l10n.dashboardWaterIntake,
-                  style: textTheme.titleMedium?.copyWith(
-                    color: palette.ink,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  l10n.dashboardWaterProgress(
-                    formatHydrationLiters(consumed),
-                    formatHydrationLiters(goal),
-                  ),
-                  key: const ValueKey('dashboard_water_progress'),
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: palette.inkSoft,
-                    fontWeight: FontWeight.w700,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                ),
-              ],
+
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              l10n.dashboardWaterIntake.toUpperCase(),
+              style: textTheme.labelMedium?.copyWith(
+                color: palette.inkMuted,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.4,
+              ),
             ),
-          ),
-          const SizedBox(width: FreshSpacing.sm),
-          _WaterStepButton(
-            key: const ValueKey('dashboard_water_decrease_button'),
-            icon: Icons.remove_rounded,
-            tooltip: l10n.dashboardWaterDecreaseTooltip,
-            enabled: canDecrease,
-            onPressed: () {
-              _setWater(consumed - 0.25, goal);
-            },
-          ),
-          const SizedBox(width: FreshSpacing.sm),
-          _WaterStepButton(
-            key: const ValueKey('dashboard_water_increase_button'),
-            icon: Icons.add_rounded,
-            tooltip: l10n.dashboardWaterIncreaseTooltip,
-            enabled: canIncrease,
-            onPressed: () {
-              _setWater(consumed + 0.25, goal);
-            },
-          ),
-        ],
-      ),
+            const SizedBox(width: FreshSpacing.sm),
+            Expanded(
+              child: Divider(color: palette.rule, height: 1, thickness: 1),
+            ),
+          ],
+        ),
+        const SizedBox(height: FreshSpacing.md),
+        Row(
+          children: [
+            Icon(
+              Icons.water_drop_outlined,
+              color: palette.lime,
+              size: 22,
+            ),
+            const SizedBox(width: FreshSpacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.commonWater,
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: palette.ink,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    l10n.dashboardWaterProgress(
+                      formatHydrationLiters(consumed),
+                      formatHydrationLiters(goal),
+                    ),
+                    key: const ValueKey('dashboard_water_progress'),
+                    style: textTheme.bodyLarge?.copyWith(
+                      color: palette.lime,
+                      fontWeight: FontWeight.w700,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: FreshSpacing.sm),
+            _WaterStepButton(
+              key: const ValueKey('dashboard_water_decrease_button'),
+              icon: Icons.remove_rounded,
+              tooltip: l10n.dashboardWaterDecreaseTooltip,
+              enabled: canDecrease,
+              onPressed: () {
+                _setWater(consumed - 0.25, goal);
+              },
+            ),
+            const SizedBox(width: FreshSpacing.sm),
+            _WaterStepButton(
+              key: const ValueKey('dashboard_water_increase_button'),
+              icon: Icons.add_rounded,
+              tooltip: l10n.dashboardWaterIncreaseTooltip,
+              enabled: canIncrease,
+              onPressed: () {
+                _setWater(consumed + 0.25, goal);
+              },
+            ),
+          ],
+        ),
+      ],
+    );
+
+    if (Theme.of(context).brightness == Brightness.dark) {
+      return content;
+    }
+
+    return KeyedSubtree(
+      key: const ValueKey('dashboard_water_intake_card'),
+      child: content,
     );
   }
 
@@ -794,27 +749,22 @@ class _WaterStepButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final actionBlue = isDark ? palette.water : const Color(0xff006da8);
-    final buttonBackground =
-        isDark ? const Color(0xff2d5963) : const Color(0xff91deed);
-    final disabledButtonBackground =
-        isDark ? const Color(0xff263f46) : const Color(0xffc5eaf2);
-    final disabledActionBlue = isDark
-        ? palette.water.withValues(alpha: 0.48)
-        : const Color(0xff6c9ead);
     return SizedBox.square(
-      dimension: 42,
+      dimension: 34,
       child: IconButton(
         tooltip: tooltip,
         onPressed: enabled ? onPressed : null,
-        icon: Icon(icon, size: 26),
+        icon: Icon(icon, size: 18),
         style: IconButton.styleFrom(
-          backgroundColor: buttonBackground,
-          foregroundColor: actionBlue,
-          disabledBackgroundColor: disabledButtonBackground,
-          disabledForegroundColor: disabledActionBlue,
+          backgroundColor: Colors.transparent,
+          foregroundColor: enabled ? palette.lime : palette.inkMuted,
+          disabledBackgroundColor: Colors.transparent,
+          disabledForegroundColor: palette.inkMuted,
           shape: const CircleBorder(),
+          side: BorderSide(
+            color: enabled ? palette.rule : palette.ruleSoft,
+            width: 1.5,
+          ),
         ),
       ),
     );
@@ -827,10 +777,6 @@ const _emptyNutrition = NutritionSnapshot(
   carbsGrams: 0,
   fatGrams: 0,
 );
-
-String _macroRatio(double consumed, double target) {
-  return '${_formatMacro(consumed)}/${_formatMacro(target)}';
-}
 
 String _formatMacro(double value) {
   return value.round().toString();
@@ -849,16 +795,33 @@ class _MealSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final palette = context.freshPalette;
     final l10n = context.l10n;
     final meals = summary?.meals ?? const <Meal>[];
+
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Row(
+          children: [
+            Text(
+              l10n.commonMeals.toUpperCase(),
+              style: textTheme.labelMedium?.copyWith(
+                color: palette.inkMuted,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.4,
+              ),
+            ),
+            const SizedBox(width: FreshSpacing.sm),
+            Expanded(
+              child: Divider(color: palette.rule, height: 1, thickness: 1),
+            ),
+          ],
+        ),
+        const SizedBox(height: FreshSpacing.md),
         if (meals.isEmpty)
-          _DashboardEmptyMealsCard(
-            title: l10n.dashboardNoMealsLoggedToday,
-            message: l10n.dashboardNoMealsMessage,
-          )
+          const _DashboardEmptyMealsCard()
         else
           for (final meal in meals)
             Padding(
@@ -875,52 +838,60 @@ class _MealSection extends StatelessWidget {
 }
 
 class _DashboardEmptyMealsCard extends StatelessWidget {
-  const _DashboardEmptyMealsCard({required this.title, required this.message});
-
-  final String title;
-  final String message;
+  const _DashboardEmptyMealsCard();
 
   @override
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
     final textTheme = Theme.of(context).textTheme;
-    final cardWidth =
-        (MediaQuery.sizeOf(context).width - 40).clamp(0.0, 720.0).toDouble();
-    return Align(
-      alignment: Alignment.center,
-      child: SizedBox(
-        width: cardWidth,
-        child: FreshCard(
-          key: const ValueKey('dashboard_empty_meals_card'),
-          color: palette.surface,
-          radius: FreshRadii.xl,
-          padding: const EdgeInsets.symmetric(
-            horizontal: FreshSpacing.xl,
-            vertical: FreshSpacing.xxl,
+    final l10n = context.l10n;
+
+    return SizedBox(
+      width: double.infinity,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.room_service_outlined,
+            size: 48,
+            color: palette.inkMuted,
           ),
-          child: Column(
-            children: [
-              FreshIconChip(
-                icon: Icons.restaurant_menu_rounded,
-                color: palette.limeDeep,
-              ),
-              const SizedBox(height: FreshSpacing.md),
-              Text(
-                title,
-                style: textTheme.titleMedium,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: FreshSpacing.sm),
-              Text(
-                message,
-                style: textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
-                textAlign: TextAlign.center,
-              ),
-            ],
+          const SizedBox(height: FreshSpacing.md),
+          Text(
+            l10n.dashboardNoMealsLoggedToday,
+            textAlign: TextAlign.center,
+            style: textTheme.titleMedium?.copyWith(
+              color: palette.ink,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: FreshSpacing.xs),
+          Text(
+            l10n.dashboardNoMealsMessage,
+            textAlign: TextAlign.center,
+            style: textTheme.bodyMedium?.copyWith(
+              color: palette.inkMuted,
+            ),
+          ),
+        const SizedBox(height: FreshSpacing.md),
+        TextButton.icon(
+          onPressed: () {
+            try {
+              context.push('/meal/create');
+            } catch (_) {}
+          },
+          icon: Icon(Icons.add_rounded, size: 18, color: palette.lime),
+          label: Text('${l10n.foodSearchAddAction} ${l10n.commonMeal}'),
+          style: TextButton.styleFrom(
+            foregroundColor: palette.lime,
+            textStyle: textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
-      ),
-    );
+          ],
+        ),
+      );
   }
 }
 
@@ -940,8 +911,13 @@ class _MealRow extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final palette = context.freshPalette;
     final l10n = context.l10n;
-    return FreshCard(
-      padding: const EdgeInsets.all(16),
+    return Container(
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: palette.rule, width: 1),
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(vertical: FreshSpacing.md),
       child: Row(
         children: [
           Expanded(
@@ -952,7 +928,13 @@ class _MealRow extends StatelessWidget {
                   _MealLabelChip(label: meal.mealLabel!),
                   const SizedBox(height: FreshSpacing.xs),
                 ],
-                Text(meal.title, style: textTheme.titleMedium),
+                Text(
+                  meal.title,
+                  style: textTheme.bodyLarge?.copyWith(
+                    color: palette.ink,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 Text(
                   l10n.caloriesValue(meal.nutrition.calories),
                   style: textTheme.bodyMedium?.copyWith(
@@ -968,7 +950,7 @@ class _MealRow extends StatelessWidget {
             icon: Icons.delete_outline_rounded,
             tooltip: l10n.dashboardDeleteMealTooltip,
             foregroundColor: palette.coral,
-            size: 42,
+            size: 40,
             onPressed: onDelete,
           ),
           const SizedBox(width: FreshSpacing.xs),
@@ -976,7 +958,7 @@ class _MealRow extends StatelessWidget {
             key: ValueKey('dashboard_edit_meal_${meal.id}'),
             icon: Icons.edit_rounded,
             tooltip: l10n.dashboardEditIngredientsTooltip,
-            size: 42,
+            size: 40,
             onPressed: onEdit,
           ),
         ],
@@ -996,16 +978,16 @@ class _MealLabelChip extends StatelessWidget {
     final palette = context.freshPalette;
     return Container(
       key: ValueKey('dashboard_meal_label_${label.type}_${label.label}'),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: palette.limeWash,
+        color: palette.surfaceSoft,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         localizedMealLabel(context.l10n, label),
-        style: textTheme.labelMedium?.copyWith(
-          color: palette.limeDeep,
-          fontWeight: FontWeight.w700,
+        style: textTheme.labelSmall?.copyWith(
+          color: palette.lime,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );

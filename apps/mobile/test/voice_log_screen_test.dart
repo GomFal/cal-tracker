@@ -49,7 +49,39 @@ void main() {
     });
 
     testWidgets(
+      'shows manual search and agent shortcut without legacy voice button',
+      (tester) async {
+        await tester.pumpWidget(
+          ChangeNotifierProvider<VoiceLogViewModel>.value(
+            value: viewModel,
+            child: MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              theme: buildLightTheme(),
+              darkTheme: buildDarkTheme(),
+              themeMode: ThemeMode.dark,
+              home: const MealCreateScreen(),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const ValueKey('meal_create_voice_action_button')),
+          findsNothing,
+        );
+        expect(find.byKey(const ValueKey('mic_button')), findsNothing);
+        expect(
+          find.byKey(const ValueKey('manual_food_search_panel')),
+          findsOneWidget,
+        );
+        expect(find.text('Faster with the agent'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
       'starts voice-only and keeps voice action while reviewing a proposal',
+      skip: true, // Voice action removed from MealCreateScreen; use /agent instead.
       (tester) async {
         final proposal = MealProposal(
           id: 'prop_chicken_rice',
@@ -194,6 +226,7 @@ void main() {
 
     testWidgets(
       'hides start over while voice recording is starting and active',
+      skip: true, // Voice action removed from MealCreateScreen; use /agent instead.
       (tester) async {
         final proposal = MealProposal(
           id: 'prop_chicken_rice',
@@ -1205,10 +1238,11 @@ void main() {
       verifyNever(() => nutritionRepository.updateProposalItems(any(), any()));
     });
 
-    testWidgets('keeps voice correction action available for active proposal', (
-      tester,
-    ) async {
-      const initialProposal = MealProposal(
+    testWidgets(
+      'keeps voice correction action available for active proposal',
+      skip: true, // Voice action removed from MealCreateScreen; use /agent instead.
+      (tester) async {
+        const initialProposal = MealProposal(
         id: 'prop_1',
         title: 'Bread and butter',
         confidence: 0.85,
@@ -1414,6 +1448,7 @@ void main() {
 
     testWidgets(
       'shows voice transcript when voice correction needs clarification',
+      skip: true, // Voice action removed from MealCreateScreen; use /agent instead.
       (tester) async {
         const initialProposal = MealProposal(
           id: 'prop_rice',
@@ -1499,6 +1534,7 @@ void main() {
 
     testWidgets(
       'shows food match clarification while keeping active proposal visible',
+      skip: true, // Voice action removed from MealCreateScreen; use /agent instead.
       (tester) async {
         const initialProposal = MealProposal(
           id: 'prop_chicken_rice',

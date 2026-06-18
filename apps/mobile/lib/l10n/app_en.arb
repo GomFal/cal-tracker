@@ -21,6 +21,7 @@
   "commonUnit": "Unit",
   "commonMeal": "Meal",
   "commonMeals": "Meals",
+  "commonWater": "Water",
   "commonRemaining": "Remaining",
   "commonConsumed": "Consumed",
   "commonToday": "Today",
@@ -94,6 +95,7 @@
   "navHome": "Home",
   "navStats": "Stats",
   "navLog": "Log",
+  "navAgent": "Agent",
   "navUsual": "Usual",
   "navMenu": "Menu",
   "authNameLabel": "Name",
@@ -485,6 +487,7 @@
     }
   },
   "macroUsePercentages": "Use percentages",
+  "dashboardGreeting": "Good morning,",
   "dashboardCouldNotLoadToday": "Could not load today",
   "dashboardGreetingMorning": "Good morning!",
   "dashboardGreetingAfternoon": "Good afternoon!",
@@ -492,6 +495,7 @@
   "dashboardDailyProgress": "Your Daily\nProgress",
   "dashboardTodayCalories": "Today's Calories",
   "dashboardCaloriesLeft": "left",
+  "dashboardOfGoal": "of goal",
   "dashboardGoalLine": "Target {calories} Kcal, {liters} L",
   "@dashboardGoalLine": {
     "placeholders": {

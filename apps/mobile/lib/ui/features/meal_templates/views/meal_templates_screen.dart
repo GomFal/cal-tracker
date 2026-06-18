@@ -257,8 +257,14 @@ class _UsualFoodCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final l10n = context.l10n;
     final palette = context.freshPalette;
-    return FreshCard(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
       padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? palette.surfaceSoft : palette.surface,
+        borderRadius: BorderRadius.circular(FreshRadii.lg),
+        border: Border.all(color: palette.rule),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -359,82 +365,94 @@ class _TemplateCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final l10n = context.l10n;
     final palette = context.freshPalette;
-    return FreshCard(
-      padding: const EdgeInsets.all(16),
-      onTap: onLog,
-      child: Column(
-        children: [
-          Row(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onLog,
+        borderRadius: BorderRadius.circular(FreshRadii.lg),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isDark ? palette.surfaceSoft : palette.surface,
+            borderRadius: BorderRadius.circular(FreshRadii.lg),
+            border: Border.all(color: palette.rule),
+          ),
+          child: Column(
             children: [
-              FreshIconChip(
-                icon: Icons.restaurant_menu_rounded,
-                color: palette.leaf,
-                backgroundColor: palette.limeWash,
-              ),
-              const SizedBox(width: FreshSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(template.title, style: textTheme.titleMedium),
-                    Text(
-                      template.aliases.isEmpty
-                          ? l10n.templatesNoAliasesYet
-                          : template.aliases.join(', '),
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: palette.inkMuted,
-                      ),
-                      overflow: TextOverflow.ellipsis,
+              Row(
+                children: [
+                  FreshIconChip(
+                    icon: Icons.restaurant_menu_rounded,
+                    color: palette.leaf,
+                    backgroundColor: palette.limeWash,
+                  ),
+                  const SizedBox(width: FreshSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(template.title, style: textTheme.titleMedium),
+                        Text(
+                          template.aliases.isEmpty
+                              ? l10n.templatesNoAliasesYet
+                              : template.aliases.join(', '),
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: palette.inkMuted,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                  IconButton(
+                    key: ValueKey('meal_template_edit_${template.id}'),
+                    tooltip: l10n.commonEditIngredients,
+                    onPressed: onEdit,
+                    icon: const Icon(Icons.edit_rounded),
+                  ),
+                  IconButton(
+                    key: ValueKey('meal_template_delete_${template.id}'),
+                    tooltip: l10n.commonDelete,
+                    onPressed: onDelete,
+                    icon: const Icon(Icons.delete_outline_rounded),
+                  ),
+                ],
               ),
-              IconButton(
-                key: ValueKey('meal_template_edit_${template.id}'),
-                tooltip: l10n.commonEditIngredients,
-                onPressed: onEdit,
-                icon: const Icon(Icons.edit_rounded),
-              ),
-              IconButton(
-                key: ValueKey('meal_template_delete_${template.id}'),
-                tooltip: l10n.commonDelete,
-                onPressed: onDelete,
-                icon: const Icon(Icons.delete_outline_rounded),
+              const SizedBox(height: FreshSpacing.md),
+              Wrap(
+                spacing: FreshSpacing.sm,
+                runSpacing: FreshSpacing.sm,
+                children: [
+                  _NutritionChip(
+                    label: l10n.commonCalories,
+                    value: '${template.nutrition.calories}',
+                    unit: l10n.commonKcal,
+                    color: palette.lime,
+                  ),
+                  _NutritionChip(
+                    label: l10n.commonProtein,
+                    value: _formatQuantity(template.nutrition.proteinGrams),
+                    unit: 'g',
+                    color: palette.mint,
+                  ),
+                  _NutritionChip(
+                    label: l10n.commonCarbs,
+                    value: _formatQuantity(template.nutrition.carbsGrams),
+                    unit: 'g',
+                    color: palette.water,
+                  ),
+                  _NutritionChip(
+                    label: l10n.commonFat,
+                    value: _formatQuantity(template.nutrition.fatGrams),
+                    unit: 'g',
+                    color: palette.orange,
+                  ),
+                ],
               ),
             ],
           ),
-          const SizedBox(height: FreshSpacing.md),
-          Wrap(
-            spacing: FreshSpacing.sm,
-            runSpacing: FreshSpacing.sm,
-            children: [
-              _NutritionChip(
-                label: l10n.commonCalories,
-                value: '${template.nutrition.calories}',
-                unit: l10n.commonKcal,
-                color: palette.lime,
-              ),
-              _NutritionChip(
-                label: l10n.commonProtein,
-                value: _formatQuantity(template.nutrition.proteinGrams),
-                unit: 'g',
-                color: palette.mint,
-              ),
-              _NutritionChip(
-                label: l10n.commonCarbs,
-                value: _formatQuantity(template.nutrition.carbsGrams),
-                unit: 'g',
-                color: palette.water,
-              ),
-              _NutritionChip(
-                label: l10n.commonFat,
-                value: _formatQuantity(template.nutrition.fatGrams),
-                unit: 'g',
-                color: palette.orange,
-              ),
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }

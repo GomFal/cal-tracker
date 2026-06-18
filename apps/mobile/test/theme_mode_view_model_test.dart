@@ -4,16 +4,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('defaults to system mode before loading preferences', () {
+  test('defaults to dark mode before loading preferences', () {
     final viewModel = ThemeModeViewModel(
       preferencesRepository: _FakePreferencesRepository(),
     );
 
-    expect(viewModel.themeMode, ThemeMode.system);
-    expect(viewModel.isDarkMode, isFalse);
+    expect(viewModel.themeMode, ThemeMode.dark);
+    expect(viewModel.isDarkMode, isTrue);
   });
 
-  test('load keeps system default without notifying when no preference exists',
+  test('load keeps dark default without notifying when no preference exists',
       () async {
     final viewModel = ThemeModeViewModel(
       preferencesRepository: _FakePreferencesRepository(),
@@ -23,12 +23,12 @@ void main() {
 
     await viewModel.load();
 
-    expect(viewModel.themeMode, ThemeMode.system);
+    expect(viewModel.themeMode, ThemeMode.dark);
     expect(notifications, 0);
   });
 
-  test('load applies stored dark mode and notifies listeners', () async {
-    final repository = _FakePreferencesRepository(ThemeMode.dark);
+  test('load applies stored light mode and notifies listeners', () async {
+    final repository = _FakePreferencesRepository(ThemeMode.light);
     final viewModel = ThemeModeViewModel(
       preferencesRepository: repository,
     );
@@ -37,8 +37,8 @@ void main() {
 
     await viewModel.load();
 
-    expect(viewModel.themeMode, ThemeMode.dark);
-    expect(viewModel.isDarkMode, isTrue);
+    expect(viewModel.themeMode, ThemeMode.light);
+    expect(viewModel.isDarkMode, isFalse);
     expect(notifications, 1);
   });
 
@@ -51,29 +51,29 @@ void main() {
     var notifications = 0;
     viewModel.addListener(() => notifications++);
 
-    await viewModel.setThemeMode(ThemeMode.dark);
+    await viewModel.setThemeMode(ThemeMode.light);
 
-    expect(viewModel.themeMode, ThemeMode.dark);
-    expect(repository.savedModes, [ThemeMode.dark]);
-    expect(notifications, 1);
-
-    await viewModel.setThemeMode(ThemeMode.dark);
-
-    expect(repository.savedModes, [ThemeMode.dark]);
+    expect(viewModel.themeMode, ThemeMode.light);
+    expect(repository.savedModes, [ThemeMode.light]);
     expect(notifications, 1);
 
     await viewModel.setThemeMode(ThemeMode.light);
 
-    expect(viewModel.themeMode, ThemeMode.light);
-    expect(repository.savedModes, [ThemeMode.dark, ThemeMode.light]);
+    expect(repository.savedModes, [ThemeMode.light]);
+    expect(notifications, 1);
+
+    await viewModel.setThemeMode(ThemeMode.dark);
+
+    expect(viewModel.themeMode, ThemeMode.dark);
+    expect(repository.savedModes, [ThemeMode.light, ThemeMode.dark]);
     expect(notifications, 2);
 
     await viewModel.setThemeMode(ThemeMode.system);
 
     expect(viewModel.themeMode, ThemeMode.system);
     expect(repository.savedModes, [
-      ThemeMode.dark,
       ThemeMode.light,
+      ThemeMode.dark,
       ThemeMode.system,
     ]);
     expect(notifications, 3);
@@ -81,7 +81,7 @@ void main() {
 }
 
 class _FakePreferencesRepository implements AppPreferencesRepository {
-  _FakePreferencesRepository([this.savedThemeMode = ThemeMode.system]);
+  _FakePreferencesRepository([this.savedThemeMode = ThemeMode.dark]);
 
   ThemeMode savedThemeMode;
   String? savedLocaleCode;

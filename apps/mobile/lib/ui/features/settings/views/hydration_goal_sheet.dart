@@ -391,8 +391,9 @@ class _HydrationInfoCard extends StatelessWidget {
       padding:
           EdgeInsets.fromLTRB(14, compact ? 10 : 12, 14, compact ? 10 : 12),
       decoration: BoxDecoration(
-        color: palette.limeWash,
-        borderRadius: BorderRadius.circular(24),
+        color: palette.surface,
+        borderRadius: BorderRadius.circular(FreshRadii.lg),
+        border: Border.all(color: palette.rule),
       ),
       child: Row(
         children: [
@@ -400,7 +401,7 @@ class _HydrationInfoCard extends StatelessWidget {
             width: compact ? 40 : 44,
             height: compact ? 40 : 44,
             decoration: BoxDecoration(
-              color: palette.surface,
+              color: palette.limeWash,
               shape: BoxShape.circle,
             ),
             child: Icon(

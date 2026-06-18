@@ -9,7 +9,6 @@ import '../../../../domain/models/nutrition_models.dart';
 import '../../../../l10n/app_localizations_context.dart';
 import '../../../core/content_frame.dart';
 import '../../../core/design_system.dart';
-import '../../../core/voice_action_button.dart';
 import '../view_models/voice_log_helpers.dart';
 import '../view_models/voice_log_view_model.dart';
 import '../../../shared/editable_meal_item_controller.dart';
@@ -49,8 +48,6 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
 
     return Scaffold(
       backgroundColor: palette.screen,
-      floatingActionButton: _MealCreateVoiceActionButton(viewModel: viewModel),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       body: KeyedSubtree(
         key: const ValueKey('meal_create_screen'),
         child: ContentFrame(
@@ -331,6 +328,55 @@ class _ManualFoodSearchPanelState extends State<_ManualFoodSearchPanel> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          InkWell(
+            onTap: () {
+              try {
+                context.push('/agent');
+              } catch (_) {}
+            },
+            borderRadius: BorderRadius.circular(FreshRadii.md),
+            child: Padding(
+              padding: const EdgeInsets.all(FreshSpacing.md),
+              child: Row(
+                children: [
+                  FreshIconChip(
+                    icon: Icons.support_agent_rounded,
+                    color: palette.lime,
+                    backgroundColor: palette.surfaceSoft,
+                  ),
+                  const SizedBox(width: FreshSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Faster with the agent',
+                          style: textTheme.bodyLarge?.copyWith(
+                            color: palette.ink,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: FreshSpacing.xs),
+                        Text(
+                          'Tap to record or type what you ate.',
+                          style: textTheme.bodySmall?.copyWith(
+                            color: palette.inkMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    color: palette.inkMuted,
+                    size: 16,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Divider(color: palette.rule, height: 1),
+          const SizedBox(height: FreshSpacing.md),
           Row(
             children: [
               FreshIconChip(
@@ -1013,7 +1059,10 @@ class _FoodSearchBoxState extends State<_FoodSearchBox> {
               item: _results[index],
               actionLabel: widget.actionLabel,
               actionIcon: widget.actionIcon,
-              onSelected: () => widget.onSelected(_results[index]),
+              onSelected: () {
+                widget.onSelected(_results[index]);
+                _clear();
+              },
             ),
             if (index != _results.length - 1)
               const Divider(height: FreshSpacing.md),
@@ -1432,96 +1481,6 @@ class _PortionChoiceChip extends StatelessWidget {
   }
 }
 
-class _MealCreateVoiceActionButton extends StatelessWidget {
-  const _MealCreateVoiceActionButton({required this.viewModel});
-
-  final VoiceLogViewModel viewModel;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.freshPalette;
-    final isRecording = viewModel.state == VoiceLogState.recording;
-    final isProcessing = viewModel.isLoading;
-    final isDisabled = viewModel.state == VoiceLogState.requestingPermission ||
-        viewModel.state == VoiceLogState.stopping ||
-        viewModel.state == VoiceLogState.transcribing ||
-        viewModel.state == VoiceLogState.agentRunning;
-    final isCorrection = viewModel.proposal != null;
-    final hasError = viewModel.state == VoiceLogState.error;
-    final colorScheme = Theme.of(context).colorScheme;
-    final tooltip = isRecording
-        ? 'Stop and submit voice'
-        : isDisabled
-            ? 'Processing voice'
-            : isCorrection
-                ? 'Record correction'
-                : 'Record meal';
-    final backgroundColor = isRecording
-        ? palette.coral
-        : hasError
-            ? palette.yellow
-            : isDisabled
-                ? palette.surfaceMuted
-                : palette.lime;
-    final icon = isRecording
-        ? Icons.stop_rounded
-        : isDisabled
-            ? Icons.graphic_eq_rounded
-            : hasError
-                ? Icons.error_outline_rounded
-                : Icons.mic_rounded;
-
-    return SafeArea(
-      child: Semantics(
-        key: const ValueKey('meal_create_voice_action_button'),
-        button: true,
-        label: tooltip,
-        child: Tooltip(
-          message: tooltip,
-          child: VoiceActionButtonChrome(
-            dimension: 72,
-            backgroundColor: backgroundColor,
-            isProcessing: isProcessing,
-            isRecording: isRecording,
-            child: IconButton(
-              key: const ValueKey('mic_button'),
-              tooltip: tooltip,
-              onPressed: isDisabled ? null : () => _handleTap(viewModel),
-              icon: Icon(icon),
-              color: isRecording
-                  ? colorScheme.onError
-                  : hasError
-                      ? palette.ink
-                      : colorScheme.onPrimary,
-              disabledColor: palette.inkMuted,
-              iconSize: 32,
-              style: IconButton.styleFrom(
-                backgroundColor: Colors.transparent,
-                disabledBackgroundColor: Colors.transparent,
-                shape: const CircleBorder(),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _handleTap(VoiceLogViewModel viewModel) async {
-    if (viewModel.canStartRecording) {
-      await viewModel.startRecording();
-      if (viewModel.state == VoiceLogState.recording) {
-        VoiceActionHaptics.recordingStarted();
-      }
-      return;
-    }
-    if (viewModel.canStopRecording) {
-      VoiceActionHaptics.recordingStopped();
-      await viewModel.stopRecording(submitAfterTranscription: true);
-    }
-  }
-}
-
 class _InfoBanner extends StatelessWidget {
   const _InfoBanner({required this.message});
 
@@ -1588,7 +1547,7 @@ class _LoggedMealBanner extends StatelessWidget {
     return FreshStatusBanner(
       icon: Icons.check_rounded,
       title: title,
-      message: 'Logged. You can correct it from history.',
+      message: context.l10n.voiceLoggedMessage,
       color: context.freshPalette.limeDeep,
     );
   }
@@ -1602,28 +1561,29 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
+    final l10n = context.l10n;
     return FreshCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const FreshSectionTitle(title: 'Today'),
+          FreshSectionTitle(title: l10n.commonToday),
           const SizedBox(height: FreshSpacing.md),
           Row(
             children: [
               Expanded(
                 child: _MetricBlock(
-                  label: 'Consumed',
+                  label: l10n.commonConsumed,
                   value: '${summary.consumed.calories}',
-                  unit: 'Kcal',
+                  unit: l10n.commonKcal,
                   color: palette.lime,
                 ),
               ),
               const SizedBox(width: FreshSpacing.md),
               Expanded(
                 child: _MetricBlock(
-                  label: 'Remaining',
+                  label: l10n.commonRemaining,
                   value: '${summary.remaining.calories}',
-                  unit: 'Kcal',
+                  unit: l10n.commonKcal,
                   color: palette.water,
                 ),
               ),
@@ -1725,26 +1685,27 @@ class _RemainingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
+    final l10n = context.l10n;
     return FreshCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const FreshSectionTitle(title: 'Remaining'),
+          FreshSectionTitle(title: l10n.commonRemaining),
           const SizedBox(height: FreshSpacing.md),
           Row(
             children: [
               Expanded(
                 child: _MetricBlock(
-                  label: 'Calories',
+                  label: l10n.commonCalories,
                   value: '${remaining.calories}',
-                  unit: 'Kcal',
+                  unit: l10n.commonKcal,
                   color: palette.lime,
                 ),
               ),
               const SizedBox(width: FreshSpacing.md),
               Expanded(
                 child: _MetricBlock(
-                  label: 'Protein',
+                  label: l10n.commonProtein,
                   value: formatQuantity(remaining.proteinGrams),
                   unit: 'g',
                   color: palette.orange,
@@ -1927,7 +1888,7 @@ class _ProposalCard extends StatelessWidget {
                   children: [
                     Text(proposal.title, style: textTheme.titleLarge),
                     Text(
-                      'Ready to log',
+                      context.l10n.mealProposalReadyToLog,
                       style: textTheme.bodyMedium?.copyWith(
                         color: palette.inkMuted,
                       ),
@@ -1939,9 +1900,9 @@ class _ProposalCard extends StatelessWidget {
           ),
           const SizedBox(height: FreshSpacing.lg),
           _MetricBlock(
-            label: 'Calories',
+            label: context.l10n.commonCalories,
             value: '${proposal.nutrition.calories}',
-            unit: 'Kcal',
+            unit: context.l10n.commonKcal,
             color: palette.lime,
           ),
           const SizedBox(height: FreshSpacing.md),
@@ -1961,7 +1922,7 @@ class _ProposalCard extends StatelessWidget {
                   key: const ValueKey('confirm_proposal_button'),
                   onPressed: onConfirm,
                   icon: const Icon(Icons.check_rounded),
-                  label: const Text('Confirm'),
+                  label: Text(context.l10n.mealProposalConfirm),
                 ),
               ),
               const SizedBox(width: FreshSpacing.md),

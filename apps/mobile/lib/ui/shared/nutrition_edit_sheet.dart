@@ -174,6 +174,9 @@ class _NutritionEditSheetState extends State<NutritionEditSheet> {
               onChanged: (_) => setState(() {}),
               decoration: InputDecoration(
                 labelText: l10n.commonCalories,
+                filled: true,
+                fillColor: palette.surfaceSoft,
+                isDense: true,
                 suffixIcon: showSuggestion
                     ? NutritionCalorieSuggestionSuffix(
                         key: ValueKey(
@@ -212,6 +215,10 @@ class _NutritionEditSheetState extends State<NutritionEditSheet> {
                     decoration: macroInputDecoration(
                       label: l10n.commonProtein,
                       color: colors[NutritionMacroKind.protein]!,
+                    ).copyWith(
+                      filled: true,
+                      fillColor: palette.surfaceSoft,
+                      isDense: true,
                     ),
                   ),
                 ),
@@ -235,6 +242,10 @@ class _NutritionEditSheetState extends State<NutritionEditSheet> {
                     decoration: macroInputDecoration(
                       label: l10n.commonCarbs,
                       color: colors[NutritionMacroKind.carbs]!,
+                    ).copyWith(
+                      filled: true,
+                      fillColor: palette.surfaceSoft,
+                      isDense: true,
                     ),
                   ),
                 ),
@@ -258,6 +269,10 @@ class _NutritionEditSheetState extends State<NutritionEditSheet> {
                     decoration: macroInputDecoration(
                       label: l10n.commonFat,
                       color: colors[NutritionMacroKind.fat]!,
+                    ).copyWith(
+                      filled: true,
+                      fillColor: palette.surfaceSoft,
+                      isDense: true,
                     ),
                   ),
                 ),
@@ -335,7 +350,8 @@ class _NutritionEditSheetState extends State<NutritionEditSheet> {
         nutrition.carbsGrams < 0 ||
         nutrition.fatGrams < 0) {
       setState(() {
-        _error = widget.errorMessage ?? context.l10n.commonIngredientDetailsError;
+        _error =
+            widget.errorMessage ?? context.l10n.commonIngredientDetailsError;
       });
       return;
     }

@@ -5,26 +5,27 @@ import 'package:flutter/material.dart';
 class FreshColors {
   const FreshColors._();
 
-  static const appBg = Color(0xfff0f0ef);
-  static const screen = Color(0xfff7f7f5);
-  static const surface = Color(0xfffbfbf8);
-  static const surfaceSoft = Color(0xfff3f3f1);
-  static const surfaceMuted = Color(0xffecedea);
-  static const ink = Color(0xff080907);
-  static const inkSoft = Color(0xff2f312d);
-  static const inkMuted = Color(0xff72756f);
-  static const rule = Color(0xffe3e5df);
-  static const ruleSoft = Color(0xffeef0eb);
-  static const lime = Color(0xff9ad32a);
-  static const limeDeep = Color(0xff78a51b);
-  static const limeSoft = Color(0xffd8f3a0);
-  static const limeWash = Color(0xffedf8d2);
-  static const leaf = Color(0xff4f9b1f);
-  static const water = Color(0xff10c7f5);
-  static const orange = Color(0xfff08b2b);
-  static const mint = Color(0xff4fd6a2);
-  static const coral = Color(0xffe94f5f);
-  static const yellow = Color(0xfffff0b6);
+  // AMOLED minimal palette — derived from the dashboard redesign reference.
+  static const appBg = Color(0xff000000);
+  static const screen = Color(0xff000000);
+  static const surface = Color(0xff0a0a0a);
+  static const surfaceSoft = Color(0xff111111);
+  static const surfaceMuted = Color(0xff1a1a1a);
+  static const ink = Color(0xffffffff);
+  static const inkSoft = Color(0xffb8b8b8);
+  static const inkMuted = Color(0xff6e6e6e);
+  static const rule = Color(0xff1f1f1f);
+  static const ruleSoft = Color(0xff161616);
+  static const lime = Color(0xffc8e14c);
+  static const limeDeep = Color(0xffb8d142);
+  static const limeSoft = Color(0xff1f2410);
+  static const limeWash = Color(0xff13160a);
+  static const leaf = Color(0xffc8e14c);
+  static const water = Color(0xffc8e14c);
+  static const orange = Color(0xffc8e14c);
+  static const mint = Color(0xffc8e14c);
+  static const coral = Color(0xffff6f80);
+  static const yellow = Color(0xffc8e14c);
 }
 
 class FreshPalette extends ThemeExtension<FreshPalette> {
@@ -75,26 +76,26 @@ class FreshPalette extends ThemeExtension<FreshPalette> {
   );
 
   static const dark = FreshPalette(
-    appBg: Color(0xff10140d),
-    screen: Color(0xff141811),
-    surface: Color(0xff1d2318),
-    surfaceSoft: Color(0xff252d1f),
-    surfaceMuted: Color(0xff303828),
-    ink: Color(0xfff3f7ee),
-    inkSoft: Color(0xffd6dfcd),
-    inkMuted: Color(0xffa2ac98),
-    rule: Color(0xff3d4734),
-    ruleSoft: Color(0xff2d3527),
-    lime: Color(0xff8fbd3a),
-    limeDeep: Color(0xff9cc94b),
-    limeSoft: Color(0xff354b21),
-    limeWash: Color(0xff243318),
-    leaf: Color(0xff6fb24a),
-    water: Color(0xff56b7ca),
-    orange: Color(0xffe4a15d),
-    mint: Color(0xff58bd8a),
-    coral: Color(0xffff7f8c),
-    yellow: Color(0xff5c4d25),
+    appBg: Color(0xff000000),
+    screen: Color(0xff000000),
+    surface: Color(0xff0a0a0a),
+    surfaceSoft: Color(0xff111111),
+    surfaceMuted: Color(0xff1a1a1a),
+    ink: Color(0xffffffff),
+    inkSoft: Color(0xffb8b8b8),
+    inkMuted: Color(0xff6e6e6e),
+    rule: Color(0xff1f1f1f),
+    ruleSoft: Color(0xff161616),
+    lime: Color(0xffc8e14c),
+    limeDeep: Color(0xffb8d142),
+    limeSoft: Color(0xff1f2410),
+    limeWash: Color(0xff13160a),
+    leaf: Color(0xffc8e14c),
+    water: Color(0xffc8e14c),
+    orange: Color(0xffc8e14c),
+    mint: Color(0xffc8e14c),
+    coral: Color(0xffff6f80),
+    yellow: Color(0xffc8e14c),
   );
 
   final Color appBg;
@@ -249,22 +250,6 @@ class FreshRadii {
   static const xl = 32.0;
 }
 
-const _lightSoftShadow = [
-  BoxShadow(
-    color: Color(0x14080907),
-    blurRadius: 14,
-    offset: Offset(0, 8),
-  ),
-];
-
-const _darkSoftShadow = [
-  BoxShadow(
-    color: Color(0x66000000),
-    blurRadius: 12,
-    offset: Offset(0, 7),
-  ),
-];
-
 class FreshPage extends StatelessWidget {
   const FreshPage({
     super.key,
@@ -285,32 +270,47 @@ class FreshPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: maxWidth),
-          child: CustomScrollView(
-            slivers: [
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
-                  child: FreshHeader(
-                    title: title,
-                    subtitle: subtitle,
-                    actions: actions,
-                    leading: leading,
+    final palette = context.freshPalette;
+    return ColoredBox(
+      color: palette.screen,
+      child: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxWidth),
+            child: CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+                    child: FreshHeader(
+                      title: title,
+                      subtitle: subtitle,
+                      actions: actions,
+                      leading: leading,
+                    ),
                   ),
                 ),
-              ),
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
-                sliver: SliverToBoxAdapter(child: child),
-              ),
-            ],
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+                  sliver: SliverToBoxAdapter(child: child),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
+  }
+}
+
+/// Kept for API compatibility; AMOLED redesign uses a pure black screen.
+class FreshScreenBackdrop extends StatelessWidget {
+  const FreshScreenBackdrop({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.freshPalette;
+    return ColoredBox(color: palette.screen);
   }
 }
 
@@ -353,8 +353,9 @@ class FreshHeader extends StatelessWidget {
                 ),
               Text(
                 title,
-                style: textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
+                style: textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.6,
                   color: palette.ink,
                 ),
               ),
@@ -396,11 +397,7 @@ class FreshCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: color ?? palette.surface,
         borderRadius: borderRadius,
-        boxShadow: shadow
-            ? Theme.of(context).brightness == Brightness.dark
-                ? _darkSoftShadow
-                : _lightSoftShadow
-            : null,
+        border: Border.all(color: palette.rule),
       ),
       child: Padding(padding: padding, child: child),
     );
@@ -437,6 +434,7 @@ class FreshIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
+    final fg = foregroundColor ?? palette.ink;
     return SizedBox.square(
       dimension: size,
       child: IconButton(
@@ -444,11 +442,12 @@ class FreshIconButton extends StatelessWidget {
         onPressed: onPressed,
         icon: Icon(icon, size: size >= 48 ? 22 : 18),
         style: IconButton.styleFrom(
-          backgroundColor: backgroundColor ?? palette.surface,
-          foregroundColor: foregroundColor ?? palette.ink,
-          disabledBackgroundColor: palette.surfaceMuted,
+          backgroundColor: backgroundColor ?? Colors.transparent,
+          foregroundColor: fg,
+          disabledBackgroundColor: Colors.transparent,
           disabledForegroundColor: palette.inkMuted,
           shape: const CircleBorder(),
+          side: BorderSide(color: palette.rule),
           elevation: 0,
         ),
       ),
@@ -575,34 +574,41 @@ class FreshStatusBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.freshPalette;
     final textTheme = Theme.of(context).textTheme;
-    return FreshCard(
-      color: color.withValues(alpha: 0.16),
-      shadow: false,
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          FreshIconChip(icon: icon, color: color),
-          const SizedBox(width: FreshSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: textTheme.titleMedium),
-                if (message != null) ...[
-                  const SizedBox(height: FreshSpacing.xs),
-                  Text(message!, style: textTheme.bodyMedium),
-                ],
-                if (action != null) ...[
-                  const SizedBox(height: FreshSpacing.sm),
-                  action!,
-                ],
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        FreshIconChip(icon: icon, color: color),
+        const SizedBox(width: FreshSpacing.md),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: textTheme.bodyLarge?.copyWith(
+                  color: palette.ink,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (message != null) ...[
+                const SizedBox(height: FreshSpacing.xs),
+                Text(
+                  message!,
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: palette.inkSoft,
+                  ),
+                ),
               ],
-            ),
+              if (action != null) ...[
+                const SizedBox(height: FreshSpacing.sm),
+                action!,
+              ],
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -615,6 +621,7 @@ class FreshProgressRing extends StatelessWidget {
     this.size = 90,
     this.color = FreshColors.lime,
     this.trackColor,
+    this.strokeWidth,
   });
 
   final double progress;
@@ -622,6 +629,7 @@ class FreshProgressRing extends StatelessWidget {
   final double size;
   final Color color;
   final Color? trackColor;
+  final double? strokeWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -637,7 +645,8 @@ class FreshProgressRing extends StatelessWidget {
               painter: _RingPainter(
                 progress: progress.clamp(0, 1).toDouble(),
                 color: color,
-                trackColor: trackColor ?? palette.surface,
+                trackColor: trackColor ?? palette.rule,
+                strokeWidth: strokeWidth,
               ),
             ),
           ),
@@ -653,15 +662,17 @@ class _RingPainter extends CustomPainter {
     required this.progress,
     required this.color,
     required this.trackColor,
+    this.strokeWidth,
   });
 
   final double progress;
   final Color color;
   final Color trackColor;
+  final double? strokeWidth;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final stroke = size.width * 0.13;
+    final stroke = strokeWidth ?? size.width * 0.13;
     final rect = Offset.zero & size;
     final insetRect = rect.deflate(stroke / 2);
     final trackPaint = Paint()
@@ -688,7 +699,8 @@ class _RingPainter extends CustomPainter {
   bool shouldRepaint(covariant _RingPainter oldDelegate) {
     return oldDelegate.progress != progress ||
         oldDelegate.color != color ||
-        oldDelegate.trackColor != trackColor;
+        oldDelegate.trackColor != trackColor ||
+        oldDelegate.strokeWidth != strokeWidth;
   }
 }
 
@@ -805,27 +817,24 @@ class FreshEmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
     final textTheme = Theme.of(context).textTheme;
-    return FreshCard(
-      color: palette.surface,
-      child: SizedBox(
-        width: double.infinity,
-        child: Column(
-          children: [
-            FreshIconChip(icon: icon, color: FreshColors.limeDeep),
-            const SizedBox(height: FreshSpacing.md),
-            Text(
-              title,
-              style: textTheme.titleMedium,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: FreshSpacing.sm),
-            Text(
-              message,
-              style: textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+    return SizedBox(
+      width: double.infinity,
+      child: Column(
+        children: [
+          FreshIconChip(icon: icon, color: FreshColors.lime),
+          const SizedBox(height: FreshSpacing.md),
+          Text(
+            title,
+            style: textTheme.titleMedium,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: FreshSpacing.sm),
+          Text(
+            message,
+            style: textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
     );
   }

@@ -56,7 +56,7 @@ class _MealItemEditorSheetState extends State<MealItemEditorSheet> {
     final l10n = context.l10n;
     final palette = context.freshPalette;
     return DecoratedBox(
-      decoration: BoxDecoration(color: palette.surfaceSoft),
+      decoration: BoxDecoration(color: palette.surface),
       child: Padding(
         padding: EdgeInsets.fromLTRB(18, 12, 18, bottomInset + 18),
         child: SingleChildScrollView(
@@ -245,11 +245,14 @@ class _MealTotalSummary extends StatelessWidget {
         height: 1.25,
       ),
     );
-    return FreshCard(
+    return Container(
       key: const ValueKey('meal_editor_total_card'),
+      decoration: BoxDecoration(
+        color: palette.surface,
+        borderRadius: BorderRadius.circular(FreshRadii.md),
+        border: Border.all(color: palette.rule),
+      ),
       padding: const EdgeInsets.all(16),
-      shadow: false,
-      color: palette.limeWash,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -356,10 +359,12 @@ class _IngredientEditorCard extends StatelessWidget {
         ),
       ),
     );
-    return FreshCard(
+    return Container(
+      decoration: BoxDecoration(
+        color: palette.surface,
+        borderRadius: BorderRadius.circular(FreshRadii.md),
+      ),
       padding: const EdgeInsets.all(16),
-      shadow: true,
-      color: palette.surface,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -634,19 +639,9 @@ class _QuantityStepButton extends StatelessWidget {
   }
 }
 
-
-
-
-
-
-
 String _macroSummary(BuildContext context, NutritionEdit nutrition) {
   final l10n = context.l10n;
   return '${l10n.commonProtein} ${formatMacro(nutrition.proteinGrams)}g · '
       '${l10n.commonCarbs} ${formatMacro(nutrition.carbsGrams)}g · '
       '${l10n.commonFat} ${formatMacro(nutrition.fatGrams)}g';
 }
-
-
-
-

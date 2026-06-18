@@ -445,7 +445,7 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
     final totalSteps = _totalSteps;
     final currentStep = _isResultStep ? totalSteps : _stepIndex + 1;
     return Material(
-      color: palette.screen,
+      color: palette.surface,
       child: AnimatedPadding(
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOut,

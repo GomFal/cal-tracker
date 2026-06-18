@@ -533,25 +533,34 @@ class _EditorSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
-    return FreshCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              FreshIconChip(
-                icon: icon,
-                color: palette.leaf,
-                backgroundColor: palette.limeWash,
-              ),
-              const SizedBox(width: FreshSpacing.md),
-              Text(title, style: Theme.of(context).textTheme.titleMedium),
-            ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 20, color: palette.leaf),
+            const SizedBox(width: FreshSpacing.sm),
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: palette.ink,
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+          ],
+        ),
+        const SizedBox(height: FreshSpacing.sm),
+        Container(
+          decoration: BoxDecoration(
+            color: palette.surface,
+            borderRadius: BorderRadius.circular(FreshRadii.md),
           ),
-          const SizedBox(height: FreshSpacing.lg),
-          child,
-        ],
-      ),
+          padding: const EdgeInsets.all(FreshSpacing.lg),
+          child: child,
+        ),
+        const SizedBox(height: FreshSpacing.md),
+        Divider(height: 1, color: palette.rule),
+      ],
     );
   }
 }
@@ -564,8 +573,11 @@ class _OptionalNutrientsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
-    return FreshCard(
-      padding: EdgeInsets.zero,
+    return Container(
+      decoration: BoxDecoration(
+        color: palette.surface,
+        borderRadius: BorderRadius.circular(FreshRadii.md),
+      ),
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
@@ -575,14 +587,12 @@ class _OptionalNutrientsSection extends StatelessWidget {
             vertical: FreshSpacing.sm,
           ),
           childrenPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-          leading: FreshIconChip(
-            icon: Icons.tune_rounded,
-            color: palette.orange,
-            backgroundColor: palette.yellow,
-          ),
+          leading: Icon(Icons.tune_rounded, size: 20, color: palette.orange),
           title: Text(
             context.l10n.usualFoodsOptionalSectionTitle,
-            style: Theme.of(context).textTheme.titleMedium,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
           ),
           subtitle: Text(
             context.l10n.usualFoodsOptionalSectionSubtitle,
@@ -668,16 +678,7 @@ class _BottomSaveBar extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: palette.screen,
-        boxShadow: [
-          BoxShadow(
-            color: context.freshShadowColor(
-              lightAlpha: 0.10,
-              darkAlpha: 0.40,
-            ),
-            blurRadius: 24,
-            offset: const Offset(0, -8),
-          ),
-        ],
+        border: Border(top: BorderSide(color: palette.rule)),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
@@ -742,15 +743,17 @@ class _ScanFromPhotoCta extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final palette = context.freshPalette;
-    return FreshCard(
+    return Container(
       key: const ValueKey('usual_food_scan_from_photo_cta'),
+      decoration: BoxDecoration(
+        color: palette.surface,
+        borderRadius: BorderRadius.circular(FreshRadii.md),
+        border: Border.all(color: palette.rule),
+      ),
+      padding: const EdgeInsets.all(FreshSpacing.md),
       child: Row(
         children: [
-          FreshIconChip(
-            icon: Icons.document_scanner_outlined,
-            color: palette.leaf,
-            backgroundColor: palette.limeWash,
-          ),
+          Icon(Icons.document_scanner_outlined, size: 20, color: palette.leaf),
           const SizedBox(width: FreshSpacing.md),
           Expanded(
             child: Column(
@@ -759,7 +762,9 @@ class _ScanFromPhotoCta extends StatelessWidget {
               children: [
                 Text(
                   l10n.usualFoodsScanTitle,
-                  style: Theme.of(context).textTheme.titleSmall,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                 ),
                 const SizedBox(height: 2),
                 Text(

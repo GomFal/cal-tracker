@@ -72,6 +72,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commonMeals => 'Meals';
 
   @override
+  String get commonWater => 'Water';
+
+  @override
   String get commonRemaining => 'Remaining';
 
   @override
@@ -167,6 +170,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get navLog => 'Log';
+
+  @override
+  String get navAgent => 'Agent';
 
   @override
   String get navUsual => 'Usual';
@@ -831,6 +837,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get macroUsePercentages => 'Use percentages';
 
   @override
+  String get dashboardGreeting => 'Good morning,';
+
+  @override
   String get dashboardCouldNotLoadToday => 'Could not load today';
 
   @override
@@ -850,6 +859,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dashboardCaloriesLeft => 'left';
+
+  @override
+  String get dashboardOfGoal => 'of goal';
 
   @override
   String dashboardGoalLine(int calories, String liters) {

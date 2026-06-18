@@ -53,7 +53,7 @@ class _MacroDistributionSheetState extends State<MacroDistributionSheet> {
     final l10n = context.l10n;
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     return Material(
-      color: palette.screen,
+      color: palette.surface,
       child: Padding(
         padding: EdgeInsets.fromLTRB(20, 12, 20, bottomInset + 20),
         child: SizedBox(
@@ -301,7 +301,7 @@ class _PersonalizedMacroSheetState extends State<_PersonalizedMacroSheet> {
     final l10n = context.l10n;
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     return Material(
-      color: palette.screen,
+      color: palette.surface,
       child: Padding(
         padding: EdgeInsets.fromLTRB(20, 12, 20, bottomInset + 20),
         child: SizedBox(
@@ -376,10 +376,12 @@ class _PersonalizedMacroSheetState extends State<_PersonalizedMacroSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        FreshCard(
+        Container(
           key: const ValueKey('macro_percentage_editor'),
-          color: context.freshPalette.surface,
-          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: palette.surfaceSoft,
+            borderRadius: BorderRadius.circular(FreshRadii.lg),
+          ),
           child: Column(
             children: [
               _MacroNumberField(
@@ -389,7 +391,7 @@ class _PersonalizedMacroSheetState extends State<_PersonalizedMacroSheet> {
                 controller: _proteinPctController,
                 onChanged: (value) => _setPercentage('protein', value),
               ),
-              const SizedBox(height: FreshSpacing.md),
+              Divider(height: 1, color: palette.rule),
               _MacroNumberField(
                 fieldKey: const ValueKey('macro_percentage_carbs_field'),
                 label: l10n.commonCarbs,
@@ -397,7 +399,7 @@ class _PersonalizedMacroSheetState extends State<_PersonalizedMacroSheet> {
                 controller: _carbsPctController,
                 onChanged: (value) => _setPercentage('carbs', value),
               ),
-              const SizedBox(height: FreshSpacing.md),
+              Divider(height: 1, color: palette.rule),
               _MacroNumberField(
                 fieldKey: const ValueKey('macro_percentage_fat_field'),
                 label: l10n.commonFat,
@@ -465,10 +467,12 @@ class _PersonalizedMacroSheetState extends State<_PersonalizedMacroSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        FreshCard(
+        Container(
           key: const ValueKey('macro_grams_editor'),
-          color: context.freshPalette.surface,
-          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: palette.surfaceSoft,
+            borderRadius: BorderRadius.circular(FreshRadii.lg),
+          ),
           child: Column(
             children: [
               _MacroNumberField(
@@ -478,7 +482,7 @@ class _PersonalizedMacroSheetState extends State<_PersonalizedMacroSheet> {
                 controller: _proteinGramsController,
                 onChanged: (_) => setState(() {}),
               ),
-              const SizedBox(height: FreshSpacing.md),
+              Divider(height: 1, color: palette.rule),
               _MacroNumberField(
                 fieldKey: const ValueKey('macro_grams_carbs_field'),
                 label: l10n.commonCarbs,
@@ -486,7 +490,7 @@ class _PersonalizedMacroSheetState extends State<_PersonalizedMacroSheet> {
                 controller: _carbsGramsController,
                 onChanged: (_) => setState(() {}),
               ),
-              const SizedBox(height: FreshSpacing.md),
+              Divider(height: 1, color: palette.rule),
               _MacroNumberField(
                 fieldKey: const ValueKey('macro_grams_fat_field'),
                 label: l10n.commonFat,

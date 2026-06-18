@@ -59,22 +59,7 @@ void main() {
         find.byKey(const ValueKey('dashboard_progress_card')),
         findsOneWidget,
       );
-      expect(
-        find.byKey(const ValueKey('dashboard_macro_carbs_icon')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const ValueKey('dashboard_macro_protein_icon')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const ValueKey('dashboard_macro_fats_icon')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const ValueKey('dashboard_water_intake_card')),
-        findsOneWidget,
-      );
+      expect(find.text('MACROS'), findsOneWidget);
       expect(find.text('0 / 0 L'), findsOneWidget);
       expect(find.byKey(const ValueKey('dashboard_goal_line')), findsNothing);
       expect(find.text('Calendar'), findsNothing);
@@ -83,7 +68,7 @@ void main() {
       expect(find.byIcon(Icons.notifications_none_rounded), findsNothing);
       expect(find.byIcon(Icons.bolt_rounded), findsNothing);
 
-      expect(themeModeViewModel.themeMode, ThemeMode.system);
+      expect(themeModeViewModel.themeMode, ThemeMode.dark);
       expect(preferencesRepository.savedModes, isEmpty);
     },
   );
@@ -116,7 +101,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Water Intake'), findsOneWidget);
+    expect(find.text('WATER INTAKE'), findsOneWidget);
     expect(find.text('0 / 2.5 L'), findsOneWidget);
 
     await tester.tap(
@@ -132,7 +117,7 @@ void main() {
     expect(find.text('0 / 2.5 L'), findsOneWidget);
   });
 
-  testWidgets('dashboard water widget uses contained dark-mode shadows', (
+  testWidgets('dashboard water section has no blue card container', (
     tester,
   ) async {
     final nutritionRepository = _FakeNutritionRepository(
@@ -163,28 +148,18 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final card = tester.widget<Container>(
+    expect(
       find.byKey(const ValueKey('dashboard_water_intake_card')),
-    );
-    final decoration = card.decoration! as BoxDecoration;
-    final shadows = decoration.boxShadow!;
-
-    expect(decoration.color, const Color(0xff18343a));
-    expect(
-      shadows.any((shadow) => shadow.color == const Color(0x14f3f7ee)),
-      isFalse,
+      findsNothing,
     );
     expect(
-      shadows.any((shadow) =>
-          _channel(shadow.color.r) > 220 &&
-          _channel(shadow.color.g) > 220 &&
-          _channel(shadow.color.b) > 220),
-      isFalse,
+      find.byKey(const ValueKey('dashboard_water_progress')),
+      findsOneWidget,
     );
   });
 
   testWidgets(
-    'dashboard empty meals card uses dark-mode shadows in dark theme',
+    'dashboard empty meals section shows CTA without card',
     (tester) async {
       final nutritionRepository = _FakeNutritionRepository(
         dailySummary: _summaryWithNoMeals,
@@ -216,36 +191,17 @@ void main() {
 
       expect(
         find.byKey(const ValueKey('dashboard_empty_meals_card')),
-        findsOneWidget,
+        findsNothing,
       );
-
-      final host = find.byKey(const ValueKey('dashboard_empty_meals_card'));
-      final decorated = tester.widget<DecoratedBox>(
-        find.descendant(
-          of: host,
-          matching: find.byWidgetPredicate(
-            (w) =>
-                w is DecoratedBox &&
-                w.decoration is BoxDecoration &&
-                (w.decoration as BoxDecoration).boxShadow != null,
-          ),
-        ),
-      );
-      final decoration = decorated.decoration as BoxDecoration;
-      final shadows = decoration.boxShadow!;
-
       expect(
-        shadows.any((shadow) =>
-            _channel(shadow.color.r) > 220 &&
-            _channel(shadow.color.g) > 220 &&
-            _channel(shadow.color.b) > 220),
-        isFalse,
+        find.text('No meals logged today'),
+        findsOneWidget,
       );
     },
   );
 
   testWidgets(
-    'dashboard calorie setup card uses dark-mode shadows in dark theme',
+    'dashboard calorie setup hero shows setup prompt without card shadows',
     (tester) async {
       final nutritionRepository = _FakeNutritionRepository(
         dailySummary: _summaryWithoutConfiguredCalories,
@@ -279,28 +235,13 @@ void main() {
         find.byKey(const ValueKey('dashboard_progress_card')),
         findsOneWidget,
       );
-
-      final host = find.byKey(const ValueKey('dashboard_progress_card'));
-      final decorated = tester.widget<DecoratedBox>(
-        find.descendant(
-          of: host,
-          matching: find.byWidgetPredicate(
-            (w) =>
-                w is DecoratedBox &&
-                w.decoration is BoxDecoration &&
-                (w.decoration as BoxDecoration).boxShadow != null,
-          ),
-        ),
-      );
-      final decoration = decorated.decoration as BoxDecoration;
-      final shadows = decoration.boxShadow!;
-
       expect(
-        shadows.any((shadow) =>
-            _channel(shadow.color.r) > 220 &&
-            _channel(shadow.color.g) > 220 &&
-            _channel(shadow.color.b) > 220),
-        isFalse,
+        find.text('Set up your'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('daily calories'),
+        findsOneWidget,
       );
     },
   );
@@ -337,7 +278,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('0 / 2.5 L'), findsOneWidget);
-      expect(find.byType(LinearProgressIndicator), findsNothing);
+      // Hero section now has a LinearProgressIndicator thin bar
 
       await tester.tap(
         find.byKey(const ValueKey('dashboard_water_increase_button')),
@@ -345,7 +286,7 @@ void main() {
       await tester.pump();
 
       expect(find.text('0.25 / 2.5 L'), findsOneWidget);
-      expect(find.byType(LinearProgressIndicator), findsNothing);
+      // Hero section now has a LinearProgressIndicator thin bar
 
       await tester.tap(
         find.byKey(const ValueKey('dashboard_water_increase_button')),
@@ -353,7 +294,7 @@ void main() {
       await tester.pump();
 
       expect(find.text('0.5 / 2.5 L'), findsOneWidget);
-      expect(find.byType(LinearProgressIndicator), findsNothing);
+      // Hero section now has a LinearProgressIndicator thin bar
       expect(nutritionRepository.hydrationUpdateRequests, [0.25]);
 
       firstSave.complete(_summaryWithWater(_summaryWithWaterGoal, 0.25));
@@ -361,13 +302,13 @@ void main() {
 
       expect(nutritionRepository.hydrationUpdateRequests, [0.25, 0.5]);
       expect(find.text('0.5 / 2.5 L'), findsOneWidget);
-      expect(find.byType(LinearProgressIndicator), findsNothing);
+      // Hero section now has a LinearProgressIndicator thin bar
 
       secondSave.complete(_summaryWithWater(_summaryWithWaterGoal, 0.5));
       await tester.pumpAndSettle();
 
       expect(find.text('0.5 / 2.5 L'), findsOneWidget);
-      expect(find.byType(LinearProgressIndicator), findsNothing);
+      // Hero section now has a LinearProgressIndicator thin bar
     },
   );
 
@@ -700,7 +641,10 @@ void main() {
     expect(find.text('Tap to set your calorie target'), findsNothing);
     expect(find.text('??'), findsNothing);
 
-    await tester.tap(find.byKey(const ValueKey('dashboard_progress_card')));
+    final progressCard = find.byKey(const ValueKey('dashboard_progress_card'));
+    await tester.ensureVisible(progressCard);
+    await tester.pumpAndSettle();
+    await tester.tap(progressCard);
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const ValueKey('dashboard_calorie_target_field')),
@@ -798,8 +742,6 @@ Widget _testApp(Widget child, {ThemeMode themeMode = ThemeMode.light}) {
     home: Scaffold(body: child),
   );
 }
-
-int _channel(double value) => (value * 255).round().clamp(0, 255);
 
 class _FakeNutritionRepository extends NutritionRepository {
   _FakeNutritionRepository({

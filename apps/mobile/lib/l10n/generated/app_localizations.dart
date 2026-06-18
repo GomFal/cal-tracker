@@ -224,6 +224,12 @@ abstract class AppLocalizations {
   /// **'Meals'**
   String get commonMeals;
 
+  /// No description provided for @commonWater.
+  ///
+  /// In en, this message translates to:
+  /// **'Water'**
+  String get commonWater;
+
   /// No description provided for @commonRemaining.
   ///
   /// In en, this message translates to:
@@ -391,6 +397,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Log'**
   String get navLog;
+
+  /// No description provided for @navAgent.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent'**
+  String get navAgent;
 
   /// No description provided for @navUsual.
   ///
@@ -1545,6 +1557,12 @@ abstract class AppLocalizations {
   /// **'Use percentages'**
   String get macroUsePercentages;
 
+  /// No description provided for @dashboardGreeting.
+  ///
+  /// In en, this message translates to:
+  /// **'Good morning,'**
+  String get dashboardGreeting;
+
   /// No description provided for @dashboardCouldNotLoadToday.
   ///
   /// In en, this message translates to:
@@ -1586,6 +1604,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'left'**
   String get dashboardCaloriesLeft;
+
+  /// No description provided for @dashboardOfGoal.
+  ///
+  /// In en, this message translates to:
+  /// **'of goal'**
+  String get dashboardOfGoal;
 
   /// No description provided for @dashboardGoalLine.
   ///

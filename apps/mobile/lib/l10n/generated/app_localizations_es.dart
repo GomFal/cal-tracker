@@ -176,7 +176,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get navAgent => 'Agente';
 
   @override
-  String get navUsual => 'Habituales';
+  String get navUsual => 'Mis alimentos';
 
   @override
   String get navMenu => 'Menú';
@@ -1010,27 +1010,27 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get templatesTitle => 'Habituales';
+  String get templatesTitle => 'Mis alimentos';
 
   @override
   String get templatesSubtitle => 'Platos e ingredientes habituales';
 
   @override
-  String get templatesAddTooltip => 'Añadir comida habitual';
+  String get templatesAddTooltip => 'Añadir comida guardada';
 
   @override
   String get templatesExplainer =>
       'Las comidas habituales son comidas de confianza que puedes registrar rápido.';
 
   @override
-  String get templatesNoUsualMealsYet => 'Aún no hay comidas habituales';
+  String get templatesNoUsualMealsYet => 'Aún no hay comidas guardadas';
 
   @override
   String get templatesNoUsualMealsMessage =>
       'Tus comidas guardadas aparecerán aquí.';
 
   @override
-  String get templatesDeleteUsualMealTitle => '¿Eliminar comida habitual?';
+  String get templatesDeleteUsualMealTitle => '¿Eliminar comida guardada?';
 
   @override
   String get templatesNoAliasesYet => 'Sin alias todavía';
@@ -1044,10 +1044,10 @@ class AppLocalizationsEs extends AppLocalizations {
       'Crea platos habituales desde ingredientes seleccionados o desde un borrador revisado. Las plantillas de relleno están desactivadas.';
 
   @override
-  String get mealTemplateEditorCreateTitle => 'Crear comida habitual';
+  String get mealTemplateEditorCreateTitle => 'Crear comida guardada';
 
   @override
-  String get mealTemplateEditorEditTitle => 'Editar comida habitual';
+  String get mealTemplateEditorEditTitle => 'Editar comida guardada';
 
   @override
   String get mealTemplateEditorSubtitle =>
@@ -1097,7 +1097,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get mealTemplateEditorAddFromSearch => 'Añadir desde búsqueda';
 
   @override
-  String get mealTemplateEditorSaveButton => 'Guardar comida habitual';
+  String get mealTemplateEditorSaveButton => 'Guardar comida';
 
   @override
   String get mealTemplateEditorTitleRequired =>
@@ -1111,33 +1111,34 @@ class AppLocalizationsEs extends AppLocalizations {
   String get mealTemplateEditorSaveFailedMessage => 'Inténtalo de nuevo.';
 
   @override
-  String get usualsMealsTab => 'Platos';
+  String get usualsMealsTab => 'Comidas';
 
   @override
   String get usualsIngredientsTab => 'Ingredientes';
 
   @override
-  String get usualsCouldNotLoad => 'No se pudieron cargar los habituales';
+  String get usualsCouldNotLoad =>
+      'No se pudieron cargar tus alimentos guardados';
 
   @override
-  String get usualFoodsAddTooltip => 'Añadir ingrediente habitual';
+  String get usualFoodsAddTooltip => 'Añadir ingrediente guardado';
 
   @override
   String get usualFoodsExplainer =>
-      'Los ingredientes habituales son alimentos que introduces manualmente para que aparezcan primero al buscar y registrar comidas.';
+      'Los ingredientes guardados son alimentos que introduces manualmente para reutilizarlos al buscar y registrar comidas.';
 
   @override
-  String get usualFoodsEmptyTitle => 'Aún no hay ingredientes habituales';
+  String get usualFoodsEmptyTitle => 'Aún no hay ingredientes guardados';
 
   @override
   String get usualFoodsEmptyMessage =>
-      'Añade alimentos que uses a menudo para que aparezcan primero al buscar y registrar comidas.';
+      'Añade alimentos que quieras reutilizar para que aparezcan primero al buscar y registrar comidas.';
 
   @override
-  String get usualFoodsCreateTitle => 'Nuevo ingrediente habitual';
+  String get usualFoodsCreateTitle => 'Nuevo ingrediente guardado';
 
   @override
-  String get usualFoodsEditTitle => 'Editar ingrediente habitual';
+  String get usualFoodsEditTitle => 'Editar ingrediente guardado';
 
   @override
   String get usualFoodsDraftLabel => 'Rellenar desde texto con IA (opcional)';
@@ -1310,17 +1311,17 @@ class AppLocalizationsEs extends AppLocalizations {
   String get usualFoodsManualSource => 'Manual';
 
   @override
-  String get usualFoodsEditTooltip => 'Editar ingrediente habitual';
+  String get usualFoodsEditTooltip => 'Editar ingrediente guardado';
 
   @override
-  String get usualFoodsDeleteTooltip => 'Eliminar ingrediente habitual';
+  String get usualFoodsDeleteTooltip => 'Eliminar ingrediente guardado';
 
   @override
-  String get usualFoodsDeleteTitle => '¿Eliminar ingrediente habitual?';
+  String get usualFoodsDeleteTitle => '¿Eliminar ingrediente guardado?';
 
   @override
   String usualFoodsDeleteMessage(String name) {
-    return '¿Eliminar $name de tus ingredientes habituales?';
+    return '¿Eliminar $name de tus ingredientes guardados?';
   }
 
   @override

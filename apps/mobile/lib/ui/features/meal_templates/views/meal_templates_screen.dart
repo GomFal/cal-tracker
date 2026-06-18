@@ -133,22 +133,19 @@ class _MealsSection extends StatelessWidget {
       );
     }
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (final template in viewModel.templates)
-          Padding(
-            padding: const EdgeInsets.only(bottom: FreshSpacing.md),
-            child: _TemplateCard(
-              template: template,
-              onLog: () => context.push(
-                '/meal/create',
-                extra: MealCreateInitialItems(template.items),
-              ),
-              onEdit: () => context.push(
-                MealTemplateEditorScreen.editRoute(template.id),
-              ),
-              onDelete: () =>
-                  _confirmDeleteTemplate(context, viewModel, template),
+          _TemplateCard(
+            template: template,
+            onLog: () => context.push(
+              '/meal/create',
+              extra: MealCreateInitialItems(template.items),
             ),
+            onEdit: () => context.push(
+              MealTemplateEditorScreen.editRoute(template.id),
+            ),
+            onDelete: () => _confirmDeleteTemplate(context, viewModel, template),
           ),
       ],
     );
@@ -197,16 +194,13 @@ class _IngredientsSection extends StatelessWidget {
       );
     }
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         for (final food in viewModel.usualFoods)
-          Padding(
-            padding: const EdgeInsets.only(bottom: FreshSpacing.md),
-            child: _UsualFoodCard(
-              food: food,
-              onEdit: () =>
-                  context.push(UsualFoodEditorScreen.editRoute(food.id)),
-              onDelete: () => _confirmDeleteFood(context, viewModel, food),
-            ),
+          _UsualFoodCard(
+            food: food,
+            onEdit: () => context.push(UsualFoodEditorScreen.editRoute(food.id)),
+            onDelete: () => _confirmDeleteFood(context, viewModel, food),
           ),
       ],
     );
@@ -257,91 +251,71 @@ class _UsualFoodCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final l10n = context.l10n;
     final palette = context.freshPalette;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? palette.surfaceSoft : palette.surface,
-        borderRadius: BorderRadius.circular(FreshRadii.lg),
-        border: Border.all(color: palette.rule),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: ValueKey('usual_food_edit_${food.id}'),
+        onTap: onEdit,
+        borderRadius: BorderRadius.circular(FreshRadii.sm),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 18),
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: palette.rule, width: 1)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              FreshIconChip(
-                icon: Icons.shopping_basket_rounded,
-                color: palette.leaf,
-                backgroundColor: palette.limeWash,
-              ),
-              const SizedBox(width: FreshSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(food.name, style: textTheme.titleMedium),
-                    Text(
-                      [
-                        if (food.brand != null) food.brand!,
-                        l10n.usualFoodsPerServing(
-                          _formatQuantity(food.servingGrams),
-                        ),
-                        l10n.usualFoodsManualSource,
-                      ].join(' · '),
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: palette.inkMuted,
-                      ),
-                    ),
-                  ],
+              Text(
+                food.name,
+                style: textTheme.titleMedium?.copyWith(
+                  color: palette.ink,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-              IconButton(
-                key: ValueKey('usual_food_edit_${food.id}'),
-                tooltip: l10n.usualFoodsEditTooltip,
-                onPressed: onEdit,
-                icon: const Icon(Icons.edit_rounded),
+              const SizedBox(height: FreshSpacing.xs),
+              Text(
+                [
+                  if (food.brand != null) food.brand!,
+                  l10n.usualFoodsPerServing(_formatQuantity(food.servingGrams)),
+                  l10n.usualFoodsManualSource,
+                ].join(' · '),
+                style: textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
               ),
-              IconButton(
-                key: ValueKey('usual_food_delete_${food.id}'),
-                tooltip: l10n.usualFoodsDeleteTooltip,
-                onPressed: onDelete,
-                icon: const Icon(Icons.delete_outline_rounded),
-              ),
-            ],
-          ),
-          const SizedBox(height: FreshSpacing.md),
-          Wrap(
-            spacing: FreshSpacing.sm,
-            runSpacing: FreshSpacing.sm,
-            children: [
-              _NutritionChip(
-                label: l10n.commonCalories,
-                value: '${food.nutrition.calories}',
-                unit: l10n.commonKcal,
-                color: palette.lime,
-              ),
-              _NutritionChip(
-                label: l10n.commonProtein,
-                value: _formatQuantity(food.nutrition.proteinGrams),
-                unit: 'g',
-                color: palette.mint,
-              ),
-              _NutritionChip(
-                label: l10n.commonCarbs,
-                value: _formatQuantity(food.nutrition.carbsGrams),
-                unit: 'g',
-                color: palette.water,
-              ),
-              _NutritionChip(
-                label: l10n.commonFat,
-                value: _formatQuantity(food.nutrition.fatGrams),
-                unit: 'g',
-                color: palette.orange,
+              const SizedBox(height: FreshSpacing.md),
+              Wrap(
+                spacing: FreshSpacing.lg,
+                runSpacing: FreshSpacing.sm,
+                children: [
+                  _NutritionChip(
+                    label: l10n.commonCalories,
+                    value: '${food.nutrition.calories}',
+                    unit: l10n.commonKcal,
+                    color: palette.lime,
+                  ),
+                  _NutritionChip(
+                    label: l10n.commonProtein,
+                    value: _formatQuantity(food.nutrition.proteinGrams),
+                    unit: 'g',
+                    color: palette.lime,
+                  ),
+                  _NutritionChip(
+                    label: l10n.commonCarbs,
+                    value: _formatQuantity(food.nutrition.carbsGrams),
+                    unit: 'g',
+                    color: palette.lime,
+                  ),
+                  _NutritionChip(
+                    label: l10n.commonFat,
+                    value: _formatQuantity(food.nutrition.fatGrams),
+                    unit: 'g',
+                    color: palette.lime,
+                  ),
+                ],
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -365,34 +339,35 @@ class _TemplateCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final l10n = context.l10n;
     final palette = context.freshPalette;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onLog,
-        borderRadius: BorderRadius.circular(FreshRadii.lg),
+        borderRadius: BorderRadius.circular(FreshRadii.sm),
         child: Container(
-          padding: const EdgeInsets.all(16),
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 18),
           decoration: BoxDecoration(
-            color: isDark ? palette.surfaceSoft : palette.surface,
-            borderRadius: BorderRadius.circular(FreshRadii.lg),
-            border: Border.all(color: palette.rule),
+            border: Border(bottom: BorderSide(color: palette.rule, width: 1)),
           ),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  FreshIconChip(
-                    icon: Icons.restaurant_menu_rounded,
-                    color: palette.leaf,
-                    backgroundColor: palette.limeWash,
-                  ),
-                  const SizedBox(width: FreshSpacing.md),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(template.title, style: textTheme.titleMedium),
+                        Text(
+                          template.title,
+                          style: textTheme.titleMedium?.copyWith(
+                            color: palette.ink,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: FreshSpacing.xs),
                         Text(
                           template.aliases.isEmpty
                               ? l10n.templatesNoAliasesYet
@@ -405,23 +380,18 @@ class _TemplateCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  IconButton(
-                    key: ValueKey('meal_template_edit_${template.id}'),
+                  FreshIconButton(
+                    key: ValueKey('meal_template_actions_${template.id}'),
                     tooltip: l10n.commonEditIngredients,
-                    onPressed: onEdit,
-                    icon: const Icon(Icons.edit_rounded),
-                  ),
-                  IconButton(
-                    key: ValueKey('meal_template_delete_${template.id}'),
-                    tooltip: l10n.commonDelete,
-                    onPressed: onDelete,
-                    icon: const Icon(Icons.delete_outline_rounded),
+                    onPressed: () => _showTemplateActions(context),
+                    icon: Icons.more_horiz_rounded,
+                    size: 38,
                   ),
                 ],
               ),
               const SizedBox(height: FreshSpacing.md),
               Wrap(
-                spacing: FreshSpacing.sm,
+                spacing: FreshSpacing.lg,
                 runSpacing: FreshSpacing.sm,
                 children: [
                   _NutritionChip(
@@ -434,21 +404,62 @@ class _TemplateCard extends StatelessWidget {
                     label: l10n.commonProtein,
                     value: _formatQuantity(template.nutrition.proteinGrams),
                     unit: 'g',
-                    color: palette.mint,
+                    color: palette.lime,
                   ),
                   _NutritionChip(
                     label: l10n.commonCarbs,
                     value: _formatQuantity(template.nutrition.carbsGrams),
                     unit: 'g',
-                    color: palette.water,
+                    color: palette.lime,
                   ),
                   _NutritionChip(
                     label: l10n.commonFat,
                     value: _formatQuantity(template.nutrition.fatGrams),
                     unit: 'g',
-                    color: palette.orange,
+                    color: palette.lime,
                   ),
                 ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showTemplateActions(BuildContext context) async {
+    final palette = context.freshPalette;
+    final l10n = context.l10n;
+    await showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(template.title, style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: FreshSpacing.md),
+              TextButton.icon(
+                key: ValueKey('meal_template_edit_${template.id}'),
+                onPressed: () {
+                  Navigator.of(sheetContext).pop();
+                  onEdit();
+                },
+                icon: const Icon(Icons.edit_rounded),
+                label: Text(l10n.commonEditIngredients),
+              ),
+              TextButton.icon(
+                key: ValueKey('meal_template_delete_${template.id}'),
+                onPressed: () {
+                  Navigator.of(sheetContext).pop();
+                  onDelete();
+                },
+                icon: Icon(Icons.delete_outline_rounded, color: palette.coral),
+                label: Text(l10n.commonDelete),
+                style: TextButton.styleFrom(foregroundColor: palette.coral),
               ),
             ],
           ),
@@ -474,21 +485,29 @@ class _NutritionChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.13),
-        borderRadius: BorderRadius.circular(FreshRadii.md),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(label, style: textTheme.labelSmall),
-          const SizedBox(height: 2),
-          Text('$value $unit', style: textTheme.labelLarge),
-        ],
-      ),
+    final palette = context.freshPalette;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label.toUpperCase(),
+          style: textTheme.labelSmall?.copyWith(
+            color: palette.inkMuted,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.8,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          '$value $unit',
+          style: textTheme.labelLarge?.copyWith(
+            color: color,
+            fontWeight: FontWeight.w700,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+      ],
     );
   }
 }

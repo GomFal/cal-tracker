@@ -130,6 +130,16 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
                       tooltip: l10n.commonBack,
                       onPressed: _leaveEditor,
                     ),
+                    actions: [
+                      if (food != null)
+                        FreshIconButton(
+                          key: ValueKey('usual_food_delete_${food.id}'),
+                          icon: Icons.delete_outline_rounded,
+                          tooltip: l10n.usualFoodsDeleteTooltip,
+                          foregroundColor: context.freshPalette.coral,
+                          onPressed: () => _confirmDeleteFood(viewModel, food),
+                        ),
+                    ],
                   ),
                 ),
                 Expanded(
@@ -443,6 +453,34 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
     if (viewModel.error == null) {
       _leaveEditor();
     }
+  }
+
+  Future<void> _confirmDeleteFood(
+    MealTemplatesViewModel viewModel,
+    UsualFood food,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(context.l10n.usualFoodsDeleteTitle),
+        content: Text(context.l10n.usualFoodsDeleteMessage(food.name)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(context.l10n.commonCancel),
+          ),
+          FilledButton(
+            key: const ValueKey('usual_food_confirm_delete_button'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(context.l10n.commonDelete),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await viewModel.deleteUsualFood(food);
+    if (!mounted || viewModel.error != null) return;
+    _leaveEditor();
   }
 
   void _leaveEditor() {

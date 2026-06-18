@@ -407,7 +407,7 @@ abstract class AppLocalizations {
   /// No description provided for @navUsual.
   ///
   /// In en, this message translates to:
-  /// **'Usual'**
+  /// **'My foods'**
   String get navUsual;
 
   /// No description provided for @navMenu.
@@ -1854,7 +1854,7 @@ abstract class AppLocalizations {
   /// No description provided for @templatesTitle.
   ///
   /// In en, this message translates to:
-  /// **'Usuals'**
+  /// **'My foods'**
   String get templatesTitle;
 
   /// No description provided for @templatesSubtitle.
@@ -1866,7 +1866,7 @@ abstract class AppLocalizations {
   /// No description provided for @templatesAddTooltip.
   ///
   /// In en, this message translates to:
-  /// **'Add usual meal'**
+  /// **'Add saved meal'**
   String get templatesAddTooltip;
 
   /// No description provided for @templatesExplainer.
@@ -1878,7 +1878,7 @@ abstract class AppLocalizations {
   /// No description provided for @templatesNoUsualMealsYet.
   ///
   /// In en, this message translates to:
-  /// **'No usual meals yet'**
+  /// **'No saved meals yet'**
   String get templatesNoUsualMealsYet;
 
   /// No description provided for @templatesNoUsualMealsMessage.
@@ -1890,7 +1890,7 @@ abstract class AppLocalizations {
   /// No description provided for @templatesDeleteUsualMealTitle.
   ///
   /// In en, this message translates to:
-  /// **'Delete usual meal?'**
+  /// **'Delete saved meal?'**
   String get templatesDeleteUsualMealTitle;
 
   /// No description provided for @templatesNoAliasesYet.
@@ -1914,13 +1914,13 @@ abstract class AppLocalizations {
   /// No description provided for @mealTemplateEditorCreateTitle.
   ///
   /// In en, this message translates to:
-  /// **'Create usual meal'**
+  /// **'Create saved meal'**
   String get mealTemplateEditorCreateTitle;
 
   /// No description provided for @mealTemplateEditorEditTitle.
   ///
   /// In en, this message translates to:
-  /// **'Edit usual meal'**
+  /// **'Edit saved meal'**
   String get mealTemplateEditorEditTitle;
 
   /// No description provided for @mealTemplateEditorSubtitle.
@@ -2004,7 +2004,7 @@ abstract class AppLocalizations {
   /// No description provided for @mealTemplateEditorSaveButton.
   ///
   /// In en, this message translates to:
-  /// **'Save usual meal'**
+  /// **'Save meal'**
   String get mealTemplateEditorSaveButton;
 
   /// No description provided for @mealTemplateEditorTitleRequired.
@@ -2040,43 +2040,43 @@ abstract class AppLocalizations {
   /// No description provided for @usualsCouldNotLoad.
   ///
   /// In en, this message translates to:
-  /// **'Could not load usuals'**
+  /// **'Could not load saved foods'**
   String get usualsCouldNotLoad;
 
   /// No description provided for @usualFoodsAddTooltip.
   ///
   /// In en, this message translates to:
-  /// **'Add usual ingredient'**
+  /// **'Add saved ingredient'**
   String get usualFoodsAddTooltip;
 
   /// No description provided for @usualFoodsExplainer.
   ///
   /// In en, this message translates to:
-  /// **'Usual ingredients are foods you enter manually so they appear first in search and meal logging.'**
+  /// **'Saved ingredients are foods you enter manually so they appear first in search and meal logging.'**
   String get usualFoodsExplainer;
 
   /// No description provided for @usualFoodsEmptyTitle.
   ///
   /// In en, this message translates to:
-  /// **'No usual ingredients yet'**
+  /// **'No saved ingredients yet'**
   String get usualFoodsEmptyTitle;
 
   /// No description provided for @usualFoodsEmptyMessage.
   ///
   /// In en, this message translates to:
-  /// **'Add foods you use often so they appear first in search and meal logging.'**
+  /// **'Add foods you want to reuse so they appear first in search and meal logging.'**
   String get usualFoodsEmptyMessage;
 
   /// No description provided for @usualFoodsCreateTitle.
   ///
   /// In en, this message translates to:
-  /// **'New usual ingredient'**
+  /// **'New saved ingredient'**
   String get usualFoodsCreateTitle;
 
   /// No description provided for @usualFoodsEditTitle.
   ///
   /// In en, this message translates to:
-  /// **'Edit usual ingredient'**
+  /// **'Edit saved ingredient'**
   String get usualFoodsEditTitle;
 
   /// No description provided for @usualFoodsDraftLabel.
@@ -2388,25 +2388,25 @@ abstract class AppLocalizations {
   /// No description provided for @usualFoodsEditTooltip.
   ///
   /// In en, this message translates to:
-  /// **'Edit usual ingredient'**
+  /// **'Edit saved ingredient'**
   String get usualFoodsEditTooltip;
 
   /// No description provided for @usualFoodsDeleteTooltip.
   ///
   /// In en, this message translates to:
-  /// **'Delete usual ingredient'**
+  /// **'Delete saved ingredient'**
   String get usualFoodsDeleteTooltip;
 
   /// No description provided for @usualFoodsDeleteTitle.
   ///
   /// In en, this message translates to:
-  /// **'Delete usual ingredient?'**
+  /// **'Delete saved ingredient?'**
   String get usualFoodsDeleteTitle;
 
   /// No description provided for @usualFoodsDeleteMessage.
   ///
   /// In en, this message translates to:
-  /// **'Delete {name} from your usual ingredients?'**
+  /// **'Delete {name} from your saved ingredients?'**
   String usualFoodsDeleteMessage(String name);
 
   /// No description provided for @voiceTitle.

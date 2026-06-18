@@ -21,10 +21,10 @@ void main() {
     await tester.pumpWidget(_RouterTestApp(repository: repository));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byTooltip('Add usual meal'));
+    await tester.tap(find.byTooltip('Add saved meal'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Create usual meal'), findsOneWidget);
+    expect(find.text('Create saved meal'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('meal_template_title_field')),
       findsOneWidget,

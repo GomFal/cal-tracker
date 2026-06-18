@@ -483,6 +483,7 @@ class _MacroSection extends StatelessWidget {
                 label: l10n.commonCarbs,
                 consumedGrams: consumed.carbsGrams,
                 targetGrams: target.carbsGrams,
+                iconSize: 36,
               ),
             ),
             _VerticalRule(color: palette.rule),
@@ -493,6 +494,7 @@ class _MacroSection extends StatelessWidget {
                 label: l10n.commonProtein,
                 consumedGrams: consumed.proteinGrams,
                 targetGrams: target.proteinGrams,
+                iconSize: 34,
               ),
             ),
             _VerticalRule(color: palette.rule),
@@ -503,6 +505,7 @@ class _MacroSection extends StatelessWidget {
                 label: l10n.commonFat,
                 consumedGrams: consumed.fatGrams,
                 targetGrams: target.fatGrams,
+                iconSize: 36,
               ),
             ),
           ],
@@ -535,6 +538,7 @@ class _MacroProgressRow extends StatelessWidget {
     required this.label,
     required this.consumedGrams,
     required this.targetGrams,
+    required this.iconSize,
   });
 
   final String assetPath;
@@ -542,6 +546,7 @@ class _MacroProgressRow extends StatelessWidget {
   final String label;
   final double consumedGrams;
   final double targetGrams;
+  final double iconSize;
 
   @override
   Widget build(BuildContext context) {
@@ -559,8 +564,8 @@ class _MacroProgressRow extends StatelessWidget {
           SvgPicture.asset(
             assetPath,
             key: iconKey,
-            width: 30,
-            height: 30,
+            width: iconSize,
+            height: iconSize,
             colorFilter: ColorFilter.mode(palette.lime, BlendMode.srcIn),
           ),
           const SizedBox(height: FreshSpacing.sm),

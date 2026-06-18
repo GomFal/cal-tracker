@@ -47,55 +47,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final palette = context.freshPalette;
     final user = auth.user;
     final goals = settings.goals;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final limeCardTextColor = isDark ? palette.ink : FreshPalette.dark.limeWash;
     return ContentFrame(
       title: l10n.settingsTitle,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          FreshCard(
-            radius: FreshRadii.xl,
-            color: palette.limeSoft,
-            child: Row(
-              children: [
-                Container(
-                  width: 58,
-                  height: 58,
-                  decoration: BoxDecoration(
-                    color: palette.surface,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.person_rounded,
-                    color: palette.limeDeep,
-                    size: 30,
-                  ),
-                ),
-                const SizedBox(width: FreshSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        user?.displayName ?? l10n.fallbackUserName,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              color: limeCardTextColor,
-                            ),
-                      ),
-                      if (user != null)
-                        Text(
-                          user.email,
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodyMedium
-                              ?.copyWith(color: limeCardTextColor),
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+          _SettingsUserHeader(
+            displayName: user?.displayName ?? l10n.fallbackUserName,
+            email: user?.email,
           ),
           const SizedBox(height: FreshSpacing.lg),
           if (settings.isLoading) ...[
@@ -123,7 +82,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ? null
                 : () => _showHydrationGoalSheet(context, goals: goals),
           ),
-          const SizedBox(height: FreshSpacing.md),
           _SettingsGoalRow(
             key: const ValueKey('calorie_target_row'),
             icon: Icons.flag_rounded,
@@ -138,7 +96,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ? null
                 : () => _showCalorieTargetSheet(context, goals),
           ),
-          const SizedBox(height: FreshSpacing.md),
           _SettingsGoalRow(
             key: const ValueKey('macro_distribution_row'),
             icon: Icons.pie_chart_rounded,
@@ -149,7 +106,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ? null
                 : () => _showMacroDistributionEntry(context, goals),
           ),
-          const SizedBox(height: FreshSpacing.md),
+          const SizedBox(height: FreshSpacing.lg),
           _SettingsGoalRow(
             key: const ValueKey('language_settings_row'),
             icon: Icons.translate_rounded,
@@ -158,7 +115,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: _languageDisplayName(locale.locale),
             onTap: () => _showLanguageSheet(context),
           ),
-          const SizedBox(height: FreshSpacing.md),
           _SettingsGoalRow(
             key: const ValueKey('theme_settings_row'),
             icon: Icons.contrast_rounded,
@@ -168,8 +124,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onTap: () => _showThemeSheet(context),
           ),
           if (!kReleaseMode) ...[
-            const SizedBox(height: FreshSpacing.md),
-            _DeveloperSettingsCard(
+            const SizedBox(height: FreshSpacing.lg),
+            _DeveloperSettingsSection(
               title: l10n.settingsDeveloperMenuTitle,
               performanceOverlayTitle: l10n.settingsPerformanceOverlayTitle,
               performanceOverlaySubtitle:
@@ -181,8 +137,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onPerformanceOverlayChanged: performanceOverlay.setVisible,
             ),
           ],
-          const SizedBox(height: FreshSpacing.md),
-          _DataSourcesCard(
+          const SizedBox(height: FreshSpacing.lg),
+          _DataSourcesSection(
             title: l10n.settingsDataSourcesTitle,
             subtitle: l10n.settingsDataSourcesSubtitle,
             openFoodFacts: l10n.settingsDataSourcesOpenFoodFacts,
@@ -212,8 +168,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     if (!context.mounted || value == null) return;
     final updated = await context.read<SettingsViewModel>().updateGoals(
-          hydrationGoalLiters: value,
-        );
+      hydrationGoalLiters: value,
+    );
     if (!context.mounted || updated == null) return;
     await _refreshGoalConsumers(context, forceDashboardRefresh: true);
   }
@@ -233,11 +189,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     if (!context.mounted || selection == null) return;
     final updated = await context.read<SettingsViewModel>().updateGoals(
-          calories: selection.calories,
-          calorieTargetSource: selection.source,
-          macroConfig: selection.macroConfig,
-          macroCalorieTarget: selection.calories,
-        );
+      calories: selection.calories,
+      calorieTargetSource: selection.source,
+      macroConfig: selection.macroConfig,
+      macroCalorieTarget: selection.calories,
+    );
     if (!context.mounted || updated == null) return;
     await _refreshGoalConsumers(context, forceDashboardRefresh: true);
     if (!context.mounted ||
@@ -245,7 +201,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         selection.macroConfig != null) {
       return;
     }
-    final shouldConfigure = await showModalBottomSheet<bool>(
+    final shouldConfigure =
+        await showModalBottomSheet<bool>(
           context: context,
           useSafeArea: true,
           builder: (context) =>
@@ -268,7 +225,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await _showMacroDistributionSheet(context, goals);
       return;
     }
-    final shouldSetCalories = await showModalBottomSheet<bool>(
+    final shouldSetCalories =
+        await showModalBottomSheet<bool>(
           context: context,
           useSafeArea: true,
           builder: (context) => const _MacroRequiresCaloriesSheet(),
@@ -293,9 +251,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     if (!context.mounted || macroConfig == null) return;
     final updated = await context.read<SettingsViewModel>().updateGoals(
-          macroConfig: macroConfig,
-          macroCalorieTarget: calories,
-        );
+      macroConfig: macroConfig,
+      macroCalorieTarget: calories,
+    );
     if (!context.mounted || updated == null) return;
     await _refreshGoalConsumers(context, forceDashboardRefresh: true);
   }
@@ -306,8 +264,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }) {
     return Future.wait([
       context.read<DashboardViewModel>().load(
-            forceRefresh: forceDashboardRefresh,
-          ),
+        forceRefresh: forceDashboardRefresh,
+      ),
       context.read<SettingsViewModel>().load(),
       context.read<MealHistoryViewModel>().load(),
     ]);
@@ -480,8 +438,56 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 }
 
-class _DeveloperSettingsCard extends StatelessWidget {
-  const _DeveloperSettingsCard({
+class _SettingsUserHeader extends StatelessWidget {
+  const _SettingsUserHeader({required this.displayName, required this.email});
+
+  final String displayName;
+  final String? email;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.freshPalette;
+    final textTheme = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(0, 4, 0, FreshSpacing.lg),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: palette.rule)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: palette.rule),
+            ),
+            child: Icon(Icons.person_rounded, color: palette.inkSoft, size: 22),
+          ),
+          const SizedBox(width: FreshSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(displayName, style: textTheme.titleLarge),
+                if (email != null)
+                  Text(
+                    email!,
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: palette.inkMuted,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DeveloperSettingsSection extends StatelessWidget {
+  const _DeveloperSettingsSection({
     required this.title,
     required this.performanceOverlayTitle,
     required this.performanceOverlaySubtitle,
@@ -501,41 +507,50 @@ class _DeveloperSettingsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
     final textTheme = Theme.of(context).textTheme;
-    return FreshCard(
-      padding: const EdgeInsets.all(16),
-      shadow: false,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              FreshIconChip(
-                icon: Icons.developer_mode_rounded,
-                color: palette.mint,
-              ),
-              const SizedBox(width: FreshSpacing.md),
-              Expanded(child: Text(title, style: textTheme.titleMedium)),
-            ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(title, style: textTheme.titleMedium),
+        const SizedBox(height: FreshSpacing.xs),
+        Container(
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: palette.rule)),
           ),
-          const SizedBox(height: FreshSpacing.sm),
-          SwitchListTile.adaptive(
-            key: const ValueKey('settings_performance_overlay_switch'),
-            contentPadding: EdgeInsets.zero,
-            title: Text(performanceOverlayTitle),
-            subtitle: Text(
-              '$performanceOverlaySubtitle\n$performanceOverlayStatus',
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: FreshSpacing.md),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(performanceOverlayTitle, style: textTheme.bodyLarge),
+                      const SizedBox(height: FreshSpacing.xs),
+                      Text(
+                        '$performanceOverlaySubtitle\n$performanceOverlayStatus',
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: palette.inkMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Switch.adaptive(
+                  key: const ValueKey('settings_performance_overlay_switch'),
+                  value: performanceOverlayEnabled,
+                  onChanged: onPerformanceOverlayChanged,
+                ),
+              ],
             ),
-            value: performanceOverlayEnabled,
-            onChanged: onPerformanceOverlayChanged,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
 
-class _DataSourcesCard extends StatelessWidget {
-  const _DataSourcesCard({
+class _DataSourcesSection extends StatelessWidget {
+  const _DataSourcesSection({
     required this.title,
     required this.subtitle,
     required this.openFoodFacts,
@@ -551,41 +566,38 @@ class _DataSourcesCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
     final textTheme = Theme.of(context).textTheme;
-    return FreshCard(
-      padding: const EdgeInsets.all(16),
-      shadow: false,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          FreshIconChip(icon: Icons.source_rounded, color: palette.orange),
-          const SizedBox(width: FreshSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: textTheme.titleMedium),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: palette.inkMuted,
-                  ),
-                ),
-                const SizedBox(height: FreshSpacing.sm),
-                Text(
-                  openFoodFacts,
-                  style: textTheme.bodySmall?.copyWith(color: palette.inkMuted),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  usda,
-                  style: textTheme.bodySmall?.copyWith(color: palette.inkMuted),
-                ),
-              ],
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: textTheme.titleMedium),
+        const SizedBox(height: FreshSpacing.xs),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.only(bottom: FreshSpacing.md),
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: palette.rule)),
           ),
-        ],
-      ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                subtitle,
+                style: textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
+              ),
+              const SizedBox(height: FreshSpacing.sm),
+              Text(
+                openFoodFacts,
+                style: textTheme.bodySmall?.copyWith(color: palette.inkMuted),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                usda,
+                style: textTheme.bodySmall?.copyWith(color: palette.inkMuted),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -604,18 +616,28 @@ class _SettingsOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return FreshCard(
-      padding: const EdgeInsets.all(16),
-      onTap: onTap,
-      shadow: false,
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(title, style: Theme.of(context).textTheme.titleMedium),
+    final palette = context.freshPalette;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: FreshSpacing.md),
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: palette.rule)),
           ),
-          if (selected)
-            Icon(Icons.check_rounded, color: context.freshPalette.limeDeep),
-        ],
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              if (selected) Icon(Icons.check_rounded, color: palette.limeDeep),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -695,29 +717,42 @@ class _SettingsGoalRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
-    return FreshCard(
-      padding: const EdgeInsets.all(16),
-      onTap: onTap,
-      child: Row(
-        children: [
-          FreshIconChip(icon: icon, color: color),
-          const SizedBox(width: FreshSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: Theme.of(context).textTheme.titleMedium),
-                Text(
-                  subtitle,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
-                ),
-              ],
-            ),
+    final textTheme = Theme.of(context).textTheme;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: FreshSpacing.md),
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: palette.rule)),
           ),
-          const Icon(Icons.chevron_right_rounded),
-        ],
+          child: Row(
+            children: [
+              Icon(icon, color: color, size: 20),
+              const SizedBox(width: FreshSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: textTheme.titleMedium),
+                    const SizedBox(height: FreshSpacing.xs),
+                    Text(
+                      subtitle,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: palette.inkMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: onTap == null ? palette.inkMuted : palette.inkSoft,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

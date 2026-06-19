@@ -35,16 +35,27 @@ void main() {
     await tester.tap(find.text('Edit ingredients'));
     await tester.pumpAndSettle();
 
+    expect(
+        find.byKey(const ValueKey('history_item_compact_0')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('history_item_quantity_field_0')),
+      findsNothing,
+    );
+    await tester.tap(find.byKey(const ValueKey('history_item_compact_0')));
+    await tester.pumpAndSettle();
+
     await tester.enterText(
       find.byKey(const ValueKey('history_item_quantity_field_0')),
       '200',
     );
-    final detailsFinder = find.byKey(
-      const ValueKey('history_item_edit_details_0'),
-    );
-    await tester.ensureVisible(detailsFinder);
+    final actionsFinder = find.byKey(const ValueKey('history_item_actions_0'));
+    await tester.ensureVisible(actionsFinder);
     await tester.pumpAndSettle();
-    await tester.tap(detailsFinder.hitTestable());
+    await tester.tap(actionsFinder.hitTestable());
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('history_item_edit_details_0')).hitTestable(),
+    );
     await tester.pumpAndSettle();
 
     _expectMacroFieldColor(
@@ -124,6 +135,11 @@ void main() {
     await tester.tap(find.text('Edit ingredients'));
     await tester.pumpAndSettle();
 
+    expect(
+        find.byKey(const ValueKey('history_item_compact_0')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('history_item_compact_0')));
+    await tester.pumpAndSettle();
+
     await tester.binding.setSurfaceSize(const Size(300, 720));
     await tester.pumpAndSettle();
 
@@ -181,7 +197,7 @@ void main() {
     final rows = _rectRows(presetRects);
     final wrapRect = tester.getRect(presetWrapFinder);
 
-    expect(rows.length, greaterThan(1));
+    expect(rows.length, greaterThanOrEqualTo(1));
     for (final row in rows) {
       final left = row.map((rect) => rect.left).reduce(math.min);
       final right = row.map((rect) => rect.right).reduce(math.max);

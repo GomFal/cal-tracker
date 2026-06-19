@@ -165,116 +165,56 @@ class _NutritionEditSheetState extends State<NutritionEditSheet> {
               const SizedBox(height: FreshSpacing.md),
             ],
             // Calorie field
-            TextField(
-              key: ValueKey(
+            FreshNumberUnitField(
+              fieldKey: ValueKey(
                 '${widget.keyPrefix}_${widget.fieldKeySuffix}_calories_${widget.index}',
               ),
+              label: l10n.commonCalories,
               controller: _caloriesController,
+              unit: l10n.commonKcal,
               keyboardType: TextInputType.number,
               onChanged: (_) => setState(() {}),
-              decoration: InputDecoration(
-                labelText: l10n.commonCalories,
-                filled: true,
-                fillColor: palette.surfaceSoft,
-                isDense: true,
-                suffixIcon: showSuggestion
-                    ? NutritionCalorieSuggestionSuffix(
-                        key: ValueKey(
-                          '${widget.keyPrefix}_${widget.fieldKeySuffix}_apply_suggestion_${widget.index}',
-                        ),
-                        calories: macroCalories,
-                        onApply: () => _applyMacroCalories(macroCalories),
-                      )
-                    : null,
-                suffixIconConstraints: const BoxConstraints(
-                  minWidth: 0,
-                  minHeight: 0,
-                ),
-              ),
+              suffix: showSuggestion
+                  ? NutritionCalorieSuggestionSuffix(
+                      key: ValueKey(
+                        '${widget.keyPrefix}_${widget.fieldKeySuffix}_apply_suggestion_${widget.index}',
+                      ),
+                      calories: macroCalories,
+                      onApply: () => _applyMacroCalories(macroCalories),
+                    )
+                  : null,
             ),
-            const SizedBox(height: FreshSpacing.sm),
+            const SizedBox(height: FreshSpacing.lg),
             // Macro fields row
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    key: ValueKey(
-                      '${widget.keyPrefix}_${widget.fieldKeySuffix}_protein_${widget.index}',
-                    ),
-                    controller: _proteinController,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    onChanged: (_) => setState(() {}),
-                    style: widget.useMacroFieldStyle
-                        ? macroFieldStyle(
-                            textTheme,
-                            colors[NutritionMacroKind.protein]!,
-                          )
-                        : null,
-                    decoration: macroInputDecoration(
-                      label: l10n.commonProtein,
-                      color: colors[NutritionMacroKind.protein]!,
-                    ).copyWith(
-                      filled: true,
-                      fillColor: palette.surfaceSoft,
-                      isDense: true,
-                    ),
+            FreshMacroFields(
+              useMacroTextColor: widget.useMacroFieldStyle,
+              fields: [
+                FreshMacroFieldData(
+                  key: ValueKey(
+                    '${widget.keyPrefix}_${widget.fieldKeySuffix}_protein_${widget.index}',
                   ),
+                  label: l10n.commonProtein,
+                  controller: _proteinController,
+                  color: colors[NutritionMacroKind.protein]!,
+                  onChanged: (_) => setState(() {}),
                 ),
-                const SizedBox(width: FreshSpacing.sm),
-                Expanded(
-                  child: TextField(
-                    key: ValueKey(
-                      '${widget.keyPrefix}_${widget.fieldKeySuffix}_carbs_${widget.index}',
-                    ),
-                    controller: _carbsController,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    onChanged: (_) => setState(() {}),
-                    style: widget.useMacroFieldStyle
-                        ? macroFieldStyle(
-                            textTheme,
-                            colors[NutritionMacroKind.carbs]!,
-                          )
-                        : null,
-                    decoration: macroInputDecoration(
-                      label: l10n.commonCarbs,
-                      color: colors[NutritionMacroKind.carbs]!,
-                    ).copyWith(
-                      filled: true,
-                      fillColor: palette.surfaceSoft,
-                      isDense: true,
-                    ),
+                FreshMacroFieldData(
+                  key: ValueKey(
+                    '${widget.keyPrefix}_${widget.fieldKeySuffix}_carbs_${widget.index}',
                   ),
+                  label: l10n.commonCarbs,
+                  controller: _carbsController,
+                  color: colors[NutritionMacroKind.carbs]!,
+                  onChanged: (_) => setState(() {}),
                 ),
-                const SizedBox(width: FreshSpacing.sm),
-                Expanded(
-                  child: TextField(
-                    key: ValueKey(
-                      '${widget.keyPrefix}_${widget.fieldKeySuffix}_fat_${widget.index}',
-                    ),
-                    controller: _fatController,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    onChanged: (_) => setState(() {}),
-                    style: widget.useMacroFieldStyle
-                        ? macroFieldStyle(
-                            textTheme,
-                            colors[NutritionMacroKind.fat]!,
-                          )
-                        : null,
-                    decoration: macroInputDecoration(
-                      label: l10n.commonFat,
-                      color: colors[NutritionMacroKind.fat]!,
-                    ).copyWith(
-                      filled: true,
-                      fillColor: palette.surfaceSoft,
-                      isDense: true,
-                    ),
+                FreshMacroFieldData(
+                  key: ValueKey(
+                    '${widget.keyPrefix}_${widget.fieldKeySuffix}_fat_${widget.index}',
                   ),
+                  label: l10n.commonFat,
+                  controller: _fatController,
+                  color: colors[NutritionMacroKind.fat]!,
+                  onChanged: (_) => setState(() {}),
                 ),
               ],
             ),

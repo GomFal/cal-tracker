@@ -115,6 +115,13 @@ class AppLocalizationsEs extends AppLocalizations {
   String get mealEditorIngredientsSection => 'Ingredientes';
 
   @override
+  String get mealEditorSearchOrAddIngredient =>
+      'Buscar o añadir ingrediente...';
+
+  @override
+  String get mealEditorReplaceFood => 'Sustituir alimento';
+
+  @override
   String get mealEditorEditDetails => 'Editar detalles';
 
   @override

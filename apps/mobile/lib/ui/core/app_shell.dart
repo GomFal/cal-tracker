@@ -236,9 +236,7 @@ class _FreshBottomNav extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: palette.screen,
-          border: Border(
-            top: BorderSide(color: palette.rule, width: 1),
-          ),
+          border: Border(top: BorderSide(color: palette.rule, width: 1)),
         ),
         padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
         child: Row(
@@ -339,23 +337,33 @@ class _NavButton extends StatelessWidget {
       color: selected ? palette.lime : palette.inkMuted,
       size: vertical ? 26 : 24,
     );
-    return InkWell(
-      borderRadius: BorderRadius.circular(FreshRadii.lg),
+    return Semantics(
+      container: true,
+      button: true,
+      selected: selected,
+      enabled: true,
+      label: item.label,
       onTap: onTap,
-      child: SizedBox(
-        width: vertical ? 78 : 64,
-        height: vertical ? 64 : 56,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            icon,
-            const SizedBox(height: 4),
-            Text(
-              item.label,
-              style: labelStyle,
-              overflow: TextOverflow.ellipsis,
+      child: ExcludeSemantics(
+        child: InkWell(
+          borderRadius: BorderRadius.circular(FreshRadii.lg),
+          onTap: onTap,
+          child: SizedBox(
+            width: vertical ? 78 : 64,
+            height: vertical ? 64 : 56,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                icon,
+                const SizedBox(height: 4),
+                Text(
+                  item.label,
+                  style: labelStyle,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -444,9 +452,7 @@ class _CenterVoiceButtonState extends State<_CenterVoiceButton> {
     unawaited(_startDirectVoiceRecording(viewModel));
   }
 
-  Future<void> _startDirectVoiceRecording(
-    AgentChatViewModel viewModel,
-  ) async {
+  Future<void> _startDirectVoiceRecording(AgentChatViewModel viewModel) async {
     await viewModel.startRecording();
     if (!mounted) return;
 
@@ -510,41 +516,46 @@ class _CenterVoiceButtonState extends State<_CenterVoiceButton> {
 
     final addButton = Semantics(
       key: const ValueKey('bottom_voice_action_button'),
+      container: true,
       button: true,
+      enabled: true,
       label: tooltip,
-      child: Tooltip(
-        message: tooltip,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: () {
-            _dismissBubble();
-            _openAgentChat(context);
-          },
-          onLongPressStart: (_) => _startDirectVoicePress(context),
-          onLongPressEnd: (_) => _requestFinishDirectVoicePress(
-            context,
-            openChat: true,
-          ),
-          onLongPressCancel: () => _requestFinishDirectVoicePress(
-            context,
-            openChat: false,
-          ),
-          child: Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: Colors.transparent,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: isRecording ? palette.coral : palette.lime,
-                width: 1.5,
+      value: isRecording ? context.l10n.voiceRecordingTitle : null,
+      onTap: () {
+        _dismissBubble();
+        _openAgentChat(context);
+      },
+      child: ExcludeSemantics(
+        child: Tooltip(
+          message: tooltip,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {
+              _dismissBubble();
+              _openAgentChat(context);
+            },
+            onLongPressStart: (_) => _startDirectVoicePress(context),
+            onLongPressEnd: (_) =>
+                _requestFinishDirectVoicePress(context, openChat: true),
+            onLongPressCancel: () =>
+                _requestFinishDirectVoicePress(context, openChat: false),
+            child: Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: Colors.transparent,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isRecording ? palette.coral : palette.lime,
+                  width: 1.5,
+                ),
               ),
-            ),
-            child: Center(
-              child: Icon(
-                isRecording ? Icons.stop_rounded : Icons.add_rounded,
-                color: isRecording ? palette.coral : palette.lime,
-                size: 28,
+              child: Center(
+                child: Icon(
+                  isRecording ? Icons.stop_rounded : Icons.add_rounded,
+                  color: isRecording ? palette.coral : palette.lime,
+                  size: 28,
+                ),
               ),
             ),
           ),
@@ -603,10 +614,7 @@ class _CenterVoiceButtonState extends State<_CenterVoiceButton> {
 }
 
 class _BubbleTip extends StatelessWidget {
-  const _BubbleTip({
-    required this.message,
-    required this.onDismiss,
-  });
+  const _BubbleTip({required this.message, required this.onDismiss});
 
   final String message;
   final VoidCallback onDismiss;
@@ -627,10 +635,7 @@ class _BubbleTip extends StatelessWidget {
             ),
             child: Container(
               constraints: const BoxConstraints(maxWidth: 260),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 8,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: isDark ? palette.surfaceMuted : palette.ink,
                 borderRadius: BorderRadius.circular(FreshRadii.sm),

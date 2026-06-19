@@ -9,10 +9,7 @@ import '../../../core/design_system.dart';
 /// around the cutout, corner markers in [FreshColors.lime], and a label above
 /// the cutout.
 class ScanViewfinderOverlay extends StatelessWidget {
-  const ScanViewfinderOverlay({
-    super.key,
-    this.frameAspectRatio = 1.6,
-  });
+  const ScanViewfinderOverlay({super.key, this.frameAspectRatio = 1.6});
 
   /// width / height of the clear cutout region.
   final double frameAspectRatio;
@@ -23,16 +20,21 @@ class ScanViewfinderOverlay extends StatelessWidget {
     final palette = context.freshPalette;
     const overlayAlpha = 0.55;
 
-    return CustomPaint(
-      size: Size.infinite,
-      painter: _ViewfinderPainter(
-        frameAspectRatio: frameAspectRatio,
-        overlayColor: palette.ink.withValues(alpha: overlayAlpha),
-        bracketColor: palette.lime,
-        bracketWidth: 3,
-        bracketArm: 22,
-        label: l10n.usualFoodsScanFrameLabel,
-        hint: l10n.usualFoodsScanHint,
+    return Semantics(
+      container: true,
+      label: l10n.usualFoodsScanFrameLabel,
+      hint: l10n.usualFoodsScanHint,
+      child: CustomPaint(
+        size: Size.infinite,
+        painter: _ViewfinderPainter(
+          frameAspectRatio: frameAspectRatio,
+          overlayColor: palette.ink.withValues(alpha: overlayAlpha),
+          bracketColor: palette.lime,
+          bracketWidth: 3,
+          bracketArm: 22,
+          label: l10n.usualFoodsScanFrameLabel,
+          hint: l10n.usualFoodsScanHint,
+        ),
       ),
     );
   }
@@ -78,14 +80,16 @@ class _ViewfinderPainter extends CustomPainter {
     canvas.drawRect(Rect.fromLTWH(0, 0, size.width, cutTop), paint);
     // bottom
     canvas.drawRect(
-      Rect.fromLTWH(0, cutRect.bottom, size.width, size.height - cutRect.bottom),
+      Rect.fromLTWH(
+        0,
+        cutRect.bottom,
+        size.width,
+        size.height - cutRect.bottom,
+      ),
       paint,
     );
     // left (between top and bottom)
-    canvas.drawRect(
-      Rect.fromLTWH(0, cutTop, cutLeft, cutH),
-      paint,
-    );
+    canvas.drawRect(Rect.fromLTWH(0, cutTop, cutLeft, cutH), paint);
     // right
     canvas.drawRect(
       Rect.fromLTWH(cutRect.right, cutTop, size.width - cutRect.right, cutH),
@@ -113,10 +117,7 @@ class _ViewfinderPainter extends CustomPainter {
     )..layout(maxWidth: size.width);
     labelPainter.paint(
       canvas,
-      Offset(
-        (size.width - labelPainter.width) / 2,
-        cutRect.top - 28,
-      ),
+      Offset((size.width - labelPainter.width) / 2, cutRect.top - 28),
     );
 
     // Hint below the cutout
@@ -133,10 +134,7 @@ class _ViewfinderPainter extends CustomPainter {
     )..layout(maxWidth: cutW - 32);
     hintPainter.paint(
       canvas,
-      Offset(
-        (size.width - hintPainter.width) / 2,
-        cutRect.bottom + 16,
-      ),
+      Offset((size.width - hintPainter.width) / 2, cutRect.bottom + 16),
     );
   }
 
@@ -149,17 +147,9 @@ class _ViewfinderPainter extends CustomPainter {
     double dirY,
   ) {
     // Horizontal arm
-    canvas.drawLine(
-      Offset(x, y),
-      Offset(x + dirX * bracketArm, y),
-      paint,
-    );
+    canvas.drawLine(Offset(x, y), Offset(x + dirX * bracketArm, y), paint);
     // Vertical arm
-    canvas.drawLine(
-      Offset(x, y),
-      Offset(x, y + dirY * bracketArm),
-      paint,
-    );
+    canvas.drawLine(Offset(x, y), Offset(x, y + dirY * bracketArm), paint);
   }
 
   @override

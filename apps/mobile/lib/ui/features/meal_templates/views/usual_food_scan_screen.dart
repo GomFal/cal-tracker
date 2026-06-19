@@ -208,17 +208,17 @@ class _UsualFoodScanScreenState extends State<UsualFoodScanScreen>
 
     final x = (cropRect.left * source.width).round().clamp(0, source.width - 1);
     final y = (cropRect.top * source.height).round().clamp(
-      0,
-      source.height - 1,
-    );
+          0,
+          source.height - 1,
+        );
     final width = (cropRect.width * source.width).round().clamp(
-      1,
-      source.width - x,
-    );
+          1,
+          source.width - x,
+        );
     final height = (cropRect.height * source.height).round().clamp(
-      1,
-      source.height - y,
-    );
+          1,
+          source.height - y,
+        );
     final cropped = img.copyCrop(
       source,
       x: x,
@@ -334,8 +334,7 @@ class _UsualFoodScanScreenState extends State<UsualFoodScanScreen>
 
     // Once we have a captured file, show the still image (the live preview
     // is paused by the VM at this point).
-    final hasStillImage =
-        capturedFilePath != null &&
+    final hasStillImage = capturedFilePath != null &&
         (phase == UsualFoodScanPhase.previewing ||
             phase == UsualFoodScanPhase.ocrProcessing ||
             phase == UsualFoodScanPhase.drafting ||
@@ -474,9 +473,15 @@ class _CropSelectionPreviewState extends State<_CropSelectionPreview> {
                     : null,
                 onPanEnd: (_) => _dragStart = null,
                 onPanCancel: () => _dragStart = null,
-                child: CustomPaint(
+                child: Semantics(
                   key: const ValueKey('usual_food_scan_crop_selector'),
-                  painter: _CropSelectionPainter(crop: crop),
+                  container: true,
+                  enabled: widget.enabled,
+                  label: context.l10n.usualFoodsScanFrameLabel,
+                  hint: context.l10n.usualFoodsScanPreviewHint,
+                  child: CustomPaint(
+                    painter: _CropSelectionPainter(crop: crop),
+                  ),
                 ),
               ),
             ),
@@ -934,23 +939,22 @@ String formatNutritionLabelOcrLines(
   List<NutritionLabelOcrLine> lines, {
   String fallbackText = '',
 }) {
-  final cleaned =
-      lines
-          .map(
-            (line) => NutritionLabelOcrLine(
-              text: _normalizeOcrCell(line.text),
-              boundingBox: line.boundingBox,
-            ),
-          )
-          .where((line) => line.text.isNotEmpty)
-          .toList()
-        ..sort((a, b) {
-          final vertical = a.centerY.compareTo(b.centerY);
-          if ((a.centerY - b.centerY).abs() > _rowTolerance(a, b)) {
-            return vertical;
-          }
-          return a.boundingBox.left.compareTo(b.boundingBox.left);
-        });
+  final cleaned = lines
+      .map(
+        (line) => NutritionLabelOcrLine(
+          text: _normalizeOcrCell(line.text),
+          boundingBox: line.boundingBox,
+        ),
+      )
+      .where((line) => line.text.isNotEmpty)
+      .toList()
+    ..sort((a, b) {
+      final vertical = a.centerY.compareTo(b.centerY);
+      if ((a.centerY - b.centerY).abs() > _rowTolerance(a, b)) {
+        return vertical;
+      }
+      return a.boundingBox.left.compareTo(b.boundingBox.left);
+    });
 
   if (cleaned.isEmpty) return fallbackText.trim();
 
@@ -961,13 +965,11 @@ String formatNutritionLabelOcrLines(
       continue;
     }
     final row = rows.last;
-    final rowCenter =
-        row
+    final rowCenter = row
             .map((item) => item.centerY)
             .reduce((value, element) => value + element) /
         row.length;
-    final rowHeight =
-        row
+    final rowHeight = row
             .map((item) => item.boundingBox.height)
             .reduce((value, element) => value + element) /
         row.length;

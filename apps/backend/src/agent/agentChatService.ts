@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   actionDefinitions,
   type ActionContext,
@@ -37,7 +38,17 @@ import { filterToolsByPolicy } from "./agentPolicy.js";
 const MAX_CHAT_ITERATIONS = 6;
 const MAX_TOOL_CALLS_PER_TURN = 8;
 const STORED_TOOL_RESULT_MAX_CHARS = 12000;
+const MAX_CONVERSATION_TITLE_CHARS = 64;
 const CHAT_OPTIONS_TOOL_NAME = "show_chat_options";
+
+type ChatTurnCorrelation = {
+  traceId: string;
+  turnId: string;
+  inputMode: "text" | "voice";
+  source: string;
+  conversationId: string;
+  activeProposalId?: string;
+};
 
 type AgentChatSuggestion = {
   label: string;
@@ -201,7 +212,17 @@ export class AgentChatService {
     const conversation = await this.resolveConversation(
       input.context.actorUserId,
       input.conversationId,
+      input.text,
     );
+    const inputMode = input.inputMode ?? "text";
+    const correlation: ChatTurnCorrelation = {
+      traceId: input.context.traceId,
+      turnId: randomUUID(),
+      inputMode,
+      source: input.context.source,
+      conversationId: conversation.id,
+      activeProposalId: input.activeProposalId,
+    };
     yield { type: "conversation_started", conversationId: conversation.id };
 
     const text = input.text.trim();
@@ -218,7 +239,11 @@ export class AgentChatService {
     await this.repository.addAgentConversationMessage(
       input.context.actorUserId,
       conversation.id,
-      { role: "user", content: text },
+      {
+        role: "user",
+        content: text,
+        ...messageCorrelation(correlation, { stage: "user_input" }),
+      },
     );
 
     let currentActiveProposal = input.activeProposalId
@@ -284,7 +309,7 @@ export class AgentChatService {
           userId: input.context.actorUserId,
           conversationId: conversation.id,
           inputText: text,
-          inputMode: input.inputMode ?? "text",
+          inputMode,
           error: summarizeError(error),
           timingsMs: { total: Date.now() - runStarted },
         });
@@ -303,7 +328,14 @@ export class AgentChatService {
         await this.repository.addAgentConversationMessage(
           input.context.actorUserId,
           conversation.id,
-          { role: "assistant", content: finalText },
+          {
+            role: "assistant",
+            content: finalText,
+            ...messageCorrelation(correlation, {
+              resultKind: "assistant_message",
+              stopReason: "assistant_message",
+            }),
+          },
         );
         yield {
           type: "assistant_delta",
@@ -316,7 +348,7 @@ export class AgentChatService {
           userId: input.context.actorUserId,
           conversationId: conversation.id,
           inputText: text,
-          inputMode: input.inputMode ?? "text",
+          inputMode,
           resultKind: "assistant_message",
           toolCallCount,
           timingsMs: { total: Date.now() - runStarted },
@@ -351,7 +383,11 @@ export class AgentChatService {
           role: "assistant",
           content: assistantText,
           toolCalls,
-          metadata: { providerRouting: decision.providerRouting },
+          ...messageCorrelation(correlation, {
+            providerRouting: decision.providerRouting,
+            iteration,
+            toolCallCount: toolCalls.length,
+          }),
         },
       );
 
@@ -378,6 +414,8 @@ export class AgentChatService {
             toolCall,
             actionId,
             error,
+            correlation,
+            { iteration, errorCode: "invalid_tool_arguments" },
           );
           continue;
         }
@@ -400,6 +438,8 @@ export class AgentChatService {
               toolCall,
               actionId,
               error,
+              correlation,
+              { iteration, errorCode: "invalid_chat_options" },
             );
             continue;
           }
@@ -410,7 +450,11 @@ export class AgentChatService {
             {
               role: "assistant",
               content: quickReply.message,
-              metadata: { suggestions: quickReply.suggestions },
+              ...messageCorrelation(correlation, {
+                suggestions: quickReply.suggestions,
+                resultKind: "assistant_options",
+                iteration,
+              }),
             },
           );
           yield {
@@ -429,7 +473,7 @@ export class AgentChatService {
             userId: input.context.actorUserId,
             conversationId: conversation.id,
             inputText: text,
-            inputMode: input.inputMode ?? "text",
+            inputMode,
             resultKind: "assistant_options",
             toolCallCount,
             timingsMs: { total: Date.now() - runStarted },
@@ -454,6 +498,8 @@ export class AgentChatService {
             toolCall,
             actionId,
             error,
+            correlation,
+            { iteration, errorCode: "disallowed_tool" },
           );
           continue;
         }
@@ -489,6 +535,8 @@ export class AgentChatService {
             toolCall,
             actionId,
             error,
+            correlation,
+            { iteration, errorCode: "repeated_tool_call" },
           );
           continue;
         }
@@ -546,7 +594,13 @@ export class AgentChatService {
               role: "tool",
               content: toolContent,
               toolCallId: toolCall.id,
-              metadata: { actionId, actionCallId: result.actionCallId },
+              ...messageCorrelation(correlation, {
+                actionId,
+                actionCallId: result.actionCallId,
+                iteration,
+                toolCallIndex: toolCallCount,
+                resultKind: mapped.kind,
+              }),
             },
           );
         } catch (error) {
@@ -571,7 +625,12 @@ export class AgentChatService {
               role: "tool",
               content: toolMessage.content,
               toolCallId: toolCall.id,
-              metadata: { actionId, error: errorText },
+              ...messageCorrelation(correlation, {
+                actionId,
+                error: errorText,
+                iteration,
+                toolCallIndex: toolCallCount,
+              }),
             },
           );
         }
@@ -588,10 +647,11 @@ export class AgentChatService {
   private async resolveConversation(
     userId: string,
     conversationId?: string,
+    initialText?: string,
   ): Promise<AgentConversationRecord> {
     if (!conversationId) {
       return this.repository.createAgentConversation(userId, {
-        title: "Nutrition chat",
+        title: conversationTitleFromInput(initialText),
       });
     }
     const existing = await this.repository.getAgentConversation(
@@ -609,6 +669,8 @@ export class AgentChatService {
     toolCall: AgentToolCall,
     actionId: string,
     error: string,
+    correlation: ChatTurnCorrelation,
+    metadata: Record<string, unknown> = {},
   ): Promise<void> {
     const toolMessage: AgentMessage = {
       role: "tool",
@@ -620,7 +682,7 @@ export class AgentChatService {
       role: "tool",
       content: toolMessage.content,
       toolCallId: toolCall.id,
-      metadata: { actionId, error },
+      ...messageCorrelation(correlation, { ...metadata, actionId, error }),
     });
   }
 
@@ -1008,6 +1070,39 @@ function safeToolContent(value: unknown): string {
   const content = JSON.stringify(value);
   if (content.length <= STORED_TOOL_RESULT_MAX_CHARS) return content;
   return `${content.slice(0, STORED_TOOL_RESULT_MAX_CHARS)}...`;
+}
+
+function conversationTitleFromInput(input?: string): string {
+  const title = (input ?? "").replace(/\s+/g, " ").trim();
+  if (!title) return "Nutrition chat";
+  if (title.length <= MAX_CONVERSATION_TITLE_CHARS) return title;
+  return `${title.slice(0, MAX_CONVERSATION_TITLE_CHARS - 3).trimEnd()}...`;
+}
+
+function messageCorrelation(
+  correlation: ChatTurnCorrelation,
+  metadata: Record<string, unknown> = {},
+): Pick<
+  AgentConversationMessageRecord,
+  "traceId" | "turnId" | "inputMode" | "source" | "activeProposalId" | "metadata"
+> {
+  const activeProposalId = correlation.activeProposalId;
+  return {
+    traceId: correlation.traceId,
+    turnId: correlation.turnId,
+    inputMode: correlation.inputMode,
+    source: correlation.source,
+    activeProposalId,
+    metadata: {
+      traceId: correlation.traceId,
+      turnId: correlation.turnId,
+      inputMode: correlation.inputMode,
+      source: correlation.source,
+      conversationId: correlation.conversationId,
+      ...(activeProposalId ? { activeProposalId } : {}),
+      ...metadata,
+    },
+  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

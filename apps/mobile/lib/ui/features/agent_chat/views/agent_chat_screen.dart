@@ -36,6 +36,15 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(context.read<AgentChatViewModel>().prepareForEntry());
+    });
+  }
+
+  @override
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
@@ -67,6 +76,23 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
                           ? context.pop()
                           : context.go('/dashboard'),
                     ),
+                    actions: [
+                      FreshIconButton(
+                        key: const ValueKey('agent_chat_new_chat_button'),
+                        icon: Icons.add_comment_rounded,
+                        tooltip: context.l10n.agentChatNewChatTooltip,
+                        onPressed: viewModel.isBusy || viewModel.isRecording
+                            ? null
+                            : () => unawaited(viewModel.startNewConversation()),
+                      ),
+                      FreshIconButton(
+                        key: const ValueKey('agent_chat_history_button'),
+                        icon: Icons.history_rounded,
+                        tooltip: context.l10n.agentChatHistoryTooltip,
+                        onPressed: () =>
+                            unawaited(_showConversationHistory(context)),
+                      ),
+                    ],
                   ),
                 ),
                 Expanded(
@@ -199,6 +225,124 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
     if (text.isEmpty) return;
     _messageController.clear();
     unawaited(context.read<AgentChatViewModel>().sendText(text));
+  }
+
+  Future<void> _showConversationHistory(BuildContext context) async {
+    final viewModel = context.read<AgentChatViewModel>();
+    unawaited(viewModel.refreshConversationHistory());
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          key: const ValueKey('agent_chat_history_sheet'),
+          child: Consumer<AgentChatViewModel>(
+            builder: (context, model, _) {
+              final conversations = model.conversations;
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  FreshSpacing.lg,
+                  0,
+                  FreshSpacing.lg,
+                  FreshSpacing.lg,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            context.l10n.agentChatHistoryTitle,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleLarge
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        if (model.isRefreshingHistory)
+                          const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: FreshSpacing.md),
+                    if (conversations.isEmpty && model.isLoadingHistory)
+                      const Padding(
+                        padding:
+                            EdgeInsets.symmetric(vertical: FreshSpacing.xl),
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    else if (conversations.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                            vertical: FreshSpacing.xl),
+                        child: Text(context.l10n.agentChatHistoryEmpty),
+                      )
+                    else
+                      Flexible(
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          itemCount: conversations.length,
+                          separatorBuilder: (_, __) =>
+                              const Divider(height: FreshSpacing.md),
+                          itemBuilder: (context, index) {
+                            final conversation = conversations[index];
+                            return ListTile(
+                              key: ValueKey('agent_chat_history_item_$index'),
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(
+                                conversation.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              subtitle: Text(
+                                context.l10n.agentChatHistoryUpdatedAt(
+                                  _formatHistoryTime(
+                                    context,
+                                    conversation.updatedAt,
+                                  ),
+                                ),
+                              ),
+                              onTap: () {
+                                Navigator.of(sheetContext).pop();
+                                unawaited(
+                                  model.loadConversation(conversation.id),
+                                );
+                              },
+                              trailing: IconButton(
+                                key: ValueKey(
+                                  'agent_chat_history_delete_$index',
+                                ),
+                                tooltip:
+                                    context.l10n.agentChatHistoryDeleteTooltip,
+                                icon: const Icon(Icons.delete_outline_rounded),
+                                onPressed: () => unawaited(
+                                  model.deleteConversation(conversation.id),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  String _formatHistoryTime(BuildContext context, DateTime value) {
+    final local = value.toLocal();
+    final date = MaterialLocalizations.of(context).formatShortDate(local);
+    final time = TimeOfDay.fromDateTime(local).format(context);
+    return '$date $time';
   }
 }
 

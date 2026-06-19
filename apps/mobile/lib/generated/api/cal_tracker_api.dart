@@ -183,6 +183,18 @@ class CalTrackerApiClient {
     return _sendSseRequest(buildRequest);
   }
 
+  Future<Map<String, Object?>> listAgentConversations() {
+    return _get('/v1/agent/conversations');
+  }
+
+  Future<Map<String, Object?>> getAgentConversation(String conversationId) {
+    return _get('/v1/agent/conversations/$conversationId');
+  }
+
+  Future<Map<String, Object?>> deleteAgentConversation(String conversationId) {
+    return _delete('/v1/agent/conversations/$conversationId');
+  }
+
   Future<Map<String, Object?>> searchFoods({
     required String query,
     String? barcode,

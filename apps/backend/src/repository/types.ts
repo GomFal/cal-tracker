@@ -351,6 +351,7 @@ export type AgentConversationRecord = {
   id: string;
   userId: string;
   title: string;
+  hiddenFromUserAt?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -365,6 +366,11 @@ export type AgentConversationMessageRecord = {
   content: string;
   toolCalls?: unknown;
   toolCallId?: string;
+  traceId?: string;
+  turnId?: string;
+  inputMode?: string;
+  source?: string;
+  activeProposalId?: string;
   metadata?: unknown;
   createdAt: string;
 };
@@ -518,6 +524,10 @@ export interface AppRepository {
     conversationId: string,
   ): Promise<AgentConversationMessageRecord[]>;
   deleteAgentConversation(
+    userId: string,
+    conversationId: string,
+  ): Promise<boolean>;
+  hideAgentConversationFromUser(
     userId: string,
     conversationId: string,
   ): Promise<boolean>;

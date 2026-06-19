@@ -951,7 +951,9 @@ export class InMemoryRepository implements AppRepository {
     conversationId: string,
   ): Promise<AgentConversationRecord | undefined> {
     const conversation = this.agentConversations.get(conversationId);
-    return conversation?.userId === userId ? conversation : undefined;
+    return conversation?.userId === userId && !conversation.hiddenFromUserAt
+      ? conversation
+      : undefined;
   }
 
   async listAgentConversations(
@@ -959,7 +961,10 @@ export class InMemoryRepository implements AppRepository {
     limit = 25,
   ): Promise<AgentConversationRecord[]> {
     return [...this.agentConversations.values()]
-      .filter((conversation) => conversation.userId === userId)
+      .filter(
+        (conversation) =>
+          conversation.userId === userId && !conversation.hiddenFromUserAt,
+      )
       .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
       .slice(0, limit);
   }
@@ -1011,13 +1016,24 @@ export class InMemoryRepository implements AppRepository {
     userId: string,
     conversationId: string,
   ): Promise<boolean> {
+    return this.hideAgentConversationFromUser(userId, conversationId);
+  }
+
+  async hideAgentConversationFromUser(
+    userId: string,
+    conversationId: string,
+  ): Promise<boolean> {
     const conversation = await this.getAgentConversation(
       userId,
       conversationId,
     );
     if (!conversation) return false;
-    this.agentConversations.delete(conversationId);
-    this.agentConversationMessages.delete(conversationId);
+    const now = new Date().toISOString();
+    this.agentConversations.set(conversationId, {
+      ...conversation,
+      hiddenFromUserAt: now,
+      updatedAt: now,
+    });
     return true;
   }
 

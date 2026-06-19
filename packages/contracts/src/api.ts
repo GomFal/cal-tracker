@@ -67,6 +67,47 @@ export const agentChatRequestSchema = z.object({
   activeProposalId: uuidSchema.optional(),
 });
 
+export const agentConversationSummarySchema = z.object({
+  id: uuidSchema,
+  userId: uuidSchema.optional(),
+  title: z.string(),
+  hiddenFromUserAt: isoDateTimeSchema.nullable().optional(),
+  createdAt: isoDateTimeSchema,
+  updatedAt: isoDateTimeSchema,
+});
+
+export const agentConversationMessageSchema = z.object({
+  id: uuidSchema,
+  conversationId: uuidSchema,
+  userId: uuidSchema.optional(),
+  role: z.enum(["user", "assistant", "tool"]),
+  content: z.string(),
+  toolCalls: z.unknown().optional(),
+  toolCallId: z.string().nullable().optional(),
+  traceId: z.string().nullable().optional(),
+  turnId: uuidSchema.nullable().optional(),
+  inputMode: z.string().nullable().optional(),
+  source: z.string().nullable().optional(),
+  activeProposalId: uuidSchema.nullable().optional(),
+  metadata: z.unknown().optional(),
+  createdAt: isoDateTimeSchema,
+});
+
+export const agentConversationsResponseSchema = z.object({
+  conversations: z.array(agentConversationSummarySchema),
+});
+
+export const agentConversationDetailResponseSchema = z.object({
+  conversation: agentConversationSummarySchema,
+  messages: z.array(agentConversationMessageSchema),
+});
+
+export const deleteAgentConversationResponseSchema = z.object({
+  ok: z.boolean(),
+  deleted: z.boolean().optional(),
+  hidden: z.boolean().optional(),
+});
+
 export const agentRunResponseSchema = z.object({
   kind: z.enum([
     "proposal",
@@ -326,6 +367,21 @@ export type CreateUsualFoodRequest = z.infer<
 >;
 export type UpdateUsualFoodRequest = z.infer<
   typeof updateUsualFoodRequestSchema
+>;
+export type AgentConversationSummary = z.infer<
+  typeof agentConversationSummarySchema
+>;
+export type AgentConversationMessage = z.infer<
+  typeof agentConversationMessageSchema
+>;
+export type AgentConversationsResponse = z.infer<
+  typeof agentConversationsResponseSchema
+>;
+export type AgentConversationDetailResponse = z.infer<
+  typeof agentConversationDetailResponseSchema
+>;
+export type DeleteAgentConversationResponse = z.infer<
+  typeof deleteAgentConversationResponseSchema
 >;
 
 export const dashboardResponseSchema = z.object({

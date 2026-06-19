@@ -2007,6 +2007,7 @@ export class PostgresRepository implements AppRepository {
     const [row] = await this.execute(dbSql`
       SELECT * FROM agent_conversations
       WHERE id = ${conversationId} AND user_id = ${userId}
+        AND hidden_from_user_at IS NULL
       LIMIT 1
     `);
     return row ? mapAgentConversation(row) : undefined;
@@ -2019,6 +2020,7 @@ export class PostgresRepository implements AppRepository {
     const rows = await this.execute(dbSql`
       SELECT * FROM agent_conversations
       WHERE user_id = ${userId}
+        AND hidden_from_user_at IS NULL
       ORDER BY updated_at DESC
       LIMIT ${Math.max(1, Math.min(100, Math.floor(limit)))}
     `);
@@ -2034,11 +2036,17 @@ export class PostgresRepository implements AppRepository {
     >,
   ): Promise<AgentConversationMessageRecord> {
     const [row] = await this.execute(dbSql`
-      INSERT INTO agent_messages (conversation_id, user_id, role, content, tool_calls_json, tool_call_id, metadata_json)
-      SELECT ${conversationId}, ${userId}, ${input.role}, ${input.content}, ${jsonb(input.toolCalls ?? null)}, ${input.toolCallId ?? null}, ${jsonb(input.metadata ?? null)}
+      INSERT INTO agent_messages (
+        conversation_id, user_id, role, content, tool_calls_json, tool_call_id,
+        trace_id, turn_id, input_mode, source, active_proposal_id, metadata_json
+      )
+      SELECT
+        ${conversationId}, ${userId}, ${input.role}, ${input.content}, ${jsonb(input.toolCalls ?? null)}, ${input.toolCallId ?? null},
+        ${input.traceId ?? null}, ${input.turnId ?? null}, ${input.inputMode ?? null}, ${input.source ?? null}, ${input.activeProposalId ?? null}, ${jsonb(input.metadata ?? null)}
       WHERE EXISTS (
         SELECT 1 FROM agent_conversations
         WHERE id = ${conversationId} AND user_id = ${userId}
+          AND hidden_from_user_at IS NULL
       )
       RETURNING *
     `);
@@ -2062,6 +2070,7 @@ export class PostgresRepository implements AppRepository {
         ON conversation.id = message.conversation_id
       WHERE message.conversation_id = ${conversationId}
         AND conversation.user_id = ${userId}
+        AND conversation.hidden_from_user_at IS NULL
       ORDER BY message.created_at, message.id
     `);
     return rows.map(mapAgentConversationMessage);
@@ -2071,9 +2080,19 @@ export class PostgresRepository implements AppRepository {
     userId: string,
     conversationId: string,
   ): Promise<boolean> {
+    return this.hideAgentConversationFromUser(userId, conversationId);
+  }
+
+  async hideAgentConversationFromUser(
+    userId: string,
+    conversationId: string,
+  ): Promise<boolean> {
     const rows = await this.execute(dbSql`
-      DELETE FROM agent_conversations
+      UPDATE agent_conversations
+      SET hidden_from_user_at = COALESCE(hidden_from_user_at, now()),
+          updated_at = now()
       WHERE id = ${conversationId} AND user_id = ${userId}
+        AND hidden_from_user_at IS NULL
       RETURNING id
     `);
     return rows.length > 0;
@@ -2970,6 +2989,9 @@ function mapAgentConversation(
     id: row.id as string,
     userId: row.user_id as string,
     title: row.title as string,
+    hiddenFromUserAt: row.hidden_from_user_at
+      ? toIso(row.hidden_from_user_at)
+      : undefined,
     createdAt: toIso(row.created_at),
     updatedAt: toIso(row.updated_at),
   };
@@ -2986,6 +3008,11 @@ function mapAgentConversationMessage(
     content: row.content as string,
     toolCalls: row.tool_calls_json ?? undefined,
     toolCallId: optionalString(row.tool_call_id),
+    traceId: optionalString(row.trace_id),
+    turnId: optionalString(row.turn_id),
+    inputMode: optionalString(row.input_mode),
+    source: optionalString(row.source),
+    activeProposalId: optionalString(row.active_proposal_id),
     metadata: row.metadata_json ?? undefined,
     createdAt: toIso(row.created_at),
   };

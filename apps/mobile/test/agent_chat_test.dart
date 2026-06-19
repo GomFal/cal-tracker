@@ -3,6 +3,9 @@ import 'dart:convert';
 
 import 'package:cal_tracker_mobile/app/theme.dart';
 import 'package:cal_tracker_mobile/data/repositories/nutrition_repository.dart';
+import 'package:cal_tracker_mobile/data/services/agent_chat_cache_store.dart';
+import 'package:cal_tracker_mobile/data/services/agent_chat_session_store.dart';
+import 'package:cal_tracker_mobile/data/services/app_preferences_storage.dart';
 import 'package:cal_tracker_mobile/data/services/api_config.dart';
 import 'package:cal_tracker_mobile/data/services/audio_recorder_service.dart';
 import 'package:cal_tracker_mobile/data/services/secure_token_storage.dart';
@@ -160,6 +163,127 @@ void main() {
     expect(toolEntry.toolStatus, AgentChatToolStatus.completed);
     expect(toolEntry.result?.summary?.consumed.calories, 420);
     expect(viewModel.entries[2].text, 'You ate breakfast.');
+  });
+
+  test('AgentChatViewModel starts blank after stale completed session',
+      () async {
+    final repository = MockNutritionRepository();
+    final recorder = MockAudioRecorderService();
+    final storage = _MemoryPreferencesStorage();
+    final sessionStore = AgentChatSessionStore(storage: storage);
+    final cacheStore = AgentChatCacheStore(storage: storage);
+    sessionStore.activateUser('user-a');
+    cacheStore.activateUser('user-a');
+    await sessionStore.writeActiveSession(
+      AgentChatSession(
+        conversationId: '11111111-1111-1111-1111-111111111111',
+        lastInteractionAt: DateTime.utc(2026, 6, 19, 12),
+        lastCompletedAt: DateTime.utc(2026, 6, 19, 12),
+        unfinished: false,
+      ),
+    );
+    when(() => repository.listAgentConversations())
+        .thenAnswer((_) async => const []);
+    final viewModel = AgentChatViewModel(
+      nutritionRepository: repository,
+      audioRecorderService: recorder,
+      sessionStore: sessionStore,
+      cacheStore: cacheStore,
+      now: () => DateTime.utc(2026, 6, 19, 12, 3),
+    )..conversationId = '11111111-1111-1111-1111-111111111111';
+
+    await viewModel.prepareForEntry();
+
+    expect(viewModel.conversationId, isNull);
+    expect(viewModel.entries, isEmpty);
+    expect(await sessionStore.readActiveSession(), isNull);
+    verifyNever(() => repository.getAgentConversation(any()));
+  });
+
+  test('AgentChatViewModel resumes stale unfinished session', () async {
+    final repository = MockNutritionRepository();
+    final recorder = MockAudioRecorderService();
+    final storage = _MemoryPreferencesStorage();
+    final sessionStore = AgentChatSessionStore(storage: storage);
+    final cacheStore = AgentChatCacheStore(storage: storage);
+    sessionStore.activateUser('user-a');
+    cacheStore.activateUser('user-a');
+    const conversationId = '11111111-1111-1111-1111-111111111111';
+    await sessionStore.writeActiveSession(
+      AgentChatSession(
+        conversationId: conversationId,
+        lastInteractionAt: DateTime.utc(2026, 6, 19, 12),
+        unfinished: true,
+      ),
+    );
+    when(() => repository.listAgentConversations())
+        .thenAnswer((_) async => const []);
+    when(() => repository.getAgentConversation(conversationId)).thenAnswer(
+      (_) async => AgentConversationDetail(
+        conversation: _conversationSummary(conversationId),
+        messages: [
+          AgentConversationMessage(
+            id: 'message-1',
+            conversationId: conversationId,
+            role: 'user',
+            content: 'finish this meal',
+            createdAt: DateTime.utc(2026, 6, 19, 12),
+          ),
+        ],
+      ),
+    );
+    final viewModel = AgentChatViewModel(
+      nutritionRepository: repository,
+      audioRecorderService: recorder,
+      sessionStore: sessionStore,
+      cacheStore: cacheStore,
+      now: () => DateTime.utc(2026, 6, 19, 12, 10),
+    );
+
+    await viewModel.prepareForEntry();
+
+    expect(viewModel.conversationId, conversationId);
+    expect(viewModel.entries.single.text, 'finish this meal');
+  });
+
+  test('AgentChatViewModel manual new chat omits conversation id on next send',
+      () async {
+    final repository = MockNutritionRepository();
+    final recorder = MockAudioRecorderService();
+    when(
+      () => repository.streamAgentChat(
+        any(),
+        conversationId: any(named: 'conversationId'),
+        activeProposalId: any(named: 'activeProposalId'),
+      ),
+    ).thenAnswer(
+      (_) => Stream.fromIterable([
+        const AgentChatStreamEvent(
+          type: 'conversation_started',
+          conversationId: '22222222-2222-2222-2222-222222222222',
+        ),
+        const AgentChatStreamEvent(
+          type: 'done',
+          conversationId: '22222222-2222-2222-2222-222222222222',
+        ),
+      ]),
+    );
+    final viewModel = AgentChatViewModel(
+      nutritionRepository: repository,
+      audioRecorderService: recorder,
+    )..conversationId = '11111111-1111-1111-1111-111111111111';
+
+    await viewModel.startNewConversation();
+    await viewModel.sendText('fresh start');
+
+    verify(
+      () => repository.streamAgentChat(
+        'fresh start',
+        conversationId: null,
+        activeProposalId: any(named: 'activeProposalId'),
+      ),
+    ).called(1);
+    expect(viewModel.conversationId, '22222222-2222-2222-2222-222222222222');
   });
 
   testWidgets('AgentChatScreen renders a completed tool widget',
@@ -541,6 +665,15 @@ DailySummary _summary() {
   );
 }
 
+AgentConversationSummary _conversationSummary(String id) {
+  return AgentConversationSummary(
+    id: id,
+    title: 'Saved chat',
+    createdAt: DateTime.utc(2026, 6, 19, 12),
+    updatedAt: DateTime.utc(2026, 6, 19, 12, 1),
+  );
+}
+
 class _MemoryTokenStorage implements TokenStorage {
   @override
   Future<void> clear() async {}
@@ -550,4 +683,29 @@ class _MemoryTokenStorage implements TokenStorage {
 
   @override
   Future<void> write(StoredTokens tokens) async {}
+}
+
+class _MemoryPreferencesStorage implements AppPreferencesStorage {
+  final values = <String, String>{};
+
+  @override
+  Future<String?> readString(String key) async => values[key];
+
+  @override
+  Future<void> writeString(String key, String value) async {
+    values[key] = value;
+  }
+
+  @override
+  Future<void> remove(String key) async {
+    values.remove(key);
+  }
+
+  @override
+  Future<Set<String>> readKeys() async => values.keys.toSet();
+
+  @override
+  Future<void> removeWhere(bool Function(String key) test) async {
+    values.removeWhere((key, value) => test(key));
+  }
 }

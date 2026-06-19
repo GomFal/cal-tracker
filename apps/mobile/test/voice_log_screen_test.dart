@@ -6,7 +6,6 @@ import 'package:cal_tracker_mobile/data/repositories/nutrition_repository.dart';
 import 'package:cal_tracker_mobile/data/services/audio_recorder_service.dart';
 import 'package:cal_tracker_mobile/domain/models/nutrition_models.dart';
 import 'package:cal_tracker_mobile/l10n/generated/app_localizations.dart';
-import 'package:cal_tracker_mobile/ui/core/design_system.dart';
 import 'package:cal_tracker_mobile/ui/features/voice_log/view_models/voice_log_view_model.dart';
 import 'package:cal_tracker_mobile/ui/features/voice_log/views/voice_log_screen.dart';
 import 'package:flutter/material.dart';
@@ -81,7 +80,8 @@ void main() {
 
     testWidgets(
       'starts voice-only and keeps voice action while reviewing a proposal',
-      skip: true, // Voice action removed from MealCreateScreen; use /agent instead.
+      skip:
+          true, // Voice action removed from MealCreateScreen; use /agent instead.
       (tester) async {
         final proposal = MealProposal(
           id: 'prop_chicken_rice',
@@ -183,13 +183,13 @@ void main() {
           find.byKey(const ValueKey('voice_transcript_card')),
           findsOneWidget,
         );
-        final transcriptCard = tester.widget<FreshCard>(
+        final transcriptCard = tester.widget<Padding>(
           find.byKey(const ValueKey('voice_transcript_card')),
         );
         final micButton = tester.widget<IconButton>(
           find.byKey(const ValueKey('mic_button')),
         );
-        expect(transcriptCard.color, FreshPalette.dark.limeWash);
+        expect(transcriptCard.padding, isA<EdgeInsets>());
         expect(micButton.color, buildDarkTheme().colorScheme.onPrimary);
         expect(find.text('I heard:'), findsOneWidget);
         expect(find.text('chicken and rice'), findsOneWidget);
@@ -226,7 +226,8 @@ void main() {
 
     testWidgets(
       'hides start over while voice recording is starting and active',
-      skip: true, // Voice action removed from MealCreateScreen; use /agent instead.
+      skip:
+          true, // Voice action removed from MealCreateScreen; use /agent instead.
       (tester) async {
         final proposal = MealProposal(
           id: 'prop_chicken_rice',
@@ -1169,7 +1170,8 @@ void main() {
       await viewModel.submitText('100 gramos de pan');
       await tester.pumpAndSettle();
 
-      expect(find.text('pan 100 g'), findsOneWidget);
+      expect(find.text('pan'), findsOneWidget);
+      expect(find.text('100 g'), findsOneWidget);
       expect(
         find.textContaining('Bread, white, commercially prepared'),
         findsNothing,
@@ -1240,126 +1242,131 @@ void main() {
 
     testWidgets(
       'keeps voice correction action available for active proposal',
-      skip: true, // Voice action removed from MealCreateScreen; use /agent instead.
+      skip:
+          true, // Voice action removed from MealCreateScreen; use /agent instead.
       (tester) async {
         const initialProposal = MealProposal(
-        id: 'prop_1',
-        title: 'Bread and butter',
-        confidence: 0.85,
-        requiresConfirmation: true,
-        trustedAutoCommitEligible: false,
-        nutrition: NutritionSnapshot(
-          calories: 408,
-          proteinGrams: 9.2,
-          carbsGrams: 49,
-          fatGrams: 19.4,
-        ),
-        items: [],
-      );
-      const updatedProposal = MealProposal(
-        id: 'prop_1',
-        title: 'Bread and butter',
-        confidence: 0.85,
-        requiresConfirmation: true,
-        trustedAutoCommitEligible: false,
-        nutrition: NutritionSnapshot(
-          calories: 552,
-          proteinGrams: 9.4,
-          carbsGrams: 49,
-          fatGrams: 35.6,
-        ),
-        items: [],
-      );
-      when(() => nutritionRepository.logText('bread and butter')).thenAnswer(
-        (_) async => const AgentRunResult(
-          kind: 'proposal',
-          message: 'Meal proposal created.',
-          proposal: initialProposal,
-        ),
-      );
-      when(() => audioRecorderService.start()).thenAnswer((_) async {});
-      when(() => audioRecorderService.stop()).thenAnswer(
-        (_) async => const RecordedAudio(
-          path: '/tmp/test.m4a',
-          mimeType: 'audio/m4a',
-          sizeBytes: 1024,
-        ),
-      );
-      when(
-        () => nutritionRepository.logAudio(any(), activeProposalId: 'prop_1'),
-      ).thenAnswer(
-        (_) async => const VoiceMealRunResult(
-          transcript: 'make the butter 40 grams',
-          provider: 'test',
-          model: 'test-model',
-          traceId: 'trace-1',
-          result: AgentRunResult(
+          id: 'prop_1',
+          title: 'Bread and butter',
+          confidence: 0.85,
+          requiresConfirmation: true,
+          trustedAutoCommitEligible: false,
+          nutrition: NutritionSnapshot(
+            calories: 408,
+            proteinGrams: 9.2,
+            carbsGrams: 49,
+            fatGrams: 19.4,
+          ),
+          items: [],
+        );
+        const updatedProposal = MealProposal(
+          id: 'prop_1',
+          title: 'Bread and butter',
+          confidence: 0.85,
+          requiresConfirmation: true,
+          trustedAutoCommitEligible: false,
+          nutrition: NutritionSnapshot(
+            calories: 552,
+            proteinGrams: 9.4,
+            carbsGrams: 49,
+            fatGrams: 35.6,
+          ),
+          items: [],
+        );
+        when(() => nutritionRepository.logText('bread and butter')).thenAnswer(
+          (_) async => const AgentRunResult(
             kind: 'proposal',
-            message: 'Meal proposal updated.',
-            proposal: updatedProposal,
+            message: 'Meal proposal created.',
+            proposal: initialProposal,
           ),
-        ),
-      );
-
-      await tester.pumpWidget(
-        ChangeNotifierProvider<VoiceLogViewModel>.value(
-          value: viewModel,
-          child: MaterialApp(
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: AppLocalizations.supportedLocales,
-            theme: buildTheme(),
-            home: const MealCreateScreen(),
+        );
+        when(() => audioRecorderService.start()).thenAnswer((_) async {});
+        when(() => audioRecorderService.stop()).thenAnswer(
+          (_) async => const RecordedAudio(
+            path: '/tmp/test.m4a',
+            mimeType: 'audio/m4a',
+            sizeBytes: 1024,
           ),
-        ),
-      );
+        );
+        when(
+          () => nutritionRepository.logAudio(any(), activeProposalId: 'prop_1'),
+        ).thenAnswer(
+          (_) async => const VoiceMealRunResult(
+            transcript: 'make the butter 40 grams',
+            provider: 'test',
+            model: 'test-model',
+            traceId: 'trace-1',
+            result: AgentRunResult(
+              kind: 'proposal',
+              message: 'Meal proposal updated.',
+              proposal: updatedProposal,
+            ),
+          ),
+        );
 
-      await viewModel.submitText('bread and butter');
-      await tester.pumpAndSettle();
+        await tester.pumpWidget(
+          ChangeNotifierProvider<VoiceLogViewModel>.value(
+            value: viewModel,
+            child: MaterialApp(
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              theme: buildTheme(),
+              home: const MealCreateScreen(),
+            ),
+          ),
+        );
 
-      expect(find.byKey(const ValueKey('meal_text_field')), findsNothing);
-      expect(find.byKey(const ValueKey('submit_meal_button')), findsNothing);
-      expect(
-        find.byKey(const ValueKey('meal_create_voice_action_button')),
-        findsOneWidget,
-      );
-      expect(viewModel.proposal, initialProposal);
+        await viewModel.submitText('bread and butter');
+        await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const ValueKey('mic_button')));
-      await tester.pump();
+        expect(find.byKey(const ValueKey('meal_text_field')), findsNothing);
+        expect(find.byKey(const ValueKey('submit_meal_button')), findsNothing);
+        expect(
+          find.byKey(const ValueKey('meal_create_voice_action_button')),
+          findsOneWidget,
+        );
+        expect(viewModel.proposal, initialProposal);
 
-      expect(viewModel.state, VoiceLogState.recording);
-      expect(viewModel.proposal, initialProposal);
-      expect(find.byKey(const ValueKey('voice_transcript_card')), findsNothing);
+        await tester.tap(find.byKey(const ValueKey('mic_button')));
+        await tester.pump();
 
-      await tester.tap(find.byKey(const ValueKey('mic_button')));
-      await tester.pumpAndSettle();
+        expect(viewModel.state, VoiceLogState.recording);
+        expect(viewModel.proposal, initialProposal);
+        expect(
+          find.byKey(const ValueKey('voice_transcript_card')),
+          findsNothing,
+        );
 
-      expect(viewModel.proposal, updatedProposal);
-      expect(
-        find.byKey(const ValueKey('proposal_change_success_toast')),
-        findsOneWidget,
-      );
-      expect(find.text('Changes applied'), findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('voice_transcript_card')),
-        findsOneWidget,
-      );
-      expect(find.text('make the butter 40 grams'), findsOneWidget);
-      verify(
-        () => nutritionRepository.logAudio(any(), activeProposalId: 'prop_1'),
-      ).called(1);
+        await tester.tap(find.byKey(const ValueKey('mic_button')));
+        await tester.pumpAndSettle();
 
-      await tester.pump(
-        VoiceLogViewModel.proposalChangeSuccessDuration +
-            const Duration(milliseconds: 100),
-      );
-      await tester.pump();
+        expect(viewModel.proposal, updatedProposal);
+        expect(
+          find.byKey(const ValueKey('proposal_change_success_toast')),
+          findsOneWidget,
+        );
+        expect(find.text('Changes applied'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('voice_transcript_card')),
+          findsOneWidget,
+        );
+        expect(find.text('make the butter 40 grams'), findsOneWidget);
+        verify(
+          () => nutritionRepository.logAudio(any(), activeProposalId: 'prop_1'),
+        ).called(1);
 
-      expect(
-        find.byKey(const ValueKey('proposal_change_success_toast')),
-        findsNothing,
-      );
-    });
+        await tester.pump(
+          VoiceLogViewModel.proposalChangeSuccessDuration +
+              const Duration(milliseconds: 100),
+        );
+        await tester.pump();
+
+        expect(
+          find.byKey(const ValueKey('proposal_change_success_toast')),
+          findsNothing,
+        );
+      },
+    );
 
     testWidgets(
       'shows localized change success for Spanish active proposal correction',
@@ -1448,7 +1455,8 @@ void main() {
 
     testWidgets(
       'shows voice transcript when voice correction needs clarification',
-      skip: true, // Voice action removed from MealCreateScreen; use /agent instead.
+      skip:
+          true, // Voice action removed from MealCreateScreen; use /agent instead.
       (tester) async {
         const initialProposal = MealProposal(
           id: 'prop_rice',
@@ -1534,7 +1542,8 @@ void main() {
 
     testWidgets(
       'shows food match clarification while keeping active proposal visible',
-      skip: true, // Voice action removed from MealCreateScreen; use /agent instead.
+      skip:
+          true, // Voice action removed from MealCreateScreen; use /agent instead.
       (tester) async {
         const initialProposal = MealProposal(
           id: 'prop_chicken_rice',

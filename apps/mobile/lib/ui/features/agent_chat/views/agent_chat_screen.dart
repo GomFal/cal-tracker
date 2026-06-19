@@ -92,7 +92,8 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
                           if (viewModel.entries.isEmpty) ...[
                             _FadeIn(
                               child: _AgentWelcomeCard(
-                                  onPromptSelected: _sendPrompt),
+                                onPromptSelected: _sendPrompt,
+                              ),
                             ),
                           ] else ...[
                             for (final entry in viewModel.entries) ...[
@@ -107,9 +108,11 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
                               viewModel.isBusy) ...[
                             _FadeIn(
                               key: ValueKey(
-                                  'agent_status_${viewModel.statusMessage}'),
+                                'agent_status_${viewModel.statusMessage}',
+                              ),
                               child: _AgentStatusCard(
-                                  message: viewModel.statusMessage!),
+                                message: viewModel.statusMessage!,
+                              ),
                             ),
                             const SizedBox(height: FreshSpacing.md),
                           ],
@@ -218,10 +221,8 @@ class _FadeIn extends StatelessWidget {
       tween: Tween(begin: 0, end: 1),
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
-      builder: (context, opacity, child) => Opacity(
-        opacity: opacity,
-        child: child,
-      ),
+      builder: (context, opacity, child) =>
+          Opacity(opacity: opacity, child: child),
       child: child,
     );
   }
@@ -241,24 +242,17 @@ class _AgentWelcomeCard extends StatelessWidget {
       context.l10n.agentChatPromptRemaining,
       context.l10n.agentChatPromptUsual,
     ];
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
+    return Padding(
       key: const ValueKey('agent_chat_welcome_card'),
-      padding: const EdgeInsets.all(FreshSpacing.xl),
-      decoration: BoxDecoration(
-        color: isDark ? palette.surfaceSoft : palette.surface,
-        borderRadius: BorderRadius.circular(FreshRadii.xl),
-        border: Border.all(color: palette.rule),
+      padding: const EdgeInsets.symmetric(
+        horizontal: FreshSpacing.xs,
+        vertical: FreshSpacing.lg,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          FreshIconChip(
-            icon: Icons.auto_awesome_rounded,
-            color: palette.limeDeep,
-            backgroundColor: palette.limeWash,
-          ),
-          const SizedBox(height: FreshSpacing.md),
+          Icon(Icons.auto_awesome_rounded, color: palette.limeDeep, size: 28),
+          const SizedBox(height: FreshSpacing.sm),
           Text(
             context.l10n.agentChatWelcomeTitle,
             style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
@@ -313,22 +307,26 @@ class _UserBubble extends StatelessWidget {
       alignment: Alignment.centerRight,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 320),
-        child: Container(
+        child: DecoratedBox(
           key: const ValueKey('agent_user_message'),
-          padding: const EdgeInsets.symmetric(
-            horizontal: FreshSpacing.lg,
-            vertical: FreshSpacing.md,
-          ),
           decoration: BoxDecoration(
-            color: palette.lime,
-            borderRadius: BorderRadius.circular(FreshRadii.lg),
+            border: Border(
+              right: BorderSide(color: palette.limeDeep, width: 3),
+            ),
           ),
-          child: Text(
-            text,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onPrimary,
-                  fontWeight: FontWeight.w600,
-                ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: FreshSpacing.md,
+              vertical: FreshSpacing.sm,
+            ),
+            child: Text(
+              text,
+              textAlign: TextAlign.right,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: palette.ink,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ),
       ),
@@ -343,21 +341,15 @@ class _AssistantBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = context.freshPalette;
     return Align(
       alignment: Alignment.centerLeft,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 360),
-        child: Container(
+        child: Padding(
           key: const ValueKey('agent_assistant_message'),
           padding: const EdgeInsets.symmetric(
             horizontal: FreshSpacing.lg,
-            vertical: FreshSpacing.md,
-          ),
-          decoration: BoxDecoration(
-            color: palette.surfaceSoft,
-            borderRadius: BorderRadius.circular(FreshRadii.lg),
-            border: Border.all(color: palette.rule),
+            vertical: FreshSpacing.sm,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -428,10 +420,7 @@ MarkdownStyleSheet _agentMarkdownStyleSheet(BuildContext context) {
     ),
     h2: headingStyle,
     h3: headingStyle,
-    h4: bodyStyle?.copyWith(
-      color: palette.ink,
-      fontWeight: FontWeight.w800,
-    ),
+    h4: bodyStyle?.copyWith(color: palette.ink, fontWeight: FontWeight.w800),
     strong: TextStyle(color: palette.ink, fontWeight: FontWeight.w800),
     em: TextStyle(color: palette.inkSoft, fontStyle: FontStyle.italic),
     listBullet: bodyStyle,
@@ -500,59 +489,60 @@ class _ToolCallCard extends StatelessWidget {
       AgentChatToolStatus.completed => palette.limeDeep,
       AgentChatToolStatus.failed => palette.coral,
     };
-    return Container(
+    return DecoratedBox(
       key: ValueKey('agent_tool_${toolCall?.id ?? entry.id}'),
-      padding: const EdgeInsets.all(FreshSpacing.lg),
       decoration: BoxDecoration(
-        color: palette.surfaceSoft,
-        borderRadius: BorderRadius.circular(FreshRadii.lg),
-        border: Border.all(color: palette.rule),
+        border: Border(
+          top: BorderSide(color: palette.ruleSoft),
+          bottom: BorderSide(color: palette.ruleSoft),
+        ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              FreshIconChip(icon: icon, color: color),
-              const SizedBox(width: FreshSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      toolCall?.label ?? context.l10n.agentChatToolFallback,
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleMedium
-                          ?.copyWith(fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: FreshSpacing.xs),
-                    Text(
-                      entry.error ?? toolCall?.summary ?? '',
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodyMedium
-                          ?.copyWith(color: palette.inkSoft),
-                    ),
-                  ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: FreshSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(icon, color: color, size: 22),
+                const SizedBox(width: FreshSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        toolCall?.label ?? context.l10n.agentChatToolFallback,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: FreshSpacing.xs),
+                      Text(
+                        entry.error ?? toolCall?.summary ?? '',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: palette.inkSoft,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+              ],
+            ),
+            if (status == AgentChatToolStatus.running) ...[
+              const SizedBox(height: FreshSpacing.md),
+              const LinearProgressIndicator(minHeight: 3),
+            ],
+            if (entry.result != null) ...[
+              const SizedBox(height: FreshSpacing.lg),
+              _FadeIn(
+                key: ValueKey(
+                  'agent_result_${toolCall?.id ?? entry.id}_${entry.result!.kind}',
+                ),
+                child: _AgentResultWidget(result: entry.result!),
               ),
             ],
-          ),
-          if (status == AgentChatToolStatus.running) ...[
-            const SizedBox(height: FreshSpacing.md),
-            const LinearProgressIndicator(minHeight: 3),
           ],
-          if (entry.result != null) ...[
-            const SizedBox(height: FreshSpacing.lg),
-            _FadeIn(
-              key: ValueKey(
-                  'agent_result_${toolCall?.id ?? entry.id}_${entry.result!.kind}'),
-              child: _AgentResultWidget(result: entry.result!),
-            ),
-          ],
-        ],
+        ),
       ),
     );
   }
@@ -621,19 +611,17 @@ class _UsualFoodDraftReview extends StatelessWidget {
         const SizedBox(height: FreshSpacing.md),
         Text(
           title,
-          style: Theme.of(context)
-              .textTheme
-              .titleMedium
-              ?.copyWith(fontWeight: FontWeight.w700),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
         ),
         if (draft.brand?.trim().isNotEmpty == true) ...[
           const SizedBox(height: FreshSpacing.xs),
           Text(
             draft.brand!.trim(),
-            style: Theme.of(context)
-                .textTheme
-                .bodyMedium
-                ?.copyWith(color: palette.inkMuted),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
           ),
         ],
         const SizedBox(height: FreshSpacing.sm),
@@ -642,10 +630,10 @@ class _UsualFoodDraftReview extends StatelessWidget {
           const SizedBox(height: FreshSpacing.sm),
           Text(
             l10n.agentChatDraftMissingFields(missing),
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall
-                ?.copyWith(color: palette.orange, fontWeight: FontWeight.w600),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: palette.orange,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
         const SizedBox(height: FreshSpacing.md),
@@ -685,8 +673,9 @@ class _UsualMealDraftReview extends StatelessWidget {
     final missing = missingFields
         .map((field) => _usualMealDraftFieldLabel(context, field))
         .join(', ');
-    final nutrition =
-        draft.items.isEmpty ? null : _sumMealItemNutrition(draft.items);
+    final nutrition = draft.items.isEmpty
+        ? null
+        : _sumMealItemNutrition(draft.items);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -701,10 +690,9 @@ class _UsualMealDraftReview extends StatelessWidget {
         else
           Text(
             title,
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(fontWeight: FontWeight.w700),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
         if (draft.items.isNotEmpty) ...[
           const SizedBox(height: FreshSpacing.md),
@@ -714,10 +702,10 @@ class _UsualMealDraftReview extends StatelessWidget {
           const SizedBox(height: FreshSpacing.sm),
           Text(
             l10n.agentChatDraftMissingFields(missing),
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall
-                ?.copyWith(color: palette.orange, fontWeight: FontWeight.w600),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: palette.orange,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
         const SizedBox(height: FreshSpacing.md),
@@ -755,30 +743,24 @@ class _DraftHeader extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        FreshIconChip(
-          icon: icon,
-          color: palette.limeDeep,
-          backgroundColor: palette.limeWash,
-        ),
-        const SizedBox(width: FreshSpacing.md),
+        Icon(icon, color: palette.limeDeep, size: 22),
+        const SizedBox(width: FreshSpacing.sm),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 title,
-                style: Theme.of(context)
-                    .textTheme
-                    .titleSmall
-                    ?.copyWith(fontWeight: FontWeight.w700),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: FreshSpacing.xs),
               Text(
                 subtitle,
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(color: palette.inkMuted),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: palette.inkMuted),
               ),
             ],
           ),
@@ -899,10 +881,9 @@ class _NutritionHeader extends StatelessWidget {
       children: [
         Text(
           title,
-          style: Theme.of(context)
-              .textTheme
-              .titleMedium
-              ?.copyWith(fontWeight: FontWeight.w700),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: FreshSpacing.sm),
         Wrap(
@@ -910,21 +891,25 @@ class _NutritionHeader extends StatelessWidget {
           runSpacing: FreshSpacing.sm,
           children: [
             _MetricPill(
-                label: context.l10n.commonKcal,
-                value: '${nutrition.calories}',
-                color: palette.limeDeep),
+              label: context.l10n.commonKcal,
+              value: '${nutrition.calories}',
+              color: palette.limeDeep,
+            ),
             _MetricPill(
-                label: context.l10n.commonProtein,
-                value: '${_grams(nutrition.proteinGrams)}g',
-                color: palette.coral),
+              label: context.l10n.commonProtein,
+              value: '${_grams(nutrition.proteinGrams)}g',
+              color: palette.coral,
+            ),
             _MetricPill(
-                label: context.l10n.commonCarbs,
-                value: '${_grams(nutrition.carbsGrams)}g',
-                color: palette.orange),
+              label: context.l10n.commonCarbs,
+              value: '${_grams(nutrition.carbsGrams)}g',
+              color: palette.orange,
+            ),
             _MetricPill(
-                label: context.l10n.commonFat,
-                value: '${_grams(nutrition.fatGrams)}g',
-                color: palette.leaf),
+              label: context.l10n.commonFat,
+              value: '${_grams(nutrition.fatGrams)}g',
+              color: palette.leaf,
+            ),
           ],
         ),
       ],
@@ -947,8 +932,11 @@ class _NutritionSnapshotGrid extends StatelessWidget {
 }
 
 class _MetricPill extends StatelessWidget {
-  const _MetricPill(
-      {required this.label, required this.value, required this.color});
+  const _MetricPill({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
 
   final String label;
   final String value;
@@ -956,14 +944,14 @@ class _MetricPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        child: Text('$value $label'),
+    return Padding(
+      padding: const EdgeInsets.only(right: FreshSpacing.sm),
+      child: Text(
+        '$value $label',
+        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+          color: color,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
@@ -1003,7 +991,8 @@ class _MealList extends StatelessWidget {
         for (final meal in meals.take(6))
           _CompactRow(
             title: meal.title,
-            subtitle: meal.mealLabel?.label ??
+            subtitle:
+                meal.mealLabel?.label ??
                 meal.occurredAt.toLocal().toString().substring(0, 16),
             trailing: '${meal.nutrition.calories} ${context.l10n.commonKcal}',
           ),
@@ -1025,7 +1014,8 @@ class _UsualFoodList extends StatelessWidget {
         for (final food in foods.take(6))
           _CompactRow(
             title: food.name,
-            subtitle: food.brand ??
+            subtitle:
+                food.brand ??
                 context.l10n.usualFoodsPerServing(_grams(food.servingGrams)),
             trailing: '${food.nutrition.calories} ${context.l10n.commonKcal}',
           ),
@@ -1058,8 +1048,11 @@ class _TemplateList extends StatelessWidget {
 }
 
 class _CompactRow extends StatelessWidget {
-  const _CompactRow(
-      {required this.title, required this.subtitle, required this.trailing});
+  const _CompactRow({
+    required this.title,
+    required this.subtitle,
+    required this.trailing,
+  });
 
   final String title;
   final String subtitle;
@@ -1079,10 +1072,9 @@ class _CompactRow extends StatelessWidget {
                 Text(title, style: Theme.of(context).textTheme.bodyMedium),
                 Text(
                   subtitle,
-                  style: Theme.of(context)
-                      .textTheme
-                      .labelMedium
-                      ?.copyWith(color: palette.inkMuted),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelMedium?.copyWith(color: palette.inkMuted),
                 ),
               ],
             ),
@@ -1113,54 +1105,63 @@ class _AgentInputBar extends StatelessWidget {
     final isRecording = viewModel.isRecording;
     return SafeArea(
       top: false,
-      child: Container(
-        color: palette.screen,
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-        child: Row(
-          children: [
-            Expanded(
-              child: TextField(
-                key: const ValueKey('agent_chat_message_field'),
-                controller: controller,
-                minLines: 1,
-                maxLines: 4,
-                textInputAction: TextInputAction.send,
-                enabled: !viewModel.isBusy && !isRecording,
-                decoration: InputDecoration(
-                  hintText: context.l10n.agentChatInputHint,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: palette.screen,
+          border: Border(top: BorderSide(color: palette.ruleSoft)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  key: const ValueKey('agent_chat_message_field'),
+                  controller: controller,
+                  minLines: 1,
+                  maxLines: 4,
+                  textInputAction: TextInputAction.send,
+                  enabled: !viewModel.isBusy && !isRecording,
+                  decoration: InputDecoration(
+                    hintText: context.l10n.agentChatInputHint,
+                  ),
+                  onSubmitted: (_) => onSubmitted(),
                 ),
-                onSubmitted: (_) => onSubmitted(),
               ),
-            ),
-            const SizedBox(width: FreshSpacing.sm),
-            IconButton.filledTonal(
-              key: const ValueKey('agent_chat_scan_label_button'),
-              tooltip: context.l10n.agentChatScanLabelTooltip,
-              onPressed: viewModel.isBusy || isRecording ? null : onScanLabel,
-              icon: const Icon(Icons.document_scanner_outlined),
-            ),
-            const SizedBox(width: FreshSpacing.sm),
-            IconButton.filledTonal(
-              key: const ValueKey('agent_chat_mic_button'),
-              tooltip: isRecording
-                  ? context.l10n.agentChatStopRecording
-                  : context.l10n.agentChatStartRecording,
-              onPressed: viewModel.isBusy
-                  ? null
-                  : () {
-                      if (!isRecording) VoiceActionHaptics.recordingStarted();
-                      if (isRecording) VoiceActionHaptics.recordingStopped();
-                      unawaited(viewModel.toggleRecording());
-                    },
-              icon: Icon(isRecording ? Icons.stop_rounded : Icons.mic_rounded),
-            ),
-            const SizedBox(width: FreshSpacing.sm),
-            FilledButton(
-              key: const ValueKey('agent_chat_send_button'),
-              onPressed: viewModel.isBusy || isRecording ? null : onSubmitted,
-              child: const Icon(Icons.send_rounded),
-            ),
-          ],
+              const SizedBox(width: FreshSpacing.sm),
+              IconButton(
+                key: const ValueKey('agent_chat_scan_label_button'),
+                tooltip: context.l10n.agentChatScanLabelTooltip,
+                onPressed: viewModel.isBusy || isRecording ? null : onScanLabel,
+                icon: const Icon(Icons.document_scanner_outlined),
+              ),
+              const SizedBox(width: FreshSpacing.sm),
+              IconButton(
+                key: const ValueKey('agent_chat_mic_button'),
+                tooltip: isRecording
+                    ? context.l10n.agentChatStopRecording
+                    : context.l10n.agentChatStartRecording,
+                onPressed: viewModel.isBusy
+                    ? null
+                    : () {
+                        if (!isRecording) VoiceActionHaptics.recordingStarted();
+                        if (isRecording) VoiceActionHaptics.recordingStopped();
+                        unawaited(viewModel.toggleRecording());
+                      },
+                color: isRecording ? palette.coral : palette.inkSoft,
+                icon: Icon(
+                  isRecording ? Icons.stop_rounded : Icons.mic_rounded,
+                ),
+              ),
+              const SizedBox(width: FreshSpacing.sm),
+              IconButton(
+                key: const ValueKey('agent_chat_send_button'),
+                onPressed: viewModel.isBusy || isRecording ? null : onSubmitted,
+                color: palette.limeDeep,
+                icon: const Icon(Icons.send_rounded),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1174,10 +1175,7 @@ NutritionSnapshot _sumMealItemNutrition(List<MealItem> items) {
       0,
       (total, item) => total + item.proteinGrams,
     ),
-    carbsGrams: items.fold<double>(
-      0,
-      (total, item) => total + item.carbsGrams,
-    ),
+    carbsGrams: items.fold<double>(0, (total, item) => total + item.carbsGrams),
     fatGrams: items.fold<double>(0, (total, item) => total + item.fatGrams),
   );
 }

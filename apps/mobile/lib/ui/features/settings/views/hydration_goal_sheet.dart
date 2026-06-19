@@ -274,105 +274,20 @@ class _HydrationStepper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = context.freshPalette;
-    final textTheme = Theme.of(context).textTheme;
-    final l10n = context.l10n;
     final displayedValue = unit == HydrationGoalUnit.liters
         ? formatHydrationLiters(liters)
         : (liters * ouncesPerLiter).toStringAsFixed(1);
     final displayedUnit = unit == HydrationGoalUnit.liters ? 'L' : 'fl oz';
-    final valueStyle =
-        (textTheme.displaySmall ?? textTheme.headlineLarge)?.copyWith(
-      color: palette.ink,
-      fontWeight: FontWeight.w800,
-      fontFeatures: const [FontFeature.tabularFigures()],
-    );
-    return FreshCard(
-      shadow: false,
-      color: palette.surfaceSoft,
-      padding: const EdgeInsets.all(14),
-      child: Row(
-        children: [
-          _RoundStepButton(
-            key: const ValueKey('hydration_goal_decrease_button'),
-            icon: Icons.remove_rounded,
-            tooltip: l10n.hydrationDecreaseGoalTooltip,
-            enabled: canDecrease,
-            onPressed: onDecrease,
-          ),
-          const SizedBox(width: FreshSpacing.md),
-          Expanded(
-            child: Container(
-              height: 60,
-              decoration: BoxDecoration(
-                color: palette.surface,
-                borderRadius: BorderRadius.circular(22),
-              ),
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      displayedValue,
-                      key: const ValueKey('hydration_goal_value'),
-                      style: valueStyle,
-                    ),
-                    const SizedBox(width: FreshSpacing.sm),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 3),
-                      child: Text(
-                        displayedUnit,
-                        style: textTheme.headlineMedium?.copyWith(
-                          color: palette.inkMuted,
-                          fontWeight: FontWeight.w800,
-                          height: 1,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: FreshSpacing.md),
-          _RoundStepButton(
-            key: const ValueKey('hydration_goal_increase_button'),
-            icon: Icons.add_rounded,
-            tooltip: l10n.hydrationIncreaseGoalTooltip,
-            enabled: canIncrease,
-            onPressed: onIncrease,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RoundStepButton extends StatelessWidget {
-  const _RoundStepButton({
-    super.key,
-    required this.icon,
-    required this.tooltip,
-    required this.enabled,
-    required this.onPressed,
-  });
-
-  final IconData icon;
-  final String tooltip;
-  final bool enabled;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.freshPalette;
-    return FreshIconButton(
-      icon: icon,
-      tooltip: tooltip,
-      onPressed: enabled ? onPressed : null,
-      backgroundColor: palette.surface,
-      foregroundColor: palette.inkSoft,
+    return FreshSteppedValueInput(
+      decrementKey: const ValueKey('hydration_goal_decrease_button'),
+      incrementKey: const ValueKey('hydration_goal_increase_button'),
+      valueKey: const ValueKey('hydration_goal_value'),
+      value: displayedValue,
+      unit: displayedUnit,
+      canDecrement: canDecrease,
+      canIncrement: canIncrease,
+      onDecrement: onDecrease,
+      onIncrement: onIncrease,
     );
   }
 }
@@ -391,8 +306,9 @@ class _HydrationInfoCard extends StatelessWidget {
       padding:
           EdgeInsets.fromLTRB(14, compact ? 10 : 12, 14, compact ? 10 : 12),
       decoration: BoxDecoration(
-        color: palette.limeWash,
-        borderRadius: BorderRadius.circular(24),
+        color: palette.surface,
+        borderRadius: BorderRadius.circular(FreshRadii.lg),
+        border: Border.all(color: palette.rule),
       ),
       child: Row(
         children: [
@@ -400,7 +316,7 @@ class _HydrationInfoCard extends StatelessWidget {
             width: compact ? 40 : 44,
             height: compact ? 40 : 44,
             decoration: BoxDecoration(
-              color: palette.surface,
+              color: palette.limeWash,
               shape: BoxShape.circle,
             ),
             child: Icon(

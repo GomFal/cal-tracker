@@ -107,13 +107,13 @@ class _MealTemplateEditorScreenState extends State<MealTemplateEditorScreen> {
                   const LinearProgressIndicator(minHeight: 3),
                   const SizedBox(height: FreshSpacing.md),
                 ],
-                _MealTemplateBasicsCard(
+                _MealTemplateBasicsSection(
                   titleController: _titleController,
                   aliasesController: _aliasesController,
                 ),
                 if (_candidateGroups.isNotEmpty) ...[
                   const SizedBox(height: FreshSpacing.md),
-                  _CandidateGroupsCard(
+                  _CandidateGroupsSection(
                     groups: _candidateGroups,
                     onSelected: _applyCandidate,
                   ),
@@ -238,7 +238,9 @@ class _MealTemplateEditorScreenState extends State<MealTemplateEditorScreen> {
     setState(() => _validationError = null);
     final title = _titleController.text.trim();
     if (title.isEmpty) {
-      setState(() => _validationError = context.l10n.mealTemplateEditorTitleRequired);
+      setState(
+        () => _validationError = context.l10n.mealTemplateEditorTitleRequired,
+      );
       return;
     }
     final items = _validItems();
@@ -318,8 +320,8 @@ void _closeEditor(BuildContext context, [Object? result]) {
   Navigator.of(context).maybePop(result);
 }
 
-class _MealTemplateBasicsCard extends StatelessWidget {
-  const _MealTemplateBasicsCard({
+class _MealTemplateBasicsSection extends StatelessWidget {
+  const _MealTemplateBasicsSection({
     required this.titleController,
     required this.aliasesController,
   });
@@ -331,54 +333,42 @@ class _MealTemplateBasicsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final palette = context.freshPalette;
-    return FreshCard(
-      radius: FreshRadii.xl,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              FreshIconChip(
-                icon: Icons.restaurant_menu_rounded,
-                color: palette.orange,
-                backgroundColor: palette.yellow,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          l10n.mealTemplateEditorDetailsSection,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: palette.ink,
+                fontWeight: FontWeight.w700,
               ),
-              const SizedBox(width: FreshSpacing.md),
-              Expanded(
-                child: Text(
-                  l10n.mealTemplateEditorDetailsSection,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: FreshSpacing.md),
-          TextField(
-            key: const ValueKey('meal_template_title_field'),
-            controller: titleController,
-            textInputAction: TextInputAction.next,
-            decoration: InputDecoration(
-              labelText: l10n.mealTemplateEditorTitleLabel,
-              hintText: l10n.mealTemplateEditorTitleHint,
-            ),
-          ),
-          const SizedBox(height: FreshSpacing.md),
-          TextField(
-            key: const ValueKey('meal_template_aliases_field'),
-            controller: aliasesController,
-            decoration: InputDecoration(
-              labelText: l10n.mealTemplateEditorAliasesLabel,
-              hintText: l10n.mealTemplateEditorAliasesHint,
-            ),
-          ),
-        ],
-      ),
+        ),
+        const SizedBox(height: FreshSpacing.md),
+        FreshUnderlineTextField(
+          fieldKey: const ValueKey('meal_template_title_field'),
+          controller: titleController,
+          label: l10n.mealTemplateEditorTitleLabel,
+          placeholder: l10n.mealTemplateEditorTitleHint,
+          textInputAction: TextInputAction.next,
+        ),
+        const SizedBox(height: FreshSpacing.md),
+        FreshUnderlineTextField(
+          fieldKey: const ValueKey('meal_template_aliases_field'),
+          controller: aliasesController,
+          label: l10n.mealTemplateEditorAliasesLabel,
+          placeholder: l10n.mealTemplateEditorAliasesHint,
+        ),
+        Divider(height: 24, color: palette.rule),
+      ],
     );
   }
 }
 
-class _CandidateGroupsCard extends StatelessWidget {
-  const _CandidateGroupsCard({required this.groups, required this.onSelected});
+class _CandidateGroupsSection extends StatelessWidget {
+  const _CandidateGroupsSection({
+    required this.groups,
+    required this.onSelected,
+  });
 
   final List<FoodCandidateGroup> groups;
   final void Function(FoodCandidateGroup group, MealItem candidate) onSelected;
@@ -387,54 +377,55 @@ class _CandidateGroupsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final palette = context.freshPalette;
-    return FreshCard(
-      radius: FreshRadii.xl,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            l10n.mealTemplateEditorCandidatesSection,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: FreshSpacing.xs),
-          Text(
-            l10n.mealTemplateEditorCandidatesHelper,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
-          ),
-          const SizedBox(height: FreshSpacing.md),
-          for (final group in groups) ...[
-            Text(
-              group.mention.originalText,
-              style: Theme.of(context).textTheme.labelLarge,
-            ),
-            const SizedBox(height: FreshSpacing.sm),
-            if (group.candidates.isEmpty)
-              Text(
-                l10n.mealTemplateEditorNoCandidates,
-                style: Theme.of(context).textTheme.bodyMedium,
-              )
-            else
-              Wrap(
-                spacing: FreshSpacing.sm,
-                runSpacing: FreshSpacing.sm,
-                children: [
-                  for (final candidate in group.candidates.take(10))
-                    ActionChip(
-                      key: ValueKey(
-                        'meal_template_candidate_${group.mention.originalText}_${candidate.name}',
-                      ),
-                      avatar: const Icon(Icons.swap_horiz_rounded, size: 18),
-                      label: Text(candidate.name),
-                      onPressed: () => onSelected(group, candidate),
-                    ),
-                ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Divider(height: 24, color: palette.rule),
+        Text(
+          l10n.mealTemplateEditorCandidatesSection,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: palette.ink,
+                fontWeight: FontWeight.w700,
               ),
-            const SizedBox(height: FreshSpacing.md),
-          ],
+        ),
+        const SizedBox(height: FreshSpacing.xs),
+        Text(
+          l10n.mealTemplateEditorCandidatesHelper,
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
+        ),
+        const SizedBox(height: FreshSpacing.md),
+        for (final group in groups) ...[
+          Text(
+            group.mention.originalText,
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
+          const SizedBox(height: FreshSpacing.sm),
+          if (group.candidates.isEmpty)
+            Text(
+              l10n.mealTemplateEditorNoCandidates,
+              style: Theme.of(context).textTheme.bodyMedium,
+            )
+          else
+            Wrap(
+              spacing: FreshSpacing.sm,
+              runSpacing: FreshSpacing.sm,
+              children: [
+                for (final candidate in group.candidates.take(10))
+                  ActionChip(
+                    key: ValueKey(
+                      'meal_template_candidate_${group.mention.originalText}_${candidate.name}',
+                    ),
+                    avatar: const Icon(Icons.swap_horiz_rounded, size: 18),
+                    label: Text(candidate.name),
+                    onPressed: () => onSelected(group, candidate),
+                  ),
+              ],
+            ),
+          const SizedBox(height: FreshSpacing.md),
         ],
-      ),
+      ],
     );
   }
 }
@@ -475,23 +466,21 @@ class _TemplateItemsSectionState extends State<_TemplateItemsSection> {
               ? FoodSearchPanel(
                   key: const ValueKey('meal_template_food_search_panel'),
                   keyPrefix: 'meal_template_food_search',
-                  searchFoods: context
-                      .read<MealTemplatesViewModel>()
-                      .searchFoods,
+                  searchFoods:
+                      context.read<MealTemplatesViewModel>().searchFoods,
                   onSelected: (item) {
                     widget.onAddFood(item);
                     setState(() => _searchExpanded = false);
                   },
                   onClose: () => setState(() => _searchExpanded = false),
                 )
-              : Align(
+              : KeyedSubtree(
                   key: const ValueKey('meal_template_food_search_collapsed'),
-                  alignment: Alignment.centerLeft,
-                  child: OutlinedButton.icon(
+                  child: FreshSearchActionRow(
                     key: const ValueKey('meal_template_add_from_search_button'),
-                    onPressed: () => setState(() => _searchExpanded = true),
-                    icon: const Icon(Icons.search_rounded),
-                    label: Text(l10n.mealTemplateEditorAddFromSearch),
+                    icon: Icons.search_rounded,
+                    label: l10n.mealTemplateEditorAddFromSearch,
+                    onTap: () => setState(() => _searchExpanded = true),
                   ),
                 ),
         ),
@@ -541,9 +530,8 @@ class _TemplateItemCardState extends State<_TemplateItemCard> {
     final l10n = context.l10n;
     final palette = context.freshPalette;
     final nutrition = widget.item.previewNutrition;
-    return FreshCard(
-      padding: const EdgeInsets.all(16),
-      shadow: true,
+    return Padding(
+      padding: const EdgeInsets.only(top: FreshSpacing.sm),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -551,8 +539,11 @@ class _TemplateItemCardState extends State<_TemplateItemCard> {
             children: [
               Expanded(
                 child: Text(
-                  l10n.commonIngredient,
-                  style: Theme.of(context).textTheme.titleSmall,
+                  '${l10n.commonIngredient} ${widget.index + 1}',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: palette.ink,
+                        fontWeight: FontWeight.w700,
+                      ),
                 ),
               ),
               IconButton(
@@ -560,90 +551,84 @@ class _TemplateItemCardState extends State<_TemplateItemCard> {
                 onPressed: widget.onDelete,
                 tooltip: l10n.commonDeleteIngredient,
                 icon: const Icon(Icons.delete_outline_rounded),
+                color: palette.inkMuted,
               ),
             ],
           ),
           const SizedBox(height: FreshSpacing.sm),
-          TextField(
-            key: ValueKey('meal_template_item_name_${widget.index}'),
+          FreshUnderlineTextField(
+            fieldKey: ValueKey('meal_template_item_name_${widget.index}'),
             controller: widget.item.nameController,
-            decoration: InputDecoration(labelText: l10n.foodSearchName),
-            onChanged: (_) {
-              setState(() {});
-              widget.onItemChanged?.call();
+            label: l10n.foodSearchName,
+            onChanged: (_) => _notifyChanged(),
+          ),
+          const SizedBox(height: FreshSpacing.sm),
+          Text(
+            l10n.commonAmount,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: palette.inkMuted,
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          const SizedBox(height: FreshSpacing.xs),
+          FreshInlineAmountStepper(
+            amountFieldKey: ValueKey(
+              'meal_template_item_quantity_${widget.index}',
+            ),
+            unitFieldKey: ValueKey('meal_template_item_unit_${widget.index}'),
+            amountController: widget.item.quantityController,
+            unitController: widget.item.unitController,
+            decrementLabel: widget.item.isGramUnit ? '−10g' : '−1',
+            incrementLabel: widget.item.isGramUnit ? '+10g' : '+1',
+            decrementKey: ValueKey(
+              'meal_template_item_decrease_10_${widget.index}',
+            ),
+            incrementKey: ValueKey(
+              'meal_template_item_increase_10_${widget.index}',
+            ),
+            onAmountChanged: (_) => _notifyChanged(),
+            onUnitChanged: (_) => _notifyChanged(),
+            onDecrement: () {
+              widget.item.adjustQuantity(widget.item.isGramUnit ? -10 : -1);
+              _notifyChanged();
+            },
+            onIncrement: () {
+              widget.item.adjustQuantity(widget.item.isGramUnit ? 10 : 1);
+              _notifyChanged();
             },
           ),
           const SizedBox(height: FreshSpacing.sm),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  key: ValueKey('meal_template_item_quantity_${widget.index}'),
-                  controller: widget.item.quantityController,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  decoration: InputDecoration(labelText: l10n.commonAmount),
-                  onChanged: (_) {
-                    setState(() {});
-                    widget.onItemChanged?.call();
-                  },
-                ),
-              ),
-              const SizedBox(width: FreshSpacing.sm),
-              SizedBox(
-                width: 92,
-                child: TextField(
-                  key: ValueKey('meal_template_item_unit_${widget.index}'),
-                  controller: widget.item.unitController,
-                  decoration: InputDecoration(labelText: l10n.commonUnit),
-                  onChanged: (_) {
-                    setState(() {});
-                    widget.onItemChanged?.call();
-                  },
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: FreshSpacing.sm),
-          TextField(
-            key: ValueKey('meal_template_item_calories_${widget.index}'),
+          FreshNumberUnitField(
+            fieldKey: ValueKey('meal_template_item_calories_${widget.index}'),
+            label: l10n.commonCalories,
             controller: widget.item.caloriesController,
+            unit: l10n.commonKcal,
             keyboardType: TextInputType.number,
-            decoration: InputDecoration(labelText: l10n.commonCalories),
-            onChanged: (_) {
-              setState(() {});
-              widget.onItemChanged?.call();
-            },
+            onChanged: (_) => _notifyChanged(),
           ),
           const SizedBox(height: FreshSpacing.sm),
-          Row(
-            children: [
-              Expanded(
-                child: _macroField(
-                  context,
-                  key: 'meal_template_item_protein_${widget.index}',
-                  controller: widget.item.proteinController,
-                  label: l10n.commonProtein,
-                ),
+          FreshMacroFields(
+            fields: [
+              FreshMacroFieldData(
+                key: ValueKey('meal_template_item_protein_${widget.index}'),
+                label: l10n.commonProtein,
+                controller: widget.item.proteinController,
+                color: palette.coral,
+                onChanged: (_) => _notifyChanged(),
               ),
-              const SizedBox(width: FreshSpacing.sm),
-              Expanded(
-                child: _macroField(
-                  context,
-                  key: 'meal_template_item_carbs_${widget.index}',
-                  controller: widget.item.carbsController,
-                  label: l10n.commonCarbs,
-                ),
+              FreshMacroFieldData(
+                key: ValueKey('meal_template_item_carbs_${widget.index}'),
+                label: l10n.commonCarbs,
+                controller: widget.item.carbsController,
+                color: palette.orange,
+                onChanged: (_) => _notifyChanged(),
               ),
-              const SizedBox(width: FreshSpacing.sm),
-              Expanded(
-                child: _macroField(
-                  context,
-                  key: 'meal_template_item_fat_${widget.index}',
-                  controller: widget.item.fatController,
-                  label: l10n.commonFat,
-                ),
+              FreshMacroFieldData(
+                key: ValueKey('meal_template_item_fat_${widget.index}'),
+                label: l10n.commonFat,
+                controller: widget.item.fatController,
+                color: palette.yellow,
+                onChanged: (_) => _notifyChanged(),
               ),
             ],
           ),
@@ -662,22 +647,9 @@ class _TemplateItemCardState extends State<_TemplateItemCard> {
     );
   }
 
-  Widget _macroField(
-    BuildContext context, {
-    required String key,
-    required TextEditingController controller,
-    required String label,
-  }) {
-    return TextField(
-      key: ValueKey(key),
-      controller: controller,
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      decoration: InputDecoration(labelText: label),
-      onChanged: (_) {
-        setState(() {});
-        widget.onItemChanged?.call();
-      },
-    );
+  void _notifyChanged() {
+    setState(() {});
+    widget.onItemChanged?.call();
   }
 }
 
@@ -695,49 +667,51 @@ class _SaveBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
-    return FreshCard(
+    return DecoratedBox(
       key: const ValueKey('meal_template_save_bar'),
-      radius: FreshRadii.xl,
-      color: palette.surface,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final compact = constraints.maxWidth < 420;
-          final total = _TotalNutrition(nutrition: nutrition);
-          final button = FilledButton.icon(
-            key: const ValueKey('meal_template_save_button'),
-            onPressed: isSaving ? null : onSave,
-            style: FilledButton.styleFrom(
-              backgroundColor: palette.lime,
-              foregroundColor: Theme.of(context).colorScheme.onPrimary,
-              disabledBackgroundColor: palette.surfaceMuted,
-              disabledForegroundColor: palette.inkMuted,
-            ),
-            icon: isSaving
-                ? const SizedBox.square(
-                    dimension: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.check_rounded),
-            label: Text(context.l10n.mealTemplateEditorSaveButton),
-          );
-          if (compact) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+      decoration: BoxDecoration(color: palette.screen),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(0, FreshSpacing.lg, 0, 0),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 420;
+            final total = _TotalNutrition(nutrition: nutrition);
+            final button = FilledButton.icon(
+              key: const ValueKey('meal_template_save_button'),
+              onPressed: isSaving ? null : onSave,
+              style: FilledButton.styleFrom(
+                backgroundColor: palette.lime,
+                foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                disabledBackgroundColor: palette.surfaceMuted,
+                disabledForegroundColor: palette.inkMuted,
+              ),
+              icon: isSaving
+                  ? const SizedBox.square(
+                      dimension: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.check_rounded),
+              label: Text(context.l10n.mealTemplateEditorSaveButton),
+            );
+            if (compact) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  total,
+                  const SizedBox(height: FreshSpacing.md),
+                  button,
+                ],
+              );
+            }
+            return Row(
               children: [
-                total,
-                const SizedBox(height: FreshSpacing.md),
+                Expanded(child: total),
+                const SizedBox(width: FreshSpacing.md),
                 button,
               ],
             );
-          }
-          return Row(
-            children: [
-              Expanded(child: total),
-              const SizedBox(width: FreshSpacing.md),
-              button,
-            ],
-          );
-        },
+          },
+        ),
       ),
     );
   }
@@ -752,35 +726,24 @@ class _TotalNutrition extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final palette = context.freshPalette;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return DecoratedBox(
+    return Column(
       key: const ValueKey('meal_template_total_nutrition_summary'),
-      decoration: BoxDecoration(
-        color: isDark ? palette.surfaceMuted : palette.surfaceSoft,
-        borderRadius: BorderRadius.circular(FreshRadii.md),
-        border: Border.all(color: palette.ruleSoft),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(FreshSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              l10n.mealEditorMealTotal,
-              style: Theme.of(
-                context,
-              ).textTheme.labelLarge?.copyWith(color: palette.inkMuted),
-            ),
-            const SizedBox(height: FreshSpacing.xs),
-            Text(
-              _nutritionLabel(context, nutrition),
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(color: palette.ink),
-            ),
-          ],
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          l10n.mealEditorMealTotal,
+          style: Theme.of(
+            context,
+          ).textTheme.labelLarge?.copyWith(color: palette.inkMuted),
         ),
-      ),
+        const SizedBox(height: FreshSpacing.xs),
+        Text(
+          _nutritionLabel(context, nutrition),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(color: palette.ink),
+        ),
+      ],
     );
   }
 }
@@ -806,13 +769,13 @@ class _TemplateMealItemController {
     this.needsReview,
     this.resolvedGrams,
     this.portionDescription,
-  }) : nameController = TextEditingController(text: name),
-       quantityController = TextEditingController(text: quantity),
-       unitController = TextEditingController(text: unit),
-       caloriesController = TextEditingController(text: calories),
-       proteinController = TextEditingController(text: protein),
-       carbsController = TextEditingController(text: carbs),
-       fatController = TextEditingController(text: fat);
+  })  : nameController = TextEditingController(text: name),
+        quantityController = TextEditingController(text: quantity),
+        unitController = TextEditingController(text: unit),
+        caloriesController = TextEditingController(text: calories),
+        proteinController = TextEditingController(text: protein),
+        carbsController = TextEditingController(text: carbs),
+        fatController = TextEditingController(text: fat);
 
   factory _TemplateMealItemController.empty() {
     return _TemplateMealItemController(
@@ -895,6 +858,14 @@ class _TemplateMealItemController {
       carbsGrams: roundMacroToTenth(carbs),
       fatGrams: roundMacroToTenth(fat),
     );
+  }
+
+  bool get isGramUnit => unitController.text.trim().toLowerCase() == 'g';
+
+  void adjustQuantity(double delta) {
+    final current = _parseDouble(quantityController.text) ?? 0;
+    final next = current + delta;
+    quantityController.text = _formatQuantity(next < 0.1 ? 0.1 : next);
   }
 
   void replaceWith(MealItem item) {

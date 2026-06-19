@@ -1,4 +1,7 @@
+import 'dart:ui' show Tristate;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
@@ -20,8 +23,9 @@ class _MockAudioRecorderService extends Mock implements AudioRecorderService {}
 Widget _buildTestApp(String initialLocation) {
   final nutritionRepository = _MockNutritionRepository();
   final audioRecorderService = _MockAudioRecorderService();
-  when(() => audioRecorderService.stateStream)
-      .thenAnswer((_) => const Stream.empty());
+  when(
+    () => audioRecorderService.stateStream,
+  ).thenAnswer((_) => const Stream.empty());
   when(() => audioRecorderService.dispose()).thenAnswer((_) async {});
 
   final voiceViewModel = VoiceLogViewModel(
@@ -38,9 +42,8 @@ Widget _buildTestApp(String initialLocation) {
     routes: [
       GoRoute(
         path: '/agent',
-        builder: (context, state) => const SizedBox(
-          key: ValueKey('agent_route_placeholder'),
-        ),
+        builder: (context, state) =>
+            const SizedBox(key: ValueKey('agent_route_placeholder')),
       ),
       StatefulShellRoute(
         builder: (context, state, navigationShell) =>
@@ -203,6 +206,39 @@ void main() {
       expect(find.text(bubbleText), findsNothing);
     });
 
+    testWidgets('navigation and agent controls expose semantics', (
+      tester,
+    ) async {
+      _setPhoneViewport(tester);
+      final semanticsHandle = tester.ensureSemantics();
+
+      await tester.pumpWidget(_buildTestApp('/dashboard'));
+      await tester.pump();
+      await tester.pump();
+
+      final homeData =
+          tester.getSemantics(find.bySemanticsLabel('Home')).getSemanticsData();
+      expect(homeData.flagsCollection.isButton, isTrue);
+      expect(homeData.flagsCollection.isSelected, Tristate.isTrue);
+      expect(homeData.hasAction(SemanticsAction.tap), isTrue);
+
+      final statsData = tester
+          .getSemantics(find.bySemanticsLabel('Stats'))
+          .getSemanticsData();
+      expect(statsData.flagsCollection.isButton, isTrue);
+      expect(statsData.flagsCollection.isSelected, Tristate.isFalse);
+      expect(statsData.hasAction(SemanticsAction.tap), isTrue);
+
+      final agentData = tester
+          .getSemantics(
+              find.byKey(const ValueKey('bottom_voice_action_button')))
+          .getSemanticsData();
+      expect(agentData.label, 'Open agent chat. Hold to speak');
+      expect(agentData.flagsCollection.isButton, isTrue);
+      expect(agentData.hasAction(SemanticsAction.tap), isTrue);
+      semanticsHandle.dispose();
+    });
+
     testWidgets('dismisses when mic button is tapped', (tester) async {
       _setPhoneViewport(tester);
       await tester.pumpWidget(_buildTestApp('/templates/meals/new'));
@@ -212,8 +248,9 @@ void main() {
       expect(find.text(bubbleText), findsOneWidget);
 
       // Tap the semantically-labeled mic button using the semantics finder
-      await tester
-          .tap(find.byKey(const ValueKey('bottom_voice_action_button')));
+      await tester.tap(
+        find.byKey(const ValueKey('bottom_voice_action_button')),
+      );
       await tester.pump();
       await tester.pump();
 

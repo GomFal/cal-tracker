@@ -8,7 +8,7 @@ class ThemeModeViewModel extends ChangeNotifier {
 
   final AppPreferencesRepository _preferencesRepository;
 
-  ThemeMode _themeMode = ThemeMode.system;
+  ThemeMode _themeMode = ThemeMode.dark;
 
   ThemeMode get themeMode => _themeMode;
 

@@ -617,7 +617,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('New usual ingredient'), findsOneWidget);
+    expect(find.text('New saved ingredient'), findsOneWidget);
     expect(find.text('Arroz Hacendado'), findsOneWidget);
     expect(
         find.byKey(const ValueKey('usual_food_save_button')), findsOneWidget);

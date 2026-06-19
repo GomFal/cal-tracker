@@ -2,30 +2,49 @@ import 'package:flutter/material.dart';
 
 import '../ui/core/design_system.dart';
 
+class CalTrackerScrollBehavior extends MaterialScrollBehavior {
+  const CalTrackerScrollBehavior();
+
+  @override
+  Widget buildOverscrollIndicator(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) {
+    return child;
+  }
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) {
+    return const ClampingScrollPhysics();
+  }
+}
+
 ThemeData buildTheme() => buildLightTheme();
 
 ThemeData buildLightTheme() {
+  const palette = FreshPalette.light;
   return _buildFreshTheme(
     brightness: Brightness.light,
-    palette: FreshPalette.light,
-    colorScheme: const ColorScheme.light(
-      primary: FreshColors.lime,
-      onPrimary: FreshColors.ink,
-      primaryContainer: FreshColors.limeSoft,
-      onPrimaryContainer: FreshColors.ink,
-      secondary: FreshColors.water,
-      onSecondary: FreshColors.ink,
-      secondaryContainer: FreshColors.limeWash,
-      onSecondaryContainer: FreshColors.ink,
-      surface: FreshColors.surface,
-      onSurface: FreshColors.ink,
-      surfaceContainerHighest: FreshColors.surfaceSoft,
-      error: FreshColors.coral,
-      onError: FreshColors.surface,
-      errorContainer: Color(0xffffe5e8),
-      onErrorContainer: FreshColors.ink,
-      outline: FreshColors.rule,
-      outlineVariant: FreshColors.ruleSoft,
+    palette: palette,
+    colorScheme: ColorScheme.light(
+      primary: palette.lime,
+      onPrimary: palette.ink,
+      primaryContainer: palette.limeSoft,
+      onPrimaryContainer: palette.ink,
+      secondary: palette.water,
+      onSecondary: palette.surface,
+      secondaryContainer: palette.limeWash,
+      onSecondaryContainer: palette.ink,
+      surface: palette.surface,
+      onSurface: palette.ink,
+      surfaceContainerHighest: palette.surfaceSoft,
+      error: palette.coral,
+      onError: palette.surface,
+      errorContainer: const Color(0xffffe5e8),
+      onErrorContainer: palette.ink,
+      outline: palette.rule,
+      outlineVariant: palette.ruleSoft,
     ),
   );
 }
@@ -37,19 +56,19 @@ ThemeData buildDarkTheme() {
     palette: palette,
     colorScheme: ColorScheme.dark(
       primary: palette.lime,
-      onPrimary: const Color(0xff182004),
+      onPrimary: const Color(0xff061000),
       primaryContainer: palette.limeSoft,
       onPrimaryContainer: palette.ink,
       secondary: palette.water,
-      onSecondary: const Color(0xff09262d),
+      onSecondary: const Color(0xff061000),
       secondaryContainer: palette.limeWash,
       onSecondaryContainer: palette.ink,
       surface: palette.surface,
       onSurface: palette.ink,
       surfaceContainerHighest: palette.surfaceSoft,
       error: palette.coral,
-      onError: const Color(0xff32080d),
-      errorContainer: const Color(0xff5c1f27),
+      onError: const Color(0xff1d0307),
+      errorContainer: const Color(0xff321016),
       onErrorContainer: palette.ink,
       outline: palette.rule,
       outlineVariant: palette.ruleSoft,
@@ -156,17 +175,17 @@ ThemeData _buildFreshTheme({
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: palette.surface,
+      fillColor: palette.surfaceSoft,
       labelStyle: TextStyle(color: palette.inkMuted),
       hintStyle: TextStyle(color: palette.inkMuted),
       contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(24),
-        borderSide: BorderSide.none,
+        borderSide: BorderSide(color: palette.rule),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(24),
-        borderSide: BorderSide(color: palette.ruleSoft),
+        borderSide: BorderSide(color: palette.rule),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(24),
@@ -185,13 +204,18 @@ ThemeData _buildFreshTheme({
       margin: EdgeInsets.zero,
       color: palette.surface,
       elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+        side: BorderSide(color: palette.rule),
+      ),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         backgroundColor: palette.lime,
         foregroundColor: colorScheme.onPrimary,
-        disabledBackgroundColor: palette.surfaceMuted,
+        disabledBackgroundColor: brightness == Brightness.dark
+            ? palette.surfaceSoft
+            : palette.surfaceMuted,
         disabledForegroundColor: palette.inkMuted,
         minimumSize: const Size(48, 52),
         padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
@@ -221,22 +245,27 @@ ThemeData _buildFreshTheme({
     iconButtonTheme: IconButtonThemeData(
       style: IconButton.styleFrom(
         foregroundColor: palette.ink,
-        backgroundColor: palette.surface,
+        backgroundColor: Colors.transparent,
         shape: const CircleBorder(),
+        side: BorderSide(color: palette.rule),
       ),
     ),
     dialogTheme: DialogThemeData(
       backgroundColor: palette.screen,
       surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(28),
+        side: BorderSide(color: palette.rule),
+      ),
       titleTextStyle: textTheme.titleLarge,
       contentTextStyle: textTheme.bodyMedium,
     ),
     bottomSheetTheme: BottomSheetThemeData(
       backgroundColor: palette.screen,
       surfaceTintColor: Colors.transparent,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      shape: RoundedRectangleBorder(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        side: BorderSide(color: palette.rule),
       ),
     ),
   );

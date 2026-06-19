@@ -69,7 +69,7 @@ void main() {
     expect(preferencesRepository.savedLocaleCode, 'es');
   });
 
-  testWidgets('Menu theme row defaults to device and persists choices', (
+  testWidgets('Menu theme row defaults to dark and persists choices', (
     tester,
   ) async {
     final preferencesRepository = _FakePreferencesRepository();
@@ -83,7 +83,7 @@ void main() {
     );
 
     expect(find.text('Appearance'), findsOneWidget);
-    expect(find.text('Device default'), findsOneWidget);
+    expect(find.text('Dark'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('theme_settings_row')));
     await tester.pumpAndSettle();
@@ -94,27 +94,27 @@ void main() {
     expect(find.byKey(const ValueKey('theme_option_dark')), findsOneWidget);
     expect(
       find.descendant(
-        of: find.byKey(const ValueKey('theme_option_system')),
+        of: find.byKey(const ValueKey('theme_option_dark')),
         matching: find.byIcon(Icons.check_rounded),
       ),
       findsOneWidget,
     );
 
-    await tester.tap(find.byKey(const ValueKey('theme_option_dark')));
-    await tester.pumpAndSettle();
-
-    expect(themeModeViewModel.themeMode, ThemeMode.dark);
-    expect(preferencesRepository.savedModes, [ThemeMode.dark]);
-    expect(find.text('Dark'), findsOneWidget);
-
-    await tester.tap(find.byKey(const ValueKey('theme_settings_row')));
-    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('theme_option_light')));
     await tester.pumpAndSettle();
 
     expect(themeModeViewModel.themeMode, ThemeMode.light);
-    expect(preferencesRepository.savedModes, [ThemeMode.dark, ThemeMode.light]);
+    expect(preferencesRepository.savedModes, [ThemeMode.light]);
     expect(find.text('Light'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('theme_settings_row')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('theme_option_dark')));
+    await tester.pumpAndSettle();
+
+    expect(themeModeViewModel.themeMode, ThemeMode.dark);
+    expect(preferencesRepository.savedModes, [ThemeMode.light, ThemeMode.dark]);
+    expect(find.text('Dark'), findsOneWidget);
   });
 
   testWidgets('Developer menu toggles the performance overlay', (
@@ -339,7 +339,9 @@ void main() {
     },
   );
 
-  testWidgets('Menu macro row uses a dark shadow in dark mode', (tester) async {
+  testWidgets('Menu macro row uses a flat surface border in dark mode', (
+    tester,
+  ) async {
     final preferencesRepository = _FakePreferencesRepository();
     final themeModeViewModel = ThemeModeViewModel(
       preferencesRepository: preferencesRepository,
@@ -353,9 +355,8 @@ void main() {
 
     final decoration = _freshCardDecoration(tester, 'macro_distribution_row');
 
-    expect(decoration.boxShadow, isNotNull);
-    expect(decoration.boxShadow!.single.color, const Color(0x66000000));
-    expect(decoration.boxShadow!.single.color, isNot(const Color(0x14080907)));
+    expect(decoration.boxShadow, isNull);
+    expect(decoration.border, isNotNull);
   });
 }
 

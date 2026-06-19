@@ -10,11 +10,7 @@ import '../view_models/meal_templates_view_model.dart';
 import 'usual_food_scan_screen.dart';
 
 class UsualFoodEditorScreen extends StatefulWidget {
-  const UsualFoodEditorScreen({
-    super.key,
-    this.foodId,
-    this.initialDraft,
-  });
+  const UsualFoodEditorScreen({super.key, this.foodId, this.initialDraft});
 
   static const newRoute = '/templates/ingredients/new';
 
@@ -130,6 +126,16 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
                       tooltip: l10n.commonBack,
                       onPressed: _leaveEditor,
                     ),
+                    actions: [
+                      if (food != null)
+                        FreshIconButton(
+                          key: ValueKey('usual_food_delete_${food.id}'),
+                          icon: Icons.delete_outline_rounded,
+                          tooltip: l10n.usualFoodsDeleteTooltip,
+                          foregroundColor: context.freshPalette.coral,
+                          onPressed: () => _confirmDeleteFood(viewModel, food),
+                        ),
+                    ],
                   ),
                 ),
                 Expanded(
@@ -169,7 +175,6 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
             if (!_isEditing) const SizedBox(height: FreshSpacing.lg),
             _EditorSection(
               title: l10n.usualFoodsIdentitySectionTitle,
-              icon: Icons.badge_outlined,
               child: Column(
                 children: [
                   _textField(
@@ -192,7 +197,6 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
             const SizedBox(height: FreshSpacing.lg),
             _EditorSection(
               title: l10n.usualFoodsServingSectionTitle,
-              icon: Icons.scale_rounded,
               child: _textField(
                 key: 'usual_food_serving_grams_field',
                 controller: _servingGramsController,
@@ -205,7 +209,6 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
             const SizedBox(height: FreshSpacing.lg),
             _EditorSection(
               title: l10n.usualFoodsMacrosSectionTitle,
-              icon: Icons.monitor_heart_outlined,
               child: _MacroGrid(
                 children: [
                   _textField(
@@ -338,16 +341,31 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
     TextInputAction? textInputAction,
     bool autofocus = false,
   }) {
+    final palette = context.freshPalette;
+    final textTheme = Theme.of(context).textTheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: FreshSpacing.md),
-      child: TextFormField(
-        key: ValueKey(key),
-        controller: controller,
-        autofocus: autofocus,
-        keyboardType: keyboardType,
-        textInputAction: textInputAction,
-        validator: validator,
-        decoration: InputDecoration(labelText: label),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            label,
+            style: textTheme.labelMedium?.copyWith(
+              color: palette.inkMuted,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: FreshSpacing.xs),
+          TextFormField(
+            key: ValueKey(key),
+            controller: controller,
+            autofocus: autofocus,
+            keyboardType: keyboardType,
+            textInputAction: textInputAction,
+            validator: validator,
+            decoration: freshUnderlineInputDecoration(context),
+          ),
+        ],
       ),
     );
   }
@@ -443,6 +461,34 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
     }
   }
 
+  Future<void> _confirmDeleteFood(
+    MealTemplatesViewModel viewModel,
+    UsualFood food,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(context.l10n.usualFoodsDeleteTitle),
+        content: Text(context.l10n.usualFoodsDeleteMessage(food.name)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(context.l10n.commonCancel),
+          ),
+          FilledButton(
+            key: const ValueKey('usual_food_confirm_delete_button'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(context.l10n.commonDelete),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await viewModel.deleteUsualFood(food);
+    if (!mounted || viewModel.error != null) return;
+    _leaveEditor();
+  }
+
   void _leaveEditor([Object? result]) {
     if (context.canPop()) {
       context.pop(result);
@@ -518,38 +564,30 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
 }
 
 class _EditorSection extends StatelessWidget {
-  const _EditorSection({
-    required this.title,
-    required this.icon,
-    required this.child,
-  });
+  const _EditorSection({required this.title, required this.child});
 
   final String title;
-  final IconData icon;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
-    return FreshCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              FreshIconChip(
-                icon: icon,
-                color: palette.leaf,
-                backgroundColor: palette.limeWash,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: palette.ink,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.2,
               ),
-              const SizedBox(width: FreshSpacing.md),
-              Text(title, style: Theme.of(context).textTheme.titleMedium),
-            ],
-          ),
-          const SizedBox(height: FreshSpacing.lg),
-          child,
-        ],
-      ),
+        ),
+        const SizedBox(height: FreshSpacing.md),
+        child,
+        const SizedBox(height: FreshSpacing.md),
+        Divider(height: 1, color: palette.rule),
+      ],
     );
   }
 }
@@ -562,35 +600,35 @@ class _OptionalNutrientsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
-    return FreshCard(
-      padding: EdgeInsets.zero,
-      child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          key: const ValueKey('usual_food_optional_nutrients_section'),
-          tilePadding: const EdgeInsets.symmetric(
-            horizontal: FreshSpacing.lg,
-            vertical: FreshSpacing.sm,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            key: const ValueKey('usual_food_optional_nutrients_section'),
+            tilePadding: EdgeInsets.zero,
+            childrenPadding: const EdgeInsets.only(top: FreshSpacing.sm),
+            iconColor: palette.ink,
+            collapsedIconColor: palette.inkMuted,
+            title: Text(
+              context.l10n.usualFoodsOptionalSectionTitle,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: palette.ink,
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+            subtitle: Text(
+              context.l10n.usualFoodsOptionalSectionSubtitle,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: palette.inkMuted),
+            ),
+            children: children,
           ),
-          childrenPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-          leading: FreshIconChip(
-            icon: Icons.tune_rounded,
-            color: palette.orange,
-            backgroundColor: palette.yellow,
-          ),
-          title: Text(
-            context.l10n.usualFoodsOptionalSectionTitle,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          subtitle: Text(
-            context.l10n.usualFoodsOptionalSectionSubtitle,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: palette.inkMuted),
-          ),
-          children: children,
         ),
-      ),
+        Divider(height: 1, color: palette.rule),
+      ],
     );
   }
 }
@@ -664,19 +702,7 @@ class _BottomSaveBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
     return DecoratedBox(
-      decoration: BoxDecoration(
-        color: palette.screen,
-        boxShadow: [
-          BoxShadow(
-            color: context.freshShadowColor(
-              lightAlpha: 0.10,
-              darkAlpha: 0.40,
-            ),
-            blurRadius: 24,
-            offset: const Offset(0, -8),
-          ),
-        ],
-      ),
+      decoration: BoxDecoration(color: palette.screen),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
         child: Row(
@@ -740,46 +766,61 @@ class _ScanFromPhotoCta extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final palette = context.freshPalette;
-    return FreshCard(
+    return Column(
       key: const ValueKey('usual_food_scan_from_photo_cta'),
-      child: Row(
-        children: [
-          FreshIconChip(
-            icon: Icons.document_scanner_outlined,
-            color: palette.leaf,
-            backgroundColor: palette.limeWash,
-          ),
-          const SizedBox(width: FreshSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+      children: [
+        InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(FreshRadii.sm),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: FreshSpacing.sm),
+            child: Row(
               children: [
-                Text(
-                  l10n.usualFoodsScanTitle,
-                  style: Theme.of(context).textTheme.titleSmall,
+                Icon(
+                  Icons.document_scanner_outlined,
+                  size: 20,
+                  color: palette.leaf,
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  l10n.usualFoodsScanHint,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: palette.inkMuted),
+                const SizedBox(width: FreshSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        l10n.usualFoodsScanTitle,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        l10n.usualFoodsScanHint,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: palette.inkMuted,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: FreshSpacing.sm),
+                TextButton.icon(
+                  onPressed: onPressed,
+                  icon: const Icon(Icons.chevron_right_rounded),
+                  label: Text(l10n.usualFoodsScanFromPhotoButton),
+                  style: TextButton.styleFrom(
+                    foregroundColor: palette.leaf,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: FreshSpacing.sm,
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: FreshSpacing.sm),
-          FilledButton(
-            onPressed: onPressed,
-            style: FilledButton.styleFrom(
-              backgroundColor: palette.lime,
-              foregroundColor: Theme.of(context).colorScheme.onPrimary,
-            ),
-            child: Text(l10n.usualFoodsScanFromPhotoButton),
-          ),
-        ],
-      ),
+        ),
+        Divider(height: FreshSpacing.xl, color: palette.rule),
+      ],
     );
   }
 }

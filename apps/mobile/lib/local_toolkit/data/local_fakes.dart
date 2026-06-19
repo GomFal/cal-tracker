@@ -129,7 +129,8 @@ class LocalAuthRepository extends AuthRepository {
 }
 
 class LocalNutritionRepository extends NutritionRepository {
-  LocalNutritionRepository(this.store) : super(apiClient: createLocalApiClient());
+  LocalNutritionRepository(this.store)
+      : super(apiClient: createLocalApiClient());
 
   @override
   bool get isBackendLikelyHealthy => true;
@@ -384,21 +385,15 @@ class LocalNutritionRepository extends NutritionRepository {
     final carbsMatch = RegExp(r'carbs?[^\d]*(\d+)\s*g').firstMatch(text);
     final fatMatch = RegExp(r'fat[^\d]*(\d+)\s*g').firstMatch(text);
 
-    final servingGrams = servingMatch != null
-        ? double.parse(servingMatch.group(1)!)
-        : 100.0;
-    final calories = caloriesMatch != null
-        ? int.parse(caloriesMatch.group(1)!)
-        : 150;
-    final proteinGrams = proteinMatch != null
-        ? double.parse(proteinMatch.group(1)!)
-        : 0.0;
-    final carbsGrams = carbsMatch != null
-        ? double.parse(carbsMatch.group(1)!)
-        : 0.0;
-    final fatGrams = fatMatch != null
-        ? double.parse(fatMatch.group(1)!)
-        : 0.0;
+    final servingGrams =
+        servingMatch != null ? double.parse(servingMatch.group(1)!) : 100.0;
+    final calories =
+        caloriesMatch != null ? int.parse(caloriesMatch.group(1)!) : 150;
+    final proteinGrams =
+        proteinMatch != null ? double.parse(proteinMatch.group(1)!) : 0.0;
+    final carbsGrams =
+        carbsMatch != null ? double.parse(carbsMatch.group(1)!) : 0.0;
+    final fatGrams = fatMatch != null ? double.parse(fatMatch.group(1)!) : 0.0;
 
     final missing = <String>[
       if (servingMatch == null) 'servingGrams',
@@ -427,7 +422,7 @@ class LocalNutritionRepository extends NutritionRepository {
 
 class LocalPreferencesRepository implements AppPreferencesRepository {
   LocalPreferencesRepository({
-    ThemeMode initialThemeMode = ThemeMode.light,
+    ThemeMode initialThemeMode = ThemeMode.dark,
     String? initialLocaleCode,
   })  : _themeMode = initialThemeMode,
         _localeCode = initialLocaleCode;

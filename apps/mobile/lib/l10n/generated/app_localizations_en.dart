@@ -72,6 +72,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commonMeals => 'Meals';
 
   @override
+  String get commonWater => 'Water';
+
+  @override
   String get commonRemaining => 'Remaining';
 
   @override
@@ -110,6 +113,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mealEditorIngredientsSection => 'Ingredients';
+
+  @override
+  String get mealEditorSearchOrAddIngredient => 'Search or add ingredient...';
+
+  @override
+  String get mealEditorReplaceFood => 'Replace food';
 
   @override
   String get mealEditorEditDetails => 'Edit details';
@@ -169,7 +178,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get navLog => 'Log';
 
   @override
-  String get navUsual => 'Usual';
+  String get navAgent => 'Agent';
+
+  @override
+  String get navUsual => 'My foods';
 
   @override
   String get navMenu => 'Menu';
@@ -831,6 +843,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get macroUsePercentages => 'Use percentages';
 
   @override
+  String get dashboardGreeting => 'Good morning,';
+
+  @override
   String get dashboardCouldNotLoadToday => 'Could not load today';
 
   @override
@@ -850,6 +865,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dashboardCaloriesLeft => 'left';
+
+  @override
+  String get dashboardOfGoal => 'of goal';
 
   @override
   String dashboardGoalLine(int calories, String liters) {
@@ -989,26 +1007,26 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get templatesTitle => 'Usuals';
+  String get templatesTitle => 'My foods';
 
   @override
   String get templatesSubtitle => 'Usual meals and ingredients';
 
   @override
-  String get templatesAddTooltip => 'Add usual meal';
+  String get templatesAddTooltip => 'Add saved meal';
 
   @override
   String get templatesExplainer =>
       'Usual meals are trusted meals you can log quickly.';
 
   @override
-  String get templatesNoUsualMealsYet => 'No usual meals yet';
+  String get templatesNoUsualMealsYet => 'No saved meals yet';
 
   @override
   String get templatesNoUsualMealsMessage => 'Saved meals will appear here.';
 
   @override
-  String get templatesDeleteUsualMealTitle => 'Delete usual meal?';
+  String get templatesDeleteUsualMealTitle => 'Delete saved meal?';
 
   @override
   String get templatesNoAliasesYet => 'No aliases yet';
@@ -1022,10 +1040,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Create usual meals from selected ingredients or a reviewed draft. Placeholder meal templates are disabled.';
 
   @override
-  String get mealTemplateEditorCreateTitle => 'Create usual meal';
+  String get mealTemplateEditorCreateTitle => 'Create saved meal';
 
   @override
-  String get mealTemplateEditorEditTitle => 'Edit usual meal';
+  String get mealTemplateEditorEditTitle => 'Edit saved meal';
 
   @override
   String get mealTemplateEditorSubtitle =>
@@ -1073,7 +1091,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mealTemplateEditorAddFromSearch => 'Add from food search';
 
   @override
-  String get mealTemplateEditorSaveButton => 'Save usual meal';
+  String get mealTemplateEditorSaveButton => 'Save meal';
 
   @override
   String get mealTemplateEditorTitleRequired =>
@@ -1092,27 +1110,27 @@ class AppLocalizationsEn extends AppLocalizations {
   String get usualsIngredientsTab => 'Ingredients';
 
   @override
-  String get usualsCouldNotLoad => 'Could not load usuals';
+  String get usualsCouldNotLoad => 'Could not load saved foods';
 
   @override
-  String get usualFoodsAddTooltip => 'Add usual ingredient';
+  String get usualFoodsAddTooltip => 'Add saved ingredient';
 
   @override
   String get usualFoodsExplainer =>
-      'Usual ingredients are foods you enter manually so they appear first in search and meal logging.';
+      'Saved ingredients are foods you enter manually so they appear first in search and meal logging.';
 
   @override
-  String get usualFoodsEmptyTitle => 'No usual ingredients yet';
+  String get usualFoodsEmptyTitle => 'No saved ingredients yet';
 
   @override
   String get usualFoodsEmptyMessage =>
-      'Add foods you use often so they appear first in search and meal logging.';
+      'Add foods you want to reuse so they appear first in search and meal logging.';
 
   @override
-  String get usualFoodsCreateTitle => 'New usual ingredient';
+  String get usualFoodsCreateTitle => 'New saved ingredient';
 
   @override
-  String get usualFoodsEditTitle => 'Edit usual ingredient';
+  String get usualFoodsEditTitle => 'Edit saved ingredient';
 
   @override
   String get usualFoodsDraftLabel => 'Fill from text with AI (optional)';
@@ -1284,17 +1302,17 @@ class AppLocalizationsEn extends AppLocalizations {
   String get usualFoodsManualSource => 'Manual';
 
   @override
-  String get usualFoodsEditTooltip => 'Edit usual ingredient';
+  String get usualFoodsEditTooltip => 'Edit saved ingredient';
 
   @override
-  String get usualFoodsDeleteTooltip => 'Delete usual ingredient';
+  String get usualFoodsDeleteTooltip => 'Delete saved ingredient';
 
   @override
-  String get usualFoodsDeleteTitle => 'Delete usual ingredient?';
+  String get usualFoodsDeleteTitle => 'Delete saved ingredient?';
 
   @override
   String usualFoodsDeleteMessage(String name) {
-    return 'Delete $name from your usual ingredients?';
+    return 'Delete $name from your saved ingredients?';
   }
 
   @override

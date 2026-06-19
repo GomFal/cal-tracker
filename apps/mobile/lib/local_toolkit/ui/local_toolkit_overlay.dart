@@ -199,85 +199,176 @@ class LocalToolkitOverlay extends StatefulWidget {
 }
 
 class _LocalToolkitOverlayState extends State<LocalToolkitOverlay> {
+  static const _floatingButtonExtent = 40.0;
+
   var _isPanelOpen = false;
+  Offset? _floatingButtonOffset;
 
   @override
   Widget build(BuildContext context) {
     if (!widget.enabled) return widget.child;
-    return Stack(
-      children: [
-        widget.child,
-        if (_isPanelOpen) ...[
-          Positioned.fill(
-            child: GestureDetector(
-              key: LocalToolkitOverlay.scrimKey,
-              behavior: HitTestBehavior.opaque,
-              onTap: _closePanel,
-              child: ColoredBox(
-                color: Colors.black.withValues(alpha: 0.18),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final overlaySize = Size(constraints.maxWidth, constraints.maxHeight);
+        final safePadding = MediaQuery.paddingOf(context);
+        final buttonOffset = _effectiveButtonOffset(
+          context: context,
+          overlaySize: overlaySize,
+          safePadding: safePadding,
+        );
+
+        return Stack(
+          children: [
+            widget.child,
+            if (_isPanelOpen) ...[
+              Positioned.fill(
+                child: GestureDetector(
+                  key: LocalToolkitOverlay.scrimKey,
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _closePanel,
+                  child: ColoredBox(
+                    color: Colors.black.withValues(alpha: 0.18),
+                  ),
+                ),
               ),
-            ),
-          ),
-          Positioned.fill(
-            child: SafeArea(
-              top: false,
-              minimum: const EdgeInsets.all(12),
-              child: Align(
-                alignment: Alignment.bottomCenter,
-                child: Material(
-                  elevation: 12,
-                  borderRadius: BorderRadius.circular(20),
-                  clipBehavior: Clip.antiAlias,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxHeight: MediaQuery.sizeOf(context).height * 0.86,
-                    ),
-                    child: LocalToolkitPanel(
-                      key: LocalToolkitOverlay.panelKey,
-                      labels: widget.labels,
-                      activeScenario: widget.activeScenario,
-                      trustedModeEnabled: widget.trustedModeEnabled,
-                      currentLocaleLabel: widget.currentLocaleLabel,
-                      currentThemeLabel: widget.currentThemeLabel,
-                      onClose: _closePanel,
-                      onRouteJump: widget.onRouteJump,
-                      onScenarioSelected: widget.onScenarioSelected,
-                      onResetScenario: widget.onResetScenario,
-                      onAddSampleMeal: widget.onAddSampleMeal,
-                      onClearMeals: widget.onClearMeals,
-                      onToggleTrustedMode: widget.onToggleTrustedMode,
-                      onSwitchLocale: widget.onSwitchLocale,
-                      onSwitchTheme: widget.onSwitchTheme,
-                      showPerformanceOverlay: widget.showPerformanceOverlay,
-                      onTogglePerformanceOverlay:
-                          widget.onTogglePerformanceOverlay,
+              Positioned.fill(
+                child: SafeArea(
+                  top: false,
+                  minimum: const EdgeInsets.all(12),
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Material(
+                      elevation: 12,
+                      borderRadius: BorderRadius.circular(20),
+                      clipBehavior: Clip.antiAlias,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxHeight: MediaQuery.sizeOf(context).height * 0.86,
+                        ),
+                        child: LocalToolkitPanel(
+                          key: LocalToolkitOverlay.panelKey,
+                          labels: widget.labels,
+                          activeScenario: widget.activeScenario,
+                          trustedModeEnabled: widget.trustedModeEnabled,
+                          currentLocaleLabel: widget.currentLocaleLabel,
+                          currentThemeLabel: widget.currentThemeLabel,
+                          onClose: _closePanel,
+                          onRouteJump: widget.onRouteJump,
+                          onScenarioSelected: widget.onScenarioSelected,
+                          onResetScenario: widget.onResetScenario,
+                          onAddSampleMeal: widget.onAddSampleMeal,
+                          onClearMeals: widget.onClearMeals,
+                          onToggleTrustedMode: widget.onToggleTrustedMode,
+                          onSwitchLocale: widget.onSwitchLocale,
+                          onSwitchTheme: widget.onSwitchTheme,
+                          showPerformanceOverlay: widget.showPerformanceOverlay,
+                          onTogglePerformanceOverlay:
+                              widget.onTogglePerformanceOverlay,
+                        ),
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ),
-        ],
-        if (!_isPanelOpen)
-          Positioned.fill(
-            child: SafeArea(
-              minimum: widget.margin,
-              child: Align(
-                alignment: widget.alignment,
-                child: Semantics(
-                  label: widget.labels.toolButtonTooltip,
-                  button: true,
-                  child: FloatingActionButton.small(
-                    key: LocalToolkitOverlay.floatingButtonKey,
-                    heroTag: null,
-                    onPressed: _openPanel,
-                    child: const Icon(Icons.construction_rounded),
+            ],
+            if (!_isPanelOpen)
+              Positioned(
+                left: buttonOffset.dx,
+                top: buttonOffset.dy,
+                child: GestureDetector(
+                  onPanStart: (_) => _floatingButtonOffset = buttonOffset,
+                  onPanUpdate: (details) => _moveFloatingButton(
+                    delta: details.delta,
+                    overlaySize: overlaySize,
+                    safePadding: safePadding,
+                    currentOffset: buttonOffset,
+                  ),
+                  child: Semantics(
+                    label: widget.labels.toolButtonTooltip,
+                    button: true,
+                    child: FloatingActionButton.small(
+                      key: LocalToolkitOverlay.floatingButtonKey,
+                      heroTag: null,
+                      onPressed: _openPanel,
+                      child: const Icon(Icons.construction_rounded),
+                    ),
                   ),
                 ),
               ),
-            ),
-          ),
-      ],
+          ],
+        );
+      },
+    );
+  }
+
+  Offset _effectiveButtonOffset({
+    required BuildContext context,
+    required Size overlaySize,
+    required EdgeInsets safePadding,
+  }) {
+    final offset = _floatingButtonOffset ??
+        _initialButtonOffset(
+          context: context,
+          overlaySize: overlaySize,
+          safePadding: safePadding,
+        );
+    return _clampButtonOffset(offset, overlaySize, safePadding);
+  }
+
+  Offset _initialButtonOffset({
+    required BuildContext context,
+    required Size overlaySize,
+    required EdgeInsets safePadding,
+  }) {
+    final alignment = widget.alignment.resolve(Directionality.of(context));
+    final minX = safePadding.left + widget.margin.left;
+    final minY = safePadding.top + widget.margin.top;
+    final maxX = overlaySize.width -
+        safePadding.right -
+        widget.margin.right -
+        _floatingButtonExtent;
+    final maxY = overlaySize.height -
+        safePadding.bottom -
+        widget.margin.bottom -
+        _floatingButtonExtent;
+    final x = minX + ((alignment.x + 1) / 2) * (maxX - minX);
+    final y = minY + ((alignment.y + 1) / 2) * (maxY - minY);
+    return Offset(x, y);
+  }
+
+  void _moveFloatingButton({
+    required Offset delta,
+    required Size overlaySize,
+    required EdgeInsets safePadding,
+    required Offset currentOffset,
+  }) {
+    setState(() {
+      _floatingButtonOffset = _clampButtonOffset(
+        (_floatingButtonOffset ?? currentOffset) + delta,
+        overlaySize,
+        safePadding,
+      );
+    });
+  }
+
+  Offset _clampButtonOffset(
+    Offset offset,
+    Size overlaySize,
+    EdgeInsets safePadding,
+  ) {
+    final minX = safePadding.left + widget.margin.left;
+    final minY = safePadding.top + widget.margin.top;
+    final maxX = overlaySize.width -
+        safePadding.right -
+        widget.margin.right -
+        _floatingButtonExtent;
+    final maxY = overlaySize.height -
+        safePadding.bottom -
+        widget.margin.bottom -
+        _floatingButtonExtent;
+    return Offset(
+      offset.dx.clamp(minX, maxX).toDouble(),
+      offset.dy.clamp(minY, maxY).toDouble(),
     );
   }
 

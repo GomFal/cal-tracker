@@ -16,23 +16,22 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 void main() {
-  testWidgets('renders meals and ingredients tabs with empty ingredient state',
-      (
+  testWidgets('renders meals and ingredients tabs with empty ingredient state', (
     tester,
   ) async {
     await _pumpScreen(tester, _FakeNutritionRepository());
 
-    expect(find.text('Usuals'), findsOneWidget);
+    expect(find.text('My foods'), findsOneWidget);
     expect(find.text('Meals'), findsOneWidget);
     expect(find.text('Ingredients'), findsOneWidget);
 
     await tester.tap(find.text('Ingredients').hitTestable());
     await tester.pumpAndSettle();
 
-    expect(find.text('No usual ingredients yet'), findsOneWidget);
+    expect(find.text('No saved ingredients yet'), findsOneWidget);
     expect(
       find.text(
-        'Add foods you use often so they appear first in search and meal logging.',
+        'Add foods you want to reuse so they appear first in search and meal logging.',
       ),
       findsOneWidget,
     );
@@ -49,20 +48,22 @@ void main() {
 
     var addButton = _addActionButton(tester);
 
-    expect(find.text('No usual meals yet'), findsOneWidget);
+    expect(find.text('No saved meals yet'), findsOneWidget);
     expect(find.text('Saved meals will appear here.'), findsOneWidget);
     expect(
-        find.byKey(const ValueKey('usuals_section_explanation')), findsNothing);
+      find.byKey(const ValueKey('usuals_section_explanation')),
+      findsNothing,
+    );
     expect(find.byKey(const ValueKey('usuals_explainer_card')), findsNothing);
     expect(addButton.backgroundColor, FreshPalette.dark.lime);
 
     await tester.tap(find.text('Ingredients').hitTestable());
     await tester.pumpAndSettle();
 
-    expect(find.text('No usual ingredients yet'), findsOneWidget);
+    expect(find.text('No saved ingredients yet'), findsOneWidget);
     expect(
       find.text(
-        'Add foods you use often so they appear first in search and meal logging.',
+        'Add foods you want to reuse so they appear first in search and meal logging.',
       ),
       findsOneWidget,
     );
@@ -77,7 +78,7 @@ void main() {
     await _pumpScreen(tester, _FakeNutritionRepository());
     await _openIngredientsTab(tester);
 
-    await tester.tap(find.byTooltip('Add usual ingredient'));
+    await tester.tap(find.byTooltip('Add saved ingredient'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('usual_food_save_button')));
     await tester.pumpAndSettle();
@@ -92,7 +93,7 @@ void main() {
     await _pumpScreen(tester, repository);
     await _openIngredientsTab(tester);
 
-    await tester.tap(find.byTooltip('Add usual ingredient'));
+    await tester.tap(find.byTooltip('Add saved ingredient'));
     await tester.pumpAndSettle();
     await _fillRequiredIngredientFields(tester, name: 'Test ingredient');
     await tester.enterText(
@@ -114,13 +115,16 @@ void main() {
     await _pumpScreen(tester, _FakeNutritionRepository());
     await _openIngredientsTab(tester);
 
-    await tester.tap(find.byTooltip('Add usual ingredient'));
+    await tester.tap(find.byTooltip('Add saved ingredient'));
     await tester.pumpAndSettle();
 
-    expect(find.text('New usual ingredient'), findsOneWidget);
+    expect(find.text('New saved ingredient'), findsOneWidget);
     expect(find.byType(AlertDialog), findsNothing);
+    expect(find.byType(Card), findsNothing);
     expect(
-        find.byKey(const ValueKey('usual_food_canonical_field')), findsNothing);
+      find.byKey(const ValueKey('usual_food_canonical_field')),
+      findsNothing,
+    );
   });
 
   testWidgets('tapping a usual meal opens create meal with template items', (
@@ -152,7 +156,7 @@ void main() {
     expect(find.text('Public rice'), findsOneWidget);
   });
 
-  testWidgets('usual meal cards match ingredient card structure in dark mode', (
+  testWidgets('usual meal rows match ingredient row structure in dark mode', (
     tester,
   ) async {
     final repository = _FakeNutritionRepository(
@@ -176,8 +180,21 @@ void main() {
 
     expect(find.text('Usual lunch'), findsOneWidget);
     expect(find.text('lunch shortcut'), findsOneWidget);
-    expect(find.byIcon(Icons.restaurant_menu_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.restaurant_menu_outlined), findsNothing);
+    expect(find.byIcon(Icons.more_horiz_rounded), findsOneWidget);
     expect(find.byType(FreshFoodStack), findsNothing);
+    expect(
+      find.byKey(const ValueKey('meal_template_actions_template-1')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('meal_template_edit_template-1')),
+      findsNothing,
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('meal_template_actions_template-1')),
+    );
+    await tester.pumpAndSettle();
     expect(
       find.byKey(const ValueKey('meal_template_edit_template-1')),
       findsOneWidget,
@@ -225,10 +242,12 @@ void main() {
     await _pumpScreen(tester, repository);
     await _openIngredientsTab(tester);
 
+    await tester.tap(find.byKey(const ValueKey('usual_food_edit_food-1')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('usual_food_delete_food-1')));
     await tester.pumpAndSettle();
     expect(
-      find.text('Delete Ingredient to delete from your usual ingredients?'),
+      find.text('Delete Ingredient to delete from your saved ingredients?'),
       findsOneWidget,
     );
 
@@ -239,13 +258,15 @@ void main() {
 
     expect(repository.deletedIds, ['food-1']);
     expect(find.text('Ingredient to delete'), findsNothing);
-    expect(find.text('No usual ingredients yet'), findsOneWidget);
+    expect(find.text('No saved ingredients yet'), findsOneWidget);
   });
 }
 
 Future<void> _pumpScreen(
-    WidgetTester tester, _FakeNutritionRepository repository,
-    {ThemeMode themeMode = ThemeMode.light}) async {
+  WidgetTester tester,
+  _FakeNutritionRepository repository, {
+  ThemeMode themeMode = ThemeMode.light,
+}) async {
   await tester.pumpWidget(
     ChangeNotifierProvider(
       create: (_) => MealTemplatesViewModel(nutritionRepository: repository),
@@ -366,9 +387,9 @@ class _FakeNutritionRepository extends NutritionRepository {
   _FakeNutritionRepository({
     List<MealTemplate> templates = const [],
     List<UsualFood> usualFoods = const [],
-  })  : templates = List.of(templates),
-        usualFoods = List.of(usualFoods),
-        super(apiClient: _unusedApiClient());
+  }) : templates = List.of(templates),
+       usualFoods = List.of(usualFoods),
+       super(apiClient: _unusedApiClient());
 
   List<MealTemplate> templates;
   List<UsualFood> usualFoods;
@@ -403,8 +424,9 @@ class _FakeNutritionRepository extends NutritionRepository {
   @override
   Future<bool> deleteUsualFood(String foodId) async {
     deletedIds.add(foodId);
-    usualFoods =
-        usualFoods.where((item) => item.id != foodId).toList(growable: false);
+    usualFoods = usualFoods
+        .where((item) => item.id != foodId)
+        .toList(growable: false);
     return true;
   }
 

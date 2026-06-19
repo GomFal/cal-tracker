@@ -19,8 +19,31 @@ void main() {
       expect(await store.readDailySummary('2026-05-10'), isNull);
 
       store.activateUser('user-a');
-      expect((await store.readDailySummary('2026-05-10'))?.value.date,
-          '2026-05-10');
+      expect(
+        (await store.readDailySummary('2026-05-10'))?.value.date,
+        '2026-05-10',
+      );
+    });
+
+    test('persists usual foods under only the active user', () async {
+      final storage = _MemoryPreferencesStorage();
+      final store = NutritionCacheStore(storage: storage);
+
+      store.activateUser('user-a');
+      await store.writeUsualFoods([_usualFood('food-a')]);
+
+      final userAFoods = await store.readUsualFoods();
+      expect(userAFoods?.value.single.id, 'food-a');
+      expect(userAFoods?.value.single.name, 'Rice food-a');
+
+      store.activateUser('user-b');
+      expect(await store.readUsualFoods(), isNull);
+
+      await store.writeUsualFoods([_usualFood('food-b')]);
+
+      expect((await store.readUsualFoods())?.value.single.id, 'food-b');
+      store.activateUser('user-a');
+      expect((await store.readUsualFoods())?.value.single.id, 'food-a');
     });
 
     test('expires stale entries and removes them from storage', () async {
@@ -114,5 +137,14 @@ MealTemplate _template(String id) {
     nutrition: _nutrition,
     items: const [],
     aliases: const [],
+  );
+}
+
+UsualFood _usualFood(String id) {
+  return UsualFood(
+    id: id,
+    name: 'Rice $id',
+    servingGrams: 100,
+    nutrition: _nutrition,
   );
 }

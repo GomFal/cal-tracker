@@ -21,14 +21,24 @@ void main() {
     await tester.pumpWidget(_RouterTestApp(repository: repository));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byTooltip('Add usual meal'));
+    await tester.tap(find.byTooltip('Add saved meal'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Create usual meal'), findsOneWidget);
+    expect(find.text('Create saved meal'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('meal_template_title_field')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('meal editor renders open sections without Material cards', (
+    tester,
+  ) async {
+    await _pumpEditor(tester, _FakeNutritionRepository());
+
+    expect(find.text('Meal details'), findsOneWidget);
+    expect(find.text('Ingredient 1'), findsOneWidget);
+    expect(find.byType(Card), findsNothing);
   });
 
   testWidgets('creates a usual meal template with a public food item', (
@@ -160,69 +170,74 @@ void main() {
     expect(updated.trustedAutoCommitEnabled, isFalse);
   });
 
-  testWidgets('live total updates when editing ingredient calories and macros', (tester) async {
-    final repository = _FakeNutritionRepository();
-    await _pumpEditor(
-      tester,
-      repository,
-      initialDraft: const UsualMealDraft(
-        title: 'Breakfast',
-        items: [_usualOats],
-      ),
-    );
+  testWidgets(
+    'live total updates when editing ingredient calories and macros',
+    (tester) async {
+      final repository = _FakeNutritionRepository();
+      await _pumpEditor(
+        tester,
+        repository,
+        initialDraft: const UsualMealDraft(
+          title: 'Breakfast',
+          items: [_usualOats],
+        ),
+      );
 
-    // Verify total shows oats nutrition (total + item preview = 2 widgets)
-    expect(
-      find.text('230 Kcal \u00b7 8g Protein \u00b7 38g Carbs \u00b7 4g Fat'),
-      findsWidgets,
-    );
+      // Verify total shows oats nutrition (total + item preview = 2 widgets)
+      expect(
+        find.text('230 Kcal \u00b7 8g Protein \u00b7 38g Carbs \u00b7 4g Fat'),
+        findsWidgets,
+      );
 
-    // Change calories — verify live update
-    await tester.enterText(
-      find.byKey(const ValueKey('meal_template_item_calories_0')),
-      '300',
-    );
-    await tester.pumpAndSettle();
-    expect(
-      find.text('300 Kcal \u00b7 8g Protein \u00b7 38g Carbs \u00b7 4g Fat'),
-      findsWidgets,
-    );
+      // Change calories — verify live update
+      await tester.enterText(
+        find.byKey(const ValueKey('meal_template_item_calories_0')),
+        '300',
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text('300 Kcal \u00b7 8g Protein \u00b7 38g Carbs \u00b7 4g Fat'),
+        findsWidgets,
+      );
 
-    // Change protein — verify live update
-    await tester.enterText(
-      find.byKey(const ValueKey('meal_template_item_protein_0')),
-      '10',
-    );
-    await tester.pumpAndSettle();
-    expect(
-      find.text('300 Kcal \u00b7 10g Protein \u00b7 38g Carbs \u00b7 4g Fat'),
-      findsWidgets,
-    );
+      // Change protein — verify live update
+      await tester.enterText(
+        find.byKey(const ValueKey('meal_template_item_protein_0')),
+        '10',
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text('300 Kcal \u00b7 10g Protein \u00b7 38g Carbs \u00b7 4g Fat'),
+        findsWidgets,
+      );
 
-    // Change carbs — verify live update
-    await tester.enterText(
-      find.byKey(const ValueKey('meal_template_item_carbs_0')),
-      '50',
-    );
-    await tester.pumpAndSettle();
-    expect(
-      find.text('300 Kcal \u00b7 10g Protein \u00b7 50g Carbs \u00b7 4g Fat'),
-      findsWidgets,
-    );
+      // Change carbs — verify live update
+      await tester.enterText(
+        find.byKey(const ValueKey('meal_template_item_carbs_0')),
+        '50',
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text('300 Kcal \u00b7 10g Protein \u00b7 50g Carbs \u00b7 4g Fat'),
+        findsWidgets,
+      );
 
-    // Change fat — verify live update
-    await tester.enterText(
-      find.byKey(const ValueKey('meal_template_item_fat_0')),
-      '5',
-    );
-    await tester.pumpAndSettle();
-    expect(
-      find.text('300 Kcal \u00b7 10g Protein \u00b7 50g Carbs \u00b7 5g Fat'),
-      findsWidgets,
-    );
-  });
+      // Change fat — verify live update
+      await tester.enterText(
+        find.byKey(const ValueKey('meal_template_item_fat_0')),
+        '5',
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text('300 Kcal \u00b7 10g Protein \u00b7 50g Carbs \u00b7 5g Fat'),
+        findsWidgets,
+      );
+    },
+  );
 
-  testWidgets('live total updates when adding a food item from search', (tester) async {
+  testWidgets('live total updates when adding a food item from search', (
+    tester,
+  ) async {
     final repository = _FakeNutritionRepository(searchItems: [_publicRice]);
     await _pumpEditor(tester, repository);
 
@@ -254,7 +269,9 @@ void main() {
 
     // Total and item preview both show rice nutrition (130 Kcal)
     expect(
-      find.text('130 Kcal \u00b7 2.7g Protein \u00b7 28g Carbs \u00b7 0.3g Fat'),
+      find.text(
+        '130 Kcal \u00b7 2.7g Protein \u00b7 28g Carbs \u00b7 0.3g Fat',
+      ),
       findsWidgets,
     );
 
@@ -282,7 +299,9 @@ void main() {
     // Actually: first rice item shows "130 Kcal ...", second rice item shows "130 Kcal ...",
     // total shows "260 Kcal ..." — all different texts, so findsOneWidget for the total text
     expect(
-      find.text('260 Kcal \u00b7 5.4g Protein \u00b7 56g Carbs \u00b7 0.6g Fat'),
+      find.text(
+        '260 Kcal \u00b7 5.4g Protein \u00b7 56g Carbs \u00b7 0.6g Fat',
+      ),
       findsOneWidget,
     );
   });
@@ -300,7 +319,9 @@ void main() {
 
     // Total should show sum of oats + rice (unique, only in total, not in any item preview)
     expect(
-      find.text('360 Kcal \u00b7 10.7g Protein \u00b7 66g Carbs \u00b7 4.3g Fat'),
+      find.text(
+        '360 Kcal \u00b7 10.7g Protein \u00b7 66g Carbs \u00b7 4.3g Fat',
+      ),
       findsOneWidget,
     );
 
@@ -313,12 +334,16 @@ void main() {
 
     // Total and item preview both show rice nutrition
     expect(
-      find.text('130 Kcal \u00b7 2.7g Protein \u00b7 28g Carbs \u00b7 0.3g Fat'),
+      find.text(
+        '130 Kcal \u00b7 2.7g Protein \u00b7 28g Carbs \u00b7 0.3g Fat',
+      ),
       findsWidgets,
     );
   });
 
-  testWidgets('live total shows zero when no valid items exist', (tester) async {
+  testWidgets('live total shows zero when no valid items exist', (
+    tester,
+  ) async {
     final repository = _FakeNutritionRepository();
     await _pumpEditor(tester, repository);
 
@@ -329,7 +354,9 @@ void main() {
     );
   });
 
-  testWidgets('partial or invalid input does not crash total calculation', (tester) async {
+  testWidgets('partial or invalid input does not crash total calculation', (
+    tester,
+  ) async {
     final repository = _FakeNutritionRepository();
     await _pumpEditor(tester, repository);
 

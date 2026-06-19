@@ -207,14 +207,25 @@ class _UsualFoodScanScreenState extends State<UsualFoodScanScreen>
     if (source == null) return null;
 
     final x = (cropRect.left * source.width).round().clamp(0, source.width - 1);
-    final y =
-        (cropRect.top * source.height).round().clamp(0, source.height - 1);
-    final width =
-        (cropRect.width * source.width).round().clamp(1, source.width - x);
-    final height =
-        (cropRect.height * source.height).round().clamp(1, source.height - y);
-    final cropped =
-        img.copyCrop(source, x: x, y: y, width: width, height: height);
+    final y = (cropRect.top * source.height).round().clamp(
+          0,
+          source.height - 1,
+        );
+    final width = (cropRect.width * source.width).round().clamp(
+          1,
+          source.width - x,
+        );
+    final height = (cropRect.height * source.height).round().clamp(
+          1,
+          source.height - y,
+        );
+    final cropped = img.copyCrop(
+      source,
+      x: x,
+      y: y,
+      width: width,
+      height: height,
+    );
     final directory = await getTemporaryDirectory();
     final output = File(
       '${directory.path}/nutrition_label_crop_${DateTime.now().microsecondsSinceEpoch}.jpg',
@@ -427,10 +438,7 @@ class _CropSelectionPreviewState extends State<_CropSelectionPreview> {
           children: [
             ColoredBox(
               color: Colors.black,
-              child: Image.file(
-                File(widget.filePath),
-                fit: BoxFit.contain,
-              ),
+              child: Image.file(File(widget.filePath), fit: BoxFit.contain),
             ),
             Positioned.fromRect(
               rect: imageRect,
@@ -465,9 +473,15 @@ class _CropSelectionPreviewState extends State<_CropSelectionPreview> {
                     : null,
                 onPanEnd: (_) => _dragStart = null,
                 onPanCancel: () => _dragStart = null,
-                child: CustomPaint(
+                child: Semantics(
                   key: const ValueKey('usual_food_scan_crop_selector'),
-                  painter: _CropSelectionPainter(crop: crop),
+                  container: true,
+                  enabled: widget.enabled,
+                  label: context.l10n.usualFoodsScanFrameLabel,
+                  hint: context.l10n.usualFoodsScanPreviewHint,
+                  child: CustomPaint(
+                    painter: _CropSelectionPainter(crop: crop),
+                  ),
                 ),
               ),
             ),
@@ -583,6 +597,39 @@ class _CloseButton extends StatelessWidget {
   }
 }
 
+class _HudPanel extends StatelessWidget {
+  const _HudPanel({
+    super.key,
+    required this.child,
+    this.backgroundColor,
+    this.borderColor = Colors.white24,
+    this.padding = const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+  });
+
+  final Widget child;
+  final Color? backgroundColor;
+  final Color borderColor;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: backgroundColor ?? Colors.black.withValues(alpha: 0.62),
+            border: Border.all(color: borderColor),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Padding(padding: padding, child: child),
+        ),
+      ),
+    );
+  }
+}
+
 class _StateCard extends StatelessWidget {
   const _StateCard({
     required this.phase,
@@ -622,55 +669,61 @@ class _StateCard extends StatelessWidget {
     if (phase == UsualFoodScanPhase.error) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Card(
+        child: _HudPanel(
           key: const ValueKey('usual_food_scan_error_card'),
-          color: const Color(0xffe94f5f).withValues(alpha: 0.92),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  l10n.usualFoodsScanFailedTitle,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                  ),
+          backgroundColor: Colors.black.withValues(alpha: 0.72),
+          borderColor: const Color(0xffff6f80).withValues(alpha: 0.72),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline_rounded, color: Color(0xffff6f80)),
+              const SizedBox(height: 8),
+              Text(
+                l10n.usualFoodsScanFailedTitle,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
                 ),
-                if (errorCode != UsualFoodScanError.none) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    _localizedErrorText(l10n) ?? '',
-                    style: const TextStyle(color: Colors.white70, fontSize: 13),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-                const SizedBox(height: 14),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (onCancel != null)
-                      TextButton(
-                        key: const ValueKey(
-                            'usual_food_scan_cancel_error_button'),
-                        onPressed: onCancel,
-                        child: Text(
-                          l10n.commonCancel,
-                          style: const TextStyle(color: Colors.white),
-                        ),
-                      ),
-                    const SizedBox(width: 12),
-                    if (onRetry != null)
-                      FilledButton.tonal(
-                        key: const ValueKey('usual_food_scan_retry_button'),
-                        onPressed: onRetry,
-                        child: Text(l10n.usualFoodsScanRetake),
-                      ),
-                  ],
+              ),
+              if (errorCode != UsualFoodScanError.none) ...[
+                const SizedBox(height: 6),
+                Text(
+                  _localizedErrorText(l10n) ?? '',
+                  style: const TextStyle(color: Colors.white70, fontSize: 13),
+                  textAlign: TextAlign.center,
                 ),
               ],
-            ),
+              const SizedBox(height: 14),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (onCancel != null)
+                    TextButton(
+                      key: const ValueKey(
+                        'usual_food_scan_cancel_error_button',
+                      ),
+                      onPressed: onCancel,
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.white,
+                      ),
+                      child: Text(l10n.commonCancel),
+                    ),
+                  const SizedBox(width: 12),
+                  if (onRetry != null)
+                    FilledButton.tonal(
+                      key: const ValueKey('usual_food_scan_retry_button'),
+                      onPressed: onRetry,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.white.withValues(alpha: 0.14),
+                        foregroundColor: Colors.white,
+                      ),
+                      child: Text(l10n.usualFoodsScanRetake),
+                    ),
+                ],
+              ),
+            ],
           ),
         ),
       );
@@ -679,28 +732,24 @@ class _StateCard extends StatelessWidget {
     if (phase == UsualFoodScanPhase.previewing) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Card(
+        child: _HudPanel(
           key: const ValueKey('usual_food_scan_preview_hint_card'),
-          color: Colors.white.withValues(alpha: 0.92),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.crop_free_rounded,
-                  color: Colors.black87,
-                  size: 18,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.crop_free_rounded,
+                color: Colors.white,
+                size: 18,
+              ),
+              const SizedBox(width: 12),
+              Flexible(
+                child: Text(
+                  l10n.usualFoodsScanPreviewHint,
+                  style: const TextStyle(color: Colors.white, fontSize: 14),
                 ),
-                const SizedBox(width: 12),
-                Flexible(
-                  child: Text(
-                    l10n.usualFoodsScanPreviewHint,
-                    style: const TextStyle(color: Colors.black87, fontSize: 14),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       );
@@ -740,30 +789,29 @@ class _StateCard extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Card(
-        color: Colors.white.withValues(alpha: 0.92),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (showSpinner)
-                const Padding(
-                  padding: EdgeInsets.only(right: 12),
-                  child: SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+      child: _HudPanel(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (showSpinner)
+              const Padding(
+                padding: EdgeInsets.only(right: 12),
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
                   ),
                 ),
-              Flexible(
-                child: Text(
-                  label,
-                  style: const TextStyle(color: Colors.black87, fontSize: 14),
-                ),
               ),
-            ],
-          ),
+            Flexible(
+              child: Text(
+                label,
+                style: const TextStyle(color: Colors.white, fontSize: 14),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -793,8 +841,9 @@ class _CaptureActionBar extends StatelessWidget {
           icon: const Icon(Icons.camera_alt_rounded),
           label: Text(label),
           style: FilledButton.styleFrom(
-            backgroundColor: Colors.white,
-            foregroundColor: Colors.black,
+            backgroundColor: Colors.black.withValues(alpha: 0.64),
+            foregroundColor: Colors.white,
+            side: const BorderSide(color: Colors.white30),
           ),
         ),
       ),
@@ -832,7 +881,8 @@ class _ConfirmRetakeBar extends StatelessWidget {
                 label: Text(retakeLabel),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.white,
-                  side: const BorderSide(color: Colors.white),
+                  backgroundColor: Colors.black.withValues(alpha: 0.42),
+                  side: const BorderSide(color: Colors.white54),
                 ),
               ),
             ),
@@ -848,8 +898,9 @@ class _ConfirmRetakeBar extends StatelessWidget {
                 icon: const Icon(Icons.check_rounded),
                 label: Text(confirmLabel),
                 style: FilledButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: Colors.black,
+                  backgroundColor: Colors.black.withValues(alpha: 0.68),
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: Color(0xffc8f05a)),
                 ),
               ),
             ),
@@ -880,10 +931,7 @@ String formatNutritionLabelOcrText(RecognizedText recognizedText) {
             boundingBox: line.boundingBox,
           ),
   ];
-  return formatNutritionLabelOcrLines(
-    lines,
-    fallbackText: recognizedText.text,
-  );
+  return formatNutritionLabelOcrLines(lines, fallbackText: recognizedText.text);
 }
 
 @visibleForTesting
@@ -925,8 +973,10 @@ String formatNutritionLabelOcrLines(
             .map((item) => item.boundingBox.height)
             .reduce((value, element) => value + element) /
         row.length;
-    final tolerance =
-        math.max(8, math.max(rowHeight, line.boundingBox.height) * 0.72);
+    final tolerance = math.max(
+      8,
+      math.max(rowHeight, line.boundingBox.height) * 0.72,
+    );
     if ((line.centerY - rowCenter).abs() <= tolerance) {
       row.add(line);
     } else {
@@ -975,7 +1025,9 @@ String _normalizeOcrCell(String value) {
 
 double _rowTolerance(NutritionLabelOcrLine a, NutritionLabelOcrLine b) {
   return math.max(
-      8, math.max(a.boundingBox.height, b.boundingBox.height) * 0.72);
+    8,
+    math.max(a.boundingBox.height, b.boundingBox.height) * 0.72,
+  );
 }
 
 /// Exists solely for testing — allows widget tests to inject a fake VM.

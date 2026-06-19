@@ -53,7 +53,7 @@ class _MacroDistributionSheetState extends State<MacroDistributionSheet> {
     final l10n = context.l10n;
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     return Material(
-      color: palette.screen,
+      color: palette.surface,
       child: Padding(
         padding: EdgeInsets.fromLTRB(20, 12, 20, bottomInset + 20),
         child: SizedBox(
@@ -90,7 +90,7 @@ class _MacroDistributionSheetState extends State<MacroDistributionSheet> {
               const SizedBox(height: FreshSpacing.lg),
               Expanded(
                 child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
+                  physics: const ClampingScrollPhysics(),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -301,7 +301,7 @@ class _PersonalizedMacroSheetState extends State<_PersonalizedMacroSheet> {
     final l10n = context.l10n;
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     return Material(
-      color: palette.screen,
+      color: palette.surface,
       child: Padding(
         padding: EdgeInsets.fromLTRB(20, 12, 20, bottomInset + 20),
         child: SizedBox(
@@ -350,7 +350,7 @@ class _PersonalizedMacroSheetState extends State<_PersonalizedMacroSheet> {
               const SizedBox(height: FreshSpacing.lg),
               Expanded(
                 child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
+                  physics: const ClampingScrollPhysics(),
                   child: _mode == MacroMode.percentage
                       ? _percentageEditor()
                       : _gramsEditor(),
@@ -376,34 +376,38 @@ class _PersonalizedMacroSheetState extends State<_PersonalizedMacroSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        FreshCard(
+        KeyedSubtree(
           key: const ValueKey('macro_percentage_editor'),
-          color: context.freshPalette.surface,
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              _MacroNumberField(
-                fieldKey: const ValueKey('macro_percentage_protein_field'),
+          child: FreshMacroFields(
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            fields: [
+              FreshMacroFieldData(
+                key: const ValueKey('macro_percentage_protein_field'),
                 label: l10n.commonProtein,
                 unit: '%',
                 controller: _proteinPctController,
-                onChanged: (value) => _setPercentage('protein', value),
+                color: palette.lime,
+                onChanged: (value) =>
+                    _setPercentage('protein', int.tryParse(value) ?? 0),
               ),
-              const SizedBox(height: FreshSpacing.md),
-              _MacroNumberField(
-                fieldKey: const ValueKey('macro_percentage_carbs_field'),
+              FreshMacroFieldData(
+                key: const ValueKey('macro_percentage_carbs_field'),
                 label: l10n.commonCarbs,
                 unit: '%',
                 controller: _carbsPctController,
-                onChanged: (value) => _setPercentage('carbs', value),
+                color: palette.lime,
+                onChanged: (value) =>
+                    _setPercentage('carbs', int.tryParse(value) ?? 0),
               ),
-              const SizedBox(height: FreshSpacing.md),
-              _MacroNumberField(
-                fieldKey: const ValueKey('macro_percentage_fat_field'),
+              FreshMacroFieldData(
+                key: const ValueKey('macro_percentage_fat_field'),
                 label: l10n.commonFat,
                 unit: '%',
                 controller: _fatPctController,
-                onChanged: (value) => _setPercentage('fat', value),
+                color: palette.lime,
+                onChanged: (value) =>
+                    _setPercentage('fat', int.tryParse(value) ?? 0),
               ),
             ],
           ),
@@ -465,33 +469,34 @@ class _PersonalizedMacroSheetState extends State<_PersonalizedMacroSheet> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        FreshCard(
+        KeyedSubtree(
           key: const ValueKey('macro_grams_editor'),
-          color: context.freshPalette.surface,
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              _MacroNumberField(
-                fieldKey: const ValueKey('macro_grams_protein_field'),
+          child: FreshMacroFields(
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            fields: [
+              FreshMacroFieldData(
+                key: const ValueKey('macro_grams_protein_field'),
                 label: l10n.commonProtein,
                 unit: 'g',
                 controller: _proteinGramsController,
+                color: palette.lime,
                 onChanged: (_) => setState(() {}),
               ),
-              const SizedBox(height: FreshSpacing.md),
-              _MacroNumberField(
-                fieldKey: const ValueKey('macro_grams_carbs_field'),
+              FreshMacroFieldData(
+                key: const ValueKey('macro_grams_carbs_field'),
                 label: l10n.commonCarbs,
                 unit: 'g',
                 controller: _carbsGramsController,
+                color: palette.lime,
                 onChanged: (_) => setState(() {}),
               ),
-              const SizedBox(height: FreshSpacing.md),
-              _MacroNumberField(
-                fieldKey: const ValueKey('macro_grams_fat_field'),
+              FreshMacroFieldData(
+                key: const ValueKey('macro_grams_fat_field'),
                 label: l10n.commonFat,
                 unit: 'g',
                 controller: _fatGramsController,
+                color: palette.lime,
                 onChanged: (_) => setState(() {}),
               ),
             ],
@@ -1063,57 +1068,6 @@ class _MacroModeSegment extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _MacroNumberField extends StatelessWidget {
-  const _MacroNumberField({
-    required this.fieldKey,
-    required this.label,
-    required this.unit,
-    required this.controller,
-    required this.onChanged,
-  });
-
-  final Key fieldKey;
-  final String label;
-  final String unit;
-  final TextEditingController controller;
-  final ValueChanged<int> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.freshPalette;
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            label,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: palette.ink,
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-        ),
-        SizedBox(
-          width: 112,
-          child: TextField(
-            key: fieldKey,
-            controller: controller,
-            textAlign: TextAlign.end,
-            keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            decoration: InputDecoration(suffixText: unit),
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: palette.ink,
-              fontWeight: FontWeight.w800,
-              fontFeatures: const [FontFeature.tabularFigures()],
-            ),
-            onChanged: (value) => onChanged(int.tryParse(value) ?? 0),
-          ),
-        ),
-      ],
     );
   }
 }

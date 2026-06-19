@@ -22,6 +22,11 @@ describe("admin telemetry routes", () => {
     await telemetry.recordLlmRun({
       traceId: "trace-admin-1",
       userId: user.user.id,
+      conversationId: "00000000-0000-0000-0000-000000000101",
+      turnId: "00000000-0000-0000-0000-000000000102",
+      provider: "openrouter",
+      providerRequestId: "req_admin_1",
+      providerGenerationId: "gen_admin_1",
       model: "test-model",
       resultKind: "proposal",
       selectedTool: "propose_meal_log",
@@ -29,6 +34,12 @@ describe("admin telemetry routes", () => {
       emptyToolCall: false,
       invalidToolArguments: false,
       providerError: false,
+      promptTokens: 10,
+      completionTokens: 20,
+      totalTokens: 30,
+      providerCostAmount: 0.00042,
+      costCurrency: "USD",
+      costSource: "provider",
       llmMs: 250,
       totalMs: 300,
       metadata: { source: "text" }
@@ -55,6 +66,61 @@ describe("admin telemetry routes", () => {
       errorCode: "agent_provider_unavailable",
       durationMs: 1234
     });
+    await telemetry.recordAgentTurn({
+      traceId: "trace-admin-1",
+      turnId: "00000000-0000-0000-0000-000000000102",
+      userId: user.user.id,
+      conversationId: "00000000-0000-0000-0000-000000000101",
+      inputMode: "text",
+      source: "flutter",
+      model: "test-model",
+      resultKind: "proposal",
+      stopReason: "assistant_response",
+      iterationCount: 1,
+      toolCallCount: 1,
+      promptTokens: 10,
+      completionTokens: 20,
+      totalTokens: 30,
+      providerCostAmount: 0.00042,
+      costCurrency: "USD",
+      costSource: "provider",
+      totalMs: 300,
+      status: "success",
+      completedAt: new Date().toISOString()
+    });
+    await telemetry.recordLlmProviderCall({
+      traceId: "trace-admin-1",
+      userId: user.user.id,
+      conversationId: "00000000-0000-0000-0000-000000000101",
+      turnId: "00000000-0000-0000-0000-000000000102",
+      featureSurface: "agent_chat",
+      provider: "openrouter",
+      providerRequestId: "req_admin_1",
+      providerGenerationId: "gen_admin_1",
+      requestedModel: "test-model",
+      servedModel: "test-model",
+      promptTokens: 10,
+      completionTokens: 20,
+      totalTokens: 30,
+      providerCostAmount: 0.00042,
+      costCurrency: "USD",
+      costSource: "provider",
+      status: "success",
+      durationMs: 250
+    });
+    await telemetry.recordTranscriptionRecord({
+      traceId: "trace-admin-4",
+      userId: user.user.id,
+      surface: "agent_chat_audio",
+      provider: "test",
+      model: "test-model",
+      audioMimeType: "audio/m4a",
+      audioBytes: 123,
+      transcriptText: "I had toast",
+      transcriptLength: 11,
+      status: "completed",
+      durationMs: 20
+    });
 
     const response = await request("http://localhost/v1/admin/telemetry/overview", {
       headers: admin.authHeader
@@ -64,6 +130,11 @@ describe("admin telemetry routes", () => {
       totalEvents: number;
       totalLlmRuns: number;
       totalFoodSearchEvents: number;
+      totalAgentTurns: number;
+      totalProviderCalls: number;
+      totalTranscriptions: number;
+      providerCostAmount: number;
+      unknownCostCount: number;
       eventsBySeverity: Record<string, number>;
       recentResultKinds: Record<string, number>;
       zeroResultRate: number;
@@ -74,6 +145,11 @@ describe("admin telemetry routes", () => {
     expect(body.eventsBySeverity.warning ?? 0).toBeGreaterThanOrEqual(1);
     expect(body.recentResultKinds.proposal ?? 0).toBeGreaterThanOrEqual(1);
     expect(body.zeroResultRate).toBeGreaterThanOrEqual(1);
+    expect(body.totalAgentTurns).toBeGreaterThanOrEqual(1);
+    expect(body.totalProviderCalls).toBeGreaterThanOrEqual(1);
+    expect(body.totalTranscriptions).toBeGreaterThanOrEqual(1);
+    expect(body.providerCostAmount).toBeGreaterThan(0);
+    expect(body.unknownCostCount).toBe(0);
   });
 
   it("returns events filtered by traceId", async () => {
@@ -114,10 +190,33 @@ describe("admin telemetry routes", () => {
     }
   });
 
-  it("returns a complete trace view including llm runs and food searches", async () => {
-    const { request, telemetry } = buildTestApp();
+  it("returns a complete trace view including conversations, agent turns, provider calls, action calls, and transcriptions", async () => {
+    const { request, telemetry, repository } = buildTestApp();
     const admin = await loginAdmin(request);
     const user = await registerAndAuth(request);
+    const conversation = await repository.createAgentConversation(user.user.id, {
+      title: "Trace detail chat",
+    });
+    await repository.addAgentConversationMessage(user.user.id, conversation.id, {
+      role: "user",
+      content: "I ate bread",
+      toolCalls: [],
+      traceId: "trace-detail",
+      turnId: "00000000-0000-0000-0000-000000000202",
+      inputMode: "voice",
+      source: "flutter",
+      metadata: { source: "test" },
+    });
+    await repository.recordActionCall({
+      userId: user.user.id,
+      actionId: "propose_meal_log",
+      source: "agent_chat",
+      input: { text: "bread" },
+      output: { kind: "proposal" },
+      confirmationStatus: "not_required",
+      traceId: "trace-detail",
+      latencyMs: 45,
+    });
     await telemetry.recordEvent({
       traceId: "trace-detail",
       userId: user.user.id,
@@ -128,11 +227,84 @@ describe("admin telemetry routes", () => {
     await telemetry.recordLlmRun({
       traceId: "trace-detail",
       userId: user.user.id,
+      conversationId: conversation.id,
+      turnId: "00000000-0000-0000-0000-000000000202",
+      provider: "openrouter",
       model: "test-model",
       resultKind: "proposal",
       emptyToolCall: false,
       invalidToolArguments: false,
       providerError: false
+    });
+    await telemetry.recordAgentTurn({
+      traceId: "trace-detail",
+      turnId: "00000000-0000-0000-0000-000000000202",
+      userId: user.user.id,
+      conversationId: conversation.id,
+      inputMode: "voice",
+      source: "flutter",
+      model: "test-model",
+      inputText: "I ate bread",
+      assistantText: "Here is a proposal.",
+      resultKind: "proposal",
+      stopReason: "assistant_response",
+      iterationCount: 1,
+      toolCallCount: 1,
+      totalTokens: 33,
+      estimatedCostAmount: 0.0002,
+      costCurrency: "USD",
+      costSource: "estimate",
+      status: "success",
+      completedAt: new Date().toISOString()
+    });
+    await telemetry.recordAgentToolCall({
+      conversationId: conversation.id,
+      traceId: "trace-detail",
+      turnId: "00000000-0000-0000-0000-000000000202",
+      userId: user.user.id,
+      toolCallId: "call_trace_detail",
+      actionId: "propose_meal_log",
+      arguments: { text: "bread" },
+      resultSummary: { kind: "proposal" },
+      status: "completed",
+      startedAt: new Date().toISOString(),
+      completedAt: new Date().toISOString(),
+      durationMs: 45
+    });
+    await telemetry.recordLlmProviderCall({
+      traceId: "trace-detail",
+      userId: user.user.id,
+      conversationId: conversation.id,
+      turnId: "00000000-0000-0000-0000-000000000202",
+      featureSurface: "agent_chat",
+      provider: "openrouter",
+      providerRequestId: "req_trace_detail",
+      providerGenerationId: "gen_trace_detail",
+      requestedModel: "test-model",
+      servedModel: "served-test-model",
+      promptTokens: 11,
+      completionTokens: 22,
+      totalTokens: 33,
+      estimatedCostAmount: 0.0002,
+      costCurrency: "USD",
+      costSource: "estimate",
+      status: "success",
+      durationMs: 123
+    });
+    await telemetry.recordTranscriptionRecord({
+      traceId: "trace-detail",
+      userId: user.user.id,
+      conversationId: conversation.id,
+      turnId: "00000000-0000-0000-0000-000000000202",
+      surface: "agent_chat_audio",
+      provider: "test",
+      model: "test-model",
+      audioMimeType: "audio/m4a",
+      audioBytes: 345,
+      transcriptText: "I ate bread",
+      transcriptLength: 11,
+      status: "completed",
+      durationMs: 30
     });
     await telemetry.recordFoodSearchEvent({
       traceId: "trace-detail",
@@ -153,11 +325,218 @@ describe("admin telemetry routes", () => {
       events: unknown[];
       llmRuns: Array<{ model: string }>;
       foodSearchEvents: Array<{ resultCount: number }>;
+      conversationMessages: Array<{ conversationId: string; inputMode: string }>;
+      agentTurns: Array<{ turnId: string; conversationId: string }>;
+      agentToolCalls: Array<{ actionId: string; turnId: string }>;
+      actionCalls: Array<{ actionId: string; traceId: string }>;
+      providerCalls: Array<{ providerGenerationId: string; totalTokens: number }>;
+      transcriptions: Array<{ transcriptText: string; conversationId: string }>;
     };
     expect(body.traceId).toBe("trace-detail");
     expect(body.events.length).toBe(1);
     expect(body.llmRuns[0]?.model).toBe("test-model");
     expect(body.foodSearchEvents[0]?.resultCount).toBe(3);
+    expect(body.conversationMessages[0]).toMatchObject({
+      conversationId: conversation.id,
+      inputMode: "voice",
+    });
+    expect(body.agentTurns[0]).toMatchObject({
+      turnId: "00000000-0000-0000-0000-000000000202",
+      conversationId: conversation.id,
+    });
+    expect(body.agentToolCalls[0]).toMatchObject({
+      actionId: "propose_meal_log",
+      turnId: "00000000-0000-0000-0000-000000000202",
+    });
+    expect(body.actionCalls[0]).toMatchObject({
+      actionId: "propose_meal_log",
+      traceId: "trace-detail",
+    });
+    expect(body.providerCalls[0]).toMatchObject({
+      providerGenerationId: "gen_trace_detail",
+      totalTokens: 33,
+    });
+    expect(body.transcriptions[0]).toMatchObject({
+      transcriptText: "I ate bread",
+      conversationId: conversation.id,
+    });
+  });
+
+  it("exposes hidden conversations only when includeHidden=true", async () => {
+    const { request, repository } = buildTestApp();
+    const admin = await loginAdmin(request);
+    const user = await registerAndAuth(request);
+    const conversation = await repository.createAgentConversation(user.user.id, {
+      title: "Hidden admin audit chat",
+    });
+    await repository.addAgentConversationMessage(user.user.id, conversation.id, {
+      role: "user",
+      content: "private beta message",
+      toolCalls: [],
+      traceId: "trace-hidden-chat",
+      turnId: "00000000-0000-0000-0000-000000000302",
+      inputMode: "text",
+      source: "flutter",
+      metadata: {},
+    });
+    await repository.hideAgentConversationFromUser(user.user.id, conversation.id);
+
+    const visibleOnly = await request(
+      "http://localhost/v1/admin/telemetry/conversations?traceId=trace-hidden-chat",
+      { headers: admin.authHeader },
+    );
+    expect(visibleOnly.status).toBe(200);
+    await expect(visibleOnly.json()).resolves.toEqual({ conversations: [] });
+
+    const includingHidden = await request(
+      "http://localhost/v1/admin/telemetry/conversations?traceId=trace-hidden-chat&includeHidden=true",
+      { headers: admin.authHeader },
+    );
+    expect(includingHidden.status).toBe(200);
+    const listBody = await includingHidden.json() as {
+      conversations: Array<{ id: string; hiddenFromUserAt: string | null }>;
+    };
+    expect(listBody.conversations[0]).toMatchObject({
+      id: conversation.id,
+      hiddenFromUserAt: expect.any(String),
+    });
+
+    const detail = await request(
+      `http://localhost/v1/admin/telemetry/conversations/${conversation.id}?includeHidden=true`,
+      { headers: admin.authHeader },
+    );
+    expect(detail.status).toBe(200);
+    const detailBody = await detail.json() as {
+      messages: Array<{ content: string; traceId: string }>;
+    };
+    expect(detailBody.messages[0]).toMatchObject({
+      content: "private beta message",
+      traceId: "trace-hidden-chat",
+    });
+  });
+
+  it("returns new admin telemetry list endpoints and LLM cost breakdowns", async () => {
+    const { request, telemetry, repository } = buildTestApp();
+    const admin = await loginAdmin(request);
+    const user = await registerAndAuth(request);
+    const conversation = await repository.createAgentConversation(user.user.id, {
+      title: "Cost chat",
+    });
+    const turnId = "00000000-0000-0000-0000-000000000402";
+    await repository.recordActionCall({
+      userId: user.user.id,
+      actionId: "commit_meal_log",
+      source: "agent_chat",
+      input: { id: "proposal" },
+      output: { kind: "meal_committed" },
+      confirmationStatus: "confirmed",
+      traceId: "trace-list-surfaces",
+      latencyMs: 88,
+    });
+    await telemetry.recordAgentTurn({
+      traceId: "trace-list-surfaces",
+      turnId,
+      userId: user.user.id,
+      conversationId: conversation.id,
+      inputMode: "text",
+      source: "flutter",
+      model: "test-model",
+      resultKind: "meal_committed",
+      stopReason: "assistant_response",
+      iterationCount: 2,
+      toolCallCount: 1,
+      totalTokens: 40,
+      providerCostAmount: 0.001,
+      costCurrency: "USD",
+      costSource: "provider",
+      status: "success",
+      completedAt: new Date().toISOString()
+    });
+    await telemetry.recordAgentToolCall({
+      conversationId: conversation.id,
+      traceId: "trace-list-surfaces",
+      turnId,
+      userId: user.user.id,
+      toolCallId: "call_commit",
+      actionId: "commit_meal_log",
+      arguments: { id: "proposal" },
+      resultSummary: { kind: "meal_committed" },
+      status: "completed",
+      startedAt: new Date().toISOString(),
+      completedAt: new Date().toISOString(),
+      durationMs: 88,
+    });
+    await telemetry.recordLlmProviderCall({
+      traceId: "trace-list-surfaces",
+      userId: user.user.id,
+      conversationId: conversation.id,
+      turnId,
+      featureSurface: "agent_chat",
+      provider: "openrouter",
+      providerRequestId: "req_list",
+      providerGenerationId: "gen_list",
+      requestedModel: "test-model",
+      servedModel: "test-model",
+      promptTokens: 15,
+      completionTokens: 25,
+      totalTokens: 40,
+      providerCostAmount: 0.001,
+      costCurrency: "USD",
+      costSource: "provider",
+      status: "success",
+      durationMs: 140,
+    });
+    await telemetry.recordTranscriptionRecord({
+      traceId: "trace-list-surfaces",
+      userId: user.user.id,
+      conversationId: conversation.id,
+      turnId,
+      surface: "stt",
+      provider: "test",
+      model: "test-model",
+      transcriptText: "commit it",
+      transcriptLength: 9,
+      status: "completed",
+    });
+
+    const [turns, tools, actions, providers, transcriptions, cost] =
+      await Promise.all([
+        request("http://localhost/v1/admin/telemetry/agent-turns?traceId=trace-list-surfaces", { headers: admin.authHeader }),
+        request("http://localhost/v1/admin/telemetry/agent-tool-calls?traceId=trace-list-surfaces", { headers: admin.authHeader }),
+        request("http://localhost/v1/admin/telemetry/action-calls?traceId=trace-list-surfaces", { headers: admin.authHeader }),
+        request("http://localhost/v1/admin/telemetry/llm-provider-calls?traceId=trace-list-surfaces", { headers: admin.authHeader }),
+        request("http://localhost/v1/admin/telemetry/transcriptions?traceId=trace-list-surfaces", { headers: admin.authHeader }),
+        request("http://localhost/v1/admin/telemetry/llm-cost?traceId=trace-list-surfaces", { headers: admin.authHeader }),
+      ]);
+
+    expect(turns.status).toBe(200);
+    expect(tools.status).toBe(200);
+    expect(actions.status).toBe(200);
+    expect(providers.status).toBe(200);
+    expect(transcriptions.status).toBe(200);
+    expect(cost.status).toBe(200);
+    await expect(turns.json()).resolves.toMatchObject({
+      agentTurns: [expect.objectContaining({ turnId, totalTokens: 40 })],
+    });
+    await expect(tools.json()).resolves.toMatchObject({
+      agentToolCalls: [expect.objectContaining({ actionId: "commit_meal_log" })],
+    });
+    await expect(actions.json()).resolves.toMatchObject({
+      actionCalls: [expect.objectContaining({ actionId: "commit_meal_log" })],
+    });
+    await expect(providers.json()).resolves.toMatchObject({
+      providerCalls: [expect.objectContaining({ providerGenerationId: "gen_list" })],
+    });
+    await expect(transcriptions.json()).resolves.toMatchObject({
+      transcriptions: [expect.objectContaining({ transcriptText: "commit it" })],
+    });
+    await expect(cost.json()).resolves.toMatchObject({
+      totalProviderCostAmount: 0.001,
+      totalEstimatedCostAmount: 0,
+      unknownCostCount: 0,
+      byConversation: [expect.objectContaining({ key: conversation.id, providerCostAmount: 0.001 })],
+      byTurn: [expect.objectContaining({ key: turnId, totalTokens: 40 })],
+    });
   });
 
   it("rejects the admin endpoints without a bearer token", async () => {

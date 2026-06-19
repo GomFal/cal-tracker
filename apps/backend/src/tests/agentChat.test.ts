@@ -39,12 +39,28 @@ describe("agent chat streaming", () => {
             },
           },
         ],
-        rawResponse: {},
+        rawResponse: {
+          id: "gen_chat_tool",
+          usage: {
+            prompt_tokens: 12,
+            completion_tokens: 8,
+            total_tokens: 20,
+            cost: 0.0002,
+          },
+        },
         interaction: { messages: [], streamEvents: [] },
       },
       {
         toolCalls: [],
-        rawResponse: {},
+        rawResponse: {
+          id: "gen_chat_final",
+          usage: {
+            prompt_tokens: 14,
+            completion_tokens: 16,
+            total_tokens: 30,
+            cost: 0.0003,
+          },
+        },
         interaction: {
           messages: [],
           assistantContent: "You have your daily summary above.",
@@ -52,7 +68,7 @@ describe("agent chat streaming", () => {
         },
       },
     ]);
-    const { request } = buildTestApp({ agentProvider });
+    const { request, telemetry, config } = buildTestApp({ agentProvider });
     const { authHeader } = await registerAndAuth(request);
 
     const response = await request("http://localhost/v1/agent/chat", {
@@ -146,6 +162,52 @@ describe("agent chat streaming", () => {
         resultKind: "summary",
       }),
     );
+
+    const turnId = [...turnIds][0] as string;
+    const turns = await telemetry.listAgentTurns({ conversationId, limit: 10 });
+    expect(turns).toHaveLength(1);
+    expect(turns[0]).toMatchObject({
+      conversationId,
+      turnId,
+      inputMode: "text",
+      source: "flutter",
+      model: config.OPENROUTER_MODEL,
+      resultKind: "assistant_message",
+      stopReason: "assistant_message",
+      status: "success",
+      toolCallCount: 1,
+      promptTokens: 26,
+      completionTokens: 24,
+      totalTokens: 50,
+      providerCostAmount: 0.0005,
+      costCurrency: "USD",
+      costSource: "provider",
+    });
+
+    const providerCalls = await telemetry.listLlmProviderCalls({
+      conversationId,
+      limit: 10,
+    });
+    expect(providerCalls.map((call) => call.providerGenerationId)).toEqual([
+      "gen_chat_final",
+      "gen_chat_tool",
+    ]);
+    expect(providerCalls.every((call) => call.turnId === turnId)).toBe(true);
+    expect(providerCalls.every((call) => call.costSource === "provider")).toBe(
+      true,
+    );
+
+    const toolCalls = await telemetry.listAgentToolCalls({
+      conversationId,
+      limit: 10,
+    });
+    expect(toolCalls).toHaveLength(1);
+    expect(toolCalls[0]).toMatchObject({
+      conversationId,
+      turnId,
+      actionId: "get_daily_summary",
+      status: "completed",
+    });
   });
 
   it("streams model-proposed quick reply buttons", async () => {
@@ -214,7 +276,7 @@ describe("agent chat streaming", () => {
         },
       },
     ]);
-    const { request } = buildTestApp({
+    const { request, telemetry } = buildTestApp({
       agentProvider,
       sttProvider: new FakeSpeechToTextProvider("voice message"),
     });
@@ -250,6 +312,27 @@ describe("agent chat streaming", () => {
           message.role === "user" && message.content === "voice message",
       ),
     ).toBe(true);
+    const conversationId = events.find(
+      (event) => event.type === "conversation_started",
+    )?.conversationId as string;
+    const turnId = events.find(
+      (event) => event.type === "conversation_started",
+    )?.turnId as string;
+    const transcriptions = await telemetry.listTranscriptionRecords({
+      conversationId,
+      limit: 10,
+    });
+    expect(transcriptions).toHaveLength(1);
+    expect(transcriptions[0]).toMatchObject({
+      conversationId,
+      turnId,
+      surface: "agent_chat_audio",
+      provider: "test",
+      model: "test-model",
+      transcriptText: "voice message",
+      transcriptLength: 13,
+      status: "completed",
+    });
   });
 
   it("hides deleted conversations from users while retaining stored messages", async () => {

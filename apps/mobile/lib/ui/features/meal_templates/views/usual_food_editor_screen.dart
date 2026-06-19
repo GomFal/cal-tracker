@@ -10,11 +10,7 @@ import '../view_models/meal_templates_view_model.dart';
 import 'usual_food_scan_screen.dart';
 
 class UsualFoodEditorScreen extends StatefulWidget {
-  const UsualFoodEditorScreen({
-    super.key,
-    this.foodId,
-    this.initialDraft,
-  });
+  const UsualFoodEditorScreen({super.key, this.foodId, this.initialDraft});
 
   static const newRoute = '/templates/ingredients/new';
 
@@ -111,8 +107,9 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
 
     final isWaitingForEditFood =
         _isEditing && food == null && (viewModel.isLoading || !_loadComplete);
-    final title =
-        _isEditing ? l10n.usualFoodsEditTitle : l10n.usualFoodsCreateTitle;
+    final title = _isEditing
+        ? l10n.usualFoodsEditTitle
+        : l10n.usualFoodsCreateTitle;
     return Scaffold(
       backgroundColor: context.freshPalette.screen,
       body: SafeArea(
@@ -146,8 +143,8 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
                   child: isWaitingForEditFood
                       ? const Center(child: CircularProgressIndicator())
                       : food == null && _isEditing
-                          ? _NotFoundState(onBack: _leaveEditor)
-                          : _buildForm(viewModel, food),
+                      ? _NotFoundState(onBack: _leaveEditor)
+                      : _buildForm(viewModel, food),
                 ),
                 if (!isWaitingForEditFood && (food != null || !_isEditing))
                   _BottomSaveBar(
@@ -179,7 +176,6 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
             if (!_isEditing) const SizedBox(height: FreshSpacing.lg),
             _EditorSection(
               title: l10n.usualFoodsIdentitySectionTitle,
-              icon: Icons.badge_outlined,
               child: Column(
                 children: [
                   _textField(
@@ -202,7 +198,6 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
             const SizedBox(height: FreshSpacing.lg),
             _EditorSection(
               title: l10n.usualFoodsServingSectionTitle,
-              icon: Icons.scale_rounded,
               child: _textField(
                 key: 'usual_food_serving_grams_field',
                 controller: _servingGramsController,
@@ -215,7 +210,6 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
             const SizedBox(height: FreshSpacing.lg),
             _EditorSection(
               title: l10n.usualFoodsMacrosSectionTitle,
-              icon: Icons.monitor_heart_outlined,
               child: _MacroGrid(
                 children: [
                   _textField(
@@ -558,14 +552,9 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
 }
 
 class _EditorSection extends StatelessWidget {
-  const _EditorSection({
-    required this.title,
-    required this.icon,
-    required this.child,
-  });
+  const _EditorSection({required this.title, required this.child});
 
   final String title;
-  final IconData icon;
   final Widget child;
 
   @override
@@ -574,28 +563,16 @@ class _EditorSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Icon(icon, size: 20, color: palette.leaf),
-            const SizedBox(width: FreshSpacing.sm),
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: palette.ink,
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-          ],
-        ),
-        const SizedBox(height: FreshSpacing.sm),
-        Container(
-          decoration: BoxDecoration(
-            color: palette.surface,
-            borderRadius: BorderRadius.circular(FreshRadii.md),
+        Text(
+          title,
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+            color: palette.ink,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.2,
           ),
-          padding: const EdgeInsets.all(FreshSpacing.lg),
-          child: child,
         ),
+        const SizedBox(height: FreshSpacing.md),
+        child,
         const SizedBox(height: FreshSpacing.md),
         Divider(height: 1, color: palette.rule),
       ],
@@ -611,36 +588,35 @@ class _OptionalNutrientsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
-    return Container(
-      decoration: BoxDecoration(
-        color: palette.surface,
-        borderRadius: BorderRadius.circular(FreshRadii.md),
-      ),
-      child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          key: const ValueKey('usual_food_optional_nutrients_section'),
-          tilePadding: const EdgeInsets.symmetric(
-            horizontal: FreshSpacing.lg,
-            vertical: FreshSpacing.sm,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            key: const ValueKey('usual_food_optional_nutrients_section'),
+            tilePadding: EdgeInsets.zero,
+            childrenPadding: const EdgeInsets.only(top: FreshSpacing.sm),
+            iconColor: palette.ink,
+            collapsedIconColor: palette.inkMuted,
+            title: Text(
+              context.l10n.usualFoodsOptionalSectionTitle,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: palette.ink,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            subtitle: Text(
+              context.l10n.usualFoodsOptionalSectionSubtitle,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: palette.inkMuted),
+            ),
+            children: children,
           ),
-          childrenPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-          leading: Icon(Icons.tune_rounded, size: 20, color: palette.orange),
-          title: Text(
-            context.l10n.usualFoodsOptionalSectionTitle,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-          subtitle: Text(
-            context.l10n.usualFoodsOptionalSectionSubtitle,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: palette.inkMuted),
-          ),
-          children: children,
         ),
-      ),
+        Divider(height: 1, color: palette.rule),
+      ],
     );
   }
 }
@@ -781,50 +757,61 @@ class _ScanFromPhotoCta extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final palette = context.freshPalette;
-    return Container(
+    return Column(
       key: const ValueKey('usual_food_scan_from_photo_cta'),
-      decoration: BoxDecoration(
-        color: palette.surface,
-        borderRadius: BorderRadius.circular(FreshRadii.md),
-        border: Border.all(color: palette.rule),
-      ),
-      padding: const EdgeInsets.all(FreshSpacing.md),
-      child: Row(
-        children: [
-          Icon(Icons.document_scanner_outlined, size: 20, color: palette.leaf),
-          const SizedBox(width: FreshSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+      children: [
+        InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(FreshRadii.sm),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: FreshSpacing.sm),
+            child: Row(
               children: [
-                Text(
-                  l10n.usualFoodsScanTitle,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
+                Icon(
+                  Icons.document_scanner_outlined,
+                  size: 20,
+                  color: palette.leaf,
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  l10n.usualFoodsScanHint,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: palette.inkMuted),
+                const SizedBox(width: FreshSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        l10n.usualFoodsScanTitle,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        l10n.usualFoodsScanHint,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: palette.inkMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: FreshSpacing.sm),
+                TextButton.icon(
+                  onPressed: onPressed,
+                  icon: const Icon(Icons.chevron_right_rounded),
+                  label: Text(l10n.usualFoodsScanFromPhotoButton),
+                  style: TextButton.styleFrom(
+                    foregroundColor: palette.leaf,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: FreshSpacing.sm,
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: FreshSpacing.sm),
-          FilledButton(
-            onPressed: onPressed,
-            style: FilledButton.styleFrom(
-              backgroundColor: palette.lime,
-              foregroundColor: Theme.of(context).colorScheme.onPrimary,
-            ),
-            child: Text(l10n.usualFoodsScanFromPhotoButton),
-          ),
-        ],
-      ),
+        ),
+        Divider(height: FreshSpacing.xl, color: palette.rule),
+      ],
     );
   }
 }

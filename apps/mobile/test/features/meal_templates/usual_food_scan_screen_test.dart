@@ -21,14 +21,14 @@ class FakeUsualFoodScanViewModel extends UsualFoodScanViewModel {
     this.overrideCapturedFilePath,
     this.overrideDraft,
   }) : super(
-          nutritionRepository: _dummyRepository,
-          initializeCamera: () async {},
-          takePicture: () async => '',
-          pausePreview: () async {},
-          resumePreview: () async {},
-          recognizeText: (_) async => '',
-          deleteCapturedFile: (_) async {},
-        );
+         nutritionRepository: _dummyRepository,
+         initializeCamera: () async {},
+         takePicture: () async => '',
+         pausePreview: () async {},
+         resumePreview: () async {},
+         recognizeText: (_) async => '',
+         deleteCapturedFile: (_) async {},
+       );
 
   static final _dummyRepository = _NutritionRepositoryStub();
 
@@ -122,32 +122,31 @@ Widget buildAppWithVm(FakeUsualFoodScanViewModel vm) {
 void main() {
   group('UsualFoodScanScreen', () {
     test('formats OCR lines into nutrition rows using bounding boxes', () {
-      final formatted = formatNutritionLabelOcrLines(
-        const [
-          NutritionLabelOcrLine(
-            text: 'Energy',
-            boundingBox: Rect.fromLTWH(10, 10, 70, 18),
-          ),
-          NutritionLabelOcrLine(
-            text: '360 kcal',
-            boundingBox: Rect.fromLTWH(220, 12, 90, 18),
-          ),
-          NutritionLabelOcrLine(
-            text: 'Protein',
-            boundingBox: Rect.fromLTWH(10, 42, 80, 18),
-          ),
-          NutritionLabelOcrLine(
-            text: '7 g',
-            boundingBox: Rect.fromLTWH(235, 43, 45, 18),
-          ),
-        ],
-      );
+      final formatted = formatNutritionLabelOcrLines(const [
+        NutritionLabelOcrLine(
+          text: 'Energy',
+          boundingBox: Rect.fromLTWH(10, 10, 70, 18),
+        ),
+        NutritionLabelOcrLine(
+          text: '360 kcal',
+          boundingBox: Rect.fromLTWH(220, 12, 90, 18),
+        ),
+        NutritionLabelOcrLine(
+          text: 'Protein',
+          boundingBox: Rect.fromLTWH(10, 42, 80, 18),
+        ),
+        NutritionLabelOcrLine(
+          text: '7 g',
+          boundingBox: Rect.fromLTWH(235, 43, 45, 18),
+        ),
+      ]);
 
       expect(formatted, 'Energy | 360 kcal\nProtein | 7 g');
     });
 
-    testWidgets('ready: shows close, capture button and viewfinder hint',
-        (tester) async {
+    testWidgets('ready: shows close, capture button and viewfinder hint', (
+      tester,
+    ) async {
       final vm = FakeUsualFoodScanViewModel(
         overridePhase: UsualFoodScanPhase.ready,
       );
@@ -169,6 +168,7 @@ void main() {
         find.byKey(const ValueKey('usual_food_scan_error_card')),
         findsNothing,
       );
+      expect(find.byType(Card), findsNothing);
     });
 
     testWidgets('capture button triggers capture()', (tester) async {
@@ -184,36 +184,39 @@ void main() {
     });
 
     testWidgets(
-        'previewing: shows confirm + retake buttons, hides capture button',
-        (tester) async {
-      final vm = FakeUsualFoodScanViewModel(
-        overridePhase: UsualFoodScanPhase.previewing,
-        overrideIsPreviewing: true,
-        overrideCapturedFilePath: '/tmp/some_capture.jpg',
-      );
-      await tester.pumpWidget(buildAppWithVm(vm));
+      'previewing: shows confirm + retake buttons, hides capture button',
+      (tester) async {
+        final vm = FakeUsualFoodScanViewModel(
+          overridePhase: UsualFoodScanPhase.previewing,
+          overrideIsPreviewing: true,
+          overrideCapturedFilePath: '/tmp/some_capture.jpg',
+        );
+        await tester.pumpWidget(buildAppWithVm(vm));
 
-      expect(
-        find.byKey(const ValueKey('usual_food_scan_confirm_button')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const ValueKey('usual_food_scan_retake_button')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const ValueKey('usual_food_scan_capture_button')),
-        findsNothing,
-      );
-      // Hint card visible
-      expect(
-        find.byKey(const ValueKey('usual_food_scan_preview_hint_card')),
-        findsOneWidget,
-      );
-    });
+        expect(
+          find.byKey(const ValueKey('usual_food_scan_confirm_button')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('usual_food_scan_retake_button')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('usual_food_scan_capture_button')),
+          findsNothing,
+        );
+        // Hint HUD visible without a Material card shell.
+        expect(
+          find.byKey(const ValueKey('usual_food_scan_preview_hint_card')),
+          findsOneWidget,
+        );
+        expect(find.byType(Card), findsNothing);
+      },
+    );
 
-    testWidgets('previewing: confirm button triggers confirmCapture()',
-        (tester) async {
+    testWidgets('previewing: confirm button triggers confirmCapture()', (
+      tester,
+    ) async {
       final vm = FakeUsualFoodScanViewModel(
         overridePhase: UsualFoodScanPhase.previewing,
         overrideIsPreviewing: true,
@@ -227,8 +230,9 @@ void main() {
       expect(vm.confirmCallCount, 1);
     });
 
-    testWidgets('previewing: retake button triggers retakeCapture()',
-        (tester) async {
+    testWidgets('previewing: retake button triggers retakeCapture()', (
+      tester,
+    ) async {
       final vm = FakeUsualFoodScanViewModel(
         overridePhase: UsualFoodScanPhase.previewing,
         overrideIsPreviewing: true,
@@ -243,23 +247,24 @@ void main() {
     });
 
     testWidgets(
-        'previewing: shows still image via Image.file when capturedFilePath set',
-        (tester) async {
-      // The screen uses Image.file with that key when there's a still image.
-      final vm = FakeUsualFoodScanViewModel(
-        overridePhase: UsualFoodScanPhase.previewing,
-        overrideIsPreviewing: true,
-        overrideCapturedFilePath: '/tmp/some_capture.jpg',
-      );
-      await tester.pumpWidget(buildAppWithVm(vm));
+      'previewing: shows still image via Image.file when capturedFilePath set',
+      (tester) async {
+        // The screen uses Image.file with that key when there's a still image.
+        final vm = FakeUsualFoodScanViewModel(
+          overridePhase: UsualFoodScanPhase.previewing,
+          overrideIsPreviewing: true,
+          overrideCapturedFilePath: '/tmp/some_capture.jpg',
+        );
+        await tester.pumpWidget(buildAppWithVm(vm));
 
-      expect(
-        find.byKey(const ValueKey('usual_food_scan_still_preview')),
-        findsOneWidget,
-      );
-    });
+        expect(
+          find.byKey(const ValueKey('usual_food_scan_still_preview')),
+          findsOneWidget,
+        );
+      },
+    );
 
-    testWidgets('error: shows card, retry and cancel buttons', (tester) async {
+    testWidgets('error: shows HUD, retry and cancel buttons', (tester) async {
       final vm = FakeUsualFoodScanViewModel(
         overridePhase: UsualFoodScanPhase.error,
         overrideErrorCode: UsualFoodScanError.cameraDenied,
@@ -282,10 +287,12 @@ void main() {
         find.byKey(const ValueKey('usual_food_scan_capture_button')),
         findsNothing,
       );
+      expect(find.byType(Card), findsNothing);
     });
 
-    testWidgets('error → retry triggers retry() and shows capture button',
-        (tester) async {
+    testWidgets('error → retry triggers retry() and shows capture button', (
+      tester,
+    ) async {
       final vm = FakeUsualFoodScanViewModel(
         overridePhase: UsualFoodScanPhase.error,
         overrideErrorCode: UsualFoodScanError.cameraDenied,
@@ -303,8 +310,9 @@ void main() {
       expect(vm.retryCallCount, 1);
     });
 
-    testWidgets('ocrProcessing: shows spinner with Reading text label',
-        (tester) async {
+    testWidgets('ocrProcessing: shows spinner with Reading text label', (
+      tester,
+    ) async {
       final vm = FakeUsualFoodScanViewModel(
         overridePhase: UsualFoodScanPhase.ocrProcessing,
         overrideIsBusy: true,
@@ -319,8 +327,9 @@ void main() {
       );
     });
 
-    testWidgets('drafting: shows spinner with Filling fields label',
-        (tester) async {
+    testWidgets('drafting: shows spinner with Filling fields label', (
+      tester,
+    ) async {
       final vm = FakeUsualFoodScanViewModel(
         overridePhase: UsualFoodScanPhase.drafting,
         overrideIsBusy: true,

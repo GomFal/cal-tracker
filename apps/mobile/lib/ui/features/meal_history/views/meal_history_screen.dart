@@ -55,7 +55,7 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
             ),
             const SizedBox(height: FreshSpacing.md),
           ],
-          _CaloriesChartCard(
+          _CaloriesChartSection(
             summaries: viewModel.weekSummaries,
             selectedDate: viewModel.selectedDate,
             onSelectDate: viewModel.selectDate,
@@ -82,7 +82,7 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
             for (final meal in viewModel.meals)
               Padding(
                 padding: const EdgeInsets.only(bottom: FreshSpacing.md),
-                child: _HistoryMealCard(
+                child: _HistoryMealRow(
                   meal: meal,
                   onTap: () => _showMealActions(context, viewModel, meal),
                 ),
@@ -150,10 +150,8 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (context) => MealItemEditorSheet(
-        meal: meal,
-        keyPrefix: 'history',
-      ),
+      builder: (context) =>
+          MealItemEditorSheet(meal: meal, keyPrefix: 'history'),
     );
     if (!context.mounted || items == null) return;
     await viewModel.correctMealItems(meal, items);
@@ -187,8 +185,8 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
   }
 }
 
-class _CaloriesChartCard extends StatelessWidget {
-  const _CaloriesChartCard({
+class _CaloriesChartSection extends StatelessWidget {
+  const _CaloriesChartSection({
     required this.summaries,
     required this.selectedDate,
     required this.onSelectDate,
@@ -222,13 +220,18 @@ class _CaloriesChartCard extends StatelessWidget {
     final bars = _weeklyBars(summaries, selectedDate, l10n);
     final textTheme = Theme.of(context).textTheme;
     final palette = context.freshPalette;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(
+        0,
+        FreshSpacing.sm,
+        0,
+        FreshSpacing.lg,
+      ),
       decoration: BoxDecoration(
-        color: isDark ? palette.surfaceSoft : palette.surface,
-        borderRadius: BorderRadius.circular(FreshRadii.xl),
-        border: Border.all(color: palette.rule),
+        border: Border(
+          top: BorderSide(color: palette.ruleSoft),
+          bottom: BorderSide(color: palette.rule),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -284,10 +287,7 @@ class _CaloriesChartCard extends StatelessWidget {
 }
 
 class _ChartBar extends StatelessWidget {
-  const _ChartBar({
-    required this.bar,
-    required this.onTap,
-  });
+  const _ChartBar({required this.bar, required this.onTap});
 
   final _BarData bar;
   final VoidCallback onTap;
@@ -338,8 +338,10 @@ class _ChartBar extends StatelessWidget {
                 child: Center(
                   child: Container(
                     constraints: const BoxConstraints(minWidth: 30),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 5, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: bar.active ? palette.limeWash : Colors.transparent,
                       borderRadius: BorderRadius.circular(999),
@@ -367,11 +369,8 @@ class _ChartBar extends StatelessWidget {
   }
 }
 
-class _HistoryMealCard extends StatelessWidget {
-  const _HistoryMealCard({
-    required this.meal,
-    required this.onTap,
-  });
+class _HistoryMealRow extends StatelessWidget {
+  const _HistoryMealRow({required this.meal, required this.onTap});
 
   final Meal meal;
   final VoidCallback onTap;
@@ -391,18 +390,10 @@ class _HistoryMealCard extends StatelessWidget {
             vertical: FreshSpacing.md,
           ),
           decoration: BoxDecoration(
-            border: Border(
-              bottom: BorderSide(color: palette.rule, width: 1),
-            ),
+            border: Border(bottom: BorderSide(color: palette.rule, width: 1)),
           ),
           child: Row(
             children: [
-              FreshIconChip(
-                icon: Icons.local_fire_department_rounded,
-                color: palette.orange,
-                backgroundColor: palette.yellow,
-              ),
-              const SizedBox(width: FreshSpacing.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -423,6 +414,8 @@ class _HistoryMealCard extends StatelessWidget {
                   fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
+              const SizedBox(width: FreshSpacing.sm),
+              Icon(Icons.more_horiz_rounded, color: palette.inkMuted, size: 20),
             ],
           ),
         ),
@@ -447,18 +440,31 @@ class _SheetAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
-    return FreshCard(
-      onTap: onTap,
-      padding: const EdgeInsets.all(16),
-      shadow: false,
-      child: Row(
-        children: [
-          FreshIconChip(icon: icon, color: color ?? palette.limeDeep),
-          const SizedBox(width: FreshSpacing.md),
-          Expanded(
-            child: Text(title, style: Theme.of(context).textTheme.titleMedium),
+    final actionColor = color ?? palette.limeDeep;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: FreshSpacing.md),
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: palette.rule)),
           ),
-        ],
+          child: Row(
+            children: [
+              Icon(icon, color: actionColor, size: 20),
+              const SizedBox(width: FreshSpacing.md),
+              Expanded(
+                child: Text(
+                  title,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleMedium?.copyWith(color: color),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -501,19 +507,14 @@ List<_BarData> _weeklyBars(
           percent: summaries[index].target.calories <= 0
               ? 0
               : ((summaries[index].consumed.calories /
-                          summaries[index].target.calories) *
-                      100)
-                  .round(),
+                            summaries[index].target.calories) *
+                        100)
+                    .round(),
           active: summaries[index].date == selectedDate,
         )
       else
-        _BarData(
-          date: '',
-          label: labels[index],
-          percent: 0,
-          active: false,
-        ),
-    ]
+        _BarData(date: '', label: labels[index], percent: 0, active: false),
+    ],
   ];
 }
 

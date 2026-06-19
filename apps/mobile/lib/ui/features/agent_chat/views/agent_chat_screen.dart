@@ -348,7 +348,10 @@ class _AssistantBubble extends StatelessWidget {
               if (entry.suggestions.isNotEmpty) ...[
                 if (entry.text.trim().isNotEmpty)
                   const SizedBox(height: FreshSpacing.md),
-                _AssistantSuggestionButtons(suggestions: entry.suggestions),
+                _AssistantSuggestionButtons(
+                  entryId: entry.id,
+                  suggestions: entry.suggestions,
+                ),
               ],
             ],
           ),
@@ -359,8 +362,12 @@ class _AssistantBubble extends StatelessWidget {
 }
 
 class _AssistantSuggestionButtons extends StatelessWidget {
-  const _AssistantSuggestionButtons({required this.suggestions});
+  const _AssistantSuggestionButtons({
+    required this.entryId,
+    required this.suggestions,
+  });
 
+  final String entryId;
   final List<AgentChatSuggestion> suggestions;
 
   @override
@@ -375,7 +382,11 @@ class _AssistantSuggestionButtons extends StatelessWidget {
             key: ValueKey('agent_chat_suggestion_$index'),
             onPressed: viewModel.isBusy
                 ? null
-                : () => unawaited(viewModel.sendText(suggestions[index].value)),
+                : () {
+                    final value = suggestions[index].value;
+                    viewModel.dismissSuggestions(entryId);
+                    unawaited(viewModel.sendText(value));
+                  },
             child: Text(suggestions[index].label),
           ),
       ],
@@ -522,7 +533,11 @@ class _ToolCallCard extends StatelessWidget {
             _FadeIn(
               key: ValueKey(
                   'agent_result_${toolCall?.id ?? entry.id}_${entry.result!.kind}'),
-              child: _AgentResultWidget(result: entry.result!),
+              child: _AgentResultWidget(
+                entryId: entry.id,
+                result: entry.result!,
+                completionMessage: entry.completionMessage,
+              ),
             ),
           ],
         ],
@@ -532,9 +547,15 @@ class _ToolCallCard extends StatelessWidget {
 }
 
 class _AgentResultWidget extends StatelessWidget {
-  const _AgentResultWidget({required this.result});
+  const _AgentResultWidget({
+    required this.entryId,
+    required this.result,
+    this.completionMessage,
+  });
 
+  final String entryId;
   final AgentRunResult result;
+  final String? completionMessage;
 
   @override
   Widget build(BuildContext context) {
@@ -559,19 +580,33 @@ class _AgentResultWidget extends StatelessWidget {
       return _TemplateList(templates: [result.template!]);
     }
     if (result.usualFoodDraft != null) {
-      return _UsualFoodDraftReview(draft: result.usualFoodDraft!);
+      return _UsualFoodDraftReview(
+        entryId: entryId,
+        draft: result.usualFoodDraft!,
+        completionMessage: completionMessage,
+      );
     }
     if (result.usualMealDraft != null) {
-      return _UsualMealDraftReview(draft: result.usualMealDraft!);
+      return _UsualMealDraftReview(
+        entryId: entryId,
+        draft: result.usualMealDraft!,
+        completionMessage: completionMessage,
+      );
     }
     return Text(result.message);
   }
 }
 
 class _UsualFoodDraftReview extends StatelessWidget {
-  const _UsualFoodDraftReview({required this.draft});
+  const _UsualFoodDraftReview({
+    required this.entryId,
+    required this.draft,
+    this.completionMessage,
+  });
 
+  final String entryId;
   final UsualFoodDraft draft;
+  final String? completionMessage;
 
   @override
   Widget build(BuildContext context) {
@@ -622,27 +657,48 @@ class _UsualFoodDraftReview extends StatelessWidget {
           ),
         ],
         const SizedBox(height: FreshSpacing.md),
-        FilledButton.icon(
-          key: const ValueKey('agent_chat_review_usual_food_draft_button'),
-          onPressed: () => unawaited(
-            Navigator.of(context).push<void>(
-              MaterialPageRoute(
-                builder: (_) => UsualFoodEditorScreen(initialDraft: draft),
-              ),
-            ),
+        if (completionMessage != null)
+          FreshStatusBanner(
+            icon: Icons.check_circle_rounded,
+            title: completionMessage!,
+            color: palette.limeDeep,
+          )
+        else
+          FilledButton.icon(
+            key: const ValueKey('agent_chat_review_usual_food_draft_button'),
+            onPressed: () => unawaited(_openEditor(context)),
+            icon: const Icon(Icons.edit_note_rounded),
+            label: Text(l10n.agentChatReviewUsualFoodDraftAction),
           ),
-          icon: const Icon(Icons.edit_note_rounded),
-          label: Text(l10n.agentChatReviewUsualFoodDraftAction),
-        ),
       ],
+    );
+  }
+
+  Future<void> _openEditor(BuildContext context) async {
+    final saved = await Navigator.of(context).push<UsualFood>(
+      MaterialPageRoute(
+        builder: (_) => UsualFoodEditorScreen(initialDraft: draft),
+      ),
+    );
+    if (!context.mounted || saved == null) return;
+    final message = context.l10n.agentChatUsualFoodSaved(saved.name);
+    context.read<AgentChatViewModel>().markEntryCompleted(entryId, message);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
     );
   }
 }
 
 class _UsualMealDraftReview extends StatelessWidget {
-  const _UsualMealDraftReview({required this.draft});
+  const _UsualMealDraftReview({
+    required this.entryId,
+    required this.draft,
+    this.completionMessage,
+  });
 
+  final String entryId;
   final UsualMealDraft draft;
+  final String? completionMessage;
 
   @override
   Widget build(BuildContext context) {
@@ -694,19 +750,34 @@ class _UsualMealDraftReview extends StatelessWidget {
           ),
         ],
         const SizedBox(height: FreshSpacing.md),
-        FilledButton.icon(
-          key: const ValueKey('agent_chat_review_usual_meal_draft_button'),
-          onPressed: () => unawaited(
-            Navigator.of(context).push<void>(
-              MaterialPageRoute(
-                builder: (_) => MealTemplateEditorScreen(initialDraft: draft),
-              ),
-            ),
+        if (completionMessage != null)
+          FreshStatusBanner(
+            icon: Icons.check_circle_rounded,
+            title: completionMessage!,
+            color: palette.limeDeep,
+          )
+        else
+          FilledButton.icon(
+            key: const ValueKey('agent_chat_review_usual_meal_draft_button'),
+            onPressed: () => unawaited(_openEditor(context)),
+            icon: const Icon(Icons.edit_note_rounded),
+            label: Text(l10n.agentChatReviewUsualMealDraftAction),
           ),
-          icon: const Icon(Icons.edit_note_rounded),
-          label: Text(l10n.agentChatReviewUsualMealDraftAction),
-        ),
       ],
+    );
+  }
+
+  Future<void> _openEditor(BuildContext context) async {
+    final saved = await Navigator.of(context).push<MealTemplate>(
+      MaterialPageRoute(
+        builder: (_) => MealTemplateEditorScreen(initialDraft: draft),
+      ),
+    );
+    if (!context.mounted || saved == null) return;
+    final message = context.l10n.agentChatUsualMealSaved(saved.title);
+    context.read<AgentChatViewModel>().markEntryCompleted(entryId, message);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
     );
   }
 }

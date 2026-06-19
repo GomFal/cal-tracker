@@ -433,21 +433,19 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
       ),
       nutrients: _nutrientsJson(),
     );
-    if (food == null) {
-      await viewModel.createUsualFood(input);
-    } else {
-      await viewModel.updateUsualFood(food, input);
-    }
+    final saved = food == null
+        ? await viewModel.createUsualFood(input)
+        : await viewModel.updateUsualFood(food, input);
     if (!mounted) return;
     setState(() => _isSaving = false);
-    if (viewModel.error == null) {
-      _leaveEditor();
+    if (saved != null && viewModel.error == null) {
+      _leaveEditor(saved);
     }
   }
 
-  void _leaveEditor() {
+  void _leaveEditor([Object? result]) {
     if (context.canPop()) {
-      context.pop();
+      context.pop(result);
     } else {
       context.go('/templates');
     }

@@ -21,6 +21,7 @@ class AgentChatEntry {
     this.result,
     this.error,
     this.suggestions = const [],
+    this.completionMessage,
   });
 
   final String id;
@@ -31,6 +32,7 @@ class AgentChatEntry {
   final AgentRunResult? result;
   final String? error;
   final List<AgentChatSuggestion> suggestions;
+  final String? completionMessage;
 
   AgentChatEntry copyWith({
     String? text,
@@ -39,6 +41,7 @@ class AgentChatEntry {
     AgentRunResult? result,
     String? error,
     List<AgentChatSuggestion>? suggestions,
+    String? completionMessage,
   }) {
     return AgentChatEntry(
       id: id,
@@ -49,6 +52,7 @@ class AgentChatEntry {
       result: result ?? this.result,
       error: error ?? this.error,
       suggestions: suggestions ?? this.suggestions,
+      completionMessage: completionMessage ?? this.completionMessage,
     );
   }
 }
@@ -88,7 +92,14 @@ class AgentChatViewModel extends ChangeNotifier {
 
   String? get activeProposalId {
     for (final entry in _entries.reversed) {
-      final proposal = entry.result?.proposal;
+      final result = entry.result;
+      if (result == null) continue;
+      if (result.kind == 'meal_committed' ||
+          result.kind == 'meal_deleted' ||
+          result.kind == 'confirmation_required') {
+        return null;
+      }
+      final proposal = result.proposal;
       if (proposal != null) {
         return proposal.id;
       }
@@ -119,6 +130,20 @@ class AgentChatViewModel extends ChangeNotifier {
         activeProposalId: activeProposalId,
       ),
     );
+  }
+
+  void dismissSuggestions(String entryId) {
+    final index = _entries.indexWhere((entry) => entry.id == entryId);
+    if (index < 0 || _entries[index].suggestions.isEmpty) return;
+    _entries[index] = _entries[index].copyWith(suggestions: const []);
+    notifyListeners();
+  }
+
+  void markEntryCompleted(String entryId, String message) {
+    final index = _entries.indexWhere((entry) => entry.id == entryId);
+    if (index < 0) return;
+    _entries[index] = _entries[index].copyWith(completionMessage: message);
+    notifyListeners();
   }
 
   Future<void> toggleRecording() async {
@@ -381,7 +406,8 @@ class AgentChatViewModel extends ChangeNotifier {
       (entry) =>
           entry.id == activeId &&
           entry.text.trim().isEmpty &&
-          entry.suggestions.isEmpty,
+          entry.suggestions.isEmpty &&
+          entry.completionMessage == null,
     );
   }
 

@@ -12,8 +12,8 @@ class MealTemplatesViewModel extends ChangeNotifier {
   MealTemplatesViewModel({
     required NutritionRepository nutritionRepository,
     DateTime Function()? now,
-  }) : _nutritionRepository = nutritionRepository,
-       _now = now ?? DateTime.now;
+  })  : _nutritionRepository = nutritionRepository,
+        _now = now ?? DateTime.now;
 
   final NutritionRepository _nutritionRepository;
   final DateTime Function() _now;
@@ -245,7 +245,7 @@ class MealTemplatesViewModel extends ChangeNotifier {
     return _nutritionRepository.transcribeAudio(audioFile);
   }
 
-  Future<void> createUsualFood(UsualFoodInput input) async {
+  Future<UsualFood?> createUsualFood(UsualFoodInput input) async {
     final temporary = _usualFoodFromInput(_temporaryId('usual-food'), input);
     _usualFoods = [..._usualFoods, temporary];
     _hasLoaded = true;
@@ -261,19 +261,21 @@ class MealTemplatesViewModel extends ChangeNotifier {
           .toList();
       await _nutritionRepository.putCachedUsualFoods(_usualFoods);
       _error = null;
+      return food;
     } catch (error) {
-      _usualFoods = _usualFoods
-          .where((item) => item.id != temporary.id)
-          .toList();
+      _usualFoods =
+          _usualFoods.where((item) => item.id != temporary.id).toList();
       await _nutritionRepository.putCachedUsualFoods(_usualFoods);
       _error = userVisibleErrorMessage(error);
+      return null;
     } finally {
       _isSaving = false;
       notifyListeners();
     }
   }
 
-  Future<void> updateUsualFood(UsualFood food, UsualFoodInput input) async {
+  Future<UsualFood?> updateUsualFood(
+      UsualFood food, UsualFoodInput input) async {
     final previous = _usualFoods;
     final optimistic = _usualFoodFromInput(
       food.id,
@@ -300,10 +302,12 @@ class MealTemplatesViewModel extends ChangeNotifier {
           .toList();
       await _nutritionRepository.putCachedUsualFoods(_usualFoods);
       _error = null;
+      return updated;
     } catch (error) {
       _usualFoods = previous;
       await _nutritionRepository.putCachedUsualFoods(previous);
       _error = userVisibleErrorMessage(error);
+      return null;
     } finally {
       _isSaving = false;
       notifyListeners();

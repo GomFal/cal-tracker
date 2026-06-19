@@ -525,6 +525,18 @@
   },
   "agentChatReviewUsualFoodDraftAction": "Revisar y guardar ingrediente",
   "agentChatReviewUsualMealDraftAction": "Revisar y guardar comida habitual",
+  "agentChatUsualFoodSaved": "Guardado {name} en tus ingredientes habituales.",
+  "@agentChatUsualFoodSaved": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "agentChatUsualMealSaved": "Guardada {title} en tus comidas habituales.",
+  "@agentChatUsualMealSaved": {
+    "placeholders": {
+      "title": {}
+    }
+  },
   "agentChatInputHint": "Pregunta o dile al agente qué hacer",
   "agentChatScanLabelTooltip": "Escanear etiqueta nutricional",
   "agentChatScanLabelPrompt": "Crea un borrador de ingrediente habitual a partir de este texto OCR de una etiqueta nutricional. Usa solo valores explícitamente visibles en el texto. Si faltan campos nutricionales obligatorios, pídeme completarlos antes de guardar.\n\nTexto OCR:\n{ocrText}",

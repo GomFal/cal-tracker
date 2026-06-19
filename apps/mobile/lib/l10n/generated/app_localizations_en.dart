@@ -1740,6 +1740,16 @@ class AppLocalizationsEn extends AppLocalizations {
       'Review and save usual meal';
 
   @override
+  String agentChatUsualFoodSaved(Object name) {
+    return 'Saved $name to your usual ingredients.';
+  }
+
+  @override
+  String agentChatUsualMealSaved(Object title) {
+    return 'Saved $title to your usual meals.';
+  }
+
+  @override
   String get agentChatInputHint => 'Ask or tell the agent what to do';
 
   @override

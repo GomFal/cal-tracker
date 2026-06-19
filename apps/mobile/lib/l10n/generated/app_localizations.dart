@@ -3219,6 +3219,18 @@ abstract class AppLocalizations {
   /// **'Review and save usual meal'**
   String get agentChatReviewUsualMealDraftAction;
 
+  /// No description provided for @agentChatUsualFoodSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved {name} to your usual ingredients.'**
+  String agentChatUsualFoodSaved(Object name);
+
+  /// No description provided for @agentChatUsualMealSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved {title} to your usual meals.'**
+  String agentChatUsualMealSaved(Object title);
+
   /// No description provided for @agentChatInputHint.
   ///
   /// In en, this message translates to:

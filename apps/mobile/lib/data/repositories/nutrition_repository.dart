@@ -898,6 +898,10 @@ class NutritionRepository {
     if (templates != null) {
       await putCachedTemplates(templates);
     }
+    final usualFoods = result.usualFoods;
+    if (usualFoods != null) {
+      await putCachedUsualFoods(usualFoods);
+    }
     final template = result.template;
     if (template != null) {
       await _replaceCachedTemplate(template);

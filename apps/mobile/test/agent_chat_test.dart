@@ -69,6 +69,22 @@ class _StreamingClient extends http.BaseClient {
 }
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(
+      const UsualFoodInput(
+        name: 'Fallback',
+        servingGrams: 100,
+        nutrition: NutritionSnapshot(
+          calories: 0,
+          proteinGrams: 0,
+          carbsGrams: 0,
+          fatGrams: 0,
+        ),
+      ),
+    );
+    registerFallbackValue(<UsualFood>[]);
+  });
+
   test('CalTrackerApiClient parses split agent chat SSE events', () async {
     final client = CalTrackerApiClient(
       config: const ApiConfig(baseUrl: 'http://localhost'),
@@ -160,6 +176,92 @@ void main() {
     expect(toolEntry.toolStatus, AgentChatToolStatus.completed);
     expect(toolEntry.result?.summary?.consumed.calories, 420);
     expect(viewModel.entries[2].text, 'You ate breakfast.');
+  });
+
+  test('AgentChatViewModel clears active proposal after meal commit', () async {
+    final repository = MockNutritionRepository();
+    final recorder = MockAudioRecorderService();
+    String? commitRequestActiveProposalId;
+    const nutrition = NutritionSnapshot(
+      calories: 360,
+      proteinGrams: 7,
+      carbsGrams: 79,
+      fatGrams: 1,
+    );
+    const proposal = MealProposal(
+      id: 'proposal_rice',
+      title: 'Rice',
+      confidence: 0.9,
+      requiresConfirmation: true,
+      trustedAutoCommitEligible: false,
+      nutrition: nutrition,
+      items: [],
+    );
+    final meal = Meal(
+      id: 'meal_rice',
+      title: 'Rice',
+      occurredAt: DateTime.utc(2026, 6, 16, 12),
+      nutrition: nutrition,
+      items: const [],
+    );
+    when(
+      () => repository.streamAgentChat(
+        any(),
+        conversationId: any(named: 'conversationId'),
+        activeProposalId: any(named: 'activeProposalId'),
+      ),
+    ).thenAnswer((invocation) {
+      final message = invocation.positionalArguments.first as String;
+      if (message == 'log rice') {
+        return Stream.fromIterable([
+          const AgentChatStreamEvent(
+            type: 'tool_call_completed',
+            toolCall: AgentToolCallFeedback(
+              id: 'call_proposal',
+              actionId: 'propose_meal_log',
+              label: 'Create proposal',
+              summary: 'Creating a meal proposal',
+            ),
+            result: AgentRunResult(
+              kind: 'proposal',
+              message: 'Meal proposal created.',
+              proposal: proposal,
+            ),
+          ),
+          const AgentChatStreamEvent(type: 'done'),
+        ]);
+      }
+      commitRequestActiveProposalId =
+          invocation.namedArguments[#activeProposalId] as String?;
+      return Stream.fromIterable([
+        AgentChatStreamEvent(
+          type: 'tool_call_completed',
+          toolCall: const AgentToolCallFeedback(
+            id: 'call_commit',
+            actionId: 'commit_meal',
+            label: 'Commit meal',
+            summary: 'Logging meal',
+          ),
+          result: AgentRunResult(
+            kind: 'meal_committed',
+            message: 'Meal logged.',
+            meal: meal,
+          ),
+        ),
+        const AgentChatStreamEvent(type: 'done'),
+      ]);
+    });
+    final viewModel = AgentChatViewModel(
+      nutritionRepository: repository,
+      audioRecorderService: recorder,
+    );
+
+    await viewModel.sendText('log rice');
+    expect(viewModel.activeProposalId, 'proposal_rice');
+
+    await viewModel.sendText('yes, log it');
+    expect(commitRequestActiveProposalId, 'proposal_rice');
+    expect(viewModel.activeProposalId, isNull);
   });
 
   testWidgets('AgentChatScreen renders a completed tool widget',
@@ -389,7 +491,7 @@ void main() {
     expect(find.byType(AgentChatScreen), findsOneWidget);
   });
 
-  testWidgets('AgentChatScreen opens usual food draft editor and pops back',
+  testWidgets('AgentChatScreen marks usual food draft saved after editor save',
       (tester) async {
     final repository = MockNutritionRepository();
     final recorder = MockAudioRecorderService();
@@ -452,6 +554,22 @@ void main() {
     when(
       () => repository.refreshUsualFoods(force: any(named: 'force')),
     ).thenAnswer((_) async => const <UsualFood>[]);
+    when(() => repository.putCachedUsualFoods(any())).thenAnswer((_) async {});
+    when(() => repository.createUsualFood(any()))
+        .thenAnswer((invocation) async {
+      final input = invocation.positionalArguments.first as UsualFoodInput;
+      return UsualFood(
+        id: 'usual_food_rice',
+        name: input.name,
+        canonicalName: input.canonicalName,
+        brand: input.brand,
+        barcode: input.barcode,
+        servingGrams: input.servingGrams,
+        nutrition: input.nutrition,
+        aliases: input.aliases,
+        nutrients: input.nutrients,
+      );
+    });
     final viewModel = AgentChatViewModel(
       nutritionRepository: repository,
       audioRecorderService: recorder,
@@ -504,11 +622,22 @@ void main() {
     expect(
         find.byKey(const ValueKey('usual_food_save_button')), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Back'));
+    await tester
+        .ensureVisible(find.byKey(const ValueKey('usual_food_save_button')));
+    await tester.tap(find.byKey(const ValueKey('usual_food_save_button')));
     await tester.pumpAndSettle();
 
     expect(find.byType(AgentChatScreen), findsOneWidget);
     expect(find.text('Usual ingredient draft'), findsOneWidget);
+    expect(
+      find.text('Saved Arroz Hacendado to your usual ingredients.'),
+      findsWidgets,
+    );
+    expect(
+      find.byKey(const ValueKey('agent_chat_review_usual_food_draft_button')),
+      findsNothing,
+    );
+    verify(() => repository.createUsualFood(any())).called(1);
   });
 }
 

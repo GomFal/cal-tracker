@@ -831,6 +831,18 @@
   },
   "agentChatReviewUsualFoodDraftAction": "Review and save ingredient",
   "agentChatReviewUsualMealDraftAction": "Review and save usual meal",
+  "agentChatUsualFoodSaved": "Saved {name} to your usual ingredients.",
+  "@agentChatUsualFoodSaved": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "agentChatUsualMealSaved": "Saved {title} to your usual meals.",
+  "@agentChatUsualMealSaved": {
+    "placeholders": {
+      "title": {}
+    }
+  },
   "agentChatInputHint": "Ask or tell the agent what to do",
   "agentChatScanLabelTooltip": "Scan nutrition label",
   "agentChatScanLabelPrompt": "Create a usual ingredient draft from this nutrition label OCR text. Only use values explicitly visible in the text. If required nutrition fields are missing, ask me to complete them before saving.\n\nOCR text:\n{ocrText}",

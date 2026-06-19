@@ -1759,6 +1759,16 @@ class AppLocalizationsEs extends AppLocalizations {
       'Revisar y guardar comida habitual';
 
   @override
+  String agentChatUsualFoodSaved(Object name) {
+    return 'Guardado $name en tus ingredientes habituales.';
+  }
+
+  @override
+  String agentChatUsualMealSaved(Object title) {
+    return 'Guardada $title en tus comidas habituales.';
+  }
+
+  @override
   String get agentChatInputHint => 'Pregunta o dile al agente qué hacer';
 
   @override

@@ -7610,6 +7610,46 @@
                     "null"
                   ]
                 },
+                "conversationId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "turnId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "provider": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "providerRequestId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "providerGenerationId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "model": {
                   "type": "string"
                 },
@@ -7813,6 +7853,34 @@
                 },
                 "providerError": {
                   "type": "boolean"
+                },
+                "providerCostAmount": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "estimatedCostAmount": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "costCurrency": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "costSource": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "pricingSnapshot": {
+                  "type": "object",
+                  "additionalProperties": {}
                 },
                 "metadata": {
                   "type": "object",
@@ -7980,6 +8048,923 @@
               ],
               "additionalProperties": false
             }
+          },
+          "conversationMessages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "conversationId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "userId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "assistant",
+                    "tool"
+                  ]
+                },
+                "content": {
+                  "type": "string"
+                },
+                "toolCalls": {},
+                "toolCallId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "traceId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "turnId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "inputMode": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "source": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "activeProposalId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "metadata": {},
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "conversationId",
+                "role",
+                "content",
+                "createdAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "agentTurns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "conversationId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "traceId": {
+                  "type": "string"
+                },
+                "turnId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "userId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "inputMode": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "source": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "activeProposalId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "model": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "inputText": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "assistantText": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "resultKind": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "stopReason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "iterationCount": {
+                  "type": "integer"
+                },
+                "toolCallCount": {
+                  "type": "integer"
+                },
+                "promptTokens": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "completionTokens": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "totalTokens": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "reasoningTokens": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "providerCostAmount": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "estimatedCostAmount": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "costCurrency": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "costSource": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "firstByteMs": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "firstToolCallMs": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "largestStreamGapMs": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "llmMs": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "actionMs": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "totalMs": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "status": {
+                  "type": "string"
+                },
+                "errorCode": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "errorMessage": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {}
+                },
+                "completedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "traceId",
+                "turnId",
+                "iterationCount",
+                "toolCallCount",
+                "status",
+                "metadata",
+                "createdAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "agentToolCalls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "agentTurnId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "conversationId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "traceId": {
+                  "type": "string"
+                },
+                "turnId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "userId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "toolCallId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "actionCallId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "actionId": {
+                  "type": "string"
+                },
+                "arguments": {},
+                "resultSummary": {},
+                "status": {
+                  "type": "string"
+                },
+                "errorMessage": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "startedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "completedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "durationMs": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {}
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "traceId",
+                "actionId",
+                "status",
+                "startedAt",
+                "metadata",
+                "createdAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "actionCalls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "userId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "actionId": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                },
+                "input": {},
+                "output": {},
+                "error": {},
+                "confirmationStatus": {
+                  "type": "string"
+                },
+                "traceId": {
+                  "type": "string"
+                },
+                "latencyMs": {
+                  "type": "integer"
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "userId",
+                "actionId",
+                "source",
+                "confirmationStatus",
+                "traceId",
+                "latencyMs",
+                "createdAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "providerCalls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "traceId": {
+                  "type": "string"
+                },
+                "userId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "conversationId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "agentTurnId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "turnId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "actionCallId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "featureSurface": {
+                  "type": "string"
+                },
+                "provider": {
+                  "type": "string"
+                },
+                "providerRequestId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "providerGenerationId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "requestedModel": {
+                  "type": "string"
+                },
+                "servedModel": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "routing": {},
+                "inputMode": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "promptTokens": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "completionTokens": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "totalTokens": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "reasoningTokens": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "providerCostAmount": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "estimatedCostAmount": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "costCurrency": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "costSource": {
+                  "type": "string"
+                },
+                "pricingSource": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "pricingVersion": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "type": "string"
+                },
+                "errorCode": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "errorMessage": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "durationMs": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {}
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "traceId",
+                "featureSurface",
+                "provider",
+                "requestedModel",
+                "costSource",
+                "status",
+                "metadata",
+                "createdAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "transcriptions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "traceId": {
+                  "type": "string"
+                },
+                "userId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "conversationId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "turnId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "surface": {
+                  "type": "string"
+                },
+                "provider": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "model": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "language": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "audioMimeType": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "audioBytes": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "audioDurationMs": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "transcriptText": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "transcriptLength": {
+                  "type": "integer"
+                },
+                "durationMs": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "status": {
+                  "type": "string"
+                },
+                "errorCode": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "errorMessage": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "downstreamResultKind": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {}
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "traceId",
+                "surface",
+                "transcriptLength",
+                "status",
+                "metadata",
+                "createdAt"
+              ],
+              "additionalProperties": false
+            }
           }
         },
         "required": [
@@ -8010,6 +8995,32 @@
             "minimum": 0
           },
           "totalFoodSearchEvents": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "totalConversations": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "totalAgentTurns": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "totalProviderCalls": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "totalTranscriptions": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "providerCostAmount": {
+            "type": "number"
+          },
+          "estimatedCostAmount": {
+            "type": "number"
+          },
+          "unknownCostCount": {
             "type": "integer",
             "minimum": 0
           },
@@ -8064,6 +9075,13 @@
           "totalEvents",
           "totalLlmRuns",
           "totalFoodSearchEvents",
+          "totalConversations",
+          "totalAgentTurns",
+          "totalProviderCalls",
+          "totalTranscriptions",
+          "providerCostAmount",
+          "estimatedCostAmount",
+          "unknownCostCount",
           "uniqueUsers",
           "uniqueTraces",
           "eventsBySeverity",
@@ -8114,6 +9132,46 @@
                   ]
                 },
                 "timezone": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "conversationId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "turnId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "provider": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "providerRequestId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "providerGenerationId": {
                   "type": [
                     "string",
                     "null"
@@ -8322,6 +9380,34 @@
                 },
                 "providerError": {
                   "type": "boolean"
+                },
+                "providerCostAmount": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "estimatedCostAmount": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "costCurrency": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "costSource": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "pricingSnapshot": {
+                  "type": "object",
+                  "additionalProperties": {}
                 },
                 "metadata": {
                   "type": "object",
@@ -8502,6 +9588,1400 @@
         },
         "required": [
           "foodSearchEvents"
+        ],
+        "additionalProperties": false
+      },
+      "AdminAgentConversationsResponse": {
+        "type": "object",
+        "properties": {
+          "conversations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "userId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "hiddenFromUserAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "updatedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "createdAt",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "conversations"
+        ],
+        "additionalProperties": false
+      },
+      "AdminAgentConversationDetailResponse": {
+        "type": "object",
+        "properties": {
+          "conversation": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "userId": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "title": {
+                "type": "string"
+              },
+              "hiddenFromUserAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "createdAt",
+              "updatedAt"
+            ],
+            "additionalProperties": false
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "conversationId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "userId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "assistant",
+                    "tool"
+                  ]
+                },
+                "content": {
+                  "type": "string"
+                },
+                "toolCalls": {},
+                "toolCallId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "traceId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "turnId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "inputMode": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "source": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "activeProposalId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "metadata": {},
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "conversationId",
+                "role",
+                "content",
+                "createdAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "conversation",
+          "messages"
+        ],
+        "additionalProperties": false
+      },
+      "AdminActionCallsResponse": {
+        "type": "object",
+        "properties": {
+          "actionCalls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "userId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "actionId": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                },
+                "input": {},
+                "output": {},
+                "error": {},
+                "confirmationStatus": {
+                  "type": "string"
+                },
+                "traceId": {
+                  "type": "string"
+                },
+                "latencyMs": {
+                  "type": "integer"
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "userId",
+                "actionId",
+                "source",
+                "confirmationStatus",
+                "traceId",
+                "latencyMs",
+                "createdAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "actionCalls"
+        ],
+        "additionalProperties": false
+      },
+      "AdminAgentTurnsResponse": {
+        "type": "object",
+        "properties": {
+          "agentTurns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "conversationId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "traceId": {
+                  "type": "string"
+                },
+                "turnId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "userId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "inputMode": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "source": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "activeProposalId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "model": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "inputText": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "assistantText": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "resultKind": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "stopReason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "iterationCount": {
+                  "type": "integer"
+                },
+                "toolCallCount": {
+                  "type": "integer"
+                },
+                "promptTokens": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "completionTokens": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "totalTokens": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "reasoningTokens": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "providerCostAmount": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "estimatedCostAmount": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "costCurrency": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "costSource": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "firstByteMs": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "firstToolCallMs": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "largestStreamGapMs": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "llmMs": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "actionMs": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "totalMs": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "status": {
+                  "type": "string"
+                },
+                "errorCode": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "errorMessage": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {}
+                },
+                "completedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "traceId",
+                "turnId",
+                "iterationCount",
+                "toolCallCount",
+                "status",
+                "metadata",
+                "createdAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "agentTurns"
+        ],
+        "additionalProperties": false
+      },
+      "AdminAgentToolCallsResponse": {
+        "type": "object",
+        "properties": {
+          "agentToolCalls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "agentTurnId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "conversationId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "traceId": {
+                  "type": "string"
+                },
+                "turnId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "userId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "toolCallId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "actionCallId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "actionId": {
+                  "type": "string"
+                },
+                "arguments": {},
+                "resultSummary": {},
+                "status": {
+                  "type": "string"
+                },
+                "errorMessage": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "startedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "completedAt": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "durationMs": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {}
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "traceId",
+                "actionId",
+                "status",
+                "startedAt",
+                "metadata",
+                "createdAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "agentToolCalls"
+        ],
+        "additionalProperties": false
+      },
+      "AdminLlmProviderCallsResponse": {
+        "type": "object",
+        "properties": {
+          "providerCalls": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "traceId": {
+                  "type": "string"
+                },
+                "userId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "conversationId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "agentTurnId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "turnId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "actionCallId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "featureSurface": {
+                  "type": "string"
+                },
+                "provider": {
+                  "type": "string"
+                },
+                "providerRequestId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "providerGenerationId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "requestedModel": {
+                  "type": "string"
+                },
+                "servedModel": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "routing": {},
+                "inputMode": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "promptTokens": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "completionTokens": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "totalTokens": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "reasoningTokens": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "providerCostAmount": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "estimatedCostAmount": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "costCurrency": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "costSource": {
+                  "type": "string"
+                },
+                "pricingSource": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "pricingVersion": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "type": "string"
+                },
+                "errorCode": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "errorMessage": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "durationMs": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {}
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "traceId",
+                "featureSurface",
+                "provider",
+                "requestedModel",
+                "costSource",
+                "status",
+                "metadata",
+                "createdAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "providerCalls"
+        ],
+        "additionalProperties": false
+      },
+      "AdminLlmCostResponse": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "totalProviderCostAmount": {
+            "type": "number"
+          },
+          "totalEstimatedCostAmount": {
+            "type": "number"
+          },
+          "totalCostAmount": {
+            "type": "number"
+          },
+          "unknownCostCount": {
+            "type": "integer"
+          },
+          "totalPromptTokens": {
+            "type": "integer"
+          },
+          "totalCompletionTokens": {
+            "type": "integer"
+          },
+          "totalTokens": {
+            "type": "integer"
+          },
+          "byUser": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "providerCostAmount": {
+                  "type": "number"
+                },
+                "estimatedCostAmount": {
+                  "type": "number"
+                },
+                "totalCostAmount": {
+                  "type": "number"
+                },
+                "unknownCostCount": {
+                  "type": "integer"
+                },
+                "totalTokens": {
+                  "type": "integer"
+                },
+                "callCount": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "key",
+                "providerCostAmount",
+                "estimatedCostAmount",
+                "totalCostAmount",
+                "unknownCostCount",
+                "totalTokens",
+                "callCount"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "byConversation": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "providerCostAmount": {
+                  "type": "number"
+                },
+                "estimatedCostAmount": {
+                  "type": "number"
+                },
+                "totalCostAmount": {
+                  "type": "number"
+                },
+                "unknownCostCount": {
+                  "type": "integer"
+                },
+                "totalTokens": {
+                  "type": "integer"
+                },
+                "callCount": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "key",
+                "providerCostAmount",
+                "estimatedCostAmount",
+                "totalCostAmount",
+                "unknownCostCount",
+                "totalTokens",
+                "callCount"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "byTurn": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "providerCostAmount": {
+                  "type": "number"
+                },
+                "estimatedCostAmount": {
+                  "type": "number"
+                },
+                "totalCostAmount": {
+                  "type": "number"
+                },
+                "unknownCostCount": {
+                  "type": "integer"
+                },
+                "totalTokens": {
+                  "type": "integer"
+                },
+                "callCount": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "key",
+                "providerCostAmount",
+                "estimatedCostAmount",
+                "totalCostAmount",
+                "unknownCostCount",
+                "totalTokens",
+                "callCount"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "byModel": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "providerCostAmount": {
+                  "type": "number"
+                },
+                "estimatedCostAmount": {
+                  "type": "number"
+                },
+                "totalCostAmount": {
+                  "type": "number"
+                },
+                "unknownCostCount": {
+                  "type": "integer"
+                },
+                "totalTokens": {
+                  "type": "integer"
+                },
+                "callCount": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "key",
+                "providerCostAmount",
+                "estimatedCostAmount",
+                "totalCostAmount",
+                "unknownCostCount",
+                "totalTokens",
+                "callCount"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "byProvider": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "providerCostAmount": {
+                  "type": "number"
+                },
+                "estimatedCostAmount": {
+                  "type": "number"
+                },
+                "totalCostAmount": {
+                  "type": "number"
+                },
+                "unknownCostCount": {
+                  "type": "integer"
+                },
+                "totalTokens": {
+                  "type": "integer"
+                },
+                "callCount": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "key",
+                "providerCostAmount",
+                "estimatedCostAmount",
+                "totalCostAmount",
+                "unknownCostCount",
+                "totalTokens",
+                "callCount"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "byFeature": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "providerCostAmount": {
+                  "type": "number"
+                },
+                "estimatedCostAmount": {
+                  "type": "number"
+                },
+                "totalCostAmount": {
+                  "type": "number"
+                },
+                "unknownCostCount": {
+                  "type": "integer"
+                },
+                "totalTokens": {
+                  "type": "integer"
+                },
+                "callCount": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "key",
+                "providerCostAmount",
+                "estimatedCostAmount",
+                "totalCostAmount",
+                "unknownCostCount",
+                "totalTokens",
+                "callCount"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "byDay": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "providerCostAmount": {
+                  "type": "number"
+                },
+                "estimatedCostAmount": {
+                  "type": "number"
+                },
+                "totalCostAmount": {
+                  "type": "number"
+                },
+                "unknownCostCount": {
+                  "type": "integer"
+                },
+                "totalTokens": {
+                  "type": "integer"
+                },
+                "callCount": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "key",
+                "providerCostAmount",
+                "estimatedCostAmount",
+                "totalCostAmount",
+                "unknownCostCount",
+                "totalTokens",
+                "callCount"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "totalProviderCostAmount",
+          "totalEstimatedCostAmount",
+          "totalCostAmount",
+          "unknownCostCount",
+          "totalPromptTokens",
+          "totalCompletionTokens",
+          "totalTokens",
+          "byUser",
+          "byConversation",
+          "byTurn",
+          "byModel",
+          "byProvider",
+          "byFeature",
+          "byDay"
+        ],
+        "additionalProperties": false
+      },
+      "AdminTranscriptionsResponse": {
+        "type": "object",
+        "properties": {
+          "transcriptions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "traceId": {
+                  "type": "string"
+                },
+                "userId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "conversationId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "turnId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "surface": {
+                  "type": "string"
+                },
+                "provider": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "model": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "language": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "audioMimeType": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "audioBytes": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "audioDurationMs": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "transcriptText": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "transcriptLength": {
+                  "type": "integer"
+                },
+                "durationMs": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "status": {
+                  "type": "string"
+                },
+                "errorCode": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "errorMessage": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "downstreamResultKind": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "metadata": {
+                  "type": "object",
+                  "additionalProperties": {}
+                },
+                "createdAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "traceId",
+                "surface",
+                "transcriptLength",
+                "status",
+                "metadata",
+                "createdAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "transcriptions"
         ],
         "additionalProperties": false
       },
@@ -17631,6 +20111,24 @@
             }
           },
           {
+            "name": "conversationId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "turnId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
             "name": "resultKind",
             "in": "query",
             "required": false,
@@ -17665,6 +20163,741 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TelemetryLlmRunsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/telemetry/conversations": {
+      "get": {
+        "operationId": "listAdminTelemetryConversations",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          {
+            "name": "traceId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 120
+            }
+          },
+          {
+            "name": "userId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "conversationId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "turnId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "includeHidden",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Admin agent conversations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAgentConversationsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/telemetry/conversations/{conversationId}": {
+      "get": {
+        "operationId": "getAdminTelemetryConversation",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "includeHidden",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Admin agent conversation detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAgentConversationDetailResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/telemetry/action-calls": {
+      "get": {
+        "operationId": "listAdminTelemetryActionCalls",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          {
+            "name": "traceId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 120
+            }
+          },
+          {
+            "name": "userId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "actionId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 120
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Admin action calls",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminActionCallsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/telemetry/agent-turns": {
+      "get": {
+        "operationId": "listAdminTelemetryAgentTurns",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          {
+            "name": "traceId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 120
+            }
+          },
+          {
+            "name": "userId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "conversationId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "turnId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "inputMode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 40
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 40
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Admin agent turns",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAgentTurnsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/telemetry/agent-tool-calls": {
+      "get": {
+        "operationId": "listAdminTelemetryAgentToolCalls",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          {
+            "name": "traceId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 120
+            }
+          },
+          {
+            "name": "userId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "conversationId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "turnId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "actionId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 120
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 40
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Admin agent tool calls",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAgentToolCallsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/telemetry/llm-provider-calls": {
+      "get": {
+        "operationId": "listAdminTelemetryLlmProviderCalls",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          {
+            "name": "traceId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 120
+            }
+          },
+          {
+            "name": "userId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "conversationId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "turnId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "provider",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 120
+            }
+          },
+          {
+            "name": "model",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 160
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 40
+            }
+          },
+          {
+            "name": "costSource",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 40
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Admin LLM provider calls",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminLlmProviderCallsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/telemetry/llm-cost": {
+      "get": {
+        "operationId": "getAdminTelemetryLlmCost",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "conversationId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "traceId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 120
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Admin LLM cost overview",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminLlmCostResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/admin/telemetry/transcriptions": {
+      "get": {
+        "operationId": "listAdminTelemetryTranscriptions",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          {
+            "name": "traceId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 120
+            }
+          },
+          {
+            "name": "userId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "conversationId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "turnId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "surface",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 80
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 40
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Admin transcriptions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminTranscriptionsResponse"
                 }
               }
             }

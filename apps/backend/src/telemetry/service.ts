@@ -1,13 +1,28 @@
 import { createHash } from "node:crypto";
 import { summarizeError } from "../observability/localRunLogger.js";
 import type {
+  AdminActionCallFilter,
+  AdminConversationFilter,
+  AgentToolCallTelemetryFilter,
+  AgentToolCallTelemetryRecord,
+  AgentTurnTelemetryFilter,
+  AgentTurnTelemetryRecord,
+  AgentConversationMessageRecord,
+  AgentConversationRecord,
+  ActionCallRecord,
   FoodSearchEventRecord,
   LlmRunRecord,
   TelemetryEventRecord,
   TelemetryEventFilter,
   LlmRunFilter,
   FoodSearchEventFilter,
+  LlmCostFilter,
+  LlmCostOverview,
+  LlmProviderCallFilter,
+  LlmProviderCallRecord,
   TelemetryOverview,
+  TranscriptionRecord,
+  TranscriptionRecordFilter,
 } from "../repository/types.js";
 import type { AppRepository } from "../repository/types.js";
 import {
@@ -19,8 +34,12 @@ import {
 import type {
   FoodResolverTelemetryEvent,
   FoodSearchTelemetryEvent,
+  AgentToolCallTelemetryEvent,
+  AgentTurnTelemetryEvent,
   LlmTelemetryEvent,
+  LlmProviderCallTelemetryEvent,
   SttTelemetryEvent,
+  TranscriptionTelemetryRecordEvent,
   VoiceMealRunTelemetryEvent,
 } from "./telemetryService.js";
 
@@ -49,6 +68,10 @@ export type FoodSearchEventTelemetryInput = Omit<FoodSearchEventRecord, "id" | "
 export interface TelemetrySink {
   recordEvent(event: TelemetryEventInput): Promise<TelemetryEventRecord | undefined>;
   recordLlmRun(run: LlmRunTelemetryInput | LlmTelemetryEvent): Promise<LlmRunRecord | undefined>;
+  recordAgentTurn(event: AgentTurnTelemetryEvent): Promise<AgentTurnTelemetryRecord | undefined>;
+  recordAgentToolCall(event: AgentToolCallTelemetryEvent): Promise<AgentToolCallTelemetryRecord | undefined>;
+  recordLlmProviderCall(event: LlmProviderCallTelemetryEvent): Promise<LlmProviderCallRecord | undefined>;
+  recordTranscriptionRecord(event: TranscriptionTelemetryRecordEvent): Promise<TranscriptionRecord | undefined>;
   recordFoodSearchEvent(event: FoodSearchEventTelemetryInput | FoodSearchTelemetryEvent): Promise<FoodSearchEventRecord | undefined>;
   recordSttEvent(event: SttTelemetryEvent): Promise<TelemetryEventRecord | undefined>;
   recordVoiceMealRunEvent(event: VoiceMealRunTelemetryEvent): Promise<TelemetryEventRecord | undefined>;
@@ -89,6 +112,59 @@ export class TelemetryService implements TelemetrySink {
       });
     } catch (error) {
       console.warn("telemetry.llm_run_write_failed", summarizeError(error));
+      return undefined;
+    }
+  }
+
+  async recordAgentTurn(event: AgentTurnTelemetryEvent): Promise<AgentTurnTelemetryRecord | undefined> {
+    if (!this.enabled) return undefined;
+    try {
+      return await this.repository.createAgentTurnTelemetry({
+        ...event,
+        pricingSnapshot: event.pricingSnapshot ?? {},
+        metadata: sanitizeMetadata(event.metadata),
+      });
+    } catch (error) {
+      console.warn("telemetry.agent_turn_write_failed", summarizeError(error));
+      return undefined;
+    }
+  }
+
+  async recordAgentToolCall(event: AgentToolCallTelemetryEvent): Promise<AgentToolCallTelemetryRecord | undefined> {
+    if (!this.enabled) return undefined;
+    try {
+      return await this.repository.createAgentToolCallTelemetry({
+        ...event,
+        metadata: sanitizeMetadata(event.metadata),
+      });
+    } catch (error) {
+      console.warn("telemetry.agent_tool_call_write_failed", summarizeError(error));
+      return undefined;
+    }
+  }
+
+  async recordLlmProviderCall(event: LlmProviderCallTelemetryEvent): Promise<LlmProviderCallRecord | undefined> {
+    if (!this.enabled) return undefined;
+    try {
+      return await this.repository.createLlmProviderCall({
+        ...event,
+        metadata: sanitizeMetadata(event.metadata),
+      });
+    } catch (error) {
+      console.warn("telemetry.llm_provider_call_write_failed", summarizeError(error));
+      return undefined;
+    }
+  }
+
+  async recordTranscriptionRecord(event: TranscriptionTelemetryRecordEvent): Promise<TranscriptionRecord | undefined> {
+    if (!this.enabled) return undefined;
+    try {
+      return await this.repository.createTranscriptionRecord({
+        ...event,
+        metadata: sanitizeMetadata(event.metadata),
+      });
+    } catch (error) {
+      console.warn("telemetry.transcription_record_write_failed", summarizeError(error));
       return undefined;
     }
   }
@@ -254,6 +330,119 @@ export class TelemetryService implements TelemetrySink {
     }
   }
 
+  async listAdminAgentConversations(
+    filter: AdminConversationFilter,
+  ): Promise<AgentConversationRecord[]> {
+    try {
+      return await this.repository.listAdminAgentConversations({
+        ...filter,
+        limit: clampLimit(filter.limit),
+      });
+    } catch (error) {
+      console.warn("telemetry.list_admin_conversations_failed", summarizeError(error));
+      return [];
+    }
+  }
+
+  async getAdminAgentConversationMessages(
+    conversationId: string,
+    includeHidden = false,
+  ): Promise<AgentConversationMessageRecord[]> {
+    try {
+      return await this.repository.getAdminAgentConversationMessages(
+        conversationId,
+        includeHidden,
+      );
+    } catch (error) {
+      console.warn("telemetry.get_admin_conversation_failed", summarizeError(error));
+      return [];
+    }
+  }
+
+  async listAgentConversationMessagesByTrace(
+    traceId: string,
+    includeHidden = false,
+  ): Promise<AgentConversationMessageRecord[]> {
+    try {
+      return await this.repository.listAgentConversationMessagesByTrace(
+        traceId,
+        includeHidden,
+      );
+    } catch (error) {
+      console.warn("telemetry.list_trace_messages_failed", summarizeError(error));
+      return [];
+    }
+  }
+
+  async listAdminActionCalls(filter: AdminActionCallFilter): Promise<ActionCallRecord[]> {
+    try {
+      return await this.repository.listAdminActionCalls({
+        ...filter,
+        limit: clampLimit(filter.limit),
+      });
+    } catch (error) {
+      console.warn("telemetry.list_admin_action_calls_failed", summarizeError(error));
+      return [];
+    }
+  }
+
+  async listAgentTurns(filter: AgentTurnTelemetryFilter): Promise<AgentTurnTelemetryRecord[]> {
+    try {
+      return await this.repository.listAgentTurnTelemetry({
+        ...filter,
+        limit: clampLimit(filter.limit),
+      });
+    } catch (error) {
+      console.warn("telemetry.list_agent_turns_failed", summarizeError(error));
+      return [];
+    }
+  }
+
+  async listAgentToolCalls(filter: AgentToolCallTelemetryFilter): Promise<AgentToolCallTelemetryRecord[]> {
+    try {
+      return await this.repository.listAgentToolCallTelemetry({
+        ...filter,
+        limit: clampLimit(filter.limit),
+      });
+    } catch (error) {
+      console.warn("telemetry.list_agent_tool_calls_failed", summarizeError(error));
+      return [];
+    }
+  }
+
+  async listLlmProviderCalls(filter: LlmProviderCallFilter): Promise<LlmProviderCallRecord[]> {
+    try {
+      return await this.repository.listLlmProviderCalls({
+        ...filter,
+        limit: clampLimit(filter.limit),
+      });
+    } catch (error) {
+      console.warn("telemetry.list_provider_calls_failed", summarizeError(error));
+      return [];
+    }
+  }
+
+  async listTranscriptionRecords(filter: TranscriptionRecordFilter): Promise<TranscriptionRecord[]> {
+    try {
+      return await this.repository.listTranscriptionRecords({
+        ...filter,
+        limit: clampLimit(filter.limit),
+      });
+    } catch (error) {
+      console.warn("telemetry.list_transcriptions_failed", summarizeError(error));
+      return [];
+    }
+  }
+
+  async getLlmCostOverview(filter: LlmCostFilter): Promise<LlmCostOverview | undefined> {
+    try {
+      return await this.repository.getLlmCostOverview(filter);
+    } catch (error) {
+      console.warn("telemetry.cost_overview_failed", summarizeError(error));
+      return undefined;
+    }
+  }
+
   async listFoodSearchEvents(
     filter: FoodSearchEventFilter,
   ): Promise<FoodSearchEventRecord[]> {
@@ -289,6 +478,11 @@ function normalizeLlmRun(run: LlmRunTelemetryInput | LlmTelemetryEvent): LlmRunT
     source: run.source,
     locale: run.locale,
     timezone: run.timezone,
+    conversationId: run.conversationId,
+    turnId: run.turnId,
+    provider: run.provider,
+    providerRequestId: run.providerRequestId,
+    providerGenerationId: run.providerGenerationId,
     model: run.model,
     inputMode: run.inputMode,
     activeProposalId: run.activeProposalId,
@@ -313,6 +507,11 @@ function normalizeLlmRun(run: LlmRunTelemetryInput | LlmTelemetryEvent): LlmRunT
     emptyToolCall: Boolean(run.emptyToolCall || run.outcome === "empty_tool_call"),
     invalidToolArguments: Boolean(run.invalidToolArguments || run.outcome === "invalid_tool_arguments"),
     providerError: Boolean(run.providerError || run.outcome === "provider_error"),
+    providerCostAmount: run.providerCostAmount,
+    estimatedCostAmount: run.estimatedCostAmount,
+    costCurrency: run.costCurrency,
+    costSource: run.costSource,
+    pricingSnapshot: run.pricingSnapshot,
     metadata: {
       outcome: run.outcome,
       errorMessage: run.errorMessage,
@@ -363,6 +562,13 @@ function emptyOverview(input: { from: string; to: string }): TelemetryOverview {
     totalEvents: 0,
     totalLlmRuns: 0,
     totalFoodSearchEvents: 0,
+    totalConversations: 0,
+    totalAgentTurns: 0,
+    totalProviderCalls: 0,
+    totalTranscriptions: 0,
+    providerCostAmount: 0,
+    estimatedCostAmount: 0,
+    unknownCostCount: 0,
     uniqueUsers: 0,
     uniqueTraces: 0,
     eventsBySeverity: {},

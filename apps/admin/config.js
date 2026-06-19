@@ -29,6 +29,14 @@ Object.assign(window.AdminTelemetry, {
     overview: "/v1/admin/telemetry/overview",
     events: "/v1/admin/telemetry/events",
     llmRuns: "/v1/admin/telemetry/llm-runs",
+    conversations: "/v1/admin/telemetry/conversations",
+    conversation: (conversationId, includeHidden = true) =>
+      `/v1/admin/telemetry/conversations/${encodeURIComponent(conversationId)}?includeHidden=${includeHidden ? "true" : "false"}`,
+    agentTurns: "/v1/admin/telemetry/agent-turns",
+    actionCalls: "/v1/admin/telemetry/action-calls",
+    llmCost: "/v1/admin/telemetry/llm-cost",
+    providerCalls: "/v1/admin/telemetry/llm-provider-calls",
+    transcriptions: "/v1/admin/telemetry/transcriptions",
     foodSearch: "/v1/admin/telemetry/food-search",
     trace: (traceId) => `/v1/admin/telemetry/traces/${encodeURIComponent(traceId)}`,
   },
@@ -37,6 +45,11 @@ Object.assign(window.AdminTelemetry, {
   defaults: {
     eventsLimit: 100,
     llmLimit: 100,
+    conversationsLimit: 100,
+    agentTurnsLimit: 100,
+    actionCallsLimit: 100,
+    providerCallsLimit: 100,
+    transcriptionsLimit: 100,
     foodLimit: 100,
   },
 });

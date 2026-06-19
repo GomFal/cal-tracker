@@ -365,8 +365,26 @@
     if (traceRaw) traceRaw.textContent = "Sign in to load telemetry.";
     renderEventsTable([]);
     renderLlmTable([]);
+    renderConversationsTable([]);
+    renderConversationDetail([]);
+    renderAgentTurnsTable([]);
+    renderActionCallsTable([]);
+    renderLlmCostView(null);
+    renderProviderCallsTable([]);
+    renderTranscriptionsTable([]);
     renderFoodTable([]);
-    renderTraceView({ traceId: "—", events: [], llmRuns: [], foodSearchEvents: [] });
+    renderTraceView({
+      traceId: "—",
+      events: [],
+      llmRuns: [],
+      foodSearchEvents: [],
+      conversationMessages: [],
+      agentTurns: [],
+      agentToolCalls: [],
+      actionCalls: [],
+      providerCalls: [],
+      transcriptions: [],
+    });
   }
 
   async function loginAdmin(username, password) {
@@ -455,6 +473,14 @@
     return String(value);
   }
 
+  function formatMoney(value, currency = "USD") {
+    if (value == null || value === "") return "—";
+    const n = Number(value);
+    if (!Number.isFinite(n)) return String(value);
+    const suffix = currency || "USD";
+    return `${n.toFixed(n >= 1 ? 2 : 6)} ${suffix}`;
+  }
+
   function formatDuration(ms) {
     if (ms == null || ms === "") return "—";
     const n = Number(ms);
@@ -516,6 +542,19 @@
     const isTrue = value === true || value === "true";
     const cls = isTrue ? "tag tag-warning" : "tag tag-neutral";
     return el("span", { class: cls, text: isTrue ? `${label} ✓` : `${label} ·` });
+  }
+
+  function jsonPreview(value, max = 96) {
+    if (value == null) return "—";
+    const raw =
+      typeof value === "string" ? value : JSON.stringify(value);
+    if (!raw) return "—";
+    return raw.length > max ? `${raw.slice(0, max - 1)}…` : raw;
+  }
+
+  function costAmount(row) {
+    const amount = row?.providerCostAmount ?? row?.estimatedCostAmount ?? row?.totalCostAmount;
+    return formatMoney(amount, row?.costCurrency || "USD");
   }
 
   function traceCell(value) {
@@ -696,6 +735,286 @@
     }
   }
 
+  function renderConversationsTable(rows) {
+    const tbody = $("#conversations-table tbody");
+    if (!tbody) return;
+    tbody.replaceChildren();
+    if (!rows || rows.length === 0) {
+      tbody.appendChild(renderEmptyRow(6, "No conversations match the current filters."));
+      return;
+    }
+    for (const row of rows) {
+      const tr = el("tr", {
+        class: row.hiddenFromUserAt ? "is-warning" : "",
+        onClick: () => loadConversationDetail(row.id, true),
+      });
+      tr.append(
+        el("td", { text: formatTimestamp(row.updatedAt) }),
+        el("td", { class: "wrap", text: row.title || "—" }),
+        el("td", { class: "mono", text: row.userId || "—" }),
+        el("td", { class: "mono" }, copyableSpan(row.id)),
+        el("td", {}, row.hiddenFromUserAt ? statusTag("hidden") : statusTag("visible")),
+        el("td", { text: formatTimestamp(row.createdAt) }),
+      );
+      tbody.appendChild(tr);
+    }
+  }
+
+  function renderConversationDetail(rows) {
+    const tbody = $("#conversation-detail-table tbody");
+    if (!tbody) return;
+    tbody.replaceChildren();
+    if (!rows || rows.length === 0) {
+      tbody.appendChild(renderEmptyRow(8, "Select a conversation row."));
+      return;
+    }
+    for (const row of rows) {
+      const text = String(row.content || "");
+      const tr = el("tr", {});
+      tr.append(
+        el("td", { text: formatTimestamp(row.createdAt) }),
+        el("td", { class: "mono", text: row.turnId || "—" }),
+        el("td", { class: "mono", text: row.role || "—" }),
+        el("td", { class: "mono", text: row.inputMode || "—" }),
+        el("td", { class: "mono", text: row.source || "—" }),
+      );
+      tr.append(traceCell(row.traceId));
+      tr.append(
+        el("td", { class: "mono", text: row.activeProposalId || "—" }),
+        el("td", { class: "wrap", text: text.length > 240 ? `${text.slice(0, 239)}…` : text || "—" }),
+      );
+      tbody.appendChild(tr);
+    }
+  }
+
+  function renderAgentTurnsTable(rows, selector = "#agent-turns-table tbody") {
+    const tbody = $(selector);
+    if (!tbody) return;
+    tbody.replaceChildren();
+    if (!rows || rows.length === 0) {
+      tbody.appendChild(renderEmptyRow(14, "No agent turns match the current filters."));
+      return;
+    }
+    for (const row of rows) {
+      const tr = el("tr", { class: row.status === "failure" ? "is-error" : "" });
+      tr.append(
+        el("td", { text: formatTimestamp(row.createdAt) }),
+        el("td", { class: "mono", text: row.userId || "—" }),
+        el("td", { class: "mono", text: row.conversationId || "—" }),
+        el("td", { class: "mono", text: row.turnId || "—" }),
+      );
+      tr.append(traceCell(row.traceId));
+      tr.append(
+        el("td", { class: "mono", text: row.inputMode || "—" }),
+        el("td", { class: "mono", text: row.model || "—" }),
+        el("td", { class: "mono", text: row.resultKind || "—" }),
+        el("td", { class: "mono", text: row.stopReason || "—" }),
+        el("td", { class: "numeric", text: formatNumber(row.toolCallCount) }),
+        el("td", { class: "numeric", text: formatNumber(row.totalTokens) }),
+        el("td", { class: "numeric", text: costAmount(row) }),
+        el("td", { class: "numeric", text: formatDuration(row.totalMs) }),
+        el("td", {}, statusTag(row.status)),
+      );
+      tbody.appendChild(tr);
+    }
+  }
+
+  function renderActionCallsTable(rows, selector = "#action-calls-table tbody") {
+    const tbody = $(selector);
+    if (!tbody) return;
+    tbody.replaceChildren();
+    if (!rows || rows.length === 0) {
+      tbody.appendChild(renderEmptyRow(10, "No action calls match the current filters."));
+      return;
+    }
+    for (const row of rows) {
+      const tr = el("tr", { class: row.error ? "is-error" : "" });
+      tr.append(
+        el("td", { text: formatTimestamp(row.createdAt) }),
+        el("td", { class: "mono", text: row.actionId || "—" }),
+        el("td", { class: "mono", text: row.source || "—" }),
+        el("td", { class: "mono", text: row.userId || "—" }),
+      );
+      tr.append(traceCell(row.traceId));
+      tr.append(
+        el("td", { class: "numeric", text: formatDuration(row.latencyMs) }),
+        el("td", { class: "mono", text: row.confirmationStatus || "—" }),
+        el("td", { class: "wrap mono", text: jsonPreview(row.input) }),
+        el("td", { class: "wrap mono", text: jsonPreview(row.output) }),
+        el("td", { class: "wrap mono", text: jsonPreview(row.error) }),
+      );
+      tbody.appendChild(tr);
+    }
+  }
+
+  function renderLlmCostView(data) {
+    const cardValues = {
+      total: data?.totalCostAmount,
+      provider: data?.totalProviderCostAmount,
+      estimated: data?.totalEstimatedCostAmount,
+      unknown: data?.unknownCostCount,
+      tokens: data?.totalTokens,
+    };
+    for (const [key, value] of Object.entries(cardValues)) {
+      const card = document.querySelector(`.card[data-cost-card="${key}"]`);
+      if (!card) continue;
+      const valueEl = card.querySelector("[data-value]");
+      if (valueEl) {
+        valueEl.textContent = key === "unknown" || key === "tokens"
+          ? formatNumber(value)
+          : formatMoney(value);
+      }
+    }
+
+    const tbody = $("#llm-cost-table tbody");
+    if (!tbody) return;
+    tbody.replaceChildren();
+    if (!data) {
+      tbody.appendChild(renderEmptyRow(8, "No cost data loaded yet."));
+      return;
+    }
+    const groups = [
+      ["user", data.byUser],
+      ["conversation", data.byConversation],
+      ["turn", data.byTurn],
+      ["model", data.byModel],
+      ["provider", data.byProvider],
+      ["feature", data.byFeature],
+      ["day", data.byDay],
+    ];
+    const rows = groups.flatMap(([group, entries]) =>
+      (entries || []).map((entry) => ({ group, ...entry })),
+    );
+    if (rows.length === 0) {
+      tbody.appendChild(renderEmptyRow(8, "No cost records match the current filters."));
+      return;
+    }
+    for (const row of rows) {
+      const tr = el("tr", { class: row.unknownCostCount > 0 ? "is-warning" : "" });
+      tr.append(
+        el("td", { class: "mono", text: row.group }),
+        el("td", { class: "mono", text: row.key || "unknown" }),
+        el("td", { class: "numeric", text: formatMoney(row.providerCostAmount) }),
+        el("td", { class: "numeric", text: formatMoney(row.estimatedCostAmount) }),
+        el("td", { class: "numeric", text: formatMoney(row.totalCostAmount) }),
+        el("td", { class: "numeric", text: formatNumber(row.unknownCostCount) }),
+        el("td", { class: "numeric", text: formatNumber(row.totalTokens) }),
+        el("td", { class: "numeric", text: formatNumber(row.callCount) }),
+      );
+      tbody.appendChild(tr);
+    }
+  }
+
+  function renderProviderCallsTable(rows, selector = "#provider-calls-table tbody") {
+    const tbody = $(selector);
+    if (!tbody) return;
+    tbody.replaceChildren();
+    if (!rows || rows.length === 0) {
+      tbody.appendChild(renderEmptyRow(13, "No provider calls match the current filters."));
+      return;
+    }
+    for (const row of rows) {
+      const tr = el("tr", { class: row.status === "failure" ? "is-error" : "" });
+      tr.append(
+        el("td", { text: formatTimestamp(row.createdAt) }),
+        el("td", { class: "mono", text: row.provider || "—" }),
+        el("td", { class: "mono", text: row.requestedModel || "—" }),
+        el("td", { class: "mono", text: row.servedModel || "—" }),
+        el("td", { class: "mono", text: row.providerGenerationId || row.providerRequestId || "—" }),
+      );
+      tr.append(traceCell(row.traceId));
+      tr.append(
+        el("td", { class: "mono", text: row.turnId || "—" }),
+        el("td", { class: "numeric", text: formatNumber(row.totalTokens) }),
+        el("td", { class: "numeric", text: costAmount(row) }),
+        el("td", { class: "mono", text: row.costSource || "—" }),
+        el("td", { class: "numeric", text: formatDuration(row.durationMs) }),
+        el("td", {}, statusTag(row.status)),
+        el("td", { class: "wrap", text: row.errorMessage || row.errorCode || "—" }),
+      );
+      tbody.appendChild(tr);
+    }
+  }
+
+  function renderTranscriptionsTable(rows, selector = "#transcriptions-table tbody") {
+    const tbody = $(selector);
+    if (!tbody) return;
+    tbody.replaceChildren();
+    if (!rows || rows.length === 0) {
+      tbody.appendChild(renderEmptyRow(13, "No transcriptions match the current filters."));
+      return;
+    }
+    for (const row of rows) {
+      const tr = el("tr", { class: row.status === "failed" ? "is-error" : "" });
+      tr.append(
+        el("td", { text: formatTimestamp(row.createdAt) }),
+        el("td", { class: "mono", text: row.surface || "—" }),
+        el("td", { class: "mono", text: row.userId || "—" }),
+        el("td", { class: "mono", text: row.conversationId || "—" }),
+      );
+      tr.append(traceCell(row.traceId));
+      tr.append(
+        el("td", { class: "mono", text: row.provider || "—" }),
+        el("td", { class: "mono", text: row.model || "—" }),
+        el("td", { class: "mono", text: row.audioMimeType ? `${row.audioMimeType} · ${formatNumber(row.audioBytes)} B` : formatNumber(row.audioBytes) }),
+        el("td", { class: "numeric", text: formatNumber(row.transcriptLength) }),
+        el("td", { class: "numeric", text: formatDuration(row.durationMs) }),
+        el("td", {}, statusTag(row.status)),
+        el("td", { class: "wrap", text: row.transcriptText || "—" }),
+        el("td", { class: "wrap", text: row.errorMessage || row.errorCode || "—" }),
+      );
+      tbody.appendChild(tr);
+    }
+  }
+
+  function renderTraceProviderCallsTable(rows) {
+    const tbody = $("#trace-provider-calls-table tbody");
+    if (!tbody) return;
+    tbody.replaceChildren();
+    if (!rows || rows.length === 0) {
+      tbody.appendChild(renderEmptyRow(8, "No provider calls recorded for this trace."));
+      return;
+    }
+    for (const row of rows) {
+      const tr = el("tr", { class: row.status === "failure" ? "is-error" : "" });
+      tr.append(
+        el("td", { text: formatTimestamp(row.createdAt) }),
+        el("td", { class: "mono", text: row.provider || "—" }),
+        el("td", { class: "mono", text: row.servedModel || row.requestedModel || "—" }),
+        el("td", { class: "mono", text: row.providerGenerationId || row.providerRequestId || "—" }),
+        el("td", { class: "mono", text: row.turnId || "—" }),
+        el("td", { class: "numeric", text: formatNumber(row.totalTokens) }),
+        el("td", { class: "numeric", text: costAmount(row) }),
+        el("td", {}, statusTag(row.status)),
+      );
+      tbody.appendChild(tr);
+    }
+  }
+
+  function renderTraceTranscriptionsTable(rows) {
+    const tbody = $("#trace-transcriptions-table tbody");
+    if (!tbody) return;
+    tbody.replaceChildren();
+    if (!rows || rows.length === 0) {
+      tbody.appendChild(renderEmptyRow(8, "No transcriptions recorded for this trace."));
+      return;
+    }
+    for (const row of rows) {
+      const tr = el("tr", { class: row.status === "failed" ? "is-error" : "" });
+      tr.append(
+        el("td", { text: formatTimestamp(row.createdAt) }),
+        el("td", { class: "mono", text: row.surface || "—" }),
+        el("td", { class: "mono", text: row.provider || "—" }),
+        el("td", { class: "mono", text: row.conversationId || "—" }),
+        el("td", { class: "mono", text: row.turnId || "—" }),
+        el("td", { class: "numeric", text: formatNumber(row.transcriptLength) }),
+        el("td", {}, statusTag(row.status)),
+        el("td", { class: "wrap", text: row.transcriptText || row.errorMessage || "—" }),
+      );
+      tbody.appendChild(tr);
+    }
+  }
+
   function renderFoodTable(rows) {
     const tbody = $("#food-table tbody");
     tbody.replaceChildren();
@@ -739,13 +1058,29 @@
 
     const events = Array.isArray(payload?.events) ? payload.events : [];
     const llmRuns = Array.isArray(payload?.llmRuns) ? payload.llmRuns : [];
+    const conversationMessages = Array.isArray(payload?.conversationMessages) ? payload.conversationMessages : [];
+    const agentTurns = Array.isArray(payload?.agentTurns) ? payload.agentTurns : [];
+    const agentToolCalls = Array.isArray(payload?.agentToolCalls) ? payload.agentToolCalls : [];
+    const actionCalls = Array.isArray(payload?.actionCalls) ? payload.actionCalls : [];
+    const providerCalls = Array.isArray(payload?.providerCalls) ? payload.providerCalls : [];
+    const transcriptions = Array.isArray(payload?.transcriptions) ? payload.transcriptions : [];
     const foodSearches = Array.isArray(payload?.foodSearchEvents)
       ? payload.foodSearchEvents
       : Array.isArray(payload?.foodSearches)
         ? payload.foodSearches
         : [];
 
-    const earliest = [events, llmRuns, foodSearches]
+    const earliest = [
+      events,
+      llmRuns,
+      conversationMessages,
+      agentTurns,
+      agentToolCalls,
+      actionCalls,
+      providerCalls,
+      transcriptions,
+      foodSearches,
+    ]
       .flat()
       .map((r) => r?.createdAt)
       .filter(Boolean)
@@ -758,6 +1093,18 @@
       el("dd", { text: formatNumber(events.length) }),
       el("dt", { text: "LLM runs" }),
       el("dd", { text: formatNumber(llmRuns.length) }),
+      el("dt", { text: "Messages" }),
+      el("dd", { text: formatNumber(conversationMessages.length) }),
+      el("dt", { text: "Agent turns" }),
+      el("dd", { text: formatNumber(agentTurns.length) }),
+      el("dt", { text: "Tool calls" }),
+      el("dd", { text: formatNumber(agentToolCalls.length) }),
+      el("dt", { text: "Action calls" }),
+      el("dd", { text: formatNumber(actionCalls.length) }),
+      el("dt", { text: "Provider calls" }),
+      el("dd", { text: formatNumber(providerCalls.length) }),
+      el("dt", { text: "Transcriptions" }),
+      el("dd", { text: formatNumber(transcriptions.length) }),
       el("dt", { text: "Food searches" }),
       el("dd", { text: formatNumber(foodSearches.length) }),
       el("dt", { text: "First seen" }),
@@ -816,6 +1163,76 @@
       }
     }
 
+    const traceMessagesBody = $("#trace-messages-table tbody");
+    traceMessagesBody.replaceChildren();
+    if (conversationMessages.length === 0) {
+      traceMessagesBody.appendChild(renderEmptyRow(7, "No conversation messages recorded for this trace."));
+    } else {
+      for (const row of conversationMessages) {
+        const text = String(row.content || "");
+        const tr = el("tr", {});
+        tr.append(
+          el("td", { text: formatTimestamp(row.createdAt) }),
+          el("td", { class: "mono", text: row.conversationId || "—" }),
+          el("td", { class: "mono", text: row.turnId || "—" }),
+          el("td", { class: "mono", text: row.role || "—" }),
+          el("td", { class: "mono", text: row.inputMode || "—" }),
+          el("td", { class: "mono", text: row.source || "—" }),
+          el("td", { class: "wrap", text: text.length > 220 ? `${text.slice(0, 219)}…` : text || "—" }),
+        );
+        traceMessagesBody.appendChild(tr);
+      }
+    }
+
+    const traceAgentTurnsBody = $("#trace-agent-turns-table tbody");
+    traceAgentTurnsBody.replaceChildren();
+    if (agentTurns.length === 0) {
+      traceAgentTurnsBody.appendChild(renderEmptyRow(9, "No agent turns recorded for this trace."));
+    } else {
+      for (const row of agentTurns) {
+        const tr = el("tr", { class: row.status === "failure" ? "is-error" : "" });
+        tr.append(
+          el("td", { text: formatTimestamp(row.createdAt) }),
+          el("td", { class: "mono", text: row.conversationId || "—" }),
+          el("td", { class: "mono", text: row.turnId || "—" }),
+          el("td", { class: "mono", text: row.inputMode || "—" }),
+          el("td", { class: "mono", text: row.resultKind || "—" }),
+          el("td", { class: "numeric", text: formatNumber(row.toolCallCount) }),
+          el("td", { class: "numeric", text: formatNumber(row.totalTokens) }),
+          el("td", { class: "numeric", text: costAmount(row) }),
+          el("td", {}, statusTag(row.status)),
+        );
+        traceAgentTurnsBody.appendChild(tr);
+      }
+    }
+
+    const traceToolActionBody = $("#trace-tool-action-table tbody");
+    traceToolActionBody.replaceChildren();
+    const toolActionRows = [
+      ...agentToolCalls.map((row) => ({ kind: "tool", ...row })),
+      ...actionCalls.map((row) => ({ kind: "action", ...row })),
+    ].sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+    if (toolActionRows.length === 0) {
+      traceToolActionBody.appendChild(renderEmptyRow(7, "No tool or action calls recorded for this trace."));
+    } else {
+      for (const row of toolActionRows) {
+        const tr = el("tr", { class: row.error || row.status === "failed" ? "is-error" : "" });
+        tr.append(
+          el("td", { text: formatTimestamp(row.createdAt || row.startedAt) }),
+          el("td", { class: "mono", text: row.kind }),
+          el("td", { class: "mono", text: row.actionId || "—" }),
+          el("td", { class: "mono", text: row.turnId || "—" }),
+          el("td", {}, statusTag(row.status || row.confirmationStatus)),
+          el("td", { class: "numeric", text: formatDuration(row.durationMs ?? row.latencyMs) }),
+          el("td", { class: "wrap mono", text: jsonPreview(row.resultSummary ?? row.output ?? row.error ?? row.input ?? row.arguments) }),
+        );
+        traceToolActionBody.appendChild(tr);
+      }
+    }
+
+    renderTraceProviderCallsTable(providerCalls);
+    renderTraceTranscriptionsTable(transcriptions);
+
     const traceFoodBody = $("#trace-food-table tbody");
     traceFoodBody.replaceChildren();
     if (foodSearches.length === 0) {
@@ -855,6 +1272,13 @@
       llm_runs: pickNumber(data, ["llmRuns", "llm_runs", "llmRunCount", "llm_run_count", "totalLlmRuns"]),
       food_search: pickNumber(data, ["foodSearch", "food_search", "foodSearchCount", "food_search_count", "totalFoodSearchEvents"]),
       zero_results: pickNumber(data, ["zeroResults", "zero_results", "zeroResultCount", "zeroResultRate"]),
+      conversations: pickNumber(data, ["totalConversations", "conversations"]),
+      agent_turns: pickNumber(data, ["totalAgentTurns", "agentTurns"]),
+      provider_calls: pickNumber(data, ["totalProviderCalls", "providerCalls"]),
+      transcriptions: pickNumber(data, ["totalTranscriptions", "transcriptions"]),
+      provider_cost: pickNumber(data, ["providerCostAmount", "totalProviderCostAmount"]),
+      estimated_cost: pickNumber(data, ["estimatedCostAmount", "totalEstimatedCostAmount"]),
+      unknown_cost: pickNumber(data, ["unknownCostCount"]),
     };
 
     for (const [key, value] of Object.entries(cards)) {
@@ -862,9 +1286,13 @@
       if (!card) continue;
       card.classList.remove("is-loading", "is-error", "is-warning", "is-success");
       const valueEl = card.querySelector("[data-value]");
-      valueEl.textContent = formatNumber(value);
+      valueEl.textContent =
+        key === "provider_cost" || key === "estimated_cost"
+          ? formatMoney(value)
+          : formatNumber(value);
       if (key === "errors" && value > 0) card.classList.add("is-error");
       if (key === "warnings" && value > 0) card.classList.add("is-warning");
+      if (key === "unknown_cost" && value > 0) card.classList.add("is-warning");
       if (key === "llm_runs" || key === "food_search") {
         if (value > 0) card.classList.add("is-success");
       }
@@ -982,6 +1410,173 @@
     } catch (err) {
       if (err.code === "aborted") return;
       renderLlmTable([]);
+      setStatusError(err);
+    }
+  }
+
+  async function loadConversations(filters) {
+    if (!isSignedIn()) {
+      renderAuthUi();
+      setStatusLocked();
+      return;
+    }
+    setStatusLoading("Loading conversations…");
+    try {
+      const params = {
+        limit: filters.limit || DEFAULTS.conversationsLimit || 100,
+      };
+      if (filters.userId) params.userId = filters.userId;
+      if (filters.traceId) params.traceId = filters.traceId;
+      if (filters.turnId) params.turnId = filters.turnId;
+      if (filters.includeHidden) params.includeHidden = filters.includeHidden;
+      const data = await apiGet(ENDPOINTS.conversations || "/v1/admin/telemetry/conversations", { params });
+      const rows = extractList(data, ["conversations", "items", "data", "results"]);
+      renderConversationsTable(rows);
+      renderConversationDetail([]);
+      setStatusSuccess(`Loaded ${rows.length} conversation${rows.length === 1 ? "" : "s"}.`);
+    } catch (err) {
+      if (err.code === "aborted") return;
+      renderConversationsTable([]);
+      setStatusError(err);
+    }
+  }
+
+  async function loadConversationDetail(conversationId, includeHidden = true) {
+    if (!conversationId) return;
+    setStatusLoading(`Loading conversation ${conversationId}…`);
+    try {
+      const path = typeof ENDPOINTS.conversation === "function"
+        ? ENDPOINTS.conversation(conversationId, includeHidden)
+        : `/v1/admin/telemetry/conversations/${encodeURIComponent(conversationId)}?includeHidden=${includeHidden ? "true" : "false"}`;
+      const data = await apiGet(path);
+      const rows = extractList(data?.messages, ["messages", "items", "data"]);
+      renderConversationDetail(rows);
+      setStatusSuccess(`Loaded ${rows.length} conversation message${rows.length === 1 ? "" : "s"}.`);
+    } catch (err) {
+      if (err.code === "aborted") return;
+      renderConversationDetail([]);
+      setStatusError(err);
+    }
+  }
+
+  async function loadAgentTurns(filters) {
+    if (!isSignedIn()) {
+      renderAuthUi();
+      setStatusLocked();
+      return;
+    }
+    setStatusLoading("Loading agent turns…");
+    try {
+      const params = { limit: filters.limit || DEFAULTS.agentTurnsLimit || 100 };
+      if (filters.userId) params.userId = filters.userId;
+      if (filters.conversationId) params.conversationId = filters.conversationId;
+      if (filters.traceId) params.traceId = filters.traceId;
+      if (filters.turnId) params.turnId = filters.turnId;
+      const data = await apiGet(ENDPOINTS.agentTurns || "/v1/admin/telemetry/agent-turns", { params });
+      const rows = extractList(data, ["agentTurns", "items", "data", "results"]);
+      renderAgentTurnsTable(rows);
+      setStatusSuccess(`Loaded ${rows.length} agent turn${rows.length === 1 ? "" : "s"}.`);
+    } catch (err) {
+      if (err.code === "aborted") return;
+      renderAgentTurnsTable([]);
+      setStatusError(err);
+    }
+  }
+
+  async function loadActionCalls(filters) {
+    if (!isSignedIn()) {
+      renderAuthUi();
+      setStatusLocked();
+      return;
+    }
+    setStatusLoading("Loading action calls…");
+    try {
+      const params = { limit: filters.limit || DEFAULTS.actionCallsLimit || 100 };
+      if (filters.userId) params.userId = filters.userId;
+      if (filters.traceId) params.traceId = filters.traceId;
+      if (filters.actionId) params.actionId = filters.actionId;
+      const data = await apiGet(ENDPOINTS.actionCalls || "/v1/admin/telemetry/action-calls", { params });
+      const rows = extractList(data, ["actionCalls", "items", "data", "results"]);
+      renderActionCallsTable(rows);
+      setStatusSuccess(`Loaded ${rows.length} action call${rows.length === 1 ? "" : "s"}.`);
+    } catch (err) {
+      if (err.code === "aborted") return;
+      renderActionCallsTable([]);
+      setStatusError(err);
+    }
+  }
+
+  async function loadLlmCost(filters) {
+    if (!isSignedIn()) {
+      renderAuthUi();
+      setStatusLocked();
+      return;
+    }
+    setStatusLoading("Loading LLM cost…");
+    try {
+      const params = {};
+      const fromIso = toIsoOrNull(filters.from);
+      const toIso = toIsoOrNull(filters.to);
+      if (fromIso) params.from = fromIso;
+      if (toIso) params.to = toIso;
+      if (filters.userId) params.userId = filters.userId;
+      if (filters.conversationId) params.conversationId = filters.conversationId;
+      if (filters.traceId) params.traceId = filters.traceId;
+      const data = await apiGet(ENDPOINTS.llmCost || "/v1/admin/telemetry/llm-cost", { params });
+      renderLlmCostView(data);
+      setStatusSuccess("Loaded LLM cost breakdowns.");
+    } catch (err) {
+      if (err.code === "aborted") return;
+      renderLlmCostView(null);
+      setStatusError(err);
+    }
+  }
+
+  async function loadProviderCalls(filters) {
+    if (!isSignedIn()) {
+      renderAuthUi();
+      setStatusLocked();
+      return;
+    }
+    setStatusLoading("Loading provider calls…");
+    try {
+      const params = { limit: filters.limit || DEFAULTS.providerCallsLimit || 100 };
+      if (filters.userId) params.userId = filters.userId;
+      if (filters.conversationId) params.conversationId = filters.conversationId;
+      if (filters.traceId) params.traceId = filters.traceId;
+      if (filters.provider) params.provider = filters.provider;
+      if (filters.model) params.model = filters.model;
+      const data = await apiGet(ENDPOINTS.providerCalls || "/v1/admin/telemetry/llm-provider-calls", { params });
+      const rows = extractList(data, ["providerCalls", "items", "data", "results"]);
+      renderProviderCallsTable(rows);
+      setStatusSuccess(`Loaded ${rows.length} provider call${rows.length === 1 ? "" : "s"}.`);
+    } catch (err) {
+      if (err.code === "aborted") return;
+      renderProviderCallsTable([]);
+      setStatusError(err);
+    }
+  }
+
+  async function loadTranscriptions(filters) {
+    if (!isSignedIn()) {
+      renderAuthUi();
+      setStatusLocked();
+      return;
+    }
+    setStatusLoading("Loading transcriptions…");
+    try {
+      const params = { limit: filters.limit || DEFAULTS.transcriptionsLimit || 100 };
+      if (filters.userId) params.userId = filters.userId;
+      if (filters.conversationId) params.conversationId = filters.conversationId;
+      if (filters.traceId) params.traceId = filters.traceId;
+      if (filters.surface) params.surface = filters.surface;
+      const data = await apiGet(ENDPOINTS.transcriptions || "/v1/admin/telemetry/transcriptions", { params });
+      const rows = extractList(data, ["transcriptions", "items", "data", "results"]);
+      renderTranscriptionsTable(rows);
+      setStatusSuccess(`Loaded ${rows.length} transcription${rows.length === 1 ? "" : "s"}.`);
+    } catch (err) {
+      if (err.code === "aborted") return;
+      renderTranscriptionsTable([]);
       setStatusError(err);
     }
   }
@@ -1157,6 +1752,48 @@
       loadLlmRuns(filters);
     });
 
+    const conversationsForm = $("#conversations-filters");
+    conversationsForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const filters = readFilters(conversationsForm);
+      loadConversations(filters);
+    });
+
+    const agentTurnsForm = $("#agent-turns-filters");
+    agentTurnsForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const filters = readFilters(agentTurnsForm);
+      loadAgentTurns(filters);
+    });
+
+    const actionCallsForm = $("#action-calls-filters");
+    actionCallsForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const filters = readFilters(actionCallsForm);
+      loadActionCalls(filters);
+    });
+
+    const llmCostForm = $("#llm-cost-filters");
+    llmCostForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const filters = readFilters(llmCostForm);
+      loadLlmCost(filters);
+    });
+
+    const providerCallsForm = $("#provider-calls-filters");
+    providerCallsForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const filters = readFilters(providerCallsForm);
+      loadProviderCalls(filters);
+    });
+
+    const transcriptionsForm = $("#transcriptions-filters");
+    transcriptionsForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const filters = readFilters(transcriptionsForm);
+      loadTranscriptions(filters);
+    });
+
     const foodForm = $("#food-filters");
     foodForm.addEventListener("submit", (e) => {
       e.preventDefault();
@@ -1182,6 +1819,12 @@
         resetForm(form);
         if (form === eventsForm) loadEvents({});
         if (form === llmForm) loadLlmRuns({});
+        if (form === conversationsForm) loadConversations({});
+        if (form === agentTurnsForm) loadAgentTurns({});
+        if (form === actionCallsForm) loadActionCalls({});
+        if (form === llmCostForm) loadLlmCost({});
+        if (form === providerCallsForm) loadProviderCalls({});
+        if (form === transcriptionsForm) loadTranscriptions({});
         if (form === foodForm) loadFoodSearch({});
       });
     });
@@ -1212,8 +1855,13 @@
         "1": "view-overview",
         "2": "view-events",
         "3": "view-llm",
-        "4": "view-food",
-        "5": "view-trace",
+        "4": "view-conversations",
+        "5": "view-agent-turns",
+        "6": "view-action-calls",
+        "7": "view-llm-cost",
+        "8": "view-provider-calls",
+        "9": "view-transcriptions",
+        "0": "view-trace",
       };
       const view = shortcuts[e.key];
       if (view) {

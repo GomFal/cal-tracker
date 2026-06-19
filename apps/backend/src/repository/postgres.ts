@@ -25,6 +25,12 @@ import { subtractNutrition, sumNutrition } from "../utils/nutrition.js";
 import { lexicalFoodScore } from "./foodSearchScoring.js";
 import type {
   ActionCallRecord,
+  AdminActionCallFilter,
+  AdminConversationFilter,
+  AgentToolCallTelemetryFilter,
+  AgentToolCallTelemetryRecord,
+  AgentTurnTelemetryFilter,
+  AgentTurnTelemetryRecord,
   AgentConversationMessageRecord,
   AgentConversationRecord,
   AppRepository,
@@ -39,14 +45,20 @@ import type {
   FoodSearchCandidate,
   FoodSearchEventFilter,
   FoodSearchEventRecord,
+  LlmCostFilter,
+  LlmCostOverview,
   LlmRunFilter,
   LlmRunRecord,
+  LlmProviderCallFilter,
+  LlmProviderCallRecord,
   MemoryMatch,
   StoredSession,
   StoredUser,
   TelemetryEventFilter,
   TelemetryEventRecord,
   TelemetryOverview,
+  TranscriptionRecord,
+  TranscriptionRecordFilter,
   UpsertFoodItemEmbeddingInput,
   UpdateDailyGoalsInput,
   UserFoodPreference,
@@ -2076,6 +2088,72 @@ export class PostgresRepository implements AppRepository {
     return rows.map(mapAgentConversationMessage);
   }
 
+  async listAdminAgentConversations(
+    filter: AdminConversationFilter,
+  ): Promise<AgentConversationRecord[]> {
+    const limit = boundedLimit(filter.limit, 100);
+    const rows = await withSpan(
+      "PostgresRepository.listAdminAgentConversations",
+      {
+        limit,
+        userId: filter.userId,
+        traceId: filter.traceId,
+        turnId: filter.turnId,
+        includeHidden: filter.includeHidden,
+      },
+      () =>
+        this.execute(dbSql`
+          SELECT DISTINCT conversation.*
+          FROM agent_conversations conversation
+          LEFT JOIN agent_messages message
+            ON message.conversation_id = conversation.id
+          WHERE (${filter.includeHidden ?? false}::boolean OR conversation.hidden_from_user_at IS NULL)
+            AND (${filter.userId ?? null}::uuid IS NULL OR conversation.user_id = ${filter.userId ?? null})
+            AND (${filter.conversationId ?? null}::uuid IS NULL OR conversation.id = ${filter.conversationId ?? null})
+            AND (${filter.traceId ?? null}::text IS NULL OR message.trace_id = ${filter.traceId ?? null})
+            AND (${filter.turnId ?? null}::uuid IS NULL OR message.turn_id = ${filter.turnId ?? null})
+            AND (${filter.from ?? null}::timestamptz IS NULL OR conversation.updated_at >= ${filter.from ?? null})
+            AND (${filter.to ?? null}::timestamptz IS NULL OR conversation.updated_at <= ${filter.to ?? null})
+          ORDER BY conversation.updated_at DESC
+          LIMIT ${limit}
+        `),
+    );
+    return rows.map(mapAgentConversation);
+  }
+
+  async getAdminAgentConversationMessages(
+    conversationId: string,
+    includeHidden = false,
+  ): Promise<AgentConversationMessageRecord[]> {
+    const rows = await this.execute(dbSql`
+      SELECT message.*
+      FROM agent_messages message
+      JOIN agent_conversations conversation
+        ON conversation.id = message.conversation_id
+      WHERE message.conversation_id = ${conversationId}
+        AND (${includeHidden}::boolean OR conversation.hidden_from_user_at IS NULL)
+      ORDER BY message.created_at, message.id
+    `);
+    return rows.map(mapAgentConversationMessage);
+  }
+
+  async listAgentConversationMessagesByTrace(
+    traceId: string,
+    includeHidden = false,
+  ): Promise<AgentConversationMessageRecord[]> {
+    const rows = await this.execute(dbSql`
+      SELECT message.*
+      FROM agent_messages message
+      JOIN agent_conversations conversation
+        ON conversation.id = message.conversation_id
+      WHERE message.trace_id = ${traceId}
+        AND (${includeHidden}::boolean OR conversation.hidden_from_user_at IS NULL)
+      ORDER BY message.created_at, message.id
+      LIMIT 500
+    `);
+    return rows.map(mapAgentConversationMessage);
+  }
+
   async deleteAgentConversation(
     userId: string,
     conversationId: string,
@@ -2133,6 +2211,28 @@ export class PostgresRepository implements AppRepository {
   async listActionCalls(userId: string): Promise<ActionCallRecord[]> {
     const rows = await this.execute(
       dbSql`SELECT * FROM action_calls WHERE user_id = ${userId} ORDER BY created_at`,
+    );
+    return rows.map(mapActionCall);
+  }
+
+  async listAdminActionCalls(
+    filter: AdminActionCallFilter,
+  ): Promise<ActionCallRecord[]> {
+    const limit = boundedLimit(filter.limit, 100);
+    const rows = await withSpan(
+      "PostgresRepository.listAdminActionCalls",
+      { limit, userId: filter.userId, traceId: filter.traceId },
+      () =>
+        this.execute(dbSql`
+          SELECT * FROM action_calls
+          WHERE (${filter.userId ?? null}::uuid IS NULL OR user_id = ${filter.userId ?? null})
+            AND (${filter.traceId ?? null}::text IS NULL OR trace_id = ${filter.traceId ?? null})
+            AND (${filter.actionId ?? null}::text IS NULL OR action_id = ${filter.actionId ?? null})
+            AND (${filter.from ?? null}::timestamptz IS NULL OR created_at >= ${filter.from ?? null})
+            AND (${filter.to ?? null}::timestamptz IS NULL OR created_at <= ${filter.to ?? null})
+          ORDER BY created_at DESC
+          LIMIT ${limit}
+        `),
     );
     return rows.map(mapActionCall);
   }
@@ -2202,21 +2302,29 @@ export class PostgresRepository implements AppRepository {
         this.execute(dbSql`
           INSERT INTO llm_runs (
             trace_id, user_id, source, locale, timezone, model, input_mode,
+            conversation_id, turn_id, provider, provider_request_id,
+            provider_generation_id,
             active_proposal_id, decision_source, selected_tool, executed_tool, result_kind, action_call_id,
             prompt_chars, tools_json_chars, messages_json_chars, request_payload_chars,
             prompt_tokens, completion_tokens, total_tokens, reasoning_tokens,
             first_byte_ms, first_tool_call_ms, largest_stream_gap_ms,
             llm_ms, action_ms, total_ms,
-            empty_tool_call, invalid_tool_arguments, provider_error, metadata_json
+            empty_tool_call, invalid_tool_arguments, provider_error,
+            provider_cost_amount, estimated_cost_amount, cost_currency,
+            cost_source, pricing_snapshot_json, metadata_json
           )
           VALUES (
             ${input.traceId}, ${input.userId ?? null}, ${input.source ?? null}, ${input.locale ?? null}, ${input.timezone ?? null}, ${input.model}, ${input.inputMode ?? null},
+            ${input.conversationId ?? null}, ${input.turnId ?? null}, ${input.provider ?? null}, ${input.providerRequestId ?? null},
+            ${input.providerGenerationId ?? null},
             ${input.activeProposalId ?? null}, ${input.decisionSource ?? null}, ${input.selectedTool ?? null}, ${input.executedTool ?? null}, ${input.resultKind ?? null}, ${input.actionCallId ?? null},
             ${input.promptChars ?? null}, ${input.toolsJsonChars ?? null}, ${input.messagesJsonChars ?? null}, ${input.requestPayloadChars ?? null},
             ${input.promptTokens ?? null}, ${input.completionTokens ?? null}, ${input.totalTokens ?? null}, ${input.reasoningTokens ?? null},
             ${input.firstByteMs ?? null}, ${input.firstToolCallMs ?? null}, ${input.largestStreamGapMs ?? null},
             ${input.llmMs ?? null}, ${input.actionMs ?? null}, ${input.totalMs ?? null},
-            ${input.emptyToolCall}, ${input.invalidToolArguments}, ${input.providerError}, ${jsonb(input.metadata)}
+            ${input.emptyToolCall}, ${input.invalidToolArguments}, ${input.providerError},
+            ${input.providerCostAmount ?? null}, ${input.estimatedCostAmount ?? null}, ${input.costCurrency ?? null},
+            ${input.costSource ?? null}, ${jsonb(input.pricingSnapshot ?? {})}, ${jsonb(input.metadata)}
           )
           RETURNING *
         `),
@@ -2239,6 +2347,8 @@ export class PostgresRepository implements AppRepository {
             AND (${filter.executedTool ?? null}::text IS NULL OR executed_tool = ${filter.executedTool ?? null})
             AND (${filter.traceId ?? null}::text IS NULL OR trace_id = ${filter.traceId ?? null})
             AND (${filter.userId ?? null}::uuid IS NULL OR user_id = ${filter.userId ?? null})
+            AND (${filter.conversationId ?? null}::uuid IS NULL OR conversation_id = ${filter.conversationId ?? null})
+            AND (${filter.turnId ?? null}::uuid IS NULL OR turn_id = ${filter.turnId ?? null})
             AND (${filter.from ?? null}::timestamptz IS NULL OR created_at >= ${filter.from ?? null})
             AND (${filter.to ?? null}::timestamptz IS NULL OR created_at <= ${filter.to ?? null})
           ORDER BY created_at DESC
@@ -2246,6 +2356,245 @@ export class PostgresRepository implements AppRepository {
         `),
     );
     return rows.map(mapLlmRun);
+  }
+
+  async createAgentTurnTelemetry(
+    input: Omit<AgentTurnTelemetryRecord, "id" | "createdAt">,
+  ): Promise<AgentTurnTelemetryRecord> {
+    const [row] = await withSpan(
+      "PostgresRepository.createAgentTurnTelemetry",
+      { traceId: input.traceId, turnId: input.turnId },
+      () =>
+        this.execute(dbSql`
+          INSERT INTO agent_turn_telemetry (
+            conversation_id, trace_id, turn_id, user_id, input_mode, source,
+            active_proposal_id, model, input_text, assistant_text, result_kind,
+            stop_reason, iteration_count, tool_call_count, prompt_chars,
+            messages_json_chars, tools_json_chars, request_payload_chars,
+            prompt_tokens, completion_tokens, total_tokens, reasoning_tokens,
+            provider_cost_amount, estimated_cost_amount, cost_currency,
+            cost_source, pricing_snapshot_json, first_byte_ms,
+            first_tool_call_ms, largest_stream_gap_ms, llm_ms, action_ms,
+            total_ms, status, error_code, error_message, metadata_json,
+            completed_at
+          )
+          VALUES (
+            ${input.conversationId ?? null}, ${input.traceId}, ${input.turnId}, ${input.userId ?? null}, ${input.inputMode ?? null}, ${input.source ?? null},
+            ${input.activeProposalId ?? null}, ${input.model ?? null}, ${input.inputText ?? null}, ${input.assistantText ?? null}, ${input.resultKind ?? null},
+            ${input.stopReason ?? null}, ${input.iterationCount}, ${input.toolCallCount}, ${input.promptChars ?? null},
+            ${input.messagesJsonChars ?? null}, ${input.toolsJsonChars ?? null}, ${input.requestPayloadChars ?? null},
+            ${input.promptTokens ?? null}, ${input.completionTokens ?? null}, ${input.totalTokens ?? null}, ${input.reasoningTokens ?? null},
+            ${input.providerCostAmount ?? null}, ${input.estimatedCostAmount ?? null}, ${input.costCurrency ?? null},
+            ${input.costSource ?? null}, ${jsonb(input.pricingSnapshot)}, ${input.firstByteMs ?? null},
+            ${input.firstToolCallMs ?? null}, ${input.largestStreamGapMs ?? null}, ${input.llmMs ?? null}, ${input.actionMs ?? null},
+            ${input.totalMs ?? null}, ${input.status}, ${input.errorCode ?? null}, ${input.errorMessage ?? null}, ${jsonb(input.metadata)},
+            ${input.completedAt ?? null}
+          )
+          ON CONFLICT (turn_id) DO UPDATE SET
+            assistant_text = EXCLUDED.assistant_text,
+            result_kind = EXCLUDED.result_kind,
+            stop_reason = EXCLUDED.stop_reason,
+            iteration_count = EXCLUDED.iteration_count,
+            tool_call_count = EXCLUDED.tool_call_count,
+            prompt_tokens = EXCLUDED.prompt_tokens,
+            completion_tokens = EXCLUDED.completion_tokens,
+            total_tokens = EXCLUDED.total_tokens,
+            reasoning_tokens = EXCLUDED.reasoning_tokens,
+            provider_cost_amount = EXCLUDED.provider_cost_amount,
+            estimated_cost_amount = EXCLUDED.estimated_cost_amount,
+            cost_currency = EXCLUDED.cost_currency,
+            cost_source = EXCLUDED.cost_source,
+            pricing_snapshot_json = EXCLUDED.pricing_snapshot_json,
+            first_byte_ms = EXCLUDED.first_byte_ms,
+            first_tool_call_ms = EXCLUDED.first_tool_call_ms,
+            largest_stream_gap_ms = EXCLUDED.largest_stream_gap_ms,
+            llm_ms = EXCLUDED.llm_ms,
+            action_ms = EXCLUDED.action_ms,
+            total_ms = EXCLUDED.total_ms,
+            status = EXCLUDED.status,
+            error_code = EXCLUDED.error_code,
+            error_message = EXCLUDED.error_message,
+            metadata_json = EXCLUDED.metadata_json,
+            completed_at = EXCLUDED.completed_at
+          RETURNING *
+        `),
+    );
+    return mapAgentTurnTelemetry(row);
+  }
+
+  async listAgentTurnTelemetry(
+    filter: AgentTurnTelemetryFilter,
+  ): Promise<AgentTurnTelemetryRecord[]> {
+    const limit = boundedLimit(filter.limit, 100);
+    const rows = await this.execute(dbSql`
+      SELECT * FROM agent_turn_telemetry
+      WHERE (${filter.userId ?? null}::uuid IS NULL OR user_id = ${filter.userId ?? null})
+        AND (${filter.conversationId ?? null}::uuid IS NULL OR conversation_id = ${filter.conversationId ?? null})
+        AND (${filter.traceId ?? null}::text IS NULL OR trace_id = ${filter.traceId ?? null})
+        AND (${filter.turnId ?? null}::uuid IS NULL OR turn_id = ${filter.turnId ?? null})
+        AND (${filter.inputMode ?? null}::text IS NULL OR input_mode = ${filter.inputMode ?? null})
+        AND (${filter.status ?? null}::text IS NULL OR status = ${filter.status ?? null})
+        AND (${filter.from ?? null}::timestamptz IS NULL OR created_at >= ${filter.from ?? null})
+        AND (${filter.to ?? null}::timestamptz IS NULL OR created_at <= ${filter.to ?? null})
+      ORDER BY created_at DESC
+      LIMIT ${limit}
+    `);
+    return rows.map(mapAgentTurnTelemetry);
+  }
+
+  async createAgentToolCallTelemetry(
+    input: Omit<AgentToolCallTelemetryRecord, "id" | "createdAt">,
+  ): Promise<AgentToolCallTelemetryRecord> {
+    const [row] = await this.execute(dbSql`
+      INSERT INTO agent_tool_call_telemetry (
+        agent_turn_id, conversation_id, trace_id, turn_id, user_id,
+        tool_call_id, action_call_id, action_id, arguments_json,
+        result_summary_json, status, error_message, started_at, completed_at,
+        duration_ms, metadata_json
+      )
+      VALUES (
+        ${input.agentTurnId ?? null}, ${input.conversationId ?? null}, ${input.traceId}, ${input.turnId ?? null}, ${input.userId ?? null},
+        ${input.toolCallId ?? null}, ${input.actionCallId ?? null}, ${input.actionId}, ${jsonb(input.arguments ?? null)},
+        ${jsonb(input.resultSummary ?? null)}, ${input.status}, ${input.errorMessage ?? null}, ${input.startedAt}, ${input.completedAt ?? null},
+        ${input.durationMs ?? null}, ${jsonb(input.metadata)}
+      )
+      RETURNING *
+    `);
+    return mapAgentToolCallTelemetry(row);
+  }
+
+  async listAgentToolCallTelemetry(
+    filter: AgentToolCallTelemetryFilter,
+  ): Promise<AgentToolCallTelemetryRecord[]> {
+    const limit = boundedLimit(filter.limit, 100);
+    const rows = await this.execute(dbSql`
+      SELECT * FROM agent_tool_call_telemetry
+      WHERE (${filter.userId ?? null}::uuid IS NULL OR user_id = ${filter.userId ?? null})
+        AND (${filter.conversationId ?? null}::uuid IS NULL OR conversation_id = ${filter.conversationId ?? null})
+        AND (${filter.traceId ?? null}::text IS NULL OR trace_id = ${filter.traceId ?? null})
+        AND (${filter.turnId ?? null}::uuid IS NULL OR turn_id = ${filter.turnId ?? null})
+        AND (${filter.actionId ?? null}::text IS NULL OR action_id = ${filter.actionId ?? null})
+        AND (${filter.status ?? null}::text IS NULL OR status = ${filter.status ?? null})
+        AND (${filter.from ?? null}::timestamptz IS NULL OR created_at >= ${filter.from ?? null})
+        AND (${filter.to ?? null}::timestamptz IS NULL OR created_at <= ${filter.to ?? null})
+      ORDER BY created_at DESC
+      LIMIT ${limit}
+    `);
+    return rows.map(mapAgentToolCallTelemetry);
+  }
+
+  async createLlmProviderCall(
+    input: Omit<LlmProviderCallRecord, "id" | "createdAt">,
+  ): Promise<LlmProviderCallRecord> {
+    const [row] = await this.execute(dbSql`
+      INSERT INTO llm_provider_calls (
+        trace_id, user_id, conversation_id, agent_turn_id, turn_id,
+        action_call_id, feature_surface, provider, provider_request_id,
+        provider_generation_id, requested_model, served_model, routing_json,
+        input_mode, prompt_tokens, completion_tokens, total_tokens,
+        reasoning_tokens, cached_input_tokens, audio_tokens, image_tokens,
+        provider_cost_amount, estimated_cost_amount, cost_currency,
+        cost_source, input_token_unit_price, output_token_unit_price,
+        reasoning_token_unit_price, cached_input_token_unit_price,
+        audio_token_unit_price, image_token_unit_price, pricing_source,
+        pricing_version, pricing_effective_at, status, error_code,
+        error_message, duration_ms, metadata_json
+      )
+      VALUES (
+        ${input.traceId}, ${input.userId ?? null}, ${input.conversationId ?? null}, ${input.agentTurnId ?? null}, ${input.turnId ?? null},
+        ${input.actionCallId ?? null}, ${input.featureSurface}, ${input.provider}, ${input.providerRequestId ?? null},
+        ${input.providerGenerationId ?? null}, ${input.requestedModel}, ${input.servedModel ?? null}, ${jsonb(input.routing ?? null)},
+        ${input.inputMode ?? null}, ${input.promptTokens ?? null}, ${input.completionTokens ?? null}, ${input.totalTokens ?? null},
+        ${input.reasoningTokens ?? null}, ${input.cachedInputTokens ?? null}, ${input.audioTokens ?? null}, ${input.imageTokens ?? null},
+        ${input.providerCostAmount ?? null}, ${input.estimatedCostAmount ?? null}, ${input.costCurrency ?? null},
+        ${input.costSource}, ${input.inputTokenUnitPrice ?? null}, ${input.outputTokenUnitPrice ?? null},
+        ${input.reasoningTokenUnitPrice ?? null}, ${input.cachedInputTokenUnitPrice ?? null},
+        ${input.audioTokenUnitPrice ?? null}, ${input.imageTokenUnitPrice ?? null}, ${input.pricingSource ?? null},
+        ${input.pricingVersion ?? null}, ${input.pricingEffectiveAt ?? null}, ${input.status}, ${input.errorCode ?? null},
+        ${input.errorMessage ?? null}, ${input.durationMs ?? null}, ${jsonb(input.metadata)}
+      )
+      RETURNING *
+    `);
+    return mapLlmProviderCall(row);
+  }
+
+  async listLlmProviderCalls(
+    filter: LlmProviderCallFilter,
+  ): Promise<LlmProviderCallRecord[]> {
+    const limit = boundedLimit(filter.limit, 100);
+    const rows = await this.execute(dbSql`
+      SELECT * FROM llm_provider_calls
+      WHERE (${filter.userId ?? null}::uuid IS NULL OR user_id = ${filter.userId ?? null})
+        AND (${filter.conversationId ?? null}::uuid IS NULL OR conversation_id = ${filter.conversationId ?? null})
+        AND (${filter.traceId ?? null}::text IS NULL OR trace_id = ${filter.traceId ?? null})
+        AND (${filter.turnId ?? null}::uuid IS NULL OR turn_id = ${filter.turnId ?? null})
+        AND (${filter.provider ?? null}::text IS NULL OR provider = ${filter.provider ?? null})
+        AND (${filter.model ?? null}::text IS NULL OR requested_model = ${filter.model ?? null})
+        AND (${filter.status ?? null}::text IS NULL OR status = ${filter.status ?? null})
+        AND (${filter.costSource ?? null}::text IS NULL OR cost_source = ${filter.costSource ?? null})
+        AND (${filter.from ?? null}::timestamptz IS NULL OR created_at >= ${filter.from ?? null})
+        AND (${filter.to ?? null}::timestamptz IS NULL OR created_at <= ${filter.to ?? null})
+      ORDER BY created_at DESC
+      LIMIT ${limit}
+    `);
+    return rows.map(mapLlmProviderCall);
+  }
+
+  async createTranscriptionRecord(
+    input: Omit<TranscriptionRecord, "id" | "createdAt">,
+  ): Promise<TranscriptionRecord> {
+    const [row] = await this.execute(dbSql`
+      INSERT INTO transcription_records (
+        trace_id, user_id, conversation_id, turn_id, surface, provider, model,
+        language, audio_mime_type, audio_bytes, audio_duration_ms,
+        transcript_text, transcript_length, duration_ms, status, error_code,
+        error_message, downstream_result_kind, metadata_json
+      )
+      VALUES (
+        ${input.traceId}, ${input.userId ?? null}, ${input.conversationId ?? null}, ${input.turnId ?? null}, ${input.surface}, ${input.provider ?? null}, ${input.model ?? null},
+        ${input.language ?? null}, ${input.audioMimeType ?? null}, ${input.audioBytes ?? null}, ${input.audioDurationMs ?? null},
+        ${input.transcriptText ?? null}, ${input.transcriptLength}, ${input.durationMs ?? null}, ${input.status}, ${input.errorCode ?? null},
+        ${input.errorMessage ?? null}, ${input.downstreamResultKind ?? null}, ${jsonb(input.metadata)}
+      )
+      RETURNING *
+    `);
+    return mapTranscriptionRecord(row);
+  }
+
+  async listTranscriptionRecords(
+    filter: TranscriptionRecordFilter,
+  ): Promise<TranscriptionRecord[]> {
+    const limit = boundedLimit(filter.limit, 100);
+    const rows = await this.execute(dbSql`
+      SELECT * FROM transcription_records
+      WHERE (${filter.userId ?? null}::uuid IS NULL OR user_id = ${filter.userId ?? null})
+        AND (${filter.conversationId ?? null}::uuid IS NULL OR conversation_id = ${filter.conversationId ?? null})
+        AND (${filter.traceId ?? null}::text IS NULL OR trace_id = ${filter.traceId ?? null})
+        AND (${filter.turnId ?? null}::uuid IS NULL OR turn_id = ${filter.turnId ?? null})
+        AND (${filter.surface ?? null}::text IS NULL OR surface = ${filter.surface ?? null})
+        AND (${filter.status ?? null}::text IS NULL OR status = ${filter.status ?? null})
+        AND (${filter.from ?? null}::timestamptz IS NULL OR created_at >= ${filter.from ?? null})
+        AND (${filter.to ?? null}::timestamptz IS NULL OR created_at <= ${filter.to ?? null})
+      ORDER BY created_at DESC
+      LIMIT ${limit}
+    `);
+    return rows.map(mapTranscriptionRecord);
+  }
+
+  async getLlmCostOverview(filter: LlmCostFilter): Promise<LlmCostOverview> {
+    const rows = await this.execute(dbSql`
+      SELECT * FROM llm_provider_calls
+      WHERE created_at >= ${filter.from}::timestamptz
+        AND created_at <= ${filter.to}::timestamptz
+        AND (${filter.userId ?? null}::uuid IS NULL OR user_id = ${filter.userId ?? null})
+        AND (${filter.conversationId ?? null}::uuid IS NULL OR conversation_id = ${filter.conversationId ?? null})
+        AND (${filter.traceId ?? null}::text IS NULL OR trace_id = ${filter.traceId ?? null})
+    `);
+    return buildPostgresCostOverview(
+      filter.from,
+      filter.to,
+      rows.map(mapLlmProviderCall),
+    );
   }
 
   async createFoodSearchEvent(
@@ -2316,17 +2665,46 @@ export class PostgresRepository implements AppRepository {
             SELECT * FROM food_search_events
             WHERE created_at >= ${input.from}::timestamptz AND created_at <= ${input.to}::timestamptz
           ),
+          conversations_in_range AS (
+            SELECT * FROM agent_conversations
+            WHERE updated_at >= ${input.from}::timestamptz AND updated_at <= ${input.to}::timestamptz
+          ),
+          turns_in_range AS (
+            SELECT * FROM agent_turn_telemetry
+            WHERE created_at >= ${input.from}::timestamptz AND created_at <= ${input.to}::timestamptz
+          ),
+          provider_calls_in_range AS (
+            SELECT * FROM llm_provider_calls
+            WHERE created_at >= ${input.from}::timestamptz AND created_at <= ${input.to}::timestamptz
+          ),
+          transcriptions_in_range AS (
+            SELECT * FROM transcription_records
+            WHERE created_at >= ${input.from}::timestamptz AND created_at <= ${input.to}::timestamptz
+          ),
           trace_ids_in_range AS (
             SELECT trace_id FROM events_in_range
             UNION
             SELECT trace_id FROM llm_in_range
             UNION
             SELECT trace_id FROM food_in_range
+            UNION
+            SELECT trace_id FROM turns_in_range
+            UNION
+            SELECT trace_id FROM provider_calls_in_range
+            UNION
+            SELECT trace_id FROM transcriptions_in_range
           )
           SELECT
             (SELECT COUNT(*)::int FROM events_in_range) AS total_events,
             (SELECT COUNT(*)::int FROM llm_in_range) AS total_llm_runs,
             (SELECT COUNT(*)::int FROM food_in_range) AS total_food_search_events,
+            (SELECT COUNT(*)::int FROM conversations_in_range) AS total_conversations,
+            (SELECT COUNT(*)::int FROM turns_in_range) AS total_agent_turns,
+            (SELECT COUNT(*)::int FROM provider_calls_in_range) AS total_provider_calls,
+            (SELECT COUNT(*)::int FROM transcriptions_in_range) AS total_transcriptions,
+            (SELECT COALESCE(SUM(provider_cost_amount), 0)::numeric FROM provider_calls_in_range) AS provider_cost_amount,
+            (SELECT COALESCE(SUM(estimated_cost_amount), 0)::numeric FROM provider_calls_in_range) AS estimated_cost_amount,
+            (SELECT COUNT(*)::int FROM provider_calls_in_range WHERE cost_source = 'unknown') AS unknown_cost_count,
             (SELECT COUNT(*)::int FROM trace_ids_in_range) AS unique_traces,
             (SELECT COALESCE(SUM(CASE WHEN zero_results THEN 1 ELSE 0 END), 0)::int FROM food_in_range) AS zero_results_count,
             (SELECT COALESCE(SUM(CASE WHEN low_confidence THEN 1 ELSE 0 END), 0)::int FROM food_in_range) AS low_confidence_count,
@@ -2337,6 +2715,13 @@ export class PostgresRepository implements AppRepository {
     const totalEvents = Number(overview.total_events ?? 0);
     const totalLlmRuns = Number(overview.total_llm_runs ?? 0);
     const totalFoodSearchEvents = Number(overview.total_food_search_events ?? 0);
+    const totalConversations = Number(overview.total_conversations ?? 0);
+    const totalAgentTurns = Number(overview.total_agent_turns ?? 0);
+    const totalProviderCalls = Number(overview.total_provider_calls ?? 0);
+    const totalTranscriptions = Number(overview.total_transcriptions ?? 0);
+    const providerCostAmount = Number(overview.provider_cost_amount ?? 0);
+    const estimatedCostAmount = Number(overview.estimated_cost_amount ?? 0);
+    const unknownCostCount = Number(overview.unknown_cost_count ?? 0);
     const zeroResultsCount = Number(overview.zero_results_count ?? 0);
     const lowConfidenceCount = Number(overview.low_confidence_count ?? 0);
     const providerErrorCount = Number(overview.provider_error_count ?? 0);
@@ -2349,6 +2734,15 @@ export class PostgresRepository implements AppRepository {
         WHERE created_at >= ${input.from}::timestamptz AND created_at <= ${input.to}::timestamptz AND user_id IS NOT NULL
         UNION
         SELECT user_id FROM food_search_events
+        WHERE created_at >= ${input.from}::timestamptz AND created_at <= ${input.to}::timestamptz AND user_id IS NOT NULL
+        UNION
+        SELECT user_id FROM agent_turn_telemetry
+        WHERE created_at >= ${input.from}::timestamptz AND created_at <= ${input.to}::timestamptz AND user_id IS NOT NULL
+        UNION
+        SELECT user_id FROM llm_provider_calls
+        WHERE created_at >= ${input.from}::timestamptz AND created_at <= ${input.to}::timestamptz AND user_id IS NOT NULL
+        UNION
+        SELECT user_id FROM transcription_records
         WHERE created_at >= ${input.from}::timestamptz AND created_at <= ${input.to}::timestamptz AND user_id IS NOT NULL
       `,
     );
@@ -2380,6 +2774,13 @@ export class PostgresRepository implements AppRepository {
       totalEvents,
       totalLlmRuns,
       totalFoodSearchEvents,
+      totalConversations,
+      totalAgentTurns,
+      totalProviderCalls,
+      totalTranscriptions,
+      providerCostAmount,
+      estimatedCostAmount,
+      unknownCostCount,
       uniqueUsers,
       uniqueTraces: Number(overview.unique_traces ?? 0),
       eventsBySeverity,
@@ -3079,6 +3480,11 @@ function mapLlmRun(row: Record<string, unknown>): LlmRunRecord {
     source: row.source as string | undefined,
     locale: row.locale as string | undefined,
     timezone: row.timezone as string | undefined,
+    conversationId: row.conversation_id as string | undefined,
+    turnId: row.turn_id as string | undefined,
+    provider: row.provider as string | undefined,
+    providerRequestId: row.provider_request_id as string | undefined,
+    providerGenerationId: row.provider_generation_id as string | undefined,
     model: row.model as string,
     inputMode: row.input_mode as string | undefined,
     activeProposalId: row.active_proposal_id as string | undefined,
@@ -3104,6 +3510,166 @@ function mapLlmRun(row: Record<string, unknown>): LlmRunRecord {
     emptyToolCall: Boolean(row.empty_tool_call),
     invalidToolArguments: Boolean(row.invalid_tool_arguments),
     providerError: Boolean(row.provider_error),
+    providerCostAmount: optionalNumber(row.provider_cost_amount),
+    estimatedCostAmount: optionalNumber(row.estimated_cost_amount),
+    costCurrency: row.cost_currency as string | undefined,
+    costSource: row.cost_source as string | undefined,
+    pricingSnapshot: isRecord(row.pricing_snapshot_json)
+      ? row.pricing_snapshot_json
+      : {},
+    metadata: isRecord(row.metadata_json) ? row.metadata_json : {},
+    createdAt: toIso(row.created_at),
+  };
+}
+
+function mapAgentTurnTelemetry(
+  row: Record<string, unknown>,
+): AgentTurnTelemetryRecord {
+  return {
+    id: row.id as string,
+    conversationId: optionalString(row.conversation_id),
+    traceId: row.trace_id as string,
+    turnId: row.turn_id as string,
+    userId: optionalString(row.user_id),
+    inputMode: optionalString(row.input_mode),
+    source: optionalString(row.source),
+    activeProposalId: optionalString(row.active_proposal_id),
+    model: optionalString(row.model),
+    inputText: optionalString(row.input_text),
+    assistantText: optionalString(row.assistant_text),
+    resultKind: optionalString(row.result_kind),
+    stopReason: optionalString(row.stop_reason),
+    iterationCount: Number(row.iteration_count ?? 0),
+    toolCallCount: Number(row.tool_call_count ?? 0),
+    promptChars: optionalNumber(row.prompt_chars),
+    messagesJsonChars: optionalNumber(row.messages_json_chars),
+    toolsJsonChars: optionalNumber(row.tools_json_chars),
+    requestPayloadChars: optionalNumber(row.request_payload_chars),
+    promptTokens: optionalNumber(row.prompt_tokens),
+    completionTokens: optionalNumber(row.completion_tokens),
+    totalTokens: optionalNumber(row.total_tokens),
+    reasoningTokens: optionalNumber(row.reasoning_tokens),
+    providerCostAmount: optionalNumber(row.provider_cost_amount),
+    estimatedCostAmount: optionalNumber(row.estimated_cost_amount),
+    costCurrency: optionalString(row.cost_currency),
+    costSource: optionalString(row.cost_source),
+    pricingSnapshot: isRecord(row.pricing_snapshot_json)
+      ? row.pricing_snapshot_json
+      : {},
+    firstByteMs: optionalNumber(row.first_byte_ms),
+    firstToolCallMs: optionalNumber(row.first_tool_call_ms),
+    largestStreamGapMs: optionalNumber(row.largest_stream_gap_ms),
+    llmMs: optionalNumber(row.llm_ms),
+    actionMs: optionalNumber(row.action_ms),
+    totalMs: optionalNumber(row.total_ms),
+    status: row.status as string,
+    errorCode: optionalString(row.error_code),
+    errorMessage: optionalString(row.error_message),
+    metadata: isRecord(row.metadata_json) ? row.metadata_json : {},
+    completedAt:
+      row.completed_at == null ? undefined : toIso(row.completed_at),
+    createdAt: toIso(row.created_at),
+  };
+}
+
+function mapAgentToolCallTelemetry(
+  row: Record<string, unknown>,
+): AgentToolCallTelemetryRecord {
+  return {
+    id: row.id as string,
+    agentTurnId: optionalString(row.agent_turn_id),
+    conversationId: optionalString(row.conversation_id),
+    traceId: row.trace_id as string,
+    turnId: optionalString(row.turn_id),
+    userId: optionalString(row.user_id),
+    toolCallId: optionalString(row.tool_call_id),
+    actionCallId: optionalString(row.action_call_id),
+    actionId: row.action_id as string,
+    arguments: row.arguments_json ?? undefined,
+    resultSummary: row.result_summary_json ?? undefined,
+    status: row.status as string,
+    errorMessage: optionalString(row.error_message),
+    startedAt: toIso(row.started_at),
+    completedAt:
+      row.completed_at == null ? undefined : toIso(row.completed_at),
+    durationMs: optionalNumber(row.duration_ms),
+    metadata: isRecord(row.metadata_json) ? row.metadata_json : {},
+    createdAt: toIso(row.created_at),
+  };
+}
+
+function mapLlmProviderCall(row: Record<string, unknown>): LlmProviderCallRecord {
+  return {
+    id: row.id as string,
+    traceId: row.trace_id as string,
+    userId: optionalString(row.user_id),
+    conversationId: optionalString(row.conversation_id),
+    agentTurnId: optionalString(row.agent_turn_id),
+    turnId: optionalString(row.turn_id),
+    actionCallId: optionalString(row.action_call_id),
+    featureSurface: row.feature_surface as string,
+    provider: row.provider as string,
+    providerRequestId: optionalString(row.provider_request_id),
+    providerGenerationId: optionalString(row.provider_generation_id),
+    requestedModel: row.requested_model as string,
+    servedModel: optionalString(row.served_model),
+    routing: row.routing_json ?? undefined,
+    inputMode: optionalString(row.input_mode),
+    promptTokens: optionalNumber(row.prompt_tokens),
+    completionTokens: optionalNumber(row.completion_tokens),
+    totalTokens: optionalNumber(row.total_tokens),
+    reasoningTokens: optionalNumber(row.reasoning_tokens),
+    cachedInputTokens: optionalNumber(row.cached_input_tokens),
+    audioTokens: optionalNumber(row.audio_tokens),
+    imageTokens: optionalNumber(row.image_tokens),
+    providerCostAmount: optionalNumber(row.provider_cost_amount),
+    estimatedCostAmount: optionalNumber(row.estimated_cost_amount),
+    costCurrency: optionalString(row.cost_currency),
+    costSource: row.cost_source as string,
+    inputTokenUnitPrice: optionalNumber(row.input_token_unit_price),
+    outputTokenUnitPrice: optionalNumber(row.output_token_unit_price),
+    reasoningTokenUnitPrice: optionalNumber(row.reasoning_token_unit_price),
+    cachedInputTokenUnitPrice: optionalNumber(
+      row.cached_input_token_unit_price,
+    ),
+    audioTokenUnitPrice: optionalNumber(row.audio_token_unit_price),
+    imageTokenUnitPrice: optionalNumber(row.image_token_unit_price),
+    pricingSource: optionalString(row.pricing_source),
+    pricingVersion: optionalString(row.pricing_version),
+    pricingEffectiveAt:
+      row.pricing_effective_at == null
+        ? undefined
+        : toIso(row.pricing_effective_at),
+    status: row.status as string,
+    errorCode: optionalString(row.error_code),
+    errorMessage: optionalString(row.error_message),
+    durationMs: optionalNumber(row.duration_ms),
+    metadata: isRecord(row.metadata_json) ? row.metadata_json : {},
+    createdAt: toIso(row.created_at),
+  };
+}
+
+function mapTranscriptionRecord(row: Record<string, unknown>): TranscriptionRecord {
+  return {
+    id: row.id as string,
+    traceId: row.trace_id as string,
+    userId: optionalString(row.user_id),
+    conversationId: optionalString(row.conversation_id),
+    turnId: optionalString(row.turn_id),
+    surface: row.surface as string,
+    provider: optionalString(row.provider),
+    model: optionalString(row.model),
+    language: optionalString(row.language),
+    audioMimeType: optionalString(row.audio_mime_type),
+    audioBytes: optionalNumber(row.audio_bytes),
+    audioDurationMs: optionalNumber(row.audio_duration_ms),
+    transcriptText: optionalString(row.transcript_text),
+    transcriptLength: Number(row.transcript_length ?? 0),
+    durationMs: optionalNumber(row.duration_ms),
+    status: row.status as string,
+    errorCode: optionalString(row.error_code),
+    errorMessage: optionalString(row.error_message),
+    downstreamResultKind: optionalString(row.downstream_result_kind),
     metadata: isRecord(row.metadata_json) ? row.metadata_json : {},
     createdAt: toIso(row.created_at),
   };
@@ -3154,6 +3720,82 @@ function optionalString(value: unknown): string | undefined {
 
 function optionalNumber(value: unknown): number | undefined {
   return value == null ? undefined : Number(value);
+}
+
+function boundedLimit(limit: number | undefined, defaultLimit: number): number {
+  return Math.max(1, Math.min(500, Math.floor(limit ?? defaultLimit)));
+}
+
+function buildPostgresCostOverview(
+  from: string,
+  to: string,
+  calls: LlmProviderCallRecord[],
+): LlmCostOverview {
+  const providerCost = sumOptionalNumber(
+    calls.map((call) => call.providerCostAmount),
+  );
+  const estimatedCost = sumOptionalNumber(
+    calls.map((call) => call.estimatedCostAmount),
+  );
+  return {
+    from,
+    to,
+    totalProviderCostAmount: providerCost,
+    totalEstimatedCostAmount: estimatedCost,
+    totalCostAmount: providerCost + estimatedCost,
+    unknownCostCount: calls.filter((call) => call.costSource === "unknown")
+      .length,
+    totalPromptTokens: sumOptionalNumber(calls.map((call) => call.promptTokens)),
+    totalCompletionTokens: sumOptionalNumber(
+      calls.map((call) => call.completionTokens),
+    ),
+    totalTokens: sumOptionalNumber(calls.map((call) => call.totalTokens)),
+    byUser: costBreakdown(calls, (call) => call.userId ?? "unknown"),
+    byConversation: costBreakdown(
+      calls,
+      (call) => call.conversationId ?? "unknown",
+    ),
+    byTurn: costBreakdown(calls, (call) => call.turnId ?? "unknown"),
+    byModel: costBreakdown(calls, (call) => call.requestedModel),
+    byProvider: costBreakdown(calls, (call) => call.provider),
+    byFeature: costBreakdown(calls, (call) => call.featureSurface),
+    byDay: costBreakdown(calls, (call) => call.createdAt.slice(0, 10)),
+  };
+}
+
+function costBreakdown(
+  calls: LlmProviderCallRecord[],
+  keyFor: (call: LlmProviderCallRecord) => string,
+): LlmCostOverview["byUser"] {
+  const grouped = new Map<string, LlmProviderCallRecord[]>();
+  for (const call of calls) {
+    const key = keyFor(call);
+    grouped.set(key, [...(grouped.get(key) ?? []), call]);
+  }
+  return [...grouped.entries()]
+    .map(([key, group]) => {
+      const providerCostAmount = sumOptionalNumber(
+        group.map((call) => call.providerCostAmount),
+      );
+      const estimatedCostAmount = sumOptionalNumber(
+        group.map((call) => call.estimatedCostAmount),
+      );
+      return {
+        key,
+        providerCostAmount,
+        estimatedCostAmount,
+        totalCostAmount: providerCostAmount + estimatedCostAmount,
+        unknownCostCount: group.filter((call) => call.costSource === "unknown")
+          .length,
+        totalTokens: sumOptionalNumber(group.map((call) => call.totalTokens)),
+        callCount: group.length,
+      };
+    })
+    .sort((a, b) => b.totalCostAmount - a.totalCostAmount);
+}
+
+function sumOptionalNumber(values: Array<number | undefined>): number {
+  return values.reduce<number>((sum, value) => sum + (value ?? 0), 0);
 }
 
 function arrayOfStrings(value: unknown): string[] {

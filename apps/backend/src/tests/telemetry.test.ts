@@ -8,8 +8,12 @@ import {
   type FoodSearchTelemetryEvent,
   type FoodResolverTelemetryEvent,
   type LlmTelemetryEvent,
+  type AgentToolCallTelemetryEvent,
+  type AgentTurnTelemetryEvent,
+  type LlmProviderCallTelemetryEvent,
   type SttTelemetryEvent,
   type TelemetryService,
+  type TranscriptionTelemetryRecordEvent,
   type VoiceMealRunTelemetryEvent,
 } from "../telemetry/telemetryService.js";
 import {
@@ -31,11 +35,19 @@ class RecordingTelemetryService implements TelemetryService {
   voice: VoiceMealRunTelemetryEvent[] = [];
   foodSearch: FoodSearchTelemetryEvent[] = [];
   foodResolver: FoodResolverTelemetryEvent[] = [];
+  agentTurns: AgentTurnTelemetryEvent[] = [];
+  agentToolCalls: AgentToolCallTelemetryEvent[] = [];
+  providerCalls: LlmProviderCallTelemetryEvent[] = [];
+  transcriptions: TranscriptionTelemetryRecordEvent[] = [];
   async recordLlmRun(event: LlmTelemetryEvent) { this.llm.push(event); }
   async recordSttEvent(event: SttTelemetryEvent) { this.stt.push(event); }
   async recordVoiceMealRunEvent(event: VoiceMealRunTelemetryEvent) { this.voice.push(event); }
   async recordFoodSearchEvent(event: FoodSearchTelemetryEvent) { this.foodSearch.push(event); }
   async recordFoodResolverEvent(event: FoodResolverTelemetryEvent) { this.foodResolver.push(event); }
+  async recordAgentTurn(event: AgentTurnTelemetryEvent) { this.agentTurns.push(event); }
+  async recordAgentToolCall(event: AgentToolCallTelemetryEvent) { this.agentToolCalls.push(event); }
+  async recordLlmProviderCall(event: LlmProviderCallTelemetryEvent) { this.providerCalls.push(event); }
+  async recordTranscriptionRecord(event: TranscriptionTelemetryRecordEvent) { this.transcriptions.push(event); }
 }
 
 class HangingFoodSearchTelemetryService extends RecordingTelemetryService {
@@ -284,6 +296,10 @@ describe("FoodResolver telemetry", () => {
       async recordVoiceMealRunEvent() { throw new Error("sink-failure"); },
       async recordFoodSearchEvent() { throw new Error("sink-failure"); },
       async recordFoodResolverEvent() { throw new Error("sink-failure"); },
+      async recordAgentTurn() { throw new Error("sink-failure"); },
+      async recordAgentToolCall() { throw new Error("sink-failure"); },
+      async recordLlmProviderCall() { throw new Error("sink-failure"); },
+      async recordTranscriptionRecord() { throw new Error("sink-failure"); },
     };
     const resolver = new FoodResolver(new ThrowingFoodDataProvider(), 0.5, failingService);
     const { items } = await resolver.search("user-2", "rice", undefined, "en-US");

@@ -132,6 +132,124 @@ class AgentChatStreamEvent {
   final List<AgentChatSuggestion> suggestions;
 }
 
+class AgentConversationSummary {
+  const AgentConversationSummary({
+    required this.id,
+    required this.title,
+    required this.createdAt,
+    required this.updatedAt,
+    this.hiddenFromUserAt,
+  });
+
+  final String id;
+  final String title;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? hiddenFromUserAt;
+
+  factory AgentConversationSummary.fromJson(Map<String, Object?> json) {
+    return AgentConversationSummary(
+      id: json['id'] as String,
+      title: json['title'] as String? ?? 'Nutrition chat',
+      createdAt: DateTime.parse(json['createdAt'] as String),
+      updatedAt: DateTime.parse(json['updatedAt'] as String),
+      hiddenFromUserAt: json['hiddenFromUserAt'] is String
+          ? DateTime.parse(json['hiddenFromUserAt'] as String)
+          : null,
+    );
+  }
+
+  Map<String, Object?> toJson() => {
+        'id': id,
+        'title': title,
+        'createdAt': createdAt.toUtc().toIso8601String(),
+        'updatedAt': updatedAt.toUtc().toIso8601String(),
+        if (hiddenFromUserAt != null)
+          'hiddenFromUserAt': hiddenFromUserAt!.toUtc().toIso8601String(),
+      };
+}
+
+class AgentConversationMessage {
+  const AgentConversationMessage({
+    required this.id,
+    required this.conversationId,
+    required this.role,
+    required this.content,
+    required this.createdAt,
+    this.toolCalls,
+    this.toolCallId,
+    this.traceId,
+    this.turnId,
+    this.inputMode,
+    this.source,
+    this.activeProposalId,
+    this.metadata,
+  });
+
+  final String id;
+  final String conversationId;
+  final String role;
+  final String content;
+  final DateTime createdAt;
+  final Object? toolCalls;
+  final String? toolCallId;
+  final String? traceId;
+  final String? turnId;
+  final String? inputMode;
+  final String? source;
+  final String? activeProposalId;
+  final Object? metadata;
+
+  factory AgentConversationMessage.fromJson(Map<String, Object?> json) {
+    return AgentConversationMessage(
+      id: json['id'] as String,
+      conversationId: json['conversationId'] as String,
+      role: json['role'] as String,
+      content: json['content'] as String? ?? '',
+      createdAt: DateTime.parse(json['createdAt'] as String),
+      toolCalls: json['toolCalls'],
+      toolCallId: json['toolCallId'] as String?,
+      traceId: json['traceId'] as String?,
+      turnId: json['turnId'] as String?,
+      inputMode: json['inputMode'] as String?,
+      source: json['source'] as String?,
+      activeProposalId: json['activeProposalId'] as String?,
+      metadata: json['metadata'],
+    );
+  }
+
+  Map<String, Object?> toJson() => {
+        'id': id,
+        'conversationId': conversationId,
+        'role': role,
+        'content': content,
+        'createdAt': createdAt.toUtc().toIso8601String(),
+        if (toolCalls != null) 'toolCalls': toolCalls,
+        if (toolCallId != null) 'toolCallId': toolCallId,
+        if (traceId != null) 'traceId': traceId,
+        if (turnId != null) 'turnId': turnId,
+        if (inputMode != null) 'inputMode': inputMode,
+        if (source != null) 'source': source,
+        if (activeProposalId != null) 'activeProposalId': activeProposalId,
+        if (metadata != null) 'metadata': metadata,
+      };
+}
+
+class AgentConversationDetail {
+  const AgentConversationDetail({
+    required this.conversation,
+    required this.messages,
+  });
+
+  final AgentConversationSummary conversation;
+  final List<AgentConversationMessage> messages;
+
+  Map<String, Object?> toJson() => {
+        'conversation': conversation.toJson(),
+        'messages': messages.map((message) => message.toJson()).toList(),
+      };
+}
+
 class FoodSearchResult {
   const FoodSearchResult({required this.items, this.candidateGroups});
 
@@ -343,7 +461,7 @@ class NutritionRepository {
         ? await _apiClient.runAgent(text)
         : await _apiClient.runAgent(text, activeProposalId: activeProposalId);
     _healthMonitor.recordSuccess();
-    final result = _parseAgentRunResult(json);
+    final result = agentRunResultFromJson(json);
     await _cacheAgentResult(result);
     return result;
   }
@@ -360,7 +478,8 @@ class NutritionRepository {
             activeProposalId: activeProposalId,
           );
     _healthMonitor.recordSuccess();
-    final result = _parseAgentRunResult(json['result'] as Map<String, Object?>);
+    final result =
+        agentRunResultFromJson(json['result'] as Map<String, Object?>);
     await _cacheAgentResult(result);
     return VoiceMealRunResult(
       transcript: json['transcript'] as String,
@@ -405,6 +524,33 @@ class NutritionRepository {
       yield event;
     }
     _healthMonitor.recordSuccess();
+  }
+
+  Future<List<AgentConversationSummary>> listAgentConversations() async {
+    final json = await _apiClient.listAgentConversations();
+    _healthMonitor.recordSuccess();
+    return (json['conversations'] as List<Object?>? ?? const [])
+        .cast<Map<String, Object?>>()
+        .map(AgentConversationSummary.fromJson)
+        .toList();
+  }
+
+  Future<AgentConversationDetail> getAgentConversation(
+    String conversationId,
+  ) async {
+    final json = await _apiClient.getAgentConversation(conversationId);
+    _healthMonitor.recordSuccess();
+    return _parseAgentConversationDetail(json, conversationId: conversationId);
+  }
+
+  Future<void> deleteAgentConversation(String conversationId) async {
+    final json = await _apiClient.deleteAgentConversation(conversationId);
+    _healthMonitor.recordSuccess();
+    final ok =
+        json['ok'] == true || json['deleted'] == true || json['hidden'] == true;
+    if (!ok) {
+      throw const ApiException(404, 'Conversation was not found.');
+    }
   }
 
   Future<FoodSearchResult> searchFoods(
@@ -475,7 +621,7 @@ class NutritionRepository {
           ? AgentToolCallFeedback.fromJson(toolCallJson)
           : null,
       result: resultJson is Map<String, Object?>
-          ? _parseAgentRunResult(resultJson)
+          ? agentRunResultFromJson(resultJson)
           : null,
       suggestions: suggestionsJson is List<Object?>
           ? suggestionsJson
@@ -485,77 +631,6 @@ class NutritionRepository {
                   suggestion.label.isNotEmpty && suggestion.value.isNotEmpty)
               .toList()
           : const [],
-    );
-  }
-
-  AgentRunResult _parseAgentRunResult(Map<String, Object?> json) {
-    final kind = json['kind'] as String;
-    return AgentRunResult(
-      kind: kind,
-      message: json['message'] as String,
-      proposal: json['proposal'] == null
-          ? null
-          : MealProposal.fromJson(json['proposal'] as Map<String, Object?>),
-      meal: json['meal'] == null
-          ? null
-          : Meal.fromJson(json['meal'] as Map<String, Object?>),
-      summary: json['summary'] == null
-          ? null
-          : DailySummary.fromJson(json['summary'] as Map<String, Object?>),
-      remaining: json['remaining'] == null
-          ? null
-          : NutritionSnapshot.fromJson(
-              json['remaining'] as Map<String, Object?>,
-            ),
-      meals: json['meals'] == null
-          ? null
-          : (json['meals'] as List<Object?>)
-              .cast<Map<String, Object?>>()
-              .map(Meal.fromJson)
-              .toList(),
-      items: json['items'] == null
-          ? null
-          : (json['items'] as List<Object?>)
-              .cast<Map<String, Object?>>()
-              .map(MealItem.fromJson)
-              .toList(),
-      templates: json['templates'] == null
-          ? null
-          : (json['templates'] as List<Object?>)
-              .cast<Map<String, Object?>>()
-              .map(MealTemplate.fromJson)
-              .toList(),
-      template: json['template'] == null
-          ? null
-          : MealTemplate.fromJson(json['template'] as Map<String, Object?>),
-      usualFoods: json['usualFoods'] == null
-          ? null
-          : (json['usualFoods'] as List<Object?>)
-              .cast<Map<String, Object?>>()
-              .map(UsualFood.fromJson)
-              .toList(),
-      resolvedItems: json['resolvedItems'] == null
-          ? null
-          : (json['resolvedItems'] as List<Object?>)
-              .cast<Map<String, Object?>>()
-              .map(MealItem.fromJson)
-              .toList(),
-      deleted: json['deleted'] as bool?,
-      actionId: json['actionId'] as String?,
-      input: json['input'],
-      clarificationOptions: _parseCandidateGroups(json['options']),
-      candidateGroups: _parseCandidateGroups(json['candidateGroups']) ??
-          _parseCandidateGroups(json['options']),
-      usualFoodDraft: json['usualFoodDraft'] == null
-          ? _parseTopLevelUsualFoodDraft(json)
-          : _parseNestedUsualFoodDraft(
-              json['usualFoodDraft'] as Map<String, Object?>,
-            ),
-      usualMealDraft: json['usualMealDraft'] == null
-          ? null
-          : UsualMealDraft.fromJson(
-              _responseOutput(json['usualMealDraft'] as Map<String, Object?>),
-            ),
     );
   }
 
@@ -1056,6 +1131,113 @@ class NutritionRepository {
 
 Map<String, Object?> _responseOutput(Map<String, Object?> json) {
   return json['output'] as Map<String, Object?>? ?? json;
+}
+
+AgentConversationDetail _parseAgentConversationDetail(
+  Map<String, Object?> json, {
+  required String conversationId,
+}) {
+  final messages = (json['messages'] as List<Object?>? ?? const [])
+      .cast<Map<String, Object?>>()
+      .map(AgentConversationMessage.fromJson)
+      .toList();
+  final conversationJson = json['conversation'];
+  final conversation = conversationJson is Map<String, Object?>
+      ? AgentConversationSummary.fromJson(conversationJson)
+      : _fallbackConversationSummary(conversationId, messages);
+  return AgentConversationDetail(
+      conversation: conversation, messages: messages);
+}
+
+AgentConversationSummary _fallbackConversationSummary(
+  String conversationId,
+  List<AgentConversationMessage> messages,
+) {
+  final createdAt = messages.isEmpty
+      ? DateTime.fromMillisecondsSinceEpoch(0, isUtc: true)
+      : messages.first.createdAt;
+  final updatedAt = messages.isEmpty ? createdAt : messages.last.createdAt;
+  final firstUserText = messages
+      .where((message) => message.role == 'user')
+      .map((message) => message.content.trim())
+      .firstWhere((text) => text.isNotEmpty, orElse: () => 'Nutrition chat');
+  return AgentConversationSummary(
+    id: conversationId,
+    title: firstUserText,
+    createdAt: createdAt,
+    updatedAt: updatedAt,
+  );
+}
+
+AgentRunResult agentRunResultFromJson(Map<String, Object?> json) {
+  final kind = json['kind'] as String;
+  return AgentRunResult(
+    kind: kind,
+    message: json['message'] as String,
+    proposal: json['proposal'] == null
+        ? null
+        : MealProposal.fromJson(json['proposal'] as Map<String, Object?>),
+    meal: json['meal'] == null
+        ? null
+        : Meal.fromJson(json['meal'] as Map<String, Object?>),
+    summary: json['summary'] == null
+        ? null
+        : DailySummary.fromJson(json['summary'] as Map<String, Object?>),
+    remaining: json['remaining'] == null
+        ? null
+        : NutritionSnapshot.fromJson(
+            json['remaining'] as Map<String, Object?>,
+          ),
+    meals: json['meals'] == null
+        ? null
+        : (json['meals'] as List<Object?>)
+            .cast<Map<String, Object?>>()
+            .map(Meal.fromJson)
+            .toList(),
+    items: json['items'] == null
+        ? null
+        : (json['items'] as List<Object?>)
+            .cast<Map<String, Object?>>()
+            .map(MealItem.fromJson)
+            .toList(),
+    templates: json['templates'] == null
+        ? null
+        : (json['templates'] as List<Object?>)
+            .cast<Map<String, Object?>>()
+            .map(MealTemplate.fromJson)
+            .toList(),
+    template: json['template'] == null
+        ? null
+        : MealTemplate.fromJson(json['template'] as Map<String, Object?>),
+    usualFoods: json['usualFoods'] == null
+        ? null
+        : (json['usualFoods'] as List<Object?>)
+            .cast<Map<String, Object?>>()
+            .map(UsualFood.fromJson)
+            .toList(),
+    resolvedItems: json['resolvedItems'] == null
+        ? null
+        : (json['resolvedItems'] as List<Object?>)
+            .cast<Map<String, Object?>>()
+            .map(MealItem.fromJson)
+            .toList(),
+    deleted: json['deleted'] as bool?,
+    actionId: json['actionId'] as String?,
+    input: json['input'],
+    clarificationOptions: _parseCandidateGroups(json['options']),
+    candidateGroups: _parseCandidateGroups(json['candidateGroups']) ??
+        _parseCandidateGroups(json['options']),
+    usualFoodDraft: json['usualFoodDraft'] == null
+        ? _parseTopLevelUsualFoodDraft(json)
+        : _parseNestedUsualFoodDraft(
+            json['usualFoodDraft'] as Map<String, Object?>,
+          ),
+    usualMealDraft: json['usualMealDraft'] == null
+        ? null
+        : UsualMealDraft.fromJson(
+            _responseOutput(json['usualMealDraft'] as Map<String, Object?>),
+          ),
+  );
 }
 
 UsualFood _parseUsualFoodResponse(Map<String, Object?> json) {

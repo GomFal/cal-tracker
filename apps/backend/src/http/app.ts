@@ -616,21 +616,35 @@ export function createApp(input: {
 
   app.get("/v1/agent/conversations/:id", async (c) => {
     const user = c.get("authUser");
+    const conversationId = c.req.param("id");
+    const conversation = await repository.getAgentConversation(
+      user.id,
+      conversationId,
+    );
+    if (!conversation) {
+      throw new HTTPException(404, {
+        message: "agent_conversation_not_found",
+      });
+    }
     return c.json({
+      conversation,
       messages: await repository.listAgentConversationMessages(
         user.id,
-        c.req.param("id"),
+        conversationId,
       ),
     });
   });
 
   app.delete("/v1/agent/conversations/:id", async (c) => {
     const user = c.get("authUser");
+    const hidden = await repository.hideAgentConversationFromUser(
+      user.id,
+      c.req.param("id"),
+    );
     return c.json({
-      deleted: await repository.deleteAgentConversation(
-        user.id,
-        c.req.param("id"),
-      ),
+      ok: hidden,
+      deleted: hidden,
+      hidden,
     });
   });
 

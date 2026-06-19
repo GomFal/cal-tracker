@@ -1806,6 +1806,32 @@ class AppLocalizationsEs extends AppLocalizations {
   String get agentChatStartRecording => 'Grabar mensaje de voz';
 
   @override
+  String get agentChatNewChatTooltip => 'Nuevo chat';
+
+  @override
+  String get agentChatHistoryTooltip => 'Historial de chats';
+
+  @override
+  String get agentChatHistoryTitle => 'Historial de chats';
+
+  @override
+  String get agentChatHistoryEmpty => 'Todavia no hay chats anteriores.';
+
+  @override
+  String get agentChatHistoryDeleteTooltip => 'Eliminar chat';
+
+  @override
+  String get agentChatHistoryLoadError => 'No se pudo cargar este chat.';
+
+  @override
+  String agentChatHistoryUpdatedAt(Object time) {
+    return 'Actualizado $time';
+  }
+
+  @override
+  String get agentChatHistoryRefreshing => 'Actualizando...';
+
+  @override
   String get agentChatOpenAction =>
       'Abrir chat con el agente. Mantén pulsado para hablar';
 }

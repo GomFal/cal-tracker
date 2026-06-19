@@ -97,14 +97,55 @@ describe("agent chat streaming", () => {
     );
     expect(persisted.status).toBe(200);
     const body = (await persisted.json()) as {
-      messages: Array<{ role: string; content: string; toolCallId?: string }>;
+      conversation: { id: string; title: string };
+      messages: Array<{
+        role: string;
+        content: string;
+        toolCallId?: string;
+        traceId?: string;
+        turnId?: string;
+        inputMode?: string;
+        source?: string;
+        metadata?: Record<string, unknown>;
+      }>;
     };
+    expect(body.conversation).toEqual(
+      expect.objectContaining({
+        id: conversationId,
+        title: "How am I doing today?",
+      }),
+    );
     expect(body.messages.map((message) => message.role)).toEqual([
       "user",
       "assistant",
       "tool",
       "assistant",
     ]);
+    const turnIds = new Set(body.messages.map((message) => message.turnId));
+    expect(turnIds.size).toBe(1);
+    expect([...turnIds][0]).toEqual(expect.any(String));
+    expect(body.messages.every((message) => message.traceId)).toBe(true);
+    expect(body.messages.every((message) => message.inputMode === "text")).toBe(
+      true,
+    );
+    expect(body.messages.every((message) => message.source === "flutter")).toBe(
+      true,
+    );
+    expect(body.messages[0]?.metadata).toEqual(
+      expect.objectContaining({
+        conversationId,
+        inputMode: "text",
+        source: "flutter",
+        turnId: [...turnIds][0],
+      }),
+    );
+    expect(body.messages[2]?.metadata).toEqual(
+      expect.objectContaining({
+        actionId: "get_daily_summary",
+        actionCallId: expect.any(String),
+        resultKind: "summary",
+      }),
+    );
   });
 
   it("streams model-proposed quick reply buttons", async () => {
@@ -209,6 +250,72 @@ describe("agent chat streaming", () => {
           message.role === "user" && message.content === "voice message",
       ),
     ).toBe(true);
+  });
+
+  it("hides deleted conversations from users while retaining stored messages", async () => {
+    const agentProvider = new QueueChatAgentProvider([
+      {
+        toolCalls: [],
+        rawResponse: {},
+        interaction: {
+          messages: [],
+          assistantContent: "Done.",
+          streamEvents: [],
+        },
+      },
+    ]);
+    const { request, repository } = buildTestApp({ agentProvider });
+    const { authHeader, user } = await registerAndAuth(request);
+
+    const response = await request("http://localhost/v1/agent/chat", {
+      method: "POST",
+      headers: authHeader,
+      body: JSON.stringify({
+        message: "Please remember this chat",
+        source: "flutter",
+      }),
+    });
+    expect(response.status).toBe(200);
+    const events = parseSse(await response.text());
+    const conversationId = events.find(
+      (event) => event.type === "conversation_started",
+    )?.conversationId as string;
+
+    const deleteResponse = await request(
+      `http://localhost/v1/agent/conversations/${conversationId}`,
+      { method: "DELETE", headers: authHeader },
+    );
+    expect(deleteResponse.status).toBe(200);
+    await expect(deleteResponse.json()).resolves.toEqual({
+      ok: true,
+      deleted: true,
+      hidden: true,
+    });
+
+    const listResponse = await request("http://localhost/v1/agent/conversations", {
+      headers: authHeader,
+    });
+    expect(listResponse.status).toBe(200);
+    await expect(listResponse.json()).resolves.toEqual({ conversations: [] });
+
+    const detailResponse = await request(
+      `http://localhost/v1/agent/conversations/${conversationId}`,
+      { headers: authHeader },
+    );
+    expect(detailResponse.status).toBe(404);
+
+    const retained = (
+      repository as unknown as {
+        agentConversationMessages: Map<
+          string,
+          Array<{ userId: string; role: string }>
+        >;
+      }
+    ).agentConversationMessages.get(conversationId);
+    expect(retained?.map((message) => message.userId)).toEqual([
+      user.id,
+      user.id,
+    ]);
   });
 });
 

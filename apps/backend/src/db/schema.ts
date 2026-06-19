@@ -1227,6 +1227,9 @@ export const agentConversations = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     title: text("title").notNull().default("New chat"),
+    hiddenFromUserAt: timestamp("hidden_from_user_at", {
+      withTimezone: true,
+    }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -1237,6 +1240,11 @@ export const agentConversations = pgTable(
   (table) => [
     index("agent_conversations_user_updated_idx").on(
       table.userId,
+      table.updatedAt,
+    ),
+    index("agent_conversations_user_visible_updated_idx").on(
+      table.userId,
+      table.hiddenFromUserAt,
       table.updatedAt,
     ),
   ],
@@ -1256,6 +1264,11 @@ export const agentMessages = pgTable(
     content: text("content").notNull().default(""),
     toolCallsJson: jsonb("tool_calls_json").$type<unknown>(),
     toolCallId: text("tool_call_id"),
+    traceId: text("trace_id"),
+    turnId: uuid("turn_id"),
+    inputMode: text("input_mode"),
+    source: text("source"),
+    activeProposalId: uuid("active_proposal_id"),
     metadataJson: jsonb("metadata_json").$type<unknown>(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -1267,6 +1280,13 @@ export const agentMessages = pgTable(
       table.createdAt,
     ),
     index("agent_messages_user_created_idx").on(table.userId, table.createdAt),
+    index("agent_messages_trace_id_idx").on(table.traceId),
+    index("agent_messages_turn_id_idx").on(table.turnId),
+    index("agent_messages_conversation_turn_idx").on(
+      table.conversationId,
+      table.turnId,
+      table.createdAt,
+    ),
     check(
       "agent_messages_role_check",
       sql`${table.role} IN ('user','assistant','tool')`,

@@ -859,5 +859,18 @@
   },
   "agentChatStopRecording": "Stop recording",
   "agentChatStartRecording": "Record voice message",
+  "agentChatNewChatTooltip": "New chat",
+  "agentChatHistoryTooltip": "Chat history",
+  "agentChatHistoryTitle": "Chat history",
+  "agentChatHistoryEmpty": "No previous chats yet.",
+  "agentChatHistoryDeleteTooltip": "Delete chat",
+  "agentChatHistoryLoadError": "Could not load this chat.",
+  "agentChatHistoryUpdatedAt": "Updated {time}",
+  "@agentChatHistoryUpdatedAt": {
+    "placeholders": {
+      "time": {}
+    }
+  },
+  "agentChatHistoryRefreshing": "Refreshing...",
   "agentChatOpenAction": "Open agent chat. Hold to speak"
 }

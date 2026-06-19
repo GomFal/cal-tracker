@@ -9,6 +9,8 @@ import '../data/repositories/auth_repository.dart';
 import '../data/repositories/nutrition_repository.dart';
 import '../data/services/app_preferences_repository.dart';
 import '../data/services/app_preferences_storage.dart';
+import '../data/services/agent_chat_cache_store.dart';
+import '../data/services/agent_chat_session_store.dart';
 import '../data/services/api_config.dart';
 import '../data/services/audio_recorder_service.dart';
 import '../data/services/client_metadata_provider.dart';
@@ -112,6 +114,12 @@ class _CalTrackerBootstrapState extends State<CalTrackerBootstrap> {
         Provider<NutritionRepository>.value(
           value: composition.nutritionRepository,
         ),
+        Provider<AgentChatSessionStore>.value(
+          value: composition.agentChatSessionStore,
+        ),
+        Provider<AgentChatCacheStore>.value(
+          value: composition.agentChatCacheStore,
+        ),
         Provider<AudioRecorderService>.value(
           value: composition.audioRecorderService,
         ),
@@ -161,6 +169,8 @@ class _CalTrackerBootstrapState extends State<CalTrackerBootstrap> {
           create: (_) => AgentChatViewModel(
             nutritionRepository: composition.nutritionRepository,
             audioRecorderService: composition.audioRecorderService,
+            sessionStore: composition.agentChatSessionStore,
+            cacheStore: composition.agentChatCacheStore,
           ),
         ),
         ChangeNotifierProvider(
@@ -210,6 +220,8 @@ class _CalTrackerComposition {
     required this.preferencesRepository,
     required this.authRepository,
     required this.nutritionRepository,
+    required this.agentChatSessionStore,
+    required this.agentChatCacheStore,
     required this.mobileUpdateService,
     required this.audioRecorderService,
     required this.ownsAudioRecorderService,
@@ -252,12 +264,20 @@ class _CalTrackerComposition {
           cacheStore: NutritionCacheStore(storage: AppPreferencesStorage()),
           telemetryService: telemetryService,
         );
+    final agentChatSessionStore = AgentChatSessionStore(
+      storage: AppPreferencesStorage(),
+    );
+    final agentChatCacheStore = AgentChatCacheStore(
+      storage: AppPreferencesStorage(),
+    );
     final ownsAudioRecorderService = widget.audioRecorderService == null;
 
     return _CalTrackerComposition(
       preferencesRepository: preferencesRepository,
       authRepository: authRepository,
       nutritionRepository: nutritionRepository,
+      agentChatSessionStore: agentChatSessionStore,
+      agentChatCacheStore: agentChatCacheStore,
       mobileUpdateService: widget.mobileUpdateService ??
           MobileUpdateService(apiConfig: widget.apiConfig),
       audioRecorderService:
@@ -272,6 +292,8 @@ class _CalTrackerComposition {
   final AppPreferencesRepository preferencesRepository;
   final AuthRepository authRepository;
   final NutritionRepository nutritionRepository;
+  final AgentChatSessionStore agentChatSessionStore;
+  final AgentChatCacheStore agentChatCacheStore;
   final MobileUpdateService mobileUpdateService;
   final AudioRecorderService audioRecorderService;
   final bool ownsAudioRecorderService;
@@ -399,6 +421,8 @@ class _AuthenticatedDataPreloaderState
       if (_activeUserId == userId) return;
       _activeUserId = userId;
       repository.activateCacheForUser(userId);
+      context.read<AgentChatSessionStore>().activateUser(userId);
+      context.read<AgentChatCacheStore>().activateUser(userId);
       _schedulePreload();
       return;
     }
@@ -409,6 +433,8 @@ class _AuthenticatedDataPreloaderState
     context.read<MealHistoryViewModel>().reset();
     context.read<MealTemplatesViewModel>().reset();
     context.read<SettingsViewModel>().reset();
+    context.read<AgentChatSessionStore>().deactivateUser();
+    context.read<AgentChatCacheStore>().deactivateUser();
     unawaited(repository.clearActiveUserCache());
   }
 

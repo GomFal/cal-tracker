@@ -5,6 +5,9 @@ import {
   actionDefinitions,
   adminLoginRequestSchema,
   adminTokenResponseSchema,
+  agentConversationDetailResponseSchema,
+  agentConversationsResponseSchema,
+  deleteAgentConversationResponseSchema,
   agentRunRequestSchema,
   agentRunResponseSchema,
   calorieEstimateRequestSchema,
@@ -143,6 +146,9 @@ const spec = {
       UsualMealDraftResponse: schema("UsualMealDraftResponse", usualMealDraftResponseSchema),
       AgentRunRequest: schema("AgentRunRequest", agentRunRequestSchema),
       AgentRunResponse: schema("AgentRunResponse", agentRunResponseSchema),
+      AgentConversationsResponse: schema("AgentConversationsResponse", agentConversationsResponseSchema),
+      AgentConversationDetailResponse: schema("AgentConversationDetailResponse", agentConversationDetailResponseSchema),
+      DeleteAgentConversationResponse: schema("DeleteAgentConversationResponse", deleteAgentConversationResponseSchema),
       TranscriptionResponse: schema("TranscriptionResponse", transcriptionResponseSchema),
       VoiceMealRunResponse: voiceMealRunResponseOpenApiSchema,
       ClientTelemetryIngestRequest: schema("ClientTelemetryIngestRequest", clientTelemetryIngestRequestSchema),
@@ -373,6 +379,33 @@ const spec = {
         },
         responses: {
           "200": { description: "Agent result", content: { "application/json": { schema: { $ref: "#/components/schemas/AgentRunResponse" } } } }
+        }
+      }
+    },
+    "/v1/agent/conversations": {
+      get: {
+        operationId: "listAgentConversations",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          "200": jsonResponse("Agent conversations", "#/components/schemas/AgentConversationsResponse")
+        }
+      }
+    },
+    "/v1/agent/conversations/{id}": {
+      get: {
+        operationId: "getAgentConversation",
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
+        responses: {
+          "200": jsonResponse("Agent conversation detail", "#/components/schemas/AgentConversationDetailResponse")
+        }
+      },
+      delete: {
+        operationId: "deleteAgentConversation",
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
+        responses: {
+          "200": jsonResponse("Deleted agent conversation", "#/components/schemas/DeleteAgentConversationResponse")
         }
       }
     },

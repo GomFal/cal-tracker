@@ -553,5 +553,18 @@
   },
   "agentChatStopRecording": "Detener grabación",
   "agentChatStartRecording": "Grabar mensaje de voz",
+  "agentChatNewChatTooltip": "Nuevo chat",
+  "agentChatHistoryTooltip": "Historial de chats",
+  "agentChatHistoryTitle": "Historial de chats",
+  "agentChatHistoryEmpty": "Todavia no hay chats anteriores.",
+  "agentChatHistoryDeleteTooltip": "Eliminar chat",
+  "agentChatHistoryLoadError": "No se pudo cargar este chat.",
+  "agentChatHistoryUpdatedAt": "Actualizado {time}",
+  "@agentChatHistoryUpdatedAt": {
+    "placeholders": {
+      "time": {}
+    }
+  },
+  "agentChatHistoryRefreshing": "Actualizando...",
   "agentChatOpenAction": "Abrir chat con el agente. Mantén pulsado para hablar"
 }

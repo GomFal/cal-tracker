@@ -3297,6 +3297,54 @@ abstract class AppLocalizations {
   /// **'Record voice message'**
   String get agentChatStartRecording;
 
+  /// No description provided for @agentChatNewChatTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'New chat'**
+  String get agentChatNewChatTooltip;
+
+  /// No description provided for @agentChatHistoryTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat history'**
+  String get agentChatHistoryTooltip;
+
+  /// No description provided for @agentChatHistoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat history'**
+  String get agentChatHistoryTitle;
+
+  /// No description provided for @agentChatHistoryEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No previous chats yet.'**
+  String get agentChatHistoryEmpty;
+
+  /// No description provided for @agentChatHistoryDeleteTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete chat'**
+  String get agentChatHistoryDeleteTooltip;
+
+  /// No description provided for @agentChatHistoryLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load this chat.'**
+  String get agentChatHistoryLoadError;
+
+  /// No description provided for @agentChatHistoryUpdatedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated {time}'**
+  String agentChatHistoryUpdatedAt(Object time);
+
+  /// No description provided for @agentChatHistoryRefreshing.
+  ///
+  /// In en, this message translates to:
+  /// **'Refreshing...'**
+  String get agentChatHistoryRefreshing;
+
   /// No description provided for @agentChatOpenAction.
   ///
   /// In en, this message translates to:

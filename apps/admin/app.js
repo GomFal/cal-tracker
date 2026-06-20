@@ -26,6 +26,7 @@
     apiBase: cfg.storageKeys?.apiBase || "bc.admin.apiBase",
     apiToken: cfg.storageKeys?.apiToken || "bc.admin.apiToken",
     adminUsername: cfg.storageKeys?.adminUsername || "bc.admin.username",
+    tableWidths: "bc.admin.tableWidths",
   };
   const ENDPOINTS = cfg.endpoints || {};
   const DEFAULTS = cfg.defaults || {};
@@ -38,6 +39,119 @@
     apiToken: "",
     adminUsername: "",
     controllers: new Set(),
+    tableRows: new Map(),
+  };
+
+  const TABLES = {
+    events: {
+      tableId: "events-table",
+      formId: "events-filters",
+      colspan: 10,
+      timeField: "createdAt",
+      statusField: "status",
+      defaultGroupBy: "eventType",
+      groupBy: ["eventType", "severity", "status", "surface", "route", "userId", "traceId"],
+      numeric: ["durationMs"],
+    },
+    llm: {
+      tableId: "llm-table",
+      formId: "llm-filters",
+      colspan: 11,
+      timeField: "createdAt",
+      statusField: "resultKind",
+      defaultGroupBy: "model",
+      groupBy: ["userId", "conversationId", "turnId", "model", "provider", "resultKind", "selectedTool", "executedTool", "traceId"],
+      numeric: ["promptTokens", "completionTokens", "totalTokens", "reasoningTokens", "providerCostAmount", "estimatedCostAmount", "totalMs", "llmMs", "actionMs"],
+    },
+    conversations: {
+      tableId: "conversations-table",
+      formId: "conversations-filters",
+      colspan: 6,
+      timeField: "updatedAt",
+      statusField: "hiddenStatus",
+      defaultGroupBy: "userId",
+      groupBy: ["userId", "hiddenStatus"],
+      numeric: [],
+    },
+    agentTurns: {
+      tableId: "agent-turns-table",
+      formId: "agent-turns-filters",
+      colspan: 14,
+      timeField: "createdAt",
+      statusField: "status",
+      backendStatus: true,
+      defaultGroupBy: "conversationId",
+      groupBy: ["userId", "conversationId", "traceId", "turnId", "model", "inputMode", "status", "resultKind"],
+      numeric: ["iterationCount", "toolCallCount", "promptTokens", "completionTokens", "totalTokens", "reasoningTokens", "providerCostAmount", "estimatedCostAmount", "firstByteMs", "firstToolCallMs", "largestStreamGapMs", "llmMs", "actionMs", "totalMs"],
+    },
+    actionCalls: {
+      tableId: "action-calls-table",
+      formId: "action-calls-filters",
+      colspan: 10,
+      timeField: "createdAt",
+      statusField: "errorStatus",
+      defaultGroupBy: "actionId",
+      groupBy: ["userId", "traceId", "actionId", "source", "confirmationStatus", "errorStatus"],
+      numeric: ["latencyMs"],
+    },
+    llmCost: {
+      tableId: "llm-cost-table",
+      formId: "llm-cost-filters",
+      colspan: 8,
+      timeField: null,
+      defaultGroupBy: "group",
+      groupBy: ["group", "key"],
+      numeric: ["providerCostAmount", "estimatedCostAmount", "totalCostAmount", "unknownCostCount", "totalTokens", "callCount"],
+    },
+    providerCalls: {
+      tableId: "provider-calls-table",
+      formId: "provider-calls-filters",
+      colspan: 13,
+      timeField: "createdAt",
+      statusField: "status",
+      backendStatus: true,
+      costSourceField: "costSource",
+      defaultGroupBy: "provider",
+      groupBy: ["userId", "conversationId", "turnId", "provider", "requestedModel", "servedModel", "status", "costSource", "traceId"],
+      numeric: ["promptTokens", "completionTokens", "totalTokens", "reasoningTokens", "providerCostAmount", "estimatedCostAmount", "durationMs"],
+    },
+    transcriptions: {
+      tableId: "transcriptions-table",
+      formId: "transcriptions-filters",
+      colspan: 13,
+      timeField: "createdAt",
+      statusField: "status",
+      backendStatus: true,
+      defaultGroupBy: "surface",
+      groupBy: ["userId", "conversationId", "surface", "provider", "model", "status", "traceId"],
+      numeric: ["audioBytes", "audioDurationMs", "transcriptLength", "durationMs"],
+    },
+    food: {
+      tableId: "food-table",
+      formId: "food-filters",
+      colspan: 9,
+      timeField: "createdAt",
+      defaultGroupBy: "path",
+      groupBy: ["userId", "traceId", "path", "zeroResults", "lowConfidence", "topExternalSource", "topResultType", "locale"],
+      numeric: ["queryLength", "resultCount", "candidateGroupCount", "topScore", "selectedRank", "durationMs"],
+    },
+  };
+
+  const TAB_LOADERS = {
+    "view-overview": () => loadOverview(readFilters($("#overview-filters"))),
+    "view-events": () => loadEvents(readFilters($("#events-filters"))),
+    "view-llm": () => loadLlmRuns(readFilters($("#llm-filters"))),
+    "view-conversations": () => loadConversations(readFilters($("#conversations-filters"))),
+    "view-agent-turns": () => loadAgentTurns(readFilters($("#agent-turns-filters"))),
+    "view-action-calls": () => loadActionCalls(readFilters($("#action-calls-filters"))),
+    "view-llm-cost": () => loadLlmCost(readFilters($("#llm-cost-filters"))),
+    "view-provider-calls": () => loadProviderCalls(readFilters($("#provider-calls-filters"))),
+    "view-transcriptions": () => loadTranscriptions(readFilters($("#transcriptions-filters"))),
+    "view-food": () => loadFoodSearch(readFilters($("#food-filters"))),
+    "view-trace": () => {
+      const traceId = ($("#trace-id")?.value || "").trim();
+      if (traceId) loadTrace(traceId);
+    },
   };
 
   /* ========== DOM helpers ========== */
@@ -547,7 +661,7 @@
   function jsonPreview(value, max = 96) {
     if (value == null) return "—";
     const raw =
-      typeof value === "string" ? value : JSON.stringify(value);
+      typeof value === "string" ? value : JSON.stringify(value, null, 2);
     if (!raw) return "—";
     return raw.length > max ? `${raw.slice(0, max - 1)}…` : raw;
   }
@@ -557,12 +671,238 @@
     return formatMoney(amount, row?.costCurrency || "USD");
   }
 
-  function traceCell(value) {
-    if (!value) return el("td", { class: "mono", text: "—" });
+  function fullText(value) {
+    if (value == null || value === "") return "";
+    return typeof value === "string" ? value : JSON.stringify(value, null, 2);
+  }
+
+  function isLikelyId(value) {
+    const text = String(value || "");
+    return text.length >= 20 || /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(text);
+  }
+
+  function copyableId(value) {
+    if (value == null || value === "") return el("span", { text: "—" });
     const text = String(value);
-    const node = el("td", { class: "mono", text });
-    node.title = text;
-    return node;
+    const wrap = el("span", { class: "copy-id" });
+    wrap.append(
+      el("span", { class: "copy-id-text mono", text, title: text }),
+      el("button", {
+        class: "copy-btn",
+        type: "button",
+        title: "Copy full value",
+        "aria-label": "Copy full value",
+        onClick: (event) => {
+          event.stopPropagation();
+          copyToClipboard(text, event.currentTarget);
+        },
+      }, "Copy"),
+    );
+    return wrap;
+  }
+
+  function idCell(value) {
+    return el("td", { class: "mono id-cell" }, copyableId(value));
+  }
+
+  function renderExpandableValue(value, { mono = false } = {}) {
+    const text = fullText(value);
+    if (!text) return el("span", { text: "—" });
+    const wrap = el("div", { class: `expandable-value${mono ? " mono" : ""}` });
+    const pre = el("pre", { class: "expandable-preview", text });
+    const actions = el("div", { class: "cell-actions" });
+    actions.append(
+      el("button", {
+        class: "copy-btn",
+        type: "button",
+        title: "Copy full value",
+        onClick: (event) => {
+          event.stopPropagation();
+          copyToClipboard(text, event.currentTarget);
+        },
+      }, "Copy"),
+      el("button", {
+        class: "copy-btn",
+        type: "button",
+        title: "Expand or collapse value",
+        onClick: (event) => {
+          event.stopPropagation();
+          const expanded = wrap.classList.toggle("is-expanded");
+          event.currentTarget.textContent = expanded ? "Less" : "More";
+        },
+      }, "More"),
+    );
+    wrap.append(pre, actions);
+    return wrap;
+  }
+
+  function textCell(value, className = "wrap") {
+    const text = fullText(value);
+    if (!text) return el("td", { class: className, text: "—" });
+    if (isLikelyId(text)) return idCell(text);
+    return el("td", { class: className, text });
+  }
+
+  function jsonCell(value) {
+    return el("td", { class: "wrap json-cell" }, renderExpandableValue(value, { mono: true }));
+  }
+
+  function appendDateParams(params, filters) {
+    const fromIso = toIsoOrNull(filters.from);
+    const toIso = toIsoOrNull(filters.to);
+    if (fromIso) params.from = fromIso;
+    if (toIso) params.to = toIso;
+  }
+
+  function readTableControls(tableKey) {
+    const form = document.getElementById(TABLES[tableKey]?.formId);
+    const filters = readFilters(form);
+    return {
+      sort: filters.sort || "desc",
+      status: filters.status || "",
+      costSource: filters.costSource || "",
+      viewMode: filters.viewMode || "rows",
+      groupBy: filters.groupBy || TABLES[tableKey]?.defaultGroupBy,
+    };
+  }
+
+  function derivedValue(row, key) {
+    if (key === "hiddenStatus") return row.hiddenFromUserAt ? "hidden" : "visible";
+    if (key === "errorStatus") return row.error ? "error" : "ok";
+    if (key === "zeroResults" || key === "lowConfidence") return row[key] ? "true" : "false";
+    return row?.[key];
+  }
+
+  function applyClientControls(tableKey, rows) {
+    const config = TABLES[tableKey];
+    const controls = readTableControls(tableKey);
+    let next = Array.isArray(rows) ? [...rows] : [];
+    if (controls.status && config?.statusField && !config.backendStatus) {
+      next = next.filter((row) => String(derivedValue(row, config.statusField) || "") === controls.status);
+    }
+    if (controls.costSource && config?.costSourceField) {
+      next = next.filter((row) => String(row[config.costSourceField] || "") === controls.costSource);
+    }
+    if (config?.timeField) {
+      next.sort((a, b) => {
+        const left = Date.parse(a?.[config.timeField] || "");
+        const right = Date.parse(b?.[config.timeField] || "");
+        const safeLeft = Number.isFinite(left) ? left : 0;
+        const safeRight = Number.isFinite(right) ? right : 0;
+        return controls.sort === "asc" ? safeLeft - safeRight : safeRight - safeLeft;
+      });
+    }
+    state.tableRows.set(tableKey, next);
+    return next;
+  }
+
+  function maybeRenderAggregateRows(tbody, tableKey, rows) {
+    const config = TABLES[tableKey];
+    if (!config) return false;
+    const controls = readTableControls(tableKey);
+    if (controls.viewMode !== "aggregate") return false;
+    const aggregates = aggregateRows(rows, tableKey, controls.groupBy);
+    tbody.replaceChildren();
+    if (!aggregates.length) {
+      tbody.appendChild(renderEmptyRow(config.colspan, "No rows to aggregate."));
+      return true;
+    }
+    for (const row of aggregates) {
+      const tr = el("tr", { class: "is-aggregate" });
+      tr.append(
+        el("td", { class: "mono" }, copyableId(row.key)),
+        el("td", { class: "numeric", text: formatNumber(row.count) }),
+        el("td", { text: formatTimestamp(row.firstSeen) }),
+        el("td", { text: formatTimestamp(row.lastSeen) }),
+        el("td", { class: "numeric", text: formatNumber(row.totalTokens) }),
+        el("td", { class: "numeric", text: formatMoney(row.totalCost) }),
+        el("td", { class: "numeric", text: formatDuration(row.medianLatency) }),
+        el("td", { class: "wrap", colspan: Math.max(1, config.colspan - 7) }, renderExpandableValue(row.numericSummary, { mono: true })),
+      );
+      tbody.appendChild(tr);
+    }
+    return true;
+  }
+
+  function aggregateRows(rows, tableKey, groupBy) {
+    const config = TABLES[tableKey];
+    const groups = new Map();
+    for (const row of rows || []) {
+      const key = String(derivedValue(row, groupBy) ?? "unknown");
+      const group = groups.get(key) || [];
+      group.push(row);
+      groups.set(key, group);
+    }
+    return [...groups.entries()].map(([key, group]) => {
+      const times = group
+        .map((row) => Date.parse(row?.[config.timeField] || row?.createdAt || row?.updatedAt || ""))
+        .filter(Number.isFinite)
+        .sort((a, b) => a - b);
+      const numericSummary = {};
+      for (const field of config.numeric || []) {
+        const values = group
+          .map((row) => Number(row?.[field]))
+          .filter(Number.isFinite);
+        if (!values.length) continue;
+        numericSummary[field] = {
+          sum: roundMetric(values.reduce((sum, value) => sum + value, 0)),
+          median: roundMetric(median(values)),
+        };
+      }
+      const totalCost = group.reduce((sum, row) => {
+        const provider = Number(row.providerCostAmount);
+        const estimated = Number(row.estimatedCostAmount);
+        const total = Number(row.totalCostAmount);
+        if (Number.isFinite(provider) || Number.isFinite(estimated)) {
+          return sum + (Number.isFinite(provider) ? provider : 0) + (Number.isFinite(estimated) ? estimated : 0);
+        }
+        return sum + (Number.isFinite(total) ? total : 0);
+      }, 0);
+      const totalTokens = sumNumbers(group, ["totalTokens"]);
+      const medianLatency = median(
+        group
+          .map((row) => Number(row.totalMs ?? row.durationMs ?? row.latencyMs))
+          .filter(Number.isFinite),
+      );
+      return {
+        key,
+        count: group.length,
+        firstSeen: times.length ? new Date(times[0]).toISOString() : undefined,
+        lastSeen: times.length ? new Date(times[times.length - 1]).toISOString() : undefined,
+        totalTokens,
+        totalCost,
+        medianLatency,
+        numericSummary,
+      };
+    }).sort((a, b) => b.count - a.count);
+  }
+
+  function sumNumbers(rows, fields) {
+    let total = 0;
+    for (const row of rows) {
+      for (const field of fields) {
+        const value = Number(row?.[field]);
+        if (Number.isFinite(value)) total += value;
+      }
+    }
+    return total;
+  }
+
+  function median(values) {
+    if (!values.length) return undefined;
+    const sorted = [...values].sort((a, b) => a - b);
+    const middle = Math.floor(sorted.length / 2);
+    return sorted.length % 2
+      ? sorted[middle]
+      : (sorted[middle - 1] + sorted[middle]) / 2;
+  }
+
+  function roundMetric(value) {
+    return Math.round(value * 1_000_000) / 1_000_000;
+  }
+
+  function traceCell(value) {
+    return idCell(value);
   }
 
   function copyableSpan(value) {
@@ -615,6 +955,164 @@
     form.reset();
   }
 
+  function enhanceFilterForms() {
+    for (const [key, config] of Object.entries(TABLES)) {
+      const form = document.getElementById(config.formId);
+      if (!form) continue;
+      const actions = $(".filters-actions", form);
+      if (!actions) continue;
+      if (config.timeField) {
+        insertControl(actions, dateField(`${config.formId}-from`, "from", "From"));
+        insertControl(actions, dateField(`${config.formId}-to`, "to", "To"));
+        insertControl(actions, selectField(`${config.formId}-sort`, "sort", "Time", [
+          ["desc", "newest first"],
+          ["asc", "oldest first"],
+        ]));
+      }
+      if (config.statusField) {
+        insertControl(actions, selectField(`${config.formId}-status`, "status", "Status", statusOptionsFor(key)));
+      }
+      if (config.costSourceField) {
+        insertControl(actions, selectField(`${config.formId}-cost-source`, "costSource", "Cost source", [
+          ["", "any"],
+          ["provider", "provider"],
+          ["estimate", "estimate"],
+          ["unknown", "unknown"],
+        ]));
+      }
+      insertControl(actions, selectField(`${config.formId}-view-mode`, "viewMode", "View", [
+        ["rows", "rows"],
+        ["aggregate", "aggregate"],
+      ]));
+      insertControl(actions, selectField(
+        `${config.formId}-group-by`,
+        "groupBy",
+        "Group by",
+        (config.groupBy || []).map((field) => [field, field]),
+      ));
+    }
+  }
+
+  function insertControl(beforeNode, control) {
+    const input = $("input, select", control);
+    if (input && beforeNode.parentElement?.querySelector(`[name="${input.name}"]`)) return;
+    beforeNode.parentElement?.insertBefore(control, beforeNode);
+  }
+
+  function dateField(id, name, label) {
+    return el("label", { class: "field" }, [
+      el("span", { text: label }),
+      el("input", { id, name, type: "datetime-local" }),
+    ]);
+  }
+
+  function selectField(id, name, label, options) {
+    const select = el("select", { id, name });
+    for (const [value, text] of options) {
+      select.appendChild(el("option", { value, text }));
+    }
+    return el("label", { class: "field field-narrowish" }, [
+      el("span", { text: label }),
+      select,
+    ]);
+  }
+
+  function statusOptionsFor(tableKey) {
+    const base = [["", "any"]];
+    if (tableKey === "events") return base.concat([["success", "success"], ["failure", "failure"], ["started", "started"]]);
+    if (tableKey === "conversations") return base.concat([["visible", "visible"], ["hidden", "hidden"]]);
+    if (tableKey === "actionCalls") return base.concat([["ok", "ok"], ["error", "error"]]);
+    if (tableKey === "llm") return base.concat([["proposal", "proposal"], ["assistant_message", "assistant_message"], ["assistant_options", "assistant_options"], ["meal_committed", "meal_committed"], ["clarification_required", "clarification_required"], ["error", "error"]]);
+    return base.concat([["success", "success"], ["failure", "failure"], ["failed", "failed"], ["completed", "completed"], ["started", "started"], ["partial", "partial"]]);
+  }
+
+  function refreshActiveView() {
+    if (!isSignedIn()) return;
+    const active = $(".view.is-active");
+    if (!active) return;
+    TAB_LOADERS[active.id]?.();
+  }
+
+  function makeAllTablesResizable() {
+    $$(".data-table").forEach(makeTableResizable);
+  }
+
+  function makeTableResizable(table) {
+    if (!table || table.dataset.resizable === "true") return;
+    table.dataset.resizable = "true";
+    const tableId = table.id;
+    ensureTableColgroup(table);
+    applyStoredColumnWidths(table);
+    $$("thead th", table).forEach((th, index) => {
+      th.classList.add("is-resizable");
+      const handle = el("span", { class: "resize-handle", title: "Drag to resize column" });
+      th.appendChild(handle);
+      handle.addEventListener("mousedown", (event) => {
+        event.preventDefault();
+        const startX = event.clientX;
+        const startWidth = th.getBoundingClientRect().width;
+        const onMove = (moveEvent) => {
+          const width = Math.max(72, Math.round(startWidth + moveEvent.clientX - startX));
+          setColumnWidth(table, index, width);
+        };
+        const onUp = () => {
+          document.removeEventListener("mousemove", onMove);
+          document.removeEventListener("mouseup", onUp);
+          persistColumnWidths(tableId, table);
+        };
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("mouseup", onUp);
+      });
+    });
+  }
+
+  function ensureTableColgroup(table) {
+    if ($("colgroup", table)) return;
+    const columnCount = $$("thead th", table).length;
+    if (!columnCount) return;
+    const colgroup = el("colgroup");
+    for (let i = 0; i < columnCount; i += 1) {
+      colgroup.appendChild(el("col"));
+    }
+    table.insertBefore(colgroup, table.firstElementChild);
+  }
+
+  function setColumnWidth(table, index, width) {
+    const col = $$("colgroup col", table)[index];
+    if (col) col.style.width = `${width}px`;
+    const th = $$("thead th", table)[index];
+    if (th) th.style.width = `${width}px`;
+    $$(`tbody tr td:nth-child(${index + 1})`, table).forEach((td) => {
+      td.style.width = `${width}px`;
+      td.style.maxWidth = `${width}px`;
+    });
+  }
+
+  function storedColumnWidths() {
+    try {
+      return JSON.parse(localStorage.getItem(STORAGE.tableWidths) || "{}");
+    } catch (_) {
+      return {};
+    }
+  }
+
+  function applyStoredColumnWidths(table) {
+    const widths = storedColumnWidths()[table.id] || [];
+    widths.forEach((width, index) => {
+      if (Number.isFinite(Number(width))) setColumnWidth(table, index, Number(width));
+    });
+  }
+
+  function persistColumnWidths(tableId, table) {
+    try {
+      const all = storedColumnWidths();
+      all[tableId] = $$("thead th", table).map((th) => Math.round(th.getBoundingClientRect().width));
+      localStorage.setItem(STORAGE.tableWidths, JSON.stringify(all));
+    } catch (err) {
+      console.warn("table width persistence failed", err);
+    }
+  }
+
   /* ========== Tabs ========== */
 
   function activateTab(target) {
@@ -636,6 +1134,7 @@
     if (location.hash !== `#${target}`) {
       history.replaceState(null, "", `#${target}`);
     }
+    TAB_LOADERS[target]?.();
   }
 
   function bindTabs() {
@@ -651,11 +1150,13 @@
   }
 
   function bootstrapTabFromHash() {
-    if (!isSignedIn()) return;
+    if (!isSignedIn()) return false;
     const hash = (location.hash || "").replace(/^#/, "");
     if (hash && $$(".view").some((v) => v.id === hash)) {
       activateTab(hash);
+      return true;
     }
+    return false;
   }
 
   /* ========== Renderers ========== */
@@ -670,11 +1171,13 @@
 
   function renderEventsTable(rows) {
     const tbody = $("#events-table tbody");
+    rows = applyClientControls("events", rows);
     tbody.replaceChildren();
     if (!rows || rows.length === 0) {
       tbody.appendChild(renderEmptyRow(10, "No events match the current filters."));
       return;
     }
+    if (maybeRenderAggregateRows(tbody, "events", rows)) return;
     for (const row of rows) {
       const severity = (row.severity || "info").toLowerCase();
       const rowClass = severity === "error" ? "is-error" : severity === "warning" ? "is-warning" : "";
@@ -689,7 +1192,7 @@
         el("td", { class: "numeric", text: formatDuration(row.durationMs) }),
       );
       tr.append(traceCell(row.traceId));
-      tr.append(el("td", { class: "mono", text: row.userId || "—" }));
+      tr.append(idCell(row.userId));
       tr.append(
         el("td", { class: "wrap" }, [
           row.errorCode ? el("div", { class: "mono", text: row.errorCode }) : null,
@@ -705,11 +1208,13 @@
 
   function renderLlmTable(rows) {
     const tbody = $("#llm-table tbody");
+    rows = applyClientControls("llm", rows);
     tbody.replaceChildren();
     if (!rows || rows.length === 0) {
       tbody.appendChild(renderEmptyRow(11, "No LLM runs match the current filters."));
       return;
     }
+    if (maybeRenderAggregateRows(tbody, "llm", rows)) return;
     for (const row of rows) {
       const flags = el("td", {});
       if (row.emptyToolCall) flags.appendChild(boolTag("empty", true));
@@ -738,11 +1243,13 @@
   function renderConversationsTable(rows) {
     const tbody = $("#conversations-table tbody");
     if (!tbody) return;
+    rows = applyClientControls("conversations", rows);
     tbody.replaceChildren();
     if (!rows || rows.length === 0) {
       tbody.appendChild(renderEmptyRow(6, "No conversations match the current filters."));
       return;
     }
+    if (maybeRenderAggregateRows(tbody, "conversations", rows)) return;
     for (const row of rows) {
       const tr = el("tr", {
         class: row.hiddenFromUserAt ? "is-warning" : "",
@@ -751,8 +1258,8 @@
       tr.append(
         el("td", { text: formatTimestamp(row.updatedAt) }),
         el("td", { class: "wrap", text: row.title || "—" }),
-        el("td", { class: "mono", text: row.userId || "—" }),
-        el("td", { class: "mono" }, copyableSpan(row.id)),
+        idCell(row.userId),
+        idCell(row.id),
         el("td", {}, row.hiddenFromUserAt ? statusTag("hidden") : statusTag("visible")),
         el("td", { text: formatTimestamp(row.createdAt) }),
       );
@@ -773,15 +1280,15 @@
       const tr = el("tr", {});
       tr.append(
         el("td", { text: formatTimestamp(row.createdAt) }),
-        el("td", { class: "mono", text: row.turnId || "—" }),
+        idCell(row.turnId),
         el("td", { class: "mono", text: row.role || "—" }),
         el("td", { class: "mono", text: row.inputMode || "—" }),
         el("td", { class: "mono", text: row.source || "—" }),
       );
       tr.append(traceCell(row.traceId));
       tr.append(
-        el("td", { class: "mono", text: row.activeProposalId || "—" }),
-        el("td", { class: "wrap", text: text.length > 240 ? `${text.slice(0, 239)}…` : text || "—" }),
+        idCell(row.activeProposalId),
+        el("td", { class: "wrap" }, renderExpandableValue(text)),
       );
       tbody.appendChild(tr);
     }
@@ -790,18 +1297,20 @@
   function renderAgentTurnsTable(rows, selector = "#agent-turns-table tbody") {
     const tbody = $(selector);
     if (!tbody) return;
+    if (selector === "#agent-turns-table tbody") rows = applyClientControls("agentTurns", rows);
     tbody.replaceChildren();
     if (!rows || rows.length === 0) {
       tbody.appendChild(renderEmptyRow(14, "No agent turns match the current filters."));
       return;
     }
+    if (selector === "#agent-turns-table tbody" && maybeRenderAggregateRows(tbody, "agentTurns", rows)) return;
     for (const row of rows) {
       const tr = el("tr", { class: row.status === "failure" ? "is-error" : "" });
       tr.append(
         el("td", { text: formatTimestamp(row.createdAt) }),
-        el("td", { class: "mono", text: row.userId || "—" }),
-        el("td", { class: "mono", text: row.conversationId || "—" }),
-        el("td", { class: "mono", text: row.turnId || "—" }),
+        idCell(row.userId),
+        idCell(row.conversationId),
+        idCell(row.turnId),
       );
       tr.append(traceCell(row.traceId));
       tr.append(
@@ -822,26 +1331,28 @@
   function renderActionCallsTable(rows, selector = "#action-calls-table tbody") {
     const tbody = $(selector);
     if (!tbody) return;
+    if (selector === "#action-calls-table tbody") rows = applyClientControls("actionCalls", rows);
     tbody.replaceChildren();
     if (!rows || rows.length === 0) {
       tbody.appendChild(renderEmptyRow(10, "No action calls match the current filters."));
       return;
     }
+    if (selector === "#action-calls-table tbody" && maybeRenderAggregateRows(tbody, "actionCalls", rows)) return;
     for (const row of rows) {
       const tr = el("tr", { class: row.error ? "is-error" : "" });
       tr.append(
         el("td", { text: formatTimestamp(row.createdAt) }),
-        el("td", { class: "mono", text: row.actionId || "—" }),
+        idCell(row.actionId),
         el("td", { class: "mono", text: row.source || "—" }),
-        el("td", { class: "mono", text: row.userId || "—" }),
+        idCell(row.userId),
       );
       tr.append(traceCell(row.traceId));
       tr.append(
         el("td", { class: "numeric", text: formatDuration(row.latencyMs) }),
         el("td", { class: "mono", text: row.confirmationStatus || "—" }),
-        el("td", { class: "wrap mono", text: jsonPreview(row.input) }),
-        el("td", { class: "wrap mono", text: jsonPreview(row.output) }),
-        el("td", { class: "wrap mono", text: jsonPreview(row.error) }),
+        jsonCell(row.input),
+        jsonCell(row.output),
+        jsonCell(row.error),
       );
       tbody.appendChild(tr);
     }
@@ -885,15 +1396,34 @@
     const rows = groups.flatMap(([group, entries]) =>
       (entries || []).map((entry) => ({ group, ...entry })),
     );
+    state.tableRows.set("llmCost", rows);
     if (rows.length === 0) {
       tbody.appendChild(renderEmptyRow(8, "No cost records match the current filters."));
       return;
     }
-    for (const row of rows) {
+    const controls = readTableControls("llmCost");
+    const visibleRows = controls.viewMode === "aggregate"
+      ? aggregateRows(rows, "llmCost", controls.groupBy)
+      : [...rows].sort((a, b) => controls.sort === "asc" ? a.group.localeCompare(b.group) : b.group.localeCompare(a.group));
+    if (controls.viewMode === "aggregate") {
+      for (const row of visibleRows) {
+        const tr = el("tr", { class: "is-aggregate" });
+        tr.append(
+          el("td", { class: "mono" }, copyableId(row.key)),
+          el("td", { class: "numeric", text: formatNumber(row.count) }),
+          el("td", { class: "numeric", text: formatMoney(row.totalCost) }),
+          el("td", { class: "numeric", text: formatNumber(row.totalTokens) }),
+          el("td", { class: "wrap", colspan: 4 }, renderExpandableValue(row.numericSummary, { mono: true })),
+        );
+        tbody.appendChild(tr);
+      }
+      return;
+    }
+    for (const row of visibleRows) {
       const tr = el("tr", { class: row.unknownCostCount > 0 ? "is-warning" : "" });
       tr.append(
         el("td", { class: "mono", text: row.group }),
-        el("td", { class: "mono", text: row.key || "unknown" }),
+        el("td", { class: "mono" }, copyableId(row.key || "unknown")),
         el("td", { class: "numeric", text: formatMoney(row.providerCostAmount) }),
         el("td", { class: "numeric", text: formatMoney(row.estimatedCostAmount) }),
         el("td", { class: "numeric", text: formatMoney(row.totalCostAmount) }),
@@ -908,11 +1438,13 @@
   function renderProviderCallsTable(rows, selector = "#provider-calls-table tbody") {
     const tbody = $(selector);
     if (!tbody) return;
+    if (selector === "#provider-calls-table tbody") rows = applyClientControls("providerCalls", rows);
     tbody.replaceChildren();
     if (!rows || rows.length === 0) {
       tbody.appendChild(renderEmptyRow(13, "No provider calls match the current filters."));
       return;
     }
+    if (selector === "#provider-calls-table tbody" && maybeRenderAggregateRows(tbody, "providerCalls", rows)) return;
     for (const row of rows) {
       const tr = el("tr", { class: row.status === "failure" ? "is-error" : "" });
       tr.append(
@@ -920,11 +1452,11 @@
         el("td", { class: "mono", text: row.provider || "—" }),
         el("td", { class: "mono", text: row.requestedModel || "—" }),
         el("td", { class: "mono", text: row.servedModel || "—" }),
-        el("td", { class: "mono", text: row.providerGenerationId || row.providerRequestId || "—" }),
+        el("td", { class: "mono id-cell" }, copyableId(row.providerGenerationId || row.providerRequestId)),
       );
       tr.append(traceCell(row.traceId));
       tr.append(
-        el("td", { class: "mono", text: row.turnId || "—" }),
+        idCell(row.turnId),
         el("td", { class: "numeric", text: formatNumber(row.totalTokens) }),
         el("td", { class: "numeric", text: costAmount(row) }),
         el("td", { class: "mono", text: row.costSource || "—" }),
@@ -939,18 +1471,20 @@
   function renderTranscriptionsTable(rows, selector = "#transcriptions-table tbody") {
     const tbody = $(selector);
     if (!tbody) return;
+    if (selector === "#transcriptions-table tbody") rows = applyClientControls("transcriptions", rows);
     tbody.replaceChildren();
     if (!rows || rows.length === 0) {
       tbody.appendChild(renderEmptyRow(13, "No transcriptions match the current filters."));
       return;
     }
+    if (selector === "#transcriptions-table tbody" && maybeRenderAggregateRows(tbody, "transcriptions", rows)) return;
     for (const row of rows) {
       const tr = el("tr", { class: row.status === "failed" ? "is-error" : "" });
       tr.append(
         el("td", { text: formatTimestamp(row.createdAt) }),
         el("td", { class: "mono", text: row.surface || "—" }),
-        el("td", { class: "mono", text: row.userId || "—" }),
-        el("td", { class: "mono", text: row.conversationId || "—" }),
+        idCell(row.userId),
+        idCell(row.conversationId),
       );
       tr.append(traceCell(row.traceId));
       tr.append(
@@ -960,7 +1494,7 @@
         el("td", { class: "numeric", text: formatNumber(row.transcriptLength) }),
         el("td", { class: "numeric", text: formatDuration(row.durationMs) }),
         el("td", {}, statusTag(row.status)),
-        el("td", { class: "wrap", text: row.transcriptText || "—" }),
+        el("td", { class: "wrap" }, renderExpandableValue(row.transcriptText)),
         el("td", { class: "wrap", text: row.errorMessage || row.errorCode || "—" }),
       );
       tbody.appendChild(tr);
@@ -981,8 +1515,8 @@
         el("td", { text: formatTimestamp(row.createdAt) }),
         el("td", { class: "mono", text: row.provider || "—" }),
         el("td", { class: "mono", text: row.servedModel || row.requestedModel || "—" }),
-        el("td", { class: "mono", text: row.providerGenerationId || row.providerRequestId || "—" }),
-        el("td", { class: "mono", text: row.turnId || "—" }),
+        el("td", { class: "mono id-cell" }, copyableId(row.providerGenerationId || row.providerRequestId)),
+        idCell(row.turnId),
         el("td", { class: "numeric", text: formatNumber(row.totalTokens) }),
         el("td", { class: "numeric", text: costAmount(row) }),
         el("td", {}, statusTag(row.status)),
@@ -1005,11 +1539,11 @@
         el("td", { text: formatTimestamp(row.createdAt) }),
         el("td", { class: "mono", text: row.surface || "—" }),
         el("td", { class: "mono", text: row.provider || "—" }),
-        el("td", { class: "mono", text: row.conversationId || "—" }),
-        el("td", { class: "mono", text: row.turnId || "—" }),
+        idCell(row.conversationId),
+        idCell(row.turnId),
         el("td", { class: "numeric", text: formatNumber(row.transcriptLength) }),
         el("td", {}, statusTag(row.status)),
-        el("td", { class: "wrap", text: row.transcriptText || row.errorMessage || "—" }),
+        el("td", { class: "wrap" }, renderExpandableValue(row.transcriptText || row.errorMessage)),
       );
       tbody.appendChild(tr);
     }
@@ -1017,11 +1551,13 @@
 
   function renderFoodTable(rows) {
     const tbody = $("#food-table tbody");
+    rows = applyClientControls("food", rows);
     tbody.replaceChildren();
     if (!rows || rows.length === 0) {
       tbody.appendChild(renderEmptyRow(9, "No food search events match the current filters."));
       return;
     }
+    if (maybeRenderAggregateRows(tbody, "food", rows)) return;
     for (const row of rows) {
       const flags = el("td", {});
       if (row.zeroResults) flags.appendChild(boolTag("zero", true));
@@ -1110,7 +1646,7 @@
       el("dt", { text: "First seen" }),
       el("dd", { class: "mono", text: earliest ? formatTimestamp(new Date(earliest).toISOString()) : "—" }),
       el("dt", { text: "Trace ID" }),
-      el("dd", { class: "mono" }, copyableSpan(traceId)),
+      el("dd", { class: "mono" }, copyableId(traceId)),
     );
 
     summary.hidden = false;
@@ -1173,12 +1709,12 @@
         const tr = el("tr", {});
         tr.append(
           el("td", { text: formatTimestamp(row.createdAt) }),
-          el("td", { class: "mono", text: row.conversationId || "—" }),
-          el("td", { class: "mono", text: row.turnId || "—" }),
+          idCell(row.conversationId),
+          idCell(row.turnId),
           el("td", { class: "mono", text: row.role || "—" }),
           el("td", { class: "mono", text: row.inputMode || "—" }),
           el("td", { class: "mono", text: row.source || "—" }),
-          el("td", { class: "wrap", text: text.length > 220 ? `${text.slice(0, 219)}…` : text || "—" }),
+          el("td", { class: "wrap" }, renderExpandableValue(text)),
         );
         traceMessagesBody.appendChild(tr);
       }
@@ -1193,8 +1729,8 @@
         const tr = el("tr", { class: row.status === "failure" ? "is-error" : "" });
         tr.append(
           el("td", { text: formatTimestamp(row.createdAt) }),
-          el("td", { class: "mono", text: row.conversationId || "—" }),
-          el("td", { class: "mono", text: row.turnId || "—" }),
+          idCell(row.conversationId),
+          idCell(row.turnId),
           el("td", { class: "mono", text: row.inputMode || "—" }),
           el("td", { class: "mono", text: row.resultKind || "—" }),
           el("td", { class: "numeric", text: formatNumber(row.toolCallCount) }),
@@ -1220,11 +1756,11 @@
         tr.append(
           el("td", { text: formatTimestamp(row.createdAt || row.startedAt) }),
           el("td", { class: "mono", text: row.kind }),
-          el("td", { class: "mono", text: row.actionId || "—" }),
-          el("td", { class: "mono", text: row.turnId || "—" }),
+          idCell(row.actionId),
+          idCell(row.turnId),
           el("td", {}, statusTag(row.status || row.confirmationStatus)),
           el("td", { class: "numeric", text: formatDuration(row.durationMs ?? row.latencyMs) }),
-          el("td", { class: "wrap mono", text: jsonPreview(row.resultSummary ?? row.output ?? row.error ?? row.input ?? row.arguments) }),
+          jsonCell(row.resultSummary ?? row.output ?? row.error ?? row.input ?? row.arguments),
         );
         traceToolActionBody.appendChild(tr);
       }
@@ -1246,12 +1782,10 @@
         if (!flags.children.length) flags.appendChild(el("span", { class: "tag tag-neutral", text: "—" }));
 
         const query = row.queryText ? String(row.queryText) : "";
-        const displayQuery = query.length > 80 ? `${query.slice(0, 77)}…` : query;
-
         const tr = el("tr", { class: row.zeroResults ? "is-warning" : "" });
         tr.append(
           el("td", { text: formatTimestamp(row.createdAt) }),
-          el("td", { class: "wrap", text: displayQuery || "—" }),
+          el("td", { class: "wrap" }, renderExpandableValue(query)),
           el("td", { class: "mono", text: row.path || "—" }),
           el("td", { class: "numeric", text: formatNumber(row.resultCount) }),
           el("td", { class: "numeric", text: row.topScore != null ? Number(row.topScore).toFixed(4) : "—" }),
@@ -1375,6 +1909,7 @@
       if (filters.eventType) params.eventType = filters.eventType;
       if (filters.traceId) params.traceId = filters.traceId;
       if (filters.userId) params.userId = filters.userId;
+      appendDateParams(params, filters);
 
       const data = await apiGet(ENDPOINTS.events || "/v1/admin/telemetry/events", { params });
       const rows = extractList(data, ["events", "items", "data", "results"]);
@@ -1402,6 +1937,7 @@
       if (filters.selectedTool) params.selectedTool = filters.selectedTool;
       if (filters.traceId) params.traceId = filters.traceId;
       if (filters.userId) params.userId = filters.userId;
+      appendDateParams(params, filters);
 
       const data = await apiGet(ENDPOINTS.llmRuns || "/v1/admin/telemetry/llm-runs", { params });
       const rows = extractList(data, ["runs", "llmRuns", "items", "data", "results"]);
@@ -1429,6 +1965,7 @@
       if (filters.traceId) params.traceId = filters.traceId;
       if (filters.turnId) params.turnId = filters.turnId;
       if (filters.includeHidden) params.includeHidden = filters.includeHidden;
+      appendDateParams(params, filters);
       const data = await apiGet(ENDPOINTS.conversations || "/v1/admin/telemetry/conversations", { params });
       const rows = extractList(data, ["conversations", "items", "data", "results"]);
       renderConversationsTable(rows);
@@ -1472,6 +2009,8 @@
       if (filters.conversationId) params.conversationId = filters.conversationId;
       if (filters.traceId) params.traceId = filters.traceId;
       if (filters.turnId) params.turnId = filters.turnId;
+      if (filters.status) params.status = filters.status;
+      appendDateParams(params, filters);
       const data = await apiGet(ENDPOINTS.agentTurns || "/v1/admin/telemetry/agent-turns", { params });
       const rows = extractList(data, ["agentTurns", "items", "data", "results"]);
       renderAgentTurnsTable(rows);
@@ -1495,6 +2034,7 @@
       if (filters.userId) params.userId = filters.userId;
       if (filters.traceId) params.traceId = filters.traceId;
       if (filters.actionId) params.actionId = filters.actionId;
+      appendDateParams(params, filters);
       const data = await apiGet(ENDPOINTS.actionCalls || "/v1/admin/telemetry/action-calls", { params });
       const rows = extractList(data, ["actionCalls", "items", "data", "results"]);
       renderActionCallsTable(rows);
@@ -1546,6 +2086,9 @@
       if (filters.traceId) params.traceId = filters.traceId;
       if (filters.provider) params.provider = filters.provider;
       if (filters.model) params.model = filters.model;
+      if (filters.status) params.status = filters.status;
+      if (filters.costSource) params.costSource = filters.costSource;
+      appendDateParams(params, filters);
       const data = await apiGet(ENDPOINTS.providerCalls || "/v1/admin/telemetry/llm-provider-calls", { params });
       const rows = extractList(data, ["providerCalls", "items", "data", "results"]);
       renderProviderCallsTable(rows);
@@ -1570,6 +2113,8 @@
       if (filters.conversationId) params.conversationId = filters.conversationId;
       if (filters.traceId) params.traceId = filters.traceId;
       if (filters.surface) params.surface = filters.surface;
+      if (filters.status) params.status = filters.status;
+      appendDateParams(params, filters);
       const data = await apiGet(ENDPOINTS.transcriptions || "/v1/admin/telemetry/transcriptions", { params });
       const rows = extractList(data, ["transcriptions", "items", "data", "results"]);
       renderTranscriptionsTable(rows);
@@ -1600,6 +2145,7 @@
       }
       if (filters.traceId) params.traceId = filters.traceId;
       if (filters.userId) params.userId = filters.userId;
+      appendDateParams(params, filters);
 
       const data = await apiGet(ENDPOINTS.foodSearch || "/v1/admin/telemetry/food-search", { params });
       const rows = extractList(data, ["foodSearchEvents", "events", "foodSearches", "items", "data", "results"]);
@@ -1711,8 +2257,10 @@
         submitBtn.textContent = "Signing in…";
         await loginAdmin(username, password);
         passwordInput.value = "";
-        setStatusSuccess("Signed in. Loading overview…");
-        await loadOverview({});
+        setStatusSuccess("Signed in. Loading telemetry…");
+        if (!bootstrapTabFromHash()) {
+          await loadOverview({});
+        }
       } catch (err) {
         if (err.code !== "aborted") {
           err.message = friendlyLoginError(err);
@@ -1879,12 +2427,15 @@
 
   function init() {
     bindTabs();
+    enhanceFilterForms();
+    makeAllTablesResizable();
     bindConfigForm();
     bindFilterForms();
     bindGlobalHotkeys();
     if (isSignedIn()) {
-      bootstrapTabFromHash();
-      loadOverview({});
+      if (!bootstrapTabFromHash()) {
+        loadOverview({});
+      }
     } else {
       clearProtectedData();
       renderAuthUi();

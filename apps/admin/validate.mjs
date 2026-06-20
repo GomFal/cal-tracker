@@ -39,6 +39,7 @@ const read = (file) => {
 const index = read("index.html");
 const app = read("app.js");
 const config = read("config.js");
+const styles = read("styles.css");
 
 const requiredHtmlSnippets = [
   ['<title>BetterCalories Admin · Telemetry</title>', "title"],
@@ -158,6 +159,15 @@ const requiredAppFeatures = [
   ["loadTranscriptions", "transcriptions loader"],
   ["loadFoodSearch", "food search loader"],
   ["loadTrace", "trace loader"],
+  ["TAB_LOADERS", "tab auto-load mapping"],
+  ["enhanceFilterForms", "dynamic date/status/table controls"],
+  ["appendDateParams", "date filter query helper"],
+  ["applyClientControls", "client-side sorting/filtering"],
+  ["maybeRenderAggregateRows", "aggregate row renderer"],
+  ["aggregateRows", "aggregate metrics helper"],
+  ["copyableId", "copyable long ID helper"],
+  ["renderExpandableValue", "expandable JSON/text helper"],
+  ["makeTableResizable", "resizable table helper"],
   ["admin/auth/login", "admin login endpoint"],
   ["admin/telemetry/overview", "overview endpoint"],
   ["admin/telemetry/events", "events endpoint"],
@@ -180,6 +190,23 @@ for (const [snippet, label] of requiredAppFeatures) {
     fail(`app.js missing ${label}: ${snippet}`);
   } else {
     console.log(`✓ app.js · ${label}`);
+  }
+}
+
+const requiredCssSnippets = [
+  [".resize-handle", "column resize handle styles"],
+  [".copy-id", "copyable ID layout"],
+  [".copy-btn", "copy button styles"],
+  [".expandable-value", "expandable value container"],
+  [".json-cell", "JSON cell layout"],
+  [".data-table tr.is-aggregate", "aggregate row styles"],
+];
+
+for (const [snippet, label] of requiredCssSnippets) {
+  if (!styles.includes(snippet)) {
+    fail(`styles.css missing ${label}: ${snippet}`);
+  } else {
+    console.log(`✓ styles.css · ${label}`);
   }
 }
 

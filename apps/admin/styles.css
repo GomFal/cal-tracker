@@ -251,6 +251,10 @@ input::placeholder {
   min-width: 90px;
 }
 
+.field-narrowish {
+  min-width: 120px;
+}
+
 .field input,
 .field select {
   min-width: 0;
@@ -618,6 +622,7 @@ input::placeholder {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
+  table-layout: auto;
 }
 
 .data-table thead th {
@@ -633,6 +638,8 @@ input::placeholder {
   position: sticky;
   top: 0;
   z-index: 1;
+  min-width: 72px;
+  user-select: none;
 }
 
 .data-table tbody td {
@@ -641,6 +648,37 @@ input::placeholder {
   vertical-align: top;
   color: var(--ink-soft);
   white-space: nowrap;
+}
+
+.data-table th.is-resizable {
+  position: sticky;
+}
+
+.resize-handle {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 7px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+  z-index: 2;
+}
+
+.resize-handle::after {
+  content: "";
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 3px;
+  width: 1px;
+  background: var(--rule-strong);
+  opacity: 0;
+}
+
+.data-table th:hover .resize-handle::after,
+.resize-handle:hover::after {
+  opacity: 1;
 }
 
 .data-table tbody tr:last-child td {
@@ -684,6 +722,83 @@ input::placeholder {
 
 .data-table tr.is-warning td {
   background: var(--warning-soft);
+}
+
+.data-table tr.is-aggregate td {
+  background: var(--info-soft);
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.copy-id {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.copy-id-text {
+  display: inline-block;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+}
+
+.copy-btn {
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--surface-soft);
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+  padding: 4px 6px;
+  white-space: nowrap;
+}
+
+.copy-btn:hover {
+  border-color: var(--rule-strong);
+  color: var(--ink);
+}
+
+.copy-btn.is-copied {
+  color: var(--success);
+  border-color: var(--success-soft);
+  background: var(--success-soft);
+}
+
+.json-cell {
+  min-width: 260px;
+}
+
+.expandable-value {
+  display: grid;
+  gap: 6px;
+  min-width: 220px;
+  max-width: min(720px, 70vw);
+}
+
+.expandable-preview {
+  margin: 0;
+  max-height: 88px;
+  overflow: hidden;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--ink-soft);
+}
+
+.expandable-value.is-expanded .expandable-preview {
+  max-height: 420px;
+  overflow: auto;
+  padding-right: 6px;
+}
+
+.cell-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
 }
 
 .tag {

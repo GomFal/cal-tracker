@@ -1,8 +1,10 @@
-## Implementation Plan: Compact Duplicated Nutrition Search Tool Results
+## Implementation Plan: Stateful Nutrition Candidate Selection
 
 ### Goal
 
 Fix the duplicated `search_nutrition_database` tool-result inefficiency without reducing live UI quality or preventing the user from selecting any candidate shown by the app.
+
+The chosen implementation treats ingredient candidate lists as backend/UI state, not LLM context. The LLM sees an accepted high-confidence item or a compact pending-selection state. It does not see full candidate arrays.
 
 ### Non-goals
 
@@ -18,6 +20,7 @@ Separate three payloads that are currently conflated:
 1. Action output: canonical backend result from `ActionExecutor`.
 2. UI payload: rich data streamed to the mobile app for rendering and selection.
 3. LLM tool content: compact context sent back to the model and persisted in `agent_messages.content`.
+4. Candidate registry metadata: full candidate rows stored in `agent_messages.metadata_json`, available for deterministic selection but not sent to the LLM.
 
 Only the third payload needs aggressive token control.
 
@@ -96,7 +99,7 @@ Do not include:
 - `displayDetails`
 - verbose provenance fields that the LLM does not need
 
-Use a conservative initial candidate cap for LLM content, for example top 5 compact candidates per group. The live UI event may still carry all candidates returned by the resolver.
+Do not send candidate lists to the LLM for low-confidence results. The live UI event carries all candidates returned by the resolver, and the LLM receives only a `selectionState` with `searchRef`, counts, threshold, and status.
 
 ### Step 3. Preserve full UI behavior
 
@@ -123,23 +126,25 @@ For history or resume, do not require `agent_messages.content` to contain the fu
 
 ### Step 4. Support user selection beyond compacted candidates
 
-When the user taps any candidate shown in the UI, including a candidate not included in the compact LLM payload, the selection should be handled deterministically.
+When the user taps any candidate shown in the UI, the selection is handled deterministically.
 
-Acceptable approaches:
+Implemented approach:
 
-- Send the selected `MealItem` payload to an existing deterministic action such as `create_meal_proposal_from_items`.
-- For active proposal clarification/revision, add a deterministic action such as `apply_meal_candidate_selection` that receives `proposalId`, `mentionKey` or `toolCallId`, and the selected candidate id/token.
-- Store backend-issued candidate tokens in the UI payload so the client can send a small stable reference instead of a full candidate object.
+- Store backend-issued candidate references in `agent_messages.metadata_json`.
+- Add `candidateSelection` to `/v1/agent/chat` requests.
+- The mobile app sends `searchRef`, `groupIndex`, and `candidateIndex`; it does not send the full candidate object.
+- The backend resolves the full candidate from metadata and injects only the selected `MealItem` into the next LLM turn.
+- A chat-only internal `resolve_candidate_reference` tool handles typed references such as "use the 6th one".
 
 The LLM follow-up should receive only a compact result:
 
 ```json
 {
-  "actionId": "apply_meal_candidate_selection",
+  "actionId": "resolve_candidate_reference",
   "result": {
-    "kind": "proposal",
-    "message": "Meal proposal updated.",
-    "selectedCandidate": {
+    "kind": "candidate_reference",
+    "message": "Selected nutrition candidate resolved.",
+    "selectedItem": {
       "rank": 6,
       "name": "Pan integral",
       "calories": 247

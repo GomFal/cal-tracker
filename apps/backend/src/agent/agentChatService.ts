@@ -35,6 +35,7 @@ import {
 import { resolveLlmCost, type LlmCostResult } from "../telemetry/llmCost.js";
 import type {
   AgentMessage,
+  AgentToolDefinition,
   AgentToolCall,
   AgentToolDecision,
   ChatAgentProvider,
@@ -42,12 +43,21 @@ import type {
 import { buildChatSystemMessage } from "./agentMessages.js";
 import { buildToolSchemas } from "./toolSchemas.js";
 import { filterToolsByPolicy } from "./agentPolicy.js";
+import {
+  buildToolContentForModel,
+  resolveCandidateReferenceFromMessages,
+  selectedCandidateContent,
+  type AgentCandidateSelectionState,
+  type AgentChatCandidateSelection,
+  type CandidateRegistryMetadata,
+} from "./toolContent.js";
 
 const MAX_CHAT_ITERATIONS = 6;
 const MAX_TOOL_CALLS_PER_TURN = 8;
 const STORED_TOOL_RESULT_MAX_CHARS = 12000;
 const MAX_CONVERSATION_TITLE_CHARS = 64;
 const CHAT_OPTIONS_TOOL_NAME = "show_chat_options";
+const RESOLVE_CANDIDATE_REFERENCE_TOOL_NAME = "resolve_candidate_reference";
 
 type ChatTurnCorrelation = {
   traceId: string;
@@ -89,6 +99,7 @@ export type AgentChatMappedResult =
       message: string;
       options?: unknown[];
       candidateGroups?: unknown[];
+      selectionState?: AgentCandidateSelectionState;
     }
   | {
       kind: "meal_committed";
@@ -96,6 +107,7 @@ export type AgentChatMappedResult =
       message: string;
       options?: unknown[];
       candidateGroups?: unknown[];
+      selectionState?: AgentCandidateSelectionState;
     }
   | {
       kind: "meal_corrected";
@@ -117,6 +129,8 @@ export type AgentChatMappedResult =
       items: MealItem[];
       message: string;
       options?: unknown[];
+      candidateGroups?: unknown[];
+      selectionState?: AgentCandidateSelectionState;
     }
   | { kind: "usual_foods"; usualFoods: UsualFood[]; message: string }
   | { kind: "templates"; templates: MealTemplate[]; message: string }
@@ -133,6 +147,7 @@ export type AgentChatMappedResult =
       message: string;
       options?: unknown[];
       candidateGroups?: unknown[];
+      selectionState?: AgentCandidateSelectionState;
     }
   | {
       kind: "confirmation_required";
@@ -148,6 +163,7 @@ export type AgentChatMappedResult =
       options?: unknown[];
       candidateGroups?: unknown[];
       resolvedItems?: MealItem[];
+      selectionState?: AgentCandidateSelectionState;
     };
 
 export type AgentToolFeedback = {
@@ -207,6 +223,7 @@ export class AgentChatService {
     private readonly model: string,
     private readonly runLogger?: LocalRunLogger,
     private readonly telemetryService: TelemetryService = DEFAULT_TELEMETRY_SERVICE,
+    private readonly selectionConfidenceThreshold = 0.75,
   ) {}
 
   async *chat(input: {
@@ -216,6 +233,7 @@ export class AgentChatService {
     activeProposalId?: string;
     activeProposal?: MealProposal | null;
     inputMode?: "text" | "voice";
+    candidateSelection?: AgentChatCandidateSelection;
   }): AsyncGenerator<AgentChatEvent> {
     const runStarted = Date.now();
     const conversation = await this.resolveConversation(
@@ -238,7 +256,16 @@ export class AgentChatService {
       turnId: correlation.turnId,
     };
 
-    const text = input.text.trim();
+    const selectedCandidate = input.candidateSelection
+      ? await this.resolveCandidateSelection(
+          input.context.actorUserId,
+          conversation.id,
+          input.candidateSelection,
+        )
+      : undefined;
+    const text = selectedCandidate
+      ? selectionMessage(input.text, selectedCandidate)
+      : input.text.trim();
     if (!text) {
       yield {
         type: "assistant_delta",
@@ -286,6 +313,7 @@ export class AgentChatService {
               .parameters ?? {},
         },
       })),
+      candidateReferenceToolDefinition(),
       chatOptionsToolDefinition(),
     ];
 
@@ -660,6 +688,86 @@ export class AgentChatService {
           return;
         }
 
+        if (actionId === RESOLVE_CANDIDATE_REFERENCE_TOOL_NAME) {
+          const feedback = describeToolCall(toolCall, parsedInput);
+          yield {
+            type: "tool_call_started",
+            conversationId: conversation.id,
+            toolCall: feedback,
+          };
+          const resolved = await this.resolveCandidateSelection(
+            input.context.actorUserId,
+            conversation.id,
+            parsedInput as AgentChatCandidateSelection,
+          );
+          const contentValue = resolved
+            ? selectedCandidateContent({
+                selection: parsedInput as AgentChatCandidateSelection,
+                resolved,
+              })
+            : {
+                actionId,
+                input: parsedInput,
+                error: "candidate_reference_not_found",
+              };
+          const toolContent = safeToolContent(contentValue);
+          const toolMessage: AgentMessage = {
+            role: "tool",
+            toolCallId: toolCall.id,
+            content: toolContent,
+          };
+          messages.push(toolMessage);
+          await this.repository.addAgentConversationMessage(
+            input.context.actorUserId,
+            conversation.id,
+            {
+              role: "tool",
+              content: toolContent,
+              toolCallId: toolCall.id,
+              ...messageCorrelation(correlation, {
+                actionId,
+                resultKind: resolved ? "candidate_reference" : "error",
+                iteration,
+                toolCallIndex: toolCallCount,
+              }),
+            },
+          );
+          if (resolved) {
+            yield {
+              type: "tool_call_completed",
+              conversationId: conversation.id,
+              toolCall: feedback,
+              result: {
+                kind: "nutrition_search",
+                items: [resolved.item],
+                message: "Selected nutrition candidate resolved.",
+              },
+            };
+          } else {
+            yield {
+              type: "tool_call_failed",
+              conversationId: conversation.id,
+              toolCall: feedback,
+              error: "Candidate reference not found.",
+            };
+          }
+          await this.recordToolCallTelemetry({
+            correlation,
+            userId: input.context.actorUserId,
+            toolCall,
+            actionId,
+            arguments: parsedInput,
+            resultSummary: resolved
+              ? { candidateRef: resolved.candidateRef }
+              : undefined,
+            status: resolved ? "completed" : "failed",
+            errorMessage: resolved ? undefined : "candidate_reference_not_found",
+            iteration,
+            toolCallIndex: toolCallCount,
+          });
+          continue;
+        }
+
         if (!allowedActions.some((action) => action.id === actionId)) {
           const feedback = describeToolCall(toolCall, parsedInput);
           const error = `This action is not available: ${actionId}`;
@@ -770,21 +878,28 @@ export class AgentChatService {
           ) {
             currentActiveProposal = undefined;
           }
-          const widget = widgetForResult(mapped);
+          const modelToolContent = buildToolContentForModel({
+            actionId,
+            actionCallId: result.actionCallId,
+            toolInput: parsedInput,
+            mappedResult: mapped as Record<string, unknown>,
+            rawOutput: result.output,
+            threshold: this.selectionConfidenceThreshold,
+          });
+          const mappedForUi = withSelectionState(
+            mapped,
+            modelToolContent.selectionState,
+          );
+          const widget = widgetForResult(mappedForUi);
           yield {
             type: "tool_call_completed",
             conversationId: conversation.id,
             toolCall: feedback,
-            result: mapped,
+            result: mappedForUi,
             widget,
           };
 
-          const toolContent = safeToolContent({
-            actionId,
-            input: parsedInput,
-            result: mapped,
-            rawOutput: result.output,
-          });
+          const toolContent = safeToolContent(modelToolContent.contentValue);
           const toolMessage: AgentMessage = {
             role: "tool",
             toolCallId: toolCall.id,
@@ -804,6 +919,15 @@ export class AgentChatService {
                 iteration,
                 toolCallIndex: toolCallCount,
                 resultKind: mapped.kind,
+                candidateRegistry: modelToolContent.candidateRegistry,
+                selectionState: modelToolContent.selectionState,
+                toolContentCompacted: true,
+                rawToolContentChars: modelToolContent.rawContentChars,
+                rawToolContentApproxTokens:
+                  modelToolContent.rawContentApproxTokens,
+                modelToolContentChars: modelToolContent.modelContentChars,
+                modelToolContentApproxTokens:
+                  modelToolContent.modelContentApproxTokens,
               }),
             },
           );
@@ -960,6 +1084,25 @@ export class AgentChatService {
       buildChatSystemMessage(context, activeProposal),
       ...stored.map(storedMessageToAgentMessage),
     ];
+  }
+
+  private async resolveCandidateSelection(
+    userId: string,
+    conversationId: string,
+    selection: AgentChatCandidateSelection,
+  ): Promise<
+    | {
+        registry: CandidateRegistryMetadata;
+        candidateRef: string;
+        item: MealItem;
+      }
+    | undefined
+  > {
+    const stored = await this.repository.listAgentConversationMessages(
+      userId,
+      conversationId,
+    );
+    return resolveCandidateReferenceFromMessages(stored, selection);
   }
 
   private async recordProviderTelemetry(input: {
@@ -1184,6 +1327,32 @@ function storedMessageToAgentMessage(
   return { role: "user", content: message.content };
 }
 
+function withSelectionState<T extends AgentChatMappedResult>(
+  mapped: T,
+  selectionState: AgentCandidateSelectionState | undefined,
+): T {
+  return selectionState
+    ? ({ ...mapped, selectionState } as T)
+    : mapped;
+}
+
+function selectionMessage(
+  text: string,
+  selected: {
+    registry: CandidateRegistryMetadata;
+    candidateRef: string;
+    item: MealItem;
+  },
+): string {
+  const prefix = text.trim() || "Selected a nutrition search result.";
+  return `${prefix}\n\nSelected nutrition candidate:\n${JSON.stringify(
+    selectedCandidateContent({
+      selection: { candidateRef: selected.candidateRef },
+      resolved: selected,
+    }).result,
+  )}`;
+}
+
 function extractLlmTokenMetrics(rawResponse: unknown): {
   promptTokens?: number;
   completionTokens?: number;
@@ -1239,9 +1408,48 @@ function safeParseJson(value: string): unknown {
   }
 }
 
-function chatOptionsToolDefinition() {
+function candidateReferenceToolDefinition(): AgentToolDefinition {
   return {
-    type: "function" as const,
+    type: "function",
+    function: {
+      name: RESOLVE_CANDIDATE_REFERENCE_TOOL_NAME,
+      description: [
+        "Resolve a prior nutrition search candidate selected by the user.",
+        "Use when the user refers to a displayed search result by number or candidateRef, such as 'use the 6th one'.",
+        "This returns the selected MealItem; do not reconstruct nutrition fields yourself.",
+      ].join(" "),
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          searchRef: {
+            type: "string",
+            description:
+              "The searchRef from the prior awaiting_user_selection result. Omit only when referring to the latest candidate list.",
+          },
+          candidateRef: {
+            type: "string",
+            description: "Exact candidateRef if available.",
+          },
+          groupIndex: {
+            type: "integer",
+            minimum: 1,
+            description: "1-based candidate group index.",
+          },
+          candidateIndex: {
+            type: "integer",
+            minimum: 1,
+            description: "1-based candidate index shown to the user.",
+          },
+        },
+      },
+    },
+  };
+}
+
+function chatOptionsToolDefinition(): AgentToolDefinition {
+  return {
+    type: "function",
     function: {
       name: CHAT_OPTIONS_TOOL_NAME,
       description: [
@@ -1375,6 +1583,7 @@ function mapActionResult(
         kind: "nutrition_search",
         items,
         options,
+        candidateGroups: options,
         message:
           items.length > 0
             ? "I found matching nutrition items."

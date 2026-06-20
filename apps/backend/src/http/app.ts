@@ -137,6 +137,7 @@ export function createApp(input: {
     config.OPENROUTER_MODEL,
     runLogger,
     telemetryService,
+    config.FOOD_RESOLVER_MIN_CONFIDENCE,
   );
 
   async function runMealInput(input: {
@@ -537,11 +538,12 @@ export function createApp(input: {
     return streamAgentChat(
       c,
       agentChatService.chat({
-        text: body.message,
+        text: body.message ?? "",
         context: buildActionContext(c, user, body.source),
         conversationId: body.conversationId,
         activeProposalId: body.activeProposalId,
         inputMode: "text",
+        candidateSelection: body.candidateSelection,
       }),
     );
   });

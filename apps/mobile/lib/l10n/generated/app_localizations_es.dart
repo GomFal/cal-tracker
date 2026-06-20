@@ -271,7 +271,11 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String settingsMacroPresetSubtitle(
-      String preset, int protein, int carbs, int fat) {
+    String preset,
+    int protein,
+    int carbs,
+    int fat,
+  ) {
     return '$preset: $protein % proteína, $carbs % carbohidratos, $fat % grasa';
   }
 
@@ -1731,6 +1735,13 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get agentChatConsumedToday => 'Consumido hoy';
+
+  @override
+  String get agentChatCandidateSelectionTitle =>
+      'Elige un ingrediente coincidente';
+
+  @override
+  String get agentChatCandidateSelectedPrefix => 'Resultado seleccionado';
 
   @override
   String get agentChatNoItems => 'No hay ingredientes que mostrar.';

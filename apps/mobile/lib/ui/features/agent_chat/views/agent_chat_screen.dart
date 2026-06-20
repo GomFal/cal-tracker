@@ -735,6 +735,16 @@ class _AgentResultWidget extends StatelessWidget {
       return _NutritionSnapshotGrid(snapshot: result.remaining!);
     }
     if (result.meals != null) return _MealList(meals: result.meals!);
+    final selectionState = result.selectionState;
+    final candidateGroups = result.candidateGroups;
+    if (selectionState?.isAwaitingUserSelection == true &&
+        candidateGroups != null &&
+        candidateGroups.isNotEmpty) {
+      return _CandidateSelectionList(
+        selectionState: selectionState!,
+        groups: candidateGroups,
+      );
+    }
     if (result.items != null) return _ItemList(items: result.items!);
     if (result.usualFoods != null) {
       return _UsualFoodList(foods: result.usualFoods!);
@@ -1172,6 +1182,90 @@ class _MetricPill extends StatelessWidget {
               fontWeight: FontWeight.w700,
             ),
       ),
+    );
+  }
+}
+
+class _CandidateSelectionList extends StatelessWidget {
+  const _CandidateSelectionList({
+    required this.selectionState,
+    required this.groups,
+  });
+
+  final AgentCandidateSelectionState selectionState;
+  final List<FoodCandidateGroup> groups;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.freshPalette;
+    final viewModel = context.watch<AgentChatViewModel>();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          context.l10n.agentChatCandidateSelectionTitle,
+          style: Theme.of(context)
+              .textTheme
+              .titleSmall
+              ?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: FreshSpacing.sm),
+        for (var groupIndex = 0; groupIndex < groups.length; groupIndex++)
+          for (var candidateIndex = 0;
+              candidateIndex < groups[groupIndex].candidates.length;
+              candidateIndex++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: FreshSpacing.xs),
+              child: OutlinedButton(
+                key: ValueKey(
+                  'agent_candidate_${groupIndex + 1}_${candidateIndex + 1}',
+                ),
+                onPressed: viewModel.isBusy
+                    ? null
+                    : () {
+                        final candidate =
+                            groups[groupIndex].candidates[candidateIndex];
+                        unawaited(
+                          viewModel.selectCandidate(
+                            selection: AgentCandidateSelection(
+                              searchRef: selectionState.searchRef,
+                              groupIndex: groupIndex + 1,
+                              candidateIndex: candidateIndex + 1,
+                            ),
+                            label:
+                                '${context.l10n.agentChatCandidateSelectedPrefix} ${candidateIndex + 1}: ${candidate.name}',
+                          ),
+                        );
+                      },
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 13,
+                      backgroundColor: palette.limeWash,
+                      child: Text(
+                        '${candidateIndex + 1}',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: palette.ink,
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                    ),
+                    const SizedBox(width: FreshSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        groups[groupIndex].candidates[candidateIndex].name,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: FreshSpacing.sm),
+                    Text(
+                      '${groups[groupIndex].candidates[candidateIndex].calories} ${context.l10n.commonKcal}',
+                    ),
+                  ],
+                ),
+              ),
+            ),
+      ],
     );
   }
 }

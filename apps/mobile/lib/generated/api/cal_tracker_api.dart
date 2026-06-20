@@ -167,6 +167,7 @@ class CalTrackerApiClient {
     String message, {
     String? conversationId,
     String? activeProposalId,
+    Map<String, Object?>? candidateSelection,
   }) {
     Future<http.BaseRequest> buildRequest() async {
       final request = http.Request('POST', _uri('/v1/agent/chat'));
@@ -176,6 +177,8 @@ class CalTrackerApiClient {
         'source': 'flutter',
         if (conversationId != null) 'conversationId': conversationId,
         if (activeProposalId != null) 'activeProposalId': activeProposalId,
+        if (candidateSelection != null)
+          'candidateSelection': candidateSelection,
       });
       return request;
     }

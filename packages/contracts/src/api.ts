@@ -58,14 +58,29 @@ export const agentRunRequestSchema = z.object({
   activeProposalId: uuidSchema.optional(),
 });
 
-export const agentChatRequestSchema = z.object({
-  message: z.string().trim().min(1),
-  source: z
-    .enum(["flutter", "ios_appintents", "android_appfunctions"])
-    .default("flutter"),
-  conversationId: uuidSchema.optional(),
-  activeProposalId: uuidSchema.optional(),
+export const agentChatCandidateSelectionSchema = z.object({
+  searchRef: z.string().trim().min(1),
+  candidateRef: z.string().trim().min(1).optional(),
+  groupIndex: z.number().int().positive().optional(),
+  candidateIndex: z.number().int().positive().optional(),
 });
+
+export const agentChatRequestSchema = z
+  .object({
+    message: z.string().trim().optional(),
+    source: z
+      .enum(["flutter", "ios_appintents", "android_appfunctions"])
+      .default("flutter"),
+    conversationId: uuidSchema.optional(),
+    activeProposalId: uuidSchema.optional(),
+    candidateSelection: agentChatCandidateSelectionSchema.optional(),
+  })
+  .refine(
+    (value) =>
+      Boolean(value.message && value.message.length > 0) ||
+      Boolean(value.candidateSelection),
+    "message or candidateSelection is required",
+  );
 
 export const agentConversationSummarySchema = z.object({
   id: uuidSchema,

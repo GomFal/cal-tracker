@@ -267,6 +267,29 @@ class AgentChatViewModel extends ChangeNotifier {
     );
   }
 
+  Future<void> selectCandidate({
+    required AgentCandidateSelection selection,
+    required String label,
+  }) async {
+    if (isBusy || isRecording) return;
+    final text = label.trim().isEmpty ? 'Selected nutrition result' : label;
+    _entries.add(
+      AgentChatEntry(
+        id: _nextEntryId('user'),
+        kind: AgentChatEntryKind.user,
+        text: text,
+      ),
+    );
+    await _runStream(
+      _nutritionRepository.streamAgentChat(
+        text,
+        conversationId: conversationId,
+        activeProposalId: activeProposalId,
+        candidateSelection: selection,
+      ),
+    );
+  }
+
   void dismissSuggestions(String entryId) {
     final index = _entries.indexWhere((entry) => entry.id == entryId);
     if (index < 0 || _entries[index].suggestions.isEmpty) return;

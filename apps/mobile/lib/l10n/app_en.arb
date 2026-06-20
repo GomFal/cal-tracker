@@ -819,6 +819,8 @@
   "agentChatPromptUsual": "Log my usual breakfast",
   "agentChatToolFallback": "Agent action",
   "agentChatConsumedToday": "Consumed today",
+  "agentChatCandidateSelectionTitle": "Choose a matching ingredient",
+  "agentChatCandidateSelectedPrefix": "Selected result",
   "agentChatNoItems": "No ingredients to show.",
   "agentChatNoMeals": "No meals to show.",
   "agentChatNoTemplates": "No usual meals to show.",

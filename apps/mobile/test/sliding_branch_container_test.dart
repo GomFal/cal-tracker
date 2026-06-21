@@ -141,6 +141,33 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('programmatic branch changes jump when animations are disabled', (
+    tester,
+  ) async {
+    final changes = <int>[];
+
+    await tester.pumpWidget(
+      _BranchHarness(
+        currentIndex: 0,
+        disableAnimations: true,
+        onPageChanged: changes.add,
+      ),
+    );
+
+    await tester.pumpWidget(
+      _BranchHarness(
+        currentIndex: 2,
+        disableAnimations: true,
+        onPageChanged: changes.add,
+      ),
+    );
+    await tester.pump();
+
+    expect(changes, isEmpty);
+    expect(_hitTestableBranch(2), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   test('modal lock observer locks until all popup routes close', () {
     final controller = ShellModalLockController();
     final observer = ShellModalLockObserver(controller);
@@ -240,29 +267,34 @@ class _BranchHarness extends StatelessWidget {
     required this.currentIndex,
     required this.onPageChanged,
     this.userScrollEnabled = true,
+    this.disableAnimations = false,
   });
 
   final int currentIndex;
   final ValueChanged<int> onPageChanged;
   final bool userScrollEnabled;
+  final bool disableAnimations;
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      home: SizedBox.expand(
-        child: SlidingBranchContainer(
-          currentIndex: currentIndex,
-          userScrollEnabled: userScrollEnabled,
-          onPageChanged: onPageChanged,
-          children: [
-            for (var index = 0; index < 4; index++)
-              GestureDetector(
-                key: ValueKey('branch_$index'),
-                behavior: HitTestBehavior.opaque,
-                onTap: () {},
-                child: Center(child: Text('Branch $index')),
-              ),
-          ],
+      home: MediaQuery(
+        data: MediaQueryData(disableAnimations: disableAnimations),
+        child: SizedBox.expand(
+          child: SlidingBranchContainer(
+            currentIndex: currentIndex,
+            userScrollEnabled: userScrollEnabled,
+            onPageChanged: onPageChanged,
+            children: [
+              for (var index = 0; index < 4; index++)
+                GestureDetector(
+                  key: ValueKey('branch_$index'),
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {},
+                  child: Center(child: Text('Branch $index')),
+                ),
+            ],
+          ),
         ),
       ),
     );

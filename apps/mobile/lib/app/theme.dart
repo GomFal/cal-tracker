@@ -155,9 +155,7 @@ ThemeData _buildFreshTheme({
     fontFamilyFallback: const ['Roboto', 'Arial', 'sans-serif'],
     textTheme: textTheme,
     useMaterial3: true,
-    extensions: <ThemeExtension<dynamic>>[
-      palette,
-    ],
+    extensions: <ThemeExtension<dynamic>>[palette],
     appBarTheme: AppBarTheme(
       backgroundColor: palette.screen,
       foregroundColor: palette.ink,
@@ -174,29 +172,28 @@ ThemeData _buildFreshTheme({
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(
-      filled: true,
-      fillColor: palette.surfaceSoft,
+      filled: false,
+      fillColor: Colors.transparent,
       labelStyle: TextStyle(color: palette.inkMuted),
       hintStyle: TextStyle(color: palette.inkMuted),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(24),
-        borderSide: BorderSide(color: palette.rule),
+      isDense: true,
+      contentPadding: const EdgeInsets.only(bottom: 9),
+      border: UnderlineInputBorder(
+        borderSide: BorderSide(color: palette.rule, width: 1.1),
       ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(24),
-        borderSide: BorderSide(color: palette.rule),
+      enabledBorder: UnderlineInputBorder(
+        borderSide: BorderSide(color: palette.rule, width: 1.1),
       ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(24),
+      disabledBorder: UnderlineInputBorder(
+        borderSide: BorderSide(color: palette.ruleSoft, width: 1.1),
+      ),
+      focusedBorder: UnderlineInputBorder(
         borderSide: BorderSide(color: palette.lime, width: 2),
       ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(24),
-        borderSide: BorderSide(color: palette.coral),
+      errorBorder: UnderlineInputBorder(
+        borderSide: BorderSide(color: palette.coral, width: 1.4),
       ),
-      focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(24),
+      focusedErrorBorder: UnderlineInputBorder(
         borderSide: BorderSide(color: palette.coral, width: 2),
       ),
     ),

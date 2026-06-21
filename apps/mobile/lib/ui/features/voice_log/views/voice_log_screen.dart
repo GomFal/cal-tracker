@@ -10,6 +10,7 @@ import '../../../../domain/models/nutrition_models.dart';
 import '../../../../l10n/app_localizations_context.dart';
 import '../../../core/content_frame.dart';
 import '../../../core/design_system.dart';
+import '../../../core/motion.dart';
 import '../view_models/voice_log_helpers.dart';
 import '../view_models/voice_log_view_model.dart';
 import '../../../shared/editable_meal_item_controller.dart';
@@ -200,6 +201,7 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
+      sheetAnimationStyle: freshSheetAnimationStyle(context),
       builder: (context) => MealItemEditorSheet(
         meal: proposalMeal,
         keyPrefix: 'proposal',
@@ -234,6 +236,7 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
+      sheetAnimationStyle: freshSheetAnimationStyle(context),
       builder: (context) => const _MealLabelSheet(),
     );
     if (!context.mounted || selection == null) return;
@@ -431,6 +434,7 @@ class _ManualFoodSearchPanelState extends State<_ManualFoodSearchPanel> {
     final edited = await showModalBottomSheet<NutritionEdit>(
       context: context,
       isScrollControlled: true,
+      sheetAnimationStyle: freshSheetAnimationStyle(context),
       builder: (context) => NutritionEditSheet(
         initialNutrition: item.currentNutrition(),
         ingredientName: item.nameController.text.trim(),

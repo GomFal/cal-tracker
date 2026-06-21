@@ -18,6 +18,7 @@ class AppPreferencesRepository {
   Future<ThemeMode> loadThemeMode() async {
     final value = await _storage.readString(_themeModeKey);
     return switch (value) {
+      _themeModeLight => ThemeMode.light,
       _themeModeDark => ThemeMode.dark,
       _themeModeSystem => ThemeMode.system,
       _ => ThemeMode.system,

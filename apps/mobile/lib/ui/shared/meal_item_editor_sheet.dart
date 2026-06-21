@@ -4,17 +4,19 @@ import '../../domain/models/nutrition_edit.dart';
 import '../../domain/models/nutrition_models.dart';
 import '../../l10n/app_localizations_context.dart';
 import '../core/design_system.dart';
+import '../core/motion.dart';
 import 'editable_meal_item_controller.dart';
 import 'food_search_panel.dart';
 import 'nutrition_edit_components.dart';
 import 'nutrition_edit_sheet.dart';
 
-typedef MealItemHeaderBuilder = Widget? Function(
-  BuildContext context,
-  EditableMealItemController item,
-  int index,
-  ValueChanged<MealItem> onReplace,
-);
+typedef MealItemHeaderBuilder =
+    Widget? Function(
+      BuildContext context,
+      EditableMealItemController item,
+      int index,
+      ValueChanged<MealItem> onReplace,
+    );
 
 class MealItemEditorSheet extends StatefulWidget {
   const MealItemEditorSheet({
@@ -179,152 +181,15 @@ class _MealItemEditorSheetState extends State<MealItemEditorSheet> {
                 const SizedBox(height: FreshSpacing.md),
               ],
               Flexible(
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        l10n.mealEditorIngredientsSection,
-                        style: textTheme.labelLarge?.copyWith(
-                          color: palette.inkMuted,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: FreshSpacing.xs),
-                      if (widget.searchFoods != null) ...[
-                        AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 160),
-                          child: _addSearchExpanded
-                              ? FoodSearchPanel(
-                                  key: ValueKey(
-                                    '${widget.keyPrefix}_food_search_panel',
-                                  ),
-                                  keyPrefix: '${widget.keyPrefix}_food_search',
-                                  searchFoods: widget.searchFoods!,
-                                  onSelected: (item) {
-                                    setState(() {
-                                      final newIndex = _items.length;
-                                      _items.add(
-                                        EditableMealItemController(item),
-                                      );
-                                      _expandedIndex = newIndex;
-                                      _replacementSearchIndex = null;
-                                      _addSearchExpanded = false;
-                                      _error = null;
-                                    });
-                                  },
-                                  onClose: () {
-                                    setState(() => _addSearchExpanded = false);
-                                  },
-                                )
-                              : KeyedSubtree(
-                                  key: ValueKey(
-                                    '${widget.keyPrefix}_food_search_collapsed',
-                                  ),
-                                  child: _CompactSearchAddBar(
-                                    key: ValueKey(
-                                      '${widget.keyPrefix}_add_from_search_button',
-                                    ),
-                                    label: l10n.mealEditorSearchOrAddIngredient,
-                                    onTap: () {
-                                      setState(() {
-                                        _addSearchExpanded = true;
-                                        _replacementSearchIndex = null;
-                                      });
-                                    },
-                                  ),
-                                ),
-                        ),
-                        const SizedBox(height: FreshSpacing.sm),
-                      ],
-                      for (var index = 0; index < _items.length; index++) ...[
-                        _IngredientEditorCard(
-                          key: ValueKey('${widget.keyPrefix}_item_card_$index'),
-                          item: _items[index],
-                          index: index,
-                          keyPrefix: widget.keyPrefix,
-                          searchFoods: widget.searchFoods,
-                          isExpanded: _expandedIndex == index,
-                          isReplacementSearchActive:
-                              _replacementSearchIndex == index,
-                          header: widget.itemHeaderBuilder?.call(
-                            context,
-                            _items[index],
-                            index,
-                            (replacement) {
-                              setState(() {
-                                _items[index].replaceWith(replacement);
-                                _expandedIndex = index;
-                                _error = null;
-                              });
-                            },
-                          ),
-                          onExpand: () {
-                            setState(() {
-                              _expandedIndex = index;
-                              _replacementSearchIndex = null;
-                            });
-                          },
-                          onReplacementSearchRequested:
-                              widget.searchFoods == null
-                                  ? null
-                                  : () {
-                                      setState(() {
-                                        _expandedIndex = index;
-                                        _replacementSearchIndex = index;
-                                        _addSearchExpanded = false;
-                                      });
-                                    },
-                          onReplacementSearchClosed: () {
-                            setState(() => _replacementSearchIndex = null);
-                          },
-                          onChanged: () {
-                            if (_error != null) {
-                              _error = null;
-                            }
-                            setState(() {});
-                          },
-                          onReplace: (replacement) {
-                            setState(() {
-                              final scaledReplacement =
-                                  _replacementWithCurrentQuantity(
-                                _items[index],
-                                replacement,
-                              );
-                              _items[index].dispose();
-                              _items[index] = EditableMealItemController(
-                                scaledReplacement,
-                              );
-                              _expandedIndex = index;
-                              _replacementSearchIndex = null;
-                              _error = null;
-                            });
-                          },
-                          onDelete: _items.length == 1
-                              ? null
-                              : () {
-                                  setState(() {
-                                    _items.removeAt(index).dispose();
-                                    if (_expandedIndex == index) {
-                                      _expandedIndex = null;
-                                    } else if (_expandedIndex != null &&
-                                        _expandedIndex! > index) {
-                                      _expandedIndex = _expandedIndex! - 1;
-                                    }
-                                    if (_replacementSearchIndex == index) {
-                                      _replacementSearchIndex = null;
-                                    } else if (_replacementSearchIndex !=
-                                            null &&
-                                        _replacementSearchIndex! > index) {
-                                      _replacementSearchIndex =
-                                          _replacementSearchIndex! - 1;
-                                    }
-                                  });
-                                },
-                        ),
-                        const SizedBox(height: FreshSpacing.sm),
-                      ],
-                      OutlinedButton.icon(
+                child: ListView.builder(
+                  padding: EdgeInsets.zero,
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  itemCount: _items.length + 2,
+                  itemBuilder: (context, index) {
+                    if (index == 0) return _buildListHeader(context);
+                    if (index == _items.length + 1) {
+                      return OutlinedButton.icon(
                         key: ValueKey('add_${widget.keyPrefix}_item_button'),
                         onPressed: () {
                           setState(() {
@@ -337,15 +202,154 @@ class _MealItemEditorSheetState extends State<MealItemEditorSheet> {
                         },
                         icon: const Icon(Icons.add_rounded),
                         label: Text(l10n.commonAddIngredient),
-                      ),
-                    ],
-                  ),
+                      );
+                    }
+
+                    final itemIndex = index - 1;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: FreshSpacing.sm),
+                      child: _buildItemCard(context, itemIndex),
+                    );
+                  },
                 ),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildListHeader(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final palette = context.freshPalette;
+    final l10n = context.l10n;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          l10n.mealEditorIngredientsSection,
+          style: textTheme.labelLarge?.copyWith(
+            color: palette.inkMuted,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: FreshSpacing.xs),
+        if (widget.searchFoods != null) ...[
+          FreshAnimatedSwitcher(
+            duration: FreshMotion.fast,
+            child: _addSearchExpanded
+                ? FoodSearchPanel(
+                    key: ValueKey('${widget.keyPrefix}_food_search_panel'),
+                    keyPrefix: '${widget.keyPrefix}_food_search',
+                    searchFoods: widget.searchFoods!,
+                    onSelected: (item) {
+                      setState(() {
+                        final newIndex = _items.length;
+                        _items.add(EditableMealItemController(item));
+                        _expandedIndex = newIndex;
+                        _replacementSearchIndex = null;
+                        _addSearchExpanded = false;
+                        _error = null;
+                      });
+                    },
+                    onClose: () => setState(() => _addSearchExpanded = false),
+                  )
+                : KeyedSubtree(
+                    key: ValueKey('${widget.keyPrefix}_food_search_collapsed'),
+                    child: _CompactSearchAddBar(
+                      key: ValueKey(
+                        '${widget.keyPrefix}_add_from_search_button',
+                      ),
+                      label: l10n.mealEditorSearchOrAddIngredient,
+                      onTap: () {
+                        setState(() {
+                          _addSearchExpanded = true;
+                          _replacementSearchIndex = null;
+                        });
+                      },
+                    ),
+                  ),
+          ),
+          const SizedBox(height: FreshSpacing.sm),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildItemCard(BuildContext context, int index) {
+    return _IngredientEditorCard(
+      key: ValueKey('${widget.keyPrefix}_item_card_$index'),
+      item: _items[index],
+      index: index,
+      keyPrefix: widget.keyPrefix,
+      searchFoods: widget.searchFoods,
+      isExpanded: _expandedIndex == index,
+      isReplacementSearchActive: _replacementSearchIndex == index,
+      header: widget.itemHeaderBuilder?.call(context, _items[index], index, (
+        replacement,
+      ) {
+        setState(() {
+          _items[index].replaceWith(replacement);
+          _expandedIndex = index;
+          _error = null;
+        });
+      }),
+      onExpand: () {
+        setState(() {
+          _expandedIndex = index;
+          _replacementSearchIndex = null;
+        });
+      },
+      onReplacementSearchRequested: widget.searchFoods == null
+          ? null
+          : () {
+              setState(() {
+                _expandedIndex = index;
+                _replacementSearchIndex = index;
+                _addSearchExpanded = false;
+              });
+            },
+      onReplacementSearchClosed: () {
+        setState(() => _replacementSearchIndex = null);
+      },
+      onChanged: () {
+        if (_error != null) {
+          _error = null;
+        }
+        setState(() {});
+      },
+      onReplace: (replacement) {
+        setState(() {
+          final scaledReplacement = _replacementWithCurrentQuantity(
+            _items[index],
+            replacement,
+          );
+          _items[index].dispose();
+          _items[index] = EditableMealItemController(scaledReplacement);
+          _expandedIndex = index;
+          _replacementSearchIndex = null;
+          _error = null;
+        });
+      },
+      onDelete: _items.length == 1
+          ? null
+          : () {
+              setState(() {
+                _items.removeAt(index).dispose();
+                if (_expandedIndex == index) {
+                  _expandedIndex = null;
+                } else if (_expandedIndex != null && _expandedIndex! > index) {
+                  _expandedIndex = _expandedIndex! - 1;
+                }
+                if (_replacementSearchIndex == index) {
+                  _replacementSearchIndex = null;
+                } else if (_replacementSearchIndex != null &&
+                    _replacementSearchIndex! > index) {
+                  _replacementSearchIndex = _replacementSearchIndex! - 1;
+                }
+              });
+            },
     );
   }
 
@@ -590,8 +594,9 @@ class _IngredientEditorCard extends StatelessWidget {
                 NutritionMacroWarningBanner(
                   key: ValueKey('${keyPrefix}_item_macro_warning_$index'),
                   title: l10n.mealEditorCaloriesMismatchTitle,
-                  message:
-                      l10n.mealEditorCaloriesMismatchMessage(macroCalories),
+                  message: l10n.mealEditorCaloriesMismatchMessage(
+                    macroCalories,
+                  ),
                 ),
               ],
               if (isReplacementSearchActive && searchFoods != null) ...[
@@ -615,8 +620,8 @@ class _IngredientEditorCard extends StatelessWidget {
     }
 
     return AnimatedSize(
-      duration: const Duration(milliseconds: 260),
-      curve: Curves.easeOutCubic,
+      duration: FreshMotion.duration(context, FreshMotion.fast),
+      curve: FreshMotion.easeOutQuart,
       alignment: Alignment.topCenter,
       child: content,
     );
@@ -627,6 +632,7 @@ class _IngredientEditorCard extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
+      sheetAnimationStyle: freshSheetAnimationStyle(context),
       builder: (sheetContext) => NutritionEditSheet(
         initialNutrition: item.currentNutrition(),
         ingredientName: item.nameController.text.trim(),
@@ -878,11 +884,7 @@ class _OverflowMenuRow extends StatelessWidget {
         Icon(icon, size: 18),
         const SizedBox(width: FreshSpacing.sm),
         Expanded(
-          child: Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
+          child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
         ),
       ],
     );

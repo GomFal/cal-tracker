@@ -9,6 +9,7 @@ import '../../data/repositories/nutrition_repository.dart';
 import '../../l10n/app_localizations_context.dart';
 import '../features/agent_chat/view_models/agent_chat_view_model.dart';
 import 'design_system.dart';
+import 'motion.dart';
 import 'voice_action_button.dart';
 
 class GlobalVoiceRoutingDestination {
@@ -86,7 +87,7 @@ class SlidingBranchContainer extends StatefulWidget {
     super.key,
     required this.currentIndex,
     required this.children,
-    this.duration = const Duration(milliseconds: 260),
+    this.duration = FreshMotion.medium,
     this.userScrollEnabled = true,
     this.onPageChanged,
   });
@@ -145,19 +146,25 @@ class _SlidingBranchContainerState extends State<SlidingBranchContainer> {
       return;
     }
 
+    if (FreshMotion.disableAnimations(context)) {
+      _controller.jumpToPage(index);
+      _programmaticTargetIndex = null;
+      return;
+    }
+
     unawaited(
       _controller
           .animateToPage(
-        index,
-        duration: widget.duration,
-        curve: Curves.easeOutQuart,
-      )
+            index,
+            duration: FreshMotion.duration(context, widget.duration),
+            curve: FreshMotion.easeOutQuart,
+          )
           .whenComplete(() {
-        if (!mounted || _programmaticTargetIndex != index) {
-          return;
-        }
-        _programmaticTargetIndex = null;
-      }),
+            if (!mounted || _programmaticTargetIndex != index) {
+              return;
+            }
+            _programmaticTargetIndex = null;
+          }),
     );
   }
 
@@ -329,9 +336,9 @@ class _NavButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
     final labelStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: selected ? palette.lime : palette.inkMuted,
-          fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-        );
+      color: selected ? palette.lime : palette.inkMuted,
+      fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+    );
     final icon = Icon(
       item.icon,
       color: selected ? palette.lime : palette.inkMuted,
@@ -563,37 +570,45 @@ class _CenterVoiceButtonState extends State<_CenterVoiceButton> {
       ),
     );
 
-    final agentButton = _showBubble
-        ? SizedBox(
-            width: 48,
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                addButton,
-                Positioned(
-                  bottom: 56,
-                  left: 0,
-                  right: 0,
-                  child: OverflowBox(
-                    fit: OverflowBoxFit.deferToChild,
-                    maxWidth: 300,
-                    maxHeight: 120,
-                    alignment: Alignment.topCenter,
-                    child: _BubbleTip(
-                      message: context.l10n.bottomMicFillEditorHint,
-                      onDismiss: _dismissBubble,
+    final agentButton = FreshAnimatedSwitcher(
+      alignment: Alignment.bottomCenter,
+      duration: FreshMotion.fast,
+      child: _showBubble
+          ? SizedBox(
+              key: const ValueKey('bottom_voice_action_bubble_visible'),
+              width: 48,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  addButton,
+                  Positioned(
+                    bottom: 56,
+                    left: 0,
+                    right: 0,
+                    child: OverflowBox(
+                      fit: OverflowBoxFit.deferToChild,
+                      maxWidth: 300,
+                      maxHeight: 120,
+                      alignment: Alignment.topCenter,
+                      child: _BubbleTip(
+                        message: context.l10n.bottomMicFillEditorHint,
+                        onDismiss: _dismissBubble,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
+            )
+          : KeyedSubtree(
+              key: const ValueKey('bottom_voice_action_bubble_hidden'),
+              child: addButton,
             ),
-          )
-        : addButton;
+    );
 
     final labelStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: palette.inkMuted,
-          fontWeight: FontWeight.w500,
-        );
+      color: palette.inkMuted,
+      fontWeight: FontWeight.w500,
+    );
 
     return SizedBox(
       width: 64,
@@ -643,8 +658,8 @@ class _BubbleTip extends StatelessWidget {
               child: Text(
                 message,
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: isDark ? palette.ink : palette.surfaceSoft,
-                    ),
+                  color: isDark ? palette.ink : palette.surfaceSoft,
+                ),
                 textAlign: TextAlign.center,
               ),
             ),

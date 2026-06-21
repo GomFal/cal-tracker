@@ -127,6 +127,39 @@ void main() {
     );
   });
 
+  testWidgets('usual ingredient editor hydrates initial food immediately', (
+    tester,
+  ) async {
+    final food = _usualFood(id: 'food-1', name: 'Hot ingredient');
+    await tester.pumpWidget(
+      ChangeNotifierProvider(
+        create: (_) => MealTemplatesViewModel(
+          nutritionRepository: _FakeNutritionRepository(),
+        ),
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          theme: buildLightTheme(),
+          home: UsualFoodEditorScreen(foodId: food.id, initialFood: food),
+        ),
+      ),
+    );
+
+    await tester.pump();
+
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.text('Edit saved ingredient'), findsOneWidget);
+    expect(
+      tester
+          .widget<TextFormField>(
+            find.byKey(const ValueKey('usual_food_name_field')),
+          )
+          .controller
+          ?.text,
+      'Hot ingredient',
+    );
+  });
+
   testWidgets('tapping a usual meal opens create meal with template items', (
     tester,
   ) async {
@@ -348,8 +381,12 @@ class _TestApp extends StatelessWidget {
             ),
             GoRoute(
               path: 'ingredients/:id/edit',
-              builder: (context, state) =>
-                  UsualFoodEditorScreen(foodId: state.pathParameters['id']),
+              builder: (context, state) => UsualFoodEditorScreen(
+                foodId: state.pathParameters['id'],
+                initialFood: state.extra is UsualFood
+                    ? state.extra as UsualFood
+                    : null,
+              ),
             ),
           ],
         ),

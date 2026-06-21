@@ -164,10 +164,12 @@ class _LocalToolkitHostState extends State<_LocalToolkitHost> {
       return;
     }
     _ensureAuthenticated();
-    final firstTemplateId =
-        _store.templates.isNotEmpty ? _store.templates.first.id : null;
-    final firstUsualFoodId =
-        _store.usualFoods.isNotEmpty ? _store.usualFoods.first.id : null;
+    final firstTemplateId = _store.templates.isNotEmpty
+        ? _store.templates.first.id
+        : null;
+    final firstUsualFoodId = _store.usualFoods.isNotEmpty
+        ? _store.usualFoods.first.id
+        : null;
     widget.router.go(switch (route) {
       LocalToolkitRoute.auth => '/auth',
       LocalToolkitRoute.dashboard => '/dashboard',
@@ -175,13 +177,15 @@ class _LocalToolkitHostState extends State<_LocalToolkitHost> {
       LocalToolkitRoute.history => '/history',
       LocalToolkitRoute.templates => '/templates',
       LocalToolkitRoute.newUsualMeal => '/templates/meals/new',
-      LocalToolkitRoute.editFirstUsualMeal => firstTemplateId != null
-          ? '/templates/meals/$firstTemplateId/edit'
-          : '/templates',
+      LocalToolkitRoute.editFirstUsualMeal =>
+        firstTemplateId != null
+            ? '/templates/meals/$firstTemplateId/edit'
+            : '/templates',
       LocalToolkitRoute.newUsualFood => '/templates/ingredients/new',
-      LocalToolkitRoute.editFirstUsualFood => firstUsualFoodId != null
-          ? '/templates/ingredients/$firstUsualFoodId/edit'
-          : '/templates',
+      LocalToolkitRoute.editFirstUsualFood =>
+        firstUsualFoodId != null
+            ? '/templates/ingredients/$firstUsualFoodId/edit'
+            : '/templates',
       LocalToolkitRoute.scanUsualFood => '/templates/ingredients/scan',
       LocalToolkitRoute.settings => '/settings',
     });
@@ -237,26 +241,26 @@ class _LocalToolkitHostState extends State<_LocalToolkitHost> {
         widget.router.go('/templates');
         break;
     }
-    _refreshVisibleData();
+    _refreshVisibleData(forceRefresh: true);
   }
 
   void _resetScenario() {
     setState(() => _activeScenario = LocalToolkitScenario.normalDay);
     _store.reset();
     _ensureAuthenticated();
-    _refreshVisibleData();
+    _refreshVisibleData(forceRefresh: true);
   }
 
   void _addSampleMeal() {
     _ensureAuthenticated();
     _store.addSampleMeal();
-    _refreshVisibleData();
+    _refreshVisibleData(forceRefresh: true);
   }
 
   void _clearMeals() {
     _ensureAuthenticated();
     _store.clearTodayMeals();
-    _refreshVisibleData();
+    _refreshVisibleData(forceRefresh: true);
   }
 
   void _toggleTrustedMode() {
@@ -269,8 +273,9 @@ class _LocalToolkitHostState extends State<_LocalToolkitHost> {
 
   void _switchLocale() {
     final localeViewModel = context.read<LocaleViewModel>();
-    final currentIndex =
-        AppLocalizations.supportedLocales.indexOf(localeViewModel.locale);
+    final currentIndex = AppLocalizations.supportedLocales.indexOf(
+      localeViewModel.locale,
+    );
     final nextIndex =
         (currentIndex + 1) % AppLocalizations.supportedLocales.length;
     final nextLocale = AppLocalizations.supportedLocales[nextIndex];
@@ -291,10 +296,16 @@ class _LocalToolkitHostState extends State<_LocalToolkitHost> {
     context.read<AuthViewModel>().setUser(_store.user);
   }
 
-  void _refreshVisibleData() {
-    unawaited(context.read<DashboardViewModel>().load(forceRefresh: true));
-    unawaited(context.read<MealHistoryViewModel>().load(forceRefresh: true));
-    unawaited(context.read<MealTemplatesViewModel>().load(forceRefresh: true));
+  void _refreshVisibleData({bool forceRefresh = false}) {
+    unawaited(
+      context.read<DashboardViewModel>().load(forceRefresh: forceRefresh),
+    );
+    unawaited(
+      context.read<MealHistoryViewModel>().load(forceRefresh: forceRefresh),
+    );
+    unawaited(
+      context.read<MealTemplatesViewModel>().load(forceRefresh: forceRefresh),
+    );
     unawaited(context.read<SettingsViewModel>().load());
   }
 }

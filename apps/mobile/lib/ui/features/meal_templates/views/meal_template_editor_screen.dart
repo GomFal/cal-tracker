@@ -7,6 +7,7 @@ import '../../../../domain/models/nutrition_models.dart';
 import '../../../../l10n/app_localizations_context.dart';
 import '../../../core/content_frame.dart';
 import '../../../core/design_system.dart';
+import '../../../core/motion.dart';
 import '../../../shared/food_search_panel.dart';
 import '../view_models/meal_templates_view_model.dart';
 
@@ -15,6 +16,7 @@ class MealTemplateEditorScreen extends StatefulWidget {
     super.key,
     this.templateId,
     this.initialDraft,
+    this.initialTemplate,
   });
 
   static const newRoute = '/templates/meals/new';
@@ -24,6 +26,7 @@ class MealTemplateEditorScreen extends StatefulWidget {
 
   final String? templateId;
   final UsualMealDraft? initialDraft;
+  final MealTemplate? initialTemplate;
 
   @override
   State<MealTemplateEditorScreen> createState() =>
@@ -47,6 +50,10 @@ class _MealTemplateEditorScreenState extends State<MealTemplateEditorScreen> {
     if (!_isEditing) {
       _items.add(_TemplateMealItemController.empty());
       _hydrated = true;
+    }
+    final initialTemplate = widget.initialTemplate;
+    if (initialTemplate != null && initialTemplate.id == widget.templateId) {
+      _hydrate(initialTemplate);
     }
     final initialDraft = widget.initialDraft;
     if (initialDraft != null) {
@@ -73,7 +80,10 @@ class _MealTemplateEditorScreenState extends State<MealTemplateEditorScreen> {
     _requestLoad(viewModel);
     final template = widget.templateId == null
         ? null
-        : viewModel.templateById(widget.templateId!);
+        : viewModel.templateById(widget.templateId!) ??
+              (widget.initialTemplate?.id == widget.templateId
+                  ? widget.initialTemplate
+                  : null);
     if (template != null && !_hydrated) {
       _hydrate(template);
     }
@@ -339,9 +349,9 @@ class _MealTemplateBasicsSection extends StatelessWidget {
         Text(
           l10n.mealTemplateEditorDetailsSection,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: palette.ink,
-                fontWeight: FontWeight.w700,
-              ),
+            color: palette.ink,
+            fontWeight: FontWeight.w700,
+          ),
         ),
         const SizedBox(height: FreshSpacing.md),
         FreshUnderlineTextField(
@@ -384,9 +394,9 @@ class _CandidateGroupsSection extends StatelessWidget {
         Text(
           l10n.mealTemplateEditorCandidatesSection,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: palette.ink,
-                fontWeight: FontWeight.w700,
-              ),
+            color: palette.ink,
+            fontWeight: FontWeight.w700,
+          ),
         ),
         const SizedBox(height: FreshSpacing.xs),
         Text(
@@ -460,14 +470,15 @@ class _TemplateItemsSectionState extends State<_TemplateItemsSection> {
       children: [
         FreshSectionTitle(title: l10n.mealEditorIngredientsSection),
         const SizedBox(height: FreshSpacing.sm),
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 160),
+        FreshAnimatedSwitcher(
+          duration: FreshMotion.fast,
           child: _searchExpanded
               ? FoodSearchPanel(
                   key: const ValueKey('meal_template_food_search_panel'),
                   keyPrefix: 'meal_template_food_search',
-                  searchFoods:
-                      context.read<MealTemplatesViewModel>().searchFoods,
+                  searchFoods: context
+                      .read<MealTemplatesViewModel>()
+                      .searchFoods,
                   onSelected: (item) {
                     widget.onAddFood(item);
                     setState(() => _searchExpanded = false);
@@ -541,9 +552,9 @@ class _TemplateItemCardState extends State<_TemplateItemCard> {
                 child: Text(
                   '${l10n.commonIngredient} ${widget.index + 1}',
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: palette.ink,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    color: palette.ink,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
               IconButton(
@@ -566,9 +577,9 @@ class _TemplateItemCardState extends State<_TemplateItemCard> {
           Text(
             l10n.commonAmount,
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: palette.inkMuted,
-                  fontWeight: FontWeight.w700,
-                ),
+              color: palette.inkMuted,
+              fontWeight: FontWeight.w700,
+            ),
           ),
           const SizedBox(height: FreshSpacing.xs),
           FreshInlineAmountStepper(
@@ -769,13 +780,13 @@ class _TemplateMealItemController {
     this.needsReview,
     this.resolvedGrams,
     this.portionDescription,
-  })  : nameController = TextEditingController(text: name),
-        quantityController = TextEditingController(text: quantity),
-        unitController = TextEditingController(text: unit),
-        caloriesController = TextEditingController(text: calories),
-        proteinController = TextEditingController(text: protein),
-        carbsController = TextEditingController(text: carbs),
-        fatController = TextEditingController(text: fat);
+  }) : nameController = TextEditingController(text: name),
+       quantityController = TextEditingController(text: quantity),
+       unitController = TextEditingController(text: unit),
+       caloriesController = TextEditingController(text: calories),
+       proteinController = TextEditingController(text: protein),
+       carbsController = TextEditingController(text: carbs),
+       fatController = TextEditingController(text: fat);
 
   factory _TemplateMealItemController.empty() {
     return _TemplateMealItemController(

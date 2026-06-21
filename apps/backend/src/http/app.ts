@@ -137,6 +137,7 @@ export function createApp(input: {
     config.OPENROUTER_MODEL,
     runLogger,
     telemetryService,
+    config.FOOD_RESOLVER_MIN_CONFIDENCE,
   );
 
   async function runMealInput(input: {

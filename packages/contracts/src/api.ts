@@ -58,14 +58,15 @@ export const agentRunRequestSchema = z.object({
   activeProposalId: uuidSchema.optional(),
 });
 
-export const agentChatRequestSchema = z.object({
-  message: z.string().trim().min(1),
-  source: z
-    .enum(["flutter", "ios_appintents", "android_appfunctions"])
-    .default("flutter"),
-  conversationId: uuidSchema.optional(),
-  activeProposalId: uuidSchema.optional(),
-});
+export const agentChatRequestSchema = z
+  .object({
+    message: z.string().trim().min(1),
+    source: z
+      .enum(["flutter", "ios_appintents", "android_appfunctions"])
+      .default("flutter"),
+    conversationId: uuidSchema.optional(),
+    activeProposalId: uuidSchema.optional(),
+  });
 
 export const agentConversationSummarySchema = z.object({
   id: uuidSchema,

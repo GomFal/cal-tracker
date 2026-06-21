@@ -4,6 +4,8 @@ import type {
   AgentToolDecision,
   ChatAgentProvider,
 } from "../agent/chatAgentProvider.js";
+import { buildToolContentForModel } from "../agent/toolContent.js";
+import type { MealItem } from "@cal-tracker/contracts";
 import {
   buildTestApp,
   FakeSpeechToTextProvider,
@@ -224,6 +226,94 @@ describe("agent chat streaming", () => {
     });
   });
 
+  it("lets the LLM resolve a compact candidate preview by reference", async () => {
+    const agentProvider = new QueueChatAgentProvider([
+      {
+        toolCalls: [
+          {
+            id: "call_candidate",
+            type: "function",
+            function: {
+              name: "resolve_candidate_reference",
+              arguments: JSON.stringify({
+                searchRef: "search-action-1",
+                candidateRef: "g1c6",
+              }),
+            },
+          },
+        ],
+        rawResponse: { id: "gen_candidate_tool" },
+        interaction: { messages: [], streamEvents: [] },
+      },
+      {
+        toolCalls: [],
+        rawResponse: { id: "gen_selection_final" },
+        interaction: {
+          messages: [],
+          assistantContent: "I will use the selected ingredient.",
+          streamEvents: [],
+        },
+      },
+    ]);
+    const { request, repository } = buildTestApp({ agentProvider });
+    const { authHeader, user } = await registerAndAuth(request);
+    const conversation = await repository.createAgentConversation(user.id, {
+      title: "Search bread",
+    });
+    const candidates = Array.from({ length: 10 }, (_, index) =>
+      chatCandidate(index + 1),
+    );
+    const toolContent = buildToolContentForModel({
+      actionId: "search_nutrition_database",
+      actionCallId: "search-action-1",
+      toolInput: { query: "bread" },
+      mappedResult: {
+        kind: "nutrition_search",
+        message: "I found matching nutrition items.",
+        items: candidates,
+        candidateGroups: [{ candidates }],
+      },
+      rawOutput: { items: candidates, candidateGroups: [{ candidates }] },
+      threshold: 0.75,
+    });
+    await repository.addAgentConversationMessage(user.id, conversation.id, {
+      role: "tool",
+      content: JSON.stringify(toolContent.contentValue),
+      toolCallId: "call_search",
+      metadata: { candidateRegistry: toolContent.candidateRegistry },
+    });
+
+    const response = await request("http://localhost/v1/agent/chat", {
+      method: "POST",
+      headers: authHeader,
+      body: JSON.stringify({
+        source: "flutter",
+        conversationId: conversation.id,
+        message: "Use the sixth result.",
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    const events = parseSse(await response.text());
+    expect(events.some((event) => event.type === "assistant_delta")).toBe(true);
+    expect(agentProvider.inputs).toHaveLength(2);
+    const firstModelMessages = agentProvider.inputs[0]!.messages;
+    const previewToolMessage = firstModelMessages.find(
+      (message) => message.role === "tool",
+    );
+    expect(previewToolMessage?.content).toContain("candidatePreview");
+    expect(previewToolMessage?.content).toContain("g1c6");
+    expect(previewToolMessage?.content).toContain("Candidate 6");
+    expect(previewToolMessage?.content).not.toContain("candidateGroups");
+
+    const secondModelMessages = agentProvider.inputs[1]!.messages;
+    const selectedToolMessage = [...secondModelMessages]
+      .reverse()
+      .find((message) => message.role === "tool");
+    expect(selectedToolMessage?.content).toContain("Selected nutrition candidate resolved");
+    expect(selectedToolMessage?.content).toContain("Candidate 6");
+  });
+
   it("streams model-proposed quick reply buttons", async () => {
     const agentProvider = new QueueChatAgentProvider([
       {
@@ -415,6 +505,27 @@ describe("agent chat streaming", () => {
     ]);
   });
 });
+
+function chatCandidate(rank: number): MealItem {
+  return {
+    name: `Candidate ${rank}`,
+    quantity: 100,
+    unit: "g",
+    calories: 180 + rank,
+    proteinGrams: 6,
+    carbsGrams: 28,
+    fatGrams: 3,
+    source: "database",
+    originalText: "bread",
+    canonicalName: `candidate ${rank}`,
+    externalSource: "test",
+    externalId: `candidate-${rank}`,
+    confidence: 0.6,
+    needsReview: true,
+    rank,
+    matchScore: 0.6,
+  };
+}
 
 function parseSse(raw: string): Array<Record<string, unknown>> {
   return raw

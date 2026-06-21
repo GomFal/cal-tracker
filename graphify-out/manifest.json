@@ -1,7 +1,52 @@
 {
+  ".codex/hooks.json": {
+    "mtime": 1780676670.3259275,
+    "ast_hash": "3807584110308b73484798e74f26bad1",
+    "semantic_hash": ""
+  },
+  ".codex/skills/ui-ux-pro-max/scripts/core.py": {
+    "mtime": 1781817669.604068,
+    "ast_hash": "3df4734a785963a8242a56c1b926adfd",
+    "semantic_hash": ""
+  },
+  ".codex/skills/ui-ux-pro-max/scripts/design_system.py": {
+    "mtime": 1781817669.606377,
+    "ast_hash": "08f84d04608a19049c90fc2b1ef314f9",
+    "semantic_hash": ""
+  },
+  ".codex/skills/ui-ux-pro-max/scripts/search.py": {
+    "mtime": 1781817669.603701,
+    "ast_hash": "8c7e35426fe8f6f3ed91e9dce0ed7af1",
+    "semantic_hash": ""
+  },
   ".impeccable/design.json": {
     "mtime": 1782078889.954859,
     "ast_hash": "3f9b6ac183c7f0e56a1bee462f7612bf",
+    "semantic_hash": ""
+  },
+  ".mimocode/package.json": {
+    "mtime": 1781631523.650905,
+    "ast_hash": "309a2a278355748b991a76d89dfcbbbe",
+    "semantic_hash": ""
+  },
+  ".opencode/package.json": {
+    "mtime": 1781817685.5301652,
+    "ast_hash": "c9442b1dfba4cd254e8dc712cf2d3da8",
+    "semantic_hash": ""
+  },
+  ".opencode/skills/ui-ux-pro-max/scripts/core.py": {
+    "mtime": 1781817655.3068504,
+    "ast_hash": "3df4734a785963a8242a56c1b926adfd",
+    "semantic_hash": ""
+  },
+  ".opencode/skills/ui-ux-pro-max/scripts/design_system.py": {
+    "mtime": 1781817655.310273,
+    "ast_hash": "08f84d04608a19049c90fc2b1ef314f9",
+    "semantic_hash": ""
+  },
+  ".opencode/skills/ui-ux-pro-max/scripts/search.py": {
+    "mtime": 1781817655.3062937,
+    "ast_hash": "8c7e35426fe8f6f3ed91e9dce0ed7af1",
     "semantic_hash": ""
   },
   "apps/admin/app.js": {
@@ -110,13 +155,13 @@
     "semantic_hash": ""
   },
   "apps/backend/src/agent/agentChatService.ts": {
-    "mtime": 1782078926.8810527,
-    "ast_hash": "fd6f46bccbc63c2b8f2b14e51d7fa50b",
+    "mtime": 1782081335.2147841,
+    "ast_hash": "b650ec291ec3fd40cd5688dfd4a6541e",
     "semantic_hash": ""
   },
   "apps/backend/src/agent/agentMessages.ts": {
-    "mtime": 1782075921.188219,
-    "ast_hash": "b30f3cc1acb0076cb00f30744ba1e1d7",
+    "mtime": 1782081335.2149346,
+    "ast_hash": "d631b8973d268a4845515e6e8613d4dc",
     "semantic_hash": ""
   },
   "apps/backend/src/agent/agentPolicy.ts": {
@@ -132,6 +177,11 @@
   "apps/backend/src/agent/chatAgentProvider.ts": {
     "mtime": 1781721873.3521585,
     "ast_hash": "51f535bb2bf43b151201dfb4a2ded02b",
+    "semantic_hash": ""
+  },
+  "apps/backend/src/agent/toolContent.ts": {
+    "mtime": 1782081335.2150326,
+    "ast_hash": "ada076203e25e496de12f85b5e1cdb01",
     "semantic_hash": ""
   },
   "apps/backend/src/agent/toolSchemas.ts": {
@@ -225,8 +275,8 @@
     "semantic_hash": ""
   },
   "apps/backend/src/http/app.ts": {
-    "mtime": 1782075921.188456,
-    "ast_hash": "f4d1e6edbc53e1664421b62bfb64317c",
+    "mtime": 1782081335.215224,
+    "ast_hash": "ab49f266c0f00491c96104a52b1eb7ec",
     "semantic_hash": ""
   },
   "apps/backend/src/index.ts": {
@@ -355,8 +405,8 @@
     "semantic_hash": ""
   },
   "apps/backend/src/tests/agentChat.test.ts": {
-    "mtime": 1782078926.8810527,
-    "ast_hash": "9c9840cc7263582686725700ede0344a",
+    "mtime": 1782081335.2154288,
+    "ast_hash": "61fc1361e54e6b1dd26107323f490a58",
     "semantic_hash": ""
   },
   "apps/backend/src/tests/agentMessages.test.ts": {
@@ -367,6 +417,11 @@
   "apps/backend/src/tests/agentPromptSchema.test.ts": {
     "mtime": 1781708647.5968957,
     "ast_hash": "235b2bcdf54ba72cc626e2d929cceb22",
+    "semantic_hash": ""
+  },
+  "apps/backend/src/tests/agentToolContent.test.ts": {
+    "mtime": 1782081335.2155108,
+    "ast_hash": "04d05b7b152103d59985f1d4b5d3cf3a",
     "semantic_hash": ""
   },
   "apps/backend/src/tests/auth.test.ts": {
@@ -762,11 +817,6 @@
   "apps/mobile/lib/data/services/request_id_generator.dart": {
     "mtime": 1781700563.9019787,
     "ast_hash": "70625c71748ab19763730522f789543b",
-    "semantic_hash": ""
-  },
-  "apps/mobile/lib/data/services/secure_token_storage.dart": {
-    "mtime": 1778349786.8755271,
-    "ast_hash": "bb8952b2d4861c6c313f75d46f2c73e9",
     "semantic_hash": ""
   },
   "apps/mobile/lib/domain/models/auth_models.dart": {
@@ -1559,11 +1609,6 @@
     "ast_hash": "adaf647c10b0230d4d2a3b1167fde67b",
     "semantic_hash": ""
   },
-  "infra/db/drizzle/0016_food_normalized_identity_token_keys.sql": {
-    "mtime": 1780582126.4293518,
-    "ast_hash": "411f0729e7ef37eb4d291430e338d8c8",
-    "semantic_hash": ""
-  },
   "infra/db/drizzle/0017_telemetry_foundation.sql": {
     "mtime": 1781700563.9153988,
     "ast_hash": "41fe52ab608539509c591988f895ffa4",
@@ -1799,6 +1844,11 @@
     "ast_hash": "863be8fbb3dcfdf9d9ff2283a5e4a697",
     "semantic_hash": ""
   },
+  "opencode.json": {
+    "mtime": 1781192545.2961059,
+    "ast_hash": "80c86459fb824de4b4492db00f7edecd",
+    "semantic_hash": ""
+  },
   "package.json": {
     "mtime": 1781700563.9160657,
     "ast_hash": "e3156e23d28feb6c05e74fd7b0fe9c94",
@@ -1820,8 +1870,8 @@
     "semantic_hash": ""
   },
   "packages/contracts/src/api.ts": {
-    "mtime": 1782075921.2105002,
-    "ast_hash": "2b348253dc66821cc4d4e25d67dfd6a5",
+    "mtime": 1782081335.2405403,
+    "ast_hash": "38fa645745e9db9679726226a8609f97",
     "semantic_hash": ""
   },
   "packages/contracts/src/auth.ts": {
@@ -1899,6 +1949,11 @@
     "ast_hash": "d4c4d701ef0af9b9b912b406ecb35540",
     "semantic_hash": ""
   },
+  ".codex/skills/ui-ux-pro-max/SKILL.md": {
+    "mtime": 1781817669.5836194,
+    "ast_hash": "e745b5a6c71379800b232a1ba32d16ec",
+    "semantic_hash": ""
+  },
   ".github/workflows/backend-ci.yml": {
     "mtime": 1778511008.789399,
     "ast_hash": "a98ef9121c5f325a9c42a48a5ff95ed3",
@@ -1907,6 +1962,11 @@
   ".github/workflows/backend-deploy.yml": {
     "mtime": 1780412862.7697122,
     "ast_hash": "baba344bd732e5ad8ce66dbcdfd2717c",
+    "semantic_hash": ""
+  },
+  ".opencode/skills/ui-ux-pro-max/SKILL.md": {
+    "mtime": 1781817655.2791357,
+    "ast_hash": "e745b5a6c71379800b232a1ba32d16ec",
     "semantic_hash": ""
   },
   ".pi/agents/exec-patch-worker-lean.md": {
@@ -1929,6 +1989,11 @@
     "ast_hash": "ff1c1f16c7d80ac0e3fd630249028b12",
     "semantic_hash": ""
   },
+  "BERRY.md": {
+    "mtime": 1780931008.2155378,
+    "ast_hash": "23d8f2232df98026ec1998007f6859c6",
+    "semantic_hash": ""
+  },
   "DESIGN.md": {
     "mtime": 1782078889.956826,
     "ast_hash": "12b9a95b917ddec3a921a24ab0cea56e",
@@ -1942,6 +2007,11 @@
   "README.md": {
     "mtime": 1779783432.0206423,
     "ast_hash": "7a0a8b7c90729706c8fd3a4e1b47f86b",
+    "semantic_hash": ""
+  },
+  "RTK.md": {
+    "mtime": 1780924054.7797103,
+    "ast_hash": "dd751fce7460600ea4321a9d955640ae",
     "semantic_hash": ""
   },
   "apps/admin/README.md": {
@@ -2024,11 +2094,6 @@
     "ast_hash": "26ebc83951f52ffbcce264b2ea991cb0",
     "semantic_hash": ""
   },
-  "docs/agent-chat-token-inefficiency-audit.md": {
-    "mtime": 1782069708.8955286,
-    "ast_hash": "59ba7d1eeb2929f2a429cc4a7d7047cc",
-    "semantic_hash": ""
-  },
   "docs/app-description.md": {
     "mtime": 1779977253.866531,
     "ast_hash": "9d74e87265f2800df38240f7f64d466b",
@@ -2055,8 +2120,8 @@
     "semantic_hash": ""
   },
   "docs/fix-agent-chat-duplicated-search.md": {
-    "mtime": 1782075921.1887207,
-    "ast_hash": "5597881760a1ebd5607fbd1f79c96552",
+    "mtime": 1782081335.2156296,
+    "ast_hash": "03229893fff3cc92b29b953e8a64ded6",
     "semantic_hash": ""
   },
   "docs/food-data-quality-cleanse-findings.md": {
@@ -2749,81 +2814,6 @@
     "ast_hash": "8e1e095112b5fcf588eaa9776498511e",
     "semantic_hash": ""
   },
-  "design-artifacts/ui-soft-inspiration.webp": {
-    "mtime": 1779126921.132868,
-    "ast_hash": "18d10f4953318d129dd24ebaca491c0d",
-    "semantic_hash": ""
-  },
-  ".codex/hooks.json": {
-    "mtime": 1780676670.3259275,
-    "ast_hash": "3807584110308b73484798e74f26bad1",
-    "semantic_hash": ""
-  },
-  ".codex/skills/ui-ux-pro-max/scripts/core.py": {
-    "mtime": 1781817669.604068,
-    "ast_hash": "3df4734a785963a8242a56c1b926adfd",
-    "semantic_hash": ""
-  },
-  ".codex/skills/ui-ux-pro-max/scripts/design_system.py": {
-    "mtime": 1781817669.606377,
-    "ast_hash": "08f84d04608a19049c90fc2b1ef314f9",
-    "semantic_hash": ""
-  },
-  ".codex/skills/ui-ux-pro-max/scripts/search.py": {
-    "mtime": 1781817669.603701,
-    "ast_hash": "8c7e35426fe8f6f3ed91e9dce0ed7af1",
-    "semantic_hash": ""
-  },
-  ".mimocode/package.json": {
-    "mtime": 1781631523.650905,
-    "ast_hash": "309a2a278355748b991a76d89dfcbbbe",
-    "semantic_hash": ""
-  },
-  ".opencode/package.json": {
-    "mtime": 1781817685.5301652,
-    "ast_hash": "c9442b1dfba4cd254e8dc712cf2d3da8",
-    "semantic_hash": ""
-  },
-  ".opencode/skills/ui-ux-pro-max/scripts/core.py": {
-    "mtime": 1781817655.3068504,
-    "ast_hash": "3df4734a785963a8242a56c1b926adfd",
-    "semantic_hash": ""
-  },
-  ".opencode/skills/ui-ux-pro-max/scripts/design_system.py": {
-    "mtime": 1781817655.310273,
-    "ast_hash": "08f84d04608a19049c90fc2b1ef314f9",
-    "semantic_hash": ""
-  },
-  ".opencode/skills/ui-ux-pro-max/scripts/search.py": {
-    "mtime": 1781817655.3062937,
-    "ast_hash": "8c7e35426fe8f6f3ed91e9dce0ed7af1",
-    "semantic_hash": ""
-  },
-  "opencode.json": {
-    "mtime": 1781192545.2961059,
-    "ast_hash": "80c86459fb824de4b4492db00f7edecd",
-    "semantic_hash": ""
-  },
-  ".codex/skills/ui-ux-pro-max/SKILL.md": {
-    "mtime": 1781817669.5836194,
-    "ast_hash": "e745b5a6c71379800b232a1ba32d16ec",
-    "semantic_hash": ""
-  },
-  ".opencode/skills/ui-ux-pro-max/SKILL.md": {
-    "mtime": 1781817655.2791357,
-    "ast_hash": "e745b5a6c71379800b232a1ba32d16ec",
-    "semantic_hash": ""
-  },
-  "BERRY.md": {
-    "mtime": 1780931008.2155378,
-    "ast_hash": "23d8f2232df98026ec1998007f6859c6",
-    "semantic_hash": ""
-  },
-  "RTK.md": {
-    "mtime": 1780924054.7797103,
-    "ast_hash": "dd751fce7460600ea4321a9d955640ae",
-    "semantic_hash": ""
-  },
   "design-artifacts/new-ui-design/dark-screen.jpeg": {
     "mtime": 1781817513.6111586,
     "ast_hash": "c774a141279bf6ca4e2b37e0e2d256a4",
@@ -2832,6 +2822,11 @@
   "design-artifacts/new-ui-design/light-screen.jpeg": {
     "mtime": 1781817513.587377,
     "ast_hash": "44d497e8398841dfa1253c8d457e9219",
+    "semantic_hash": ""
+  },
+  "design-artifacts/ui-soft-inspiration.webp": {
+    "mtime": 1779126921.132868,
+    "ast_hash": "18d10f4953318d129dd24ebaca491c0d",
     "semantic_hash": ""
   }
 }

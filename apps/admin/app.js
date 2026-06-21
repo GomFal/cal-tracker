@@ -76,7 +76,7 @@
     agentTurns: {
       tableId: "agent-turns-table",
       formId: "agent-turns-filters",
-      colspan: 14,
+      colspan: 17,
       timeField: "createdAt",
       statusField: "status",
       backendStatus: true,
@@ -106,7 +106,7 @@
     providerCalls: {
       tableId: "provider-calls-table",
       formId: "provider-calls-filters",
-      colspan: 13,
+      colspan: 16,
       timeField: "createdAt",
       statusField: "status",
       backendStatus: true,
@@ -757,12 +757,14 @@
   function readTableControls(tableKey) {
     const form = document.getElementById(TABLES[tableKey]?.formId);
     const filters = readFilters(form);
+    const config = TABLES[tableKey];
     return {
+      sortBy: filters.sortBy || defaultSortField(config),
       sort: filters.sort || "desc",
       status: filters.status || "",
       costSource: filters.costSource || "",
       viewMode: filters.viewMode || "rows",
-      groupBy: filters.groupBy || TABLES[tableKey]?.defaultGroupBy,
+      groupBy: filters.groupBy || config?.defaultGroupBy,
     };
   }
 
@@ -783,17 +785,92 @@
     if (controls.costSource && config?.costSourceField) {
       next = next.filter((row) => String(row[config.costSourceField] || "") === controls.costSource);
     }
-    if (config?.timeField) {
-      next.sort((a, b) => {
-        const left = Date.parse(a?.[config.timeField] || "");
-        const right = Date.parse(b?.[config.timeField] || "");
-        const safeLeft = Number.isFinite(left) ? left : 0;
-        const safeRight = Number.isFinite(right) ? right : 0;
-        return controls.sort === "asc" ? safeLeft - safeRight : safeRight - safeLeft;
-      });
-    }
+    next = sortRows(next, tableKey, controls);
     state.tableRows.set(tableKey, next);
     return next;
+  }
+
+  function sortRows(rows, tableKey, controls = readTableControls(tableKey)) {
+    const config = TABLES[tableKey];
+    const sortBy = controls.sortBy || defaultSortField(config);
+    if (!sortBy) return rows;
+    const direction = controls.sort === "asc" ? 1 : -1;
+    return [...rows].sort((a, b) => {
+      const left = sortableValue(a, sortBy, config);
+      const right = sortableValue(b, sortBy, config);
+      if (left == null && right == null) return 0;
+      if (left == null) return 1;
+      if (right == null) return -1;
+      if (typeof left === "string" || typeof right === "string") {
+        return direction * String(left).localeCompare(String(right));
+      }
+      return direction * (left - right);
+    });
+  }
+
+  function sortAggregates(rows, controls) {
+    const sortBy = controls.sortBy || "count";
+    const direction = controls.sort === "asc" ? 1 : -1;
+    return [...rows].sort((a, b) => {
+      const left = aggregateSortableValue(a, sortBy);
+      const right = aggregateSortableValue(b, sortBy);
+      if (left == null && right == null) return 0;
+      if (left == null) return 1;
+      if (right == null) return -1;
+      if (typeof left === "string" || typeof right === "string") {
+        return direction * String(left).localeCompare(String(right));
+      }
+      return direction * (left - right);
+    });
+  }
+
+  function sortableValue(row, field, config) {
+    if (!row) return null;
+    if (field === "time") {
+      const value = Date.parse(row?.[config?.timeField] || row?.createdAt || row?.updatedAt || "");
+      return Number.isFinite(value) ? value : null;
+    }
+    if (field === "cost") return costSortableValue(row);
+    const value = derivedValue(row, field);
+    if (value == null || value === "") return null;
+    if (field.endsWith("At")) {
+      const parsed = Date.parse(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    const numeric = Number(value);
+    return Number.isFinite(numeric) && value !== "" ? numeric : String(value);
+  }
+
+  function aggregateSortableValue(row, field) {
+    if (field === "time") {
+      const value = Date.parse(row?.lastSeen || row?.firstSeen || "");
+      return Number.isFinite(value) ? value : null;
+    }
+    if (field === "cost") return Number(row?.totalCost);
+    if (field === "totalTokens") return Number(row?.totalTokens);
+    if (field === "count") return Number(row?.count);
+    const summary = row?.numericSummary?.[field];
+    if (summary) return Number(summary.sum ?? summary.median);
+    const value = row?.[field];
+    if (value == null || value === "") return null;
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : String(value);
+  }
+
+  function costSortableValue(row) {
+    const total = optionalFiniteNumber(row?.totalCostAmount);
+    const provider = optionalFiniteNumber(row?.providerCostAmount);
+    const estimated = optionalFiniteNumber(row?.estimatedCostAmount);
+    if (total != null) return total;
+    if (provider != null) return provider;
+    if (estimated != null) return estimated;
+    return null;
+  }
+
+  function optionalFiniteNumber(value) {
+    if (value == null || value === "") return null;
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : null;
   }
 
   function maybeRenderAggregateRows(tbody, tableKey, rows) {
@@ -801,7 +878,10 @@
     if (!config) return false;
     const controls = readTableControls(tableKey);
     if (controls.viewMode !== "aggregate") return false;
-    const aggregates = aggregateRows(rows, tableKey, controls.groupBy);
+    const aggregates = sortAggregates(
+      aggregateRows(rows, tableKey, controls.groupBy),
+      controls,
+    );
     tbody.replaceChildren();
     if (!aggregates.length) {
       tbody.appendChild(renderEmptyRow(config.colspan, "No rows to aggregate."));
@@ -888,6 +968,77 @@
     return total;
   }
 
+  function sumMetric(rows, field) {
+    let total = 0;
+    let seen = false;
+    for (const row of rows || []) {
+      const raw = row?.[field];
+      if (raw == null || raw === "") continue;
+      const value = Number(raw);
+      if (!Number.isFinite(value)) continue;
+      total += value;
+      seen = true;
+    }
+    return seen ? total : undefined;
+  }
+
+  function tokenCell(row, field) {
+    return el("td", { class: "numeric", text: formatNumber(row?.[field]) });
+  }
+
+  function tokenCells(row) {
+    return [
+      tokenCell(row, "promptTokens"),
+      tokenCell(row, "completionTokens"),
+      tokenCell(row, "totalTokens"),
+      tokenCell(row, "reasoningTokens"),
+    ];
+  }
+
+  function buildTurnMetricMaps(agentTurns = [], providerCalls = []) {
+    const byTurnId = new Map();
+    for (const turn of agentTurns || []) {
+      if (!turn?.turnId) continue;
+      byTurnId.set(turn.turnId, {
+        promptTokens: turn.promptTokens,
+        completionTokens: turn.completionTokens,
+        totalTokens: turn.totalTokens,
+        reasoningTokens: turn.reasoningTokens,
+        providerCostAmount: turn.providerCostAmount,
+        estimatedCostAmount: turn.estimatedCostAmount,
+        totalCostAmount: turn.totalCostAmount,
+        costCurrency: turn.costCurrency,
+        providerCallCount: 0,
+      });
+    }
+
+    const callsByTurnId = new Map();
+    for (const call of providerCalls || []) {
+      if (!call?.turnId) continue;
+      const calls = callsByTurnId.get(call.turnId) || [];
+      calls.push(call);
+      callsByTurnId.set(call.turnId, calls);
+    }
+
+    for (const [turnId, calls] of callsByTurnId.entries()) {
+      const existing = byTurnId.get(turnId) || {};
+      byTurnId.set(turnId, {
+        ...existing,
+        promptTokens: existing.promptTokens ?? sumMetric(calls, "promptTokens"),
+        completionTokens: existing.completionTokens ?? sumMetric(calls, "completionTokens"),
+        totalTokens: existing.totalTokens ?? sumMetric(calls, "totalTokens"),
+        reasoningTokens: existing.reasoningTokens ?? sumMetric(calls, "reasoningTokens"),
+        providerCostAmount: existing.providerCostAmount ?? sumMetric(calls, "providerCostAmount"),
+        estimatedCostAmount: existing.estimatedCostAmount ?? sumMetric(calls, "estimatedCostAmount"),
+        totalCostAmount: existing.totalCostAmount ?? sumMetric(calls, "totalCostAmount"),
+        costCurrency: existing.costCurrency ?? calls.find((call) => call.costCurrency)?.costCurrency,
+        providerCallCount: calls.length,
+      });
+    }
+
+    return byTurnId;
+  }
+
   function median(values) {
     if (!values.length) return undefined;
     const sorted = [...values].sort((a, b) => a - b);
@@ -964,9 +1115,13 @@
       if (config.timeField) {
         insertControl(actions, dateField(`${config.formId}-from`, "from", "From"));
         insertControl(actions, dateField(`${config.formId}-to`, "to", "To"));
-        insertControl(actions, selectField(`${config.formId}-sort`, "sort", "Time", [
-          ["desc", "newest first"],
-          ["asc", "oldest first"],
+      }
+      const sortOptions = sortableOptionsFor(config);
+      if (sortOptions.length) {
+        insertControl(actions, selectField(`${config.formId}-sort-by`, "sortBy", "Sort by", sortOptions));
+        insertControl(actions, selectField(`${config.formId}-sort`, "sort", "Order", [
+          ["desc", "high/newest"],
+          ["asc", "low/oldest"],
         ]));
       }
       if (config.statusField) {
@@ -1015,6 +1170,34 @@
       el("span", { text: label }),
       select,
     ]);
+  }
+
+  function sortableOptionsFor(config) {
+    if (!config) return [];
+    const options = [];
+    const add = (value, label) => {
+      if (!value || options.some(([existing]) => existing === value)) return;
+      options.push([value, label]);
+    };
+    if (config.timeField) add("time", "time");
+    for (const field of config.numeric || []) {
+      if (field === "promptTokens") add(field, "prompt tokens");
+      else if (field === "completionTokens") add(field, "completion tokens");
+      else if (field === "totalTokens") add(field, "total tokens");
+      else if (field === "reasoningTokens") add(field, "reasoning tokens");
+      else if (field === "providerCostAmount") add("cost", "cost");
+      else if (field === "estimatedCostAmount") add("cost", "cost");
+      else if (field === "totalCostAmount") add("cost", "cost");
+      else add(field, field);
+    }
+    return options;
+  }
+
+  function defaultSortField(config) {
+    if (!config) return "";
+    if (config.timeField) return "time";
+    const options = sortableOptionsFor(config);
+    return options[0]?.[0] || "";
   }
 
   function statusOptionsFor(tableKey) {
@@ -1267,16 +1450,17 @@
     }
   }
 
-  function renderConversationDetail(rows) {
+  function renderConversationDetail(rows, turnMetrics = new Map()) {
     const tbody = $("#conversation-detail-table tbody");
     if (!tbody) return;
     tbody.replaceChildren();
     if (!rows || rows.length === 0) {
-      tbody.appendChild(renderEmptyRow(8, "Select a conversation row."));
+      tbody.appendChild(renderEmptyRow(14, "Select a conversation row."));
       return;
     }
     for (const row of rows) {
       const text = String(row.content || "");
+      const metrics = row.turnId ? turnMetrics.get(row.turnId) : null;
       const tr = el("tr", {});
       tr.append(
         el("td", { text: formatTimestamp(row.createdAt) }),
@@ -1288,6 +1472,9 @@
       tr.append(traceCell(row.traceId));
       tr.append(
         idCell(row.activeProposalId),
+        ...tokenCells(metrics),
+        el("td", { class: "numeric", text: formatNumber(metrics?.providerCallCount) }),
+        el("td", { class: "numeric", text: costAmount(metrics) }),
         el("td", { class: "wrap" }, renderExpandableValue(text)),
       );
       tbody.appendChild(tr);
@@ -1300,7 +1487,7 @@
     if (selector === "#agent-turns-table tbody") rows = applyClientControls("agentTurns", rows);
     tbody.replaceChildren();
     if (!rows || rows.length === 0) {
-      tbody.appendChild(renderEmptyRow(14, "No agent turns match the current filters."));
+      tbody.appendChild(renderEmptyRow(17, "No agent turns match the current filters."));
       return;
     }
     if (selector === "#agent-turns-table tbody" && maybeRenderAggregateRows(tbody, "agentTurns", rows)) return;
@@ -1319,7 +1506,7 @@
         el("td", { class: "mono", text: row.resultKind || "—" }),
         el("td", { class: "mono", text: row.stopReason || "—" }),
         el("td", { class: "numeric", text: formatNumber(row.toolCallCount) }),
-        el("td", { class: "numeric", text: formatNumber(row.totalTokens) }),
+        ...tokenCells(row),
         el("td", { class: "numeric", text: costAmount(row) }),
         el("td", { class: "numeric", text: formatDuration(row.totalMs) }),
         el("td", {}, statusTag(row.status)),
@@ -1403,8 +1590,8 @@
     }
     const controls = readTableControls("llmCost");
     const visibleRows = controls.viewMode === "aggregate"
-      ? aggregateRows(rows, "llmCost", controls.groupBy)
-      : [...rows].sort((a, b) => controls.sort === "asc" ? a.group.localeCompare(b.group) : b.group.localeCompare(a.group));
+      ? sortAggregates(aggregateRows(rows, "llmCost", controls.groupBy), controls)
+      : sortRows(rows, "llmCost", controls);
     if (controls.viewMode === "aggregate") {
       for (const row of visibleRows) {
         const tr = el("tr", { class: "is-aggregate" });
@@ -1441,7 +1628,7 @@
     if (selector === "#provider-calls-table tbody") rows = applyClientControls("providerCalls", rows);
     tbody.replaceChildren();
     if (!rows || rows.length === 0) {
-      tbody.appendChild(renderEmptyRow(13, "No provider calls match the current filters."));
+      tbody.appendChild(renderEmptyRow(16, "No provider calls match the current filters."));
       return;
     }
     if (selector === "#provider-calls-table tbody" && maybeRenderAggregateRows(tbody, "providerCalls", rows)) return;
@@ -1457,7 +1644,7 @@
       tr.append(traceCell(row.traceId));
       tr.append(
         idCell(row.turnId),
-        el("td", { class: "numeric", text: formatNumber(row.totalTokens) }),
+        ...tokenCells(row),
         el("td", { class: "numeric", text: costAmount(row) }),
         el("td", { class: "mono", text: row.costSource || "—" }),
         el("td", { class: "numeric", text: formatDuration(row.durationMs) }),
@@ -1506,7 +1693,7 @@
     if (!tbody) return;
     tbody.replaceChildren();
     if (!rows || rows.length === 0) {
-      tbody.appendChild(renderEmptyRow(8, "No provider calls recorded for this trace."));
+      tbody.appendChild(renderEmptyRow(11, "No provider calls recorded for this trace."));
       return;
     }
     for (const row of rows) {
@@ -1517,7 +1704,7 @@
         el("td", { class: "mono", text: row.servedModel || row.requestedModel || "—" }),
         el("td", { class: "mono id-cell" }, copyableId(row.providerGenerationId || row.providerRequestId)),
         idCell(row.turnId),
-        el("td", { class: "numeric", text: formatNumber(row.totalTokens) }),
+        ...tokenCells(row),
         el("td", { class: "numeric", text: costAmount(row) }),
         el("td", {}, statusTag(row.status)),
       );
@@ -1605,6 +1792,7 @@
       : Array.isArray(payload?.foodSearches)
         ? payload.foodSearches
         : [];
+    const traceTurnMetrics = buildTurnMetricMaps(agentTurns, providerCalls);
 
     const earliest = [
       events,
@@ -1702,10 +1890,11 @@
     const traceMessagesBody = $("#trace-messages-table tbody");
     traceMessagesBody.replaceChildren();
     if (conversationMessages.length === 0) {
-      traceMessagesBody.appendChild(renderEmptyRow(7, "No conversation messages recorded for this trace."));
+      traceMessagesBody.appendChild(renderEmptyRow(13, "No conversation messages recorded for this trace."));
     } else {
       for (const row of conversationMessages) {
         const text = String(row.content || "");
+        const metrics = row.turnId ? traceTurnMetrics.get(row.turnId) : null;
         const tr = el("tr", {});
         tr.append(
           el("td", { text: formatTimestamp(row.createdAt) }),
@@ -1714,6 +1903,9 @@
           el("td", { class: "mono", text: row.role || "—" }),
           el("td", { class: "mono", text: row.inputMode || "—" }),
           el("td", { class: "mono", text: row.source || "—" }),
+          ...tokenCells(metrics),
+          el("td", { class: "numeric", text: formatNumber(metrics?.providerCallCount) }),
+          el("td", { class: "numeric", text: costAmount(metrics) }),
           el("td", { class: "wrap" }, renderExpandableValue(text)),
         );
         traceMessagesBody.appendChild(tr);
@@ -1723,7 +1915,7 @@
     const traceAgentTurnsBody = $("#trace-agent-turns-table tbody");
     traceAgentTurnsBody.replaceChildren();
     if (agentTurns.length === 0) {
-      traceAgentTurnsBody.appendChild(renderEmptyRow(9, "No agent turns recorded for this trace."));
+      traceAgentTurnsBody.appendChild(renderEmptyRow(12, "No agent turns recorded for this trace."));
     } else {
       for (const row of agentTurns) {
         const tr = el("tr", { class: row.status === "failure" ? "is-error" : "" });
@@ -1734,7 +1926,7 @@
           el("td", { class: "mono", text: row.inputMode || "—" }),
           el("td", { class: "mono", text: row.resultKind || "—" }),
           el("td", { class: "numeric", text: formatNumber(row.toolCallCount) }),
-          el("td", { class: "numeric", text: formatNumber(row.totalTokens) }),
+          ...tokenCells(row),
           el("td", { class: "numeric", text: costAmount(row) }),
           el("td", {}, statusTag(row.status)),
         );
@@ -1987,8 +2179,16 @@
         : `/v1/admin/telemetry/conversations/${encodeURIComponent(conversationId)}?includeHidden=${includeHidden ? "true" : "false"}`;
       const data = await apiGet(path);
       const rows = extractList(data?.messages, ["messages", "items", "data"]);
-      renderConversationDetail(rows);
-      setStatusSuccess(`Loaded ${rows.length} conversation message${rows.length === 1 ? "" : "s"}.`);
+      const turnsData = await apiGet(ENDPOINTS.agentTurns || "/v1/admin/telemetry/agent-turns", {
+        params: { conversationId, limit: 500 },
+      });
+      const providerData = await apiGet(ENDPOINTS.providerCalls || "/v1/admin/telemetry/llm-provider-calls", {
+        params: { conversationId, limit: 500 },
+      });
+      const agentTurns = extractList(turnsData, ["agentTurns", "items", "data", "results"]);
+      const providerCalls = extractList(providerData, ["providerCalls", "items", "data", "results"]);
+      renderConversationDetail(rows, buildTurnMetricMaps(agentTurns, providerCalls));
+      setStatusSuccess(`Loaded ${rows.length} conversation message${rows.length === 1 ? "" : "s"} · ${agentTurns.length} turn${agentTurns.length === 1 ? "" : "s"} · ${providerCalls.length} provider call${providerCalls.length === 1 ? "" : "s"}.`);
     } catch (err) {
       if (err.code === "aborted") return;
       renderConversationDetail([]);

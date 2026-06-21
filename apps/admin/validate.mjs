@@ -163,6 +163,8 @@ const requiredAppFeatures = [
   ["enhanceFilterForms", "dynamic date/status/table controls"],
   ["appendDateParams", "date filter query helper"],
   ["applyClientControls", "client-side sorting/filtering"],
+  ["sortRows", "client-side metric sorting"],
+  ["sortableOptionsFor", "dynamic sort-by options"],
   ["maybeRenderAggregateRows", "aggregate row renderer"],
   ["aggregateRows", "aggregate metrics helper"],
   ["copyableId", "copyable long ID helper"],

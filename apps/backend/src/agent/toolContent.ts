@@ -9,13 +9,12 @@ export type AgentChatCandidateSelection = {
 };
 
 export type AgentCandidateSelectionState = {
-  status: "accepted" | "awaiting_user_selection";
+  status: "candidate_preview";
   searchRef: string;
   candidateCount: number;
   groupCount: number;
   threshold: number;
   topConfidence?: number;
-  acceptedCandidateRef?: string;
 };
 
 export type CandidateRegistryMetadata = {
@@ -66,15 +65,15 @@ export function buildToolContentForModel(input: {
   const selectionState = candidateRegistry
     ? selectionStateForRegistry(candidateRegistry)
     : undefined;
-  const selected = selectionState?.acceptedCandidateRef
-    ? findCandidate(candidateRegistry, {
-        candidateRef: selectionState.acceptedCandidateRef,
-      })?.item
-    : undefined;
   const contentValue = {
     actionId: input.actionId,
     input: compactInput(input.toolInput),
-    result: compactMappedResult(input.mappedResult, selectionState, selected),
+    result: compactMappedResult({
+      mappedResult: input.mappedResult,
+      selectionState,
+      candidateRegistry,
+      toolInput: input.toolInput,
+    }),
   };
   const modelContentChars = JSON.stringify(contentValue).length;
   return {
@@ -248,30 +247,31 @@ function selectionStateForRegistry(
   const first = registry.groups[0]?.candidates[0];
   const topConfidence =
     typeof first?.item.confidence === "number" ? first.item.confidence : undefined;
-  const accepted =
-    first && topConfidence !== undefined && topConfidence >= registry.threshold;
   return {
-    status: accepted ? "accepted" : "awaiting_user_selection",
+    status: "candidate_preview",
     searchRef: registry.searchRef,
     candidateCount: registry.candidateCount,
     groupCount: registry.groupCount,
     threshold: registry.threshold,
     topConfidence,
-    acceptedCandidateRef: accepted ? first.candidateRef : undefined,
   };
 }
 
-function compactMappedResult(
-  mappedResult: Record<string, unknown>,
-  selectionState?: AgentCandidateSelectionState,
-  selected?: MealItem,
-): Record<string, unknown> {
+function compactMappedResult(input: {
+  mappedResult: Record<string, unknown>;
+  selectionState?: AgentCandidateSelectionState;
+  candidateRegistry?: CandidateRegistryMetadata;
+  toolInput: unknown;
+}): Record<string, unknown> {
+  const { mappedResult, selectionState, candidateRegistry, toolInput } = input;
   if (selectionState) {
     return compactObject({
       kind: mappedResult.kind,
       message: mappedResult.message,
       selectionState,
-      selectedItem: selected ? mealItemForToolUse(selected) : undefined,
+      candidatePreview: candidateRegistry
+        ? candidatePreviewNotation(candidateRegistry, toolInput)
+        : undefined,
     });
   }
   return compactObject({
@@ -281,12 +281,50 @@ function compactMappedResult(
   });
 }
 
+function candidatePreviewNotation(
+  registry: CandidateRegistryMetadata,
+  toolInput: unknown,
+): string {
+  const query = stringValue(recordValue(toolInput)?.query);
+  const rows: string[] = [
+    `search q=${tonValue(query)} ref=${tonValue(registry.searchRef)} total=${registry.candidateCount} shown=${Math.min(10, registry.candidateCount)}`,
+    "cols=n|ref|name|qty|kcal|p|c|f|conf|score|src|id",
+  ];
+  let shown = 0;
+  for (const group of registry.groups) {
+    for (const candidate of group.candidates) {
+      if (shown >= 10) return rows.join("\n");
+      const item = candidate.item;
+      rows.push([
+        candidate.candidateIndex,
+        shortCandidateRef(group.groupIndex, candidate.candidateIndex),
+        tonValue(item.name),
+        tonValue(`${item.quantity}${item.unit}`),
+        numberValue(item.calories),
+        numberValue(item.proteinGrams),
+        numberValue(item.carbsGrams),
+        numberValue(item.fatGrams),
+        numberValue(item.confidence),
+        numberValue(item.matchScore),
+        tonValue(item.externalSource),
+        tonValue(item.externalId),
+      ].join("|"));
+      shown++;
+    }
+  }
+  return rows.join("\n");
+}
+
 function findCandidate(
   registry: CandidateRegistryMetadata | undefined,
   selection: AgentChatCandidateSelection,
 ): { candidateRef: string; item: MealItem } | undefined {
   if (!registry) return undefined;
-  if (!selection.candidateRef && selection.candidateIndex === undefined) {
+  const shortRefSelection = parseShortCandidateRef(selection.candidateRef);
+  const groupIndex = selection.groupIndex ?? shortRefSelection?.groupIndex;
+  const candidateIndex =
+    selection.candidateIndex ?? shortRefSelection?.candidateIndex;
+  if (!selection.candidateRef && candidateIndex === undefined) {
     return undefined;
   }
   for (const group of registry.groups) {
@@ -295,12 +333,15 @@ function findCandidate(
         return { candidateRef: candidate.candidateRef, item: candidate.item };
       }
       const groupMatches =
-        selection.groupIndex === undefined ||
-        selection.groupIndex === group.groupIndex;
+        groupIndex === undefined ||
+        groupIndex === group.groupIndex;
       const candidateMatches =
-        selection.candidateIndex === undefined ||
-        selection.candidateIndex === candidate.candidateIndex;
+        candidateIndex === undefined ||
+        candidateIndex === candidate.candidateIndex;
       if (!selection.candidateRef && groupMatches && candidateMatches) {
+        return { candidateRef: candidate.candidateRef, item: candidate.item };
+      }
+      if (selection.candidateRef && shortRefSelection && groupMatches && candidateMatches) {
         return { candidateRef: candidate.candidateRef, item: candidate.item };
       }
     }
@@ -324,6 +365,21 @@ function candidateRef(
   candidateIndex: number,
 ): string {
   return `${searchRef}:g${groupIndex}:c${candidateIndex}`;
+}
+
+function shortCandidateRef(groupIndex: number, candidateIndex: number): string {
+  return `g${groupIndex}c${candidateIndex}`;
+}
+
+function parseShortCandidateRef(
+  value: string | undefined,
+): { groupIndex: number; candidateIndex: number } | undefined {
+  const match = value?.match(/^g(\d+)c(\d+)$/);
+  if (!match) return undefined;
+  return {
+    groupIndex: Number(match[1]),
+    candidateIndex: Number(match[2]),
+  };
 }
 
 function compactInput(input: unknown): unknown {
@@ -352,4 +408,21 @@ function recordValue(value: unknown): Record<string, unknown> | undefined {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : undefined;
+}
+
+function stringValue(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function numberValue(value: unknown): string {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Number(value.toFixed(3)).toString()
+    : "";
+}
+
+function tonValue(value: unknown): string {
+  return String(value ?? "")
+    .replace(/[|\r\n\t]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }

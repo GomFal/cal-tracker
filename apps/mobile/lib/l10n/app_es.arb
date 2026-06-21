@@ -513,8 +513,6 @@
   "agentChatPromptUsual": "Registra mi desayuno habitual",
   "agentChatToolFallback": "Acción del agente",
   "agentChatConsumedToday": "Consumido hoy",
-  "agentChatCandidateSelectionTitle": "Elige un ingrediente coincidente",
-  "agentChatCandidateSelectedPrefix": "Resultado seleccionado",
   "agentChatNoItems": "No hay ingredientes que mostrar.",
   "agentChatNoMeals": "No hay comidas que mostrar.",
   "agentChatNoTemplates": "No hay comidas habituales que mostrar.",

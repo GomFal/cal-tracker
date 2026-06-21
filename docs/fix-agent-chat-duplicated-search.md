@@ -1,15 +1,16 @@
-## Implementation Plan: Stateful Nutrition Candidate Selection
+## Implementation Plan: LLM-Selected Compact Candidate Preview
 
 ### Goal
 
 Fix the duplicated `search_nutrition_database` tool-result inefficiency without reducing live UI quality or preventing the user from selecting any candidate shown by the app.
 
-The chosen implementation treats ingredient candidate lists as backend/UI state, not LLM context. The LLM sees an accepted high-confidence item or a compact pending-selection state. It does not see full candidate arrays.
+The chosen implementation gives the LLM a compact top-10 candidate preview and stores full candidate rows as backend metadata. The model chooses the best candidate by reference, then the backend resolves the full `MealItem` deterministically.
 
 ### Non-goals
 
 - Do not remove rich candidate lists from the live mobile UI.
-- Do not rely on the LLM to remember every candidate.
+- Do not rely on the LLM to remember every raw candidate object.
+- Do not ask the user to press ingredient candidate buttons in agent chat.
 - Do not introduce natural-language or regex food parsing.
 - Do not break direct action endpoints that mobile or tests already consume.
 
@@ -20,7 +21,7 @@ Separate three payloads that are currently conflated:
 1. Action output: canonical backend result from `ActionExecutor`.
 2. UI payload: rich data streamed to the mobile app for rendering and selection.
 3. LLM tool content: compact context sent back to the model and persisted in `agent_messages.content`.
-4. Candidate registry metadata: full candidate rows stored in `agent_messages.metadata_json`, available for deterministic selection but not sent to the LLM.
+4. Candidate registry metadata: full candidate rows stored in `agent_messages.metadata_json`, available for deterministic LLM-selected reference resolution.
 
 Only the third payload needs aggressive token control.
 
@@ -99,7 +100,7 @@ Do not include:
 - `displayDetails`
 - verbose provenance fields that the LLM does not need
 
-Do not send candidate lists to the LLM for low-confidence results. The live UI event carries all candidates returned by the resolver, and the LLM receives only a `selectionState` with `searchRef`, counts, threshold, and status.
+Send at most 10 compact candidate rows to the LLM using token-oriented notation. The live UI event may still carry the rich result payload, but the chat UI should not render ingredient selection buttons.
 
 ### Step 3. Preserve full UI behavior
 
@@ -126,15 +127,15 @@ For history or resume, do not require `agent_messages.content` to contain the fu
 
 ### Step 4. Support user selection beyond compacted candidates
 
-When the user taps any candidate shown in the UI, the selection is handled deterministically.
+When the LLM selects any candidate shown in the compact preview, the selection is handled deterministically.
 
 Implemented approach:
 
 - Store backend-issued candidate references in `agent_messages.metadata_json`.
-- Add `candidateSelection` to `/v1/agent/chat` requests.
-- The mobile app sends `searchRef`, `groupIndex`, and `candidateIndex`; it does not send the full candidate object.
+- Include a compact top-10 preview in `agent_messages.content`.
+- The LLM calls chat-only `resolve_candidate_reference` with a compact ref such as `g1c6`.
 - The backend resolves the full candidate from metadata and injects only the selected `MealItem` into the next LLM turn.
-- A chat-only internal `resolve_candidate_reference` tool handles typed references such as "use the 6th one".
+- User corrections are handled conversationally by voice/text, not by pressing ingredient buttons.
 
 The LLM follow-up should receive only a compact result:
 

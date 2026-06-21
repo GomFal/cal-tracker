@@ -212,8 +212,25 @@ describe("agent chat streaming", () => {
     });
   });
 
-  it("resolves structured candidate selections without sending candidate lists to the LLM", async () => {
+  it("lets the LLM resolve a compact candidate preview by reference", async () => {
     const agentProvider = new QueueChatAgentProvider([
+      {
+        toolCalls: [
+          {
+            id: "call_candidate",
+            type: "function",
+            function: {
+              name: "resolve_candidate_reference",
+              arguments: JSON.stringify({
+                searchRef: "search-action-1",
+                candidateRef: "g1c6",
+              }),
+            },
+          },
+        ],
+        rawResponse: { id: "gen_candidate_tool" },
+        interaction: { messages: [], streamEvents: [] },
+      },
       {
         toolCalls: [],
         rawResponse: { id: "gen_selection_final" },
@@ -258,25 +275,29 @@ describe("agent chat streaming", () => {
       body: JSON.stringify({
         source: "flutter",
         conversationId: conversation.id,
-        candidateSelection: {
-          searchRef: "search-action-1",
-          groupIndex: 1,
-          candidateIndex: 6,
-        },
+        message: "Use the sixth result.",
       }),
     });
 
     expect(response.status).toBe(200);
     const events = parseSse(await response.text());
     expect(events.some((event) => event.type === "assistant_delta")).toBe(true);
-    const modelMessages = agentProvider.inputs[0]!.messages;
-    const userMessage = [...modelMessages]
+    expect(agentProvider.inputs).toHaveLength(2);
+    const firstModelMessages = agentProvider.inputs[0]!.messages;
+    const previewToolMessage = firstModelMessages.find(
+      (message) => message.role === "tool",
+    );
+    expect(previewToolMessage?.content).toContain("candidatePreview");
+    expect(previewToolMessage?.content).toContain("g1c6");
+    expect(previewToolMessage?.content).toContain("Candidate 6");
+    expect(previewToolMessage?.content).not.toContain("candidateGroups");
+
+    const secondModelMessages = agentProvider.inputs[1]!.messages;
+    const selectedToolMessage = [...secondModelMessages]
       .reverse()
-      .find((message) => message.role === "user");
-    expect(userMessage?.content).toContain("Selected nutrition candidate");
-    expect(userMessage?.content).toContain("Candidate 6");
-    expect(userMessage?.content).not.toContain("Candidate 10");
-    expect(JSON.stringify(modelMessages)).not.toContain("candidateGroups");
+      .find((message) => message.role === "tool");
+    expect(selectedToolMessage?.content).toContain("Selected nutrition candidate resolved");
+    expect(selectedToolMessage?.content).toContain("Candidate 6");
   });
 
   it("streams model-proposed quick reply buttons", async () => {

@@ -7,8 +7,8 @@ import {
 import type { AgentConversationMessageRecord } from "../repository/types.js";
 
 describe("agent chat tool content", () => {
-  it("keeps low-confidence nutrition candidates out of model-visible content", () => {
-    const candidates = Array.from({ length: 10 }, (_, index) =>
+  it("sends a compressed top-10 candidate preview to the model", () => {
+    const candidates = Array.from({ length: 12 }, (_, index) =>
       candidate(index + 1),
     );
     const mappedResult = {
@@ -42,23 +42,27 @@ describe("agent chat tool content", () => {
     });
 
     expect(built.selectionState).toMatchObject({
-      status: "awaiting_user_selection",
+      status: "candidate_preview",
       searchRef: "action-search-1",
-      candidateCount: 10,
+      candidateCount: 12,
     });
     expect(built.modelContentApproxTokens).toBeLessThan(
-      Math.ceil(built.rawContentApproxTokens * 0.2),
+      Math.ceil(built.rawContentApproxTokens * 0.1),
     );
 
     const content = JSON.stringify(built.contentValue);
     expect(JSON.parse(content)).toEqual(built.contentValue);
+    expect(content).toContain("candidatePreview");
+    expect(content).toContain("cols=n|ref|name|qty|kcal|p|c|f|conf|score|src|id");
+    expect(content).toContain("Candidate 10");
+    expect(content).not.toContain("Candidate 11");
     expect(content).not.toContain("candidateGroups");
     expect(content).not.toContain("candidates");
     expect(content).not.toContain("rawOutput");
     expect(content).not.toContain("sourceUrl");
     expect(content).not.toContain("license");
     expect(content).not.toContain("displayDetails");
-    expect(built.candidateRegistry?.groups[0]?.candidates).toHaveLength(10);
+    expect(built.candidateRegistry?.groups[0]?.candidates).toHaveLength(12);
   });
 
   it("resolves a candidate outside the model-visible payload from metadata", () => {
@@ -92,8 +96,7 @@ describe("agent chat tool content", () => {
 
     const resolved = resolveCandidateReferenceFromMessages(messages, {
       searchRef: "action-search-2",
-      groupIndex: 1,
-      candidateIndex: 6,
+      candidateRef: "g1c6",
     });
 
     expect(resolved?.candidateRef).toBe("action-search-2:g1:c6");

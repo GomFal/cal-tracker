@@ -105,13 +105,13 @@
     "semantic_hash": ""
   },
   "apps/backend/src/agent/agentChatService.ts": {
-    "mtime": 1781913164.3191147,
-    "ast_hash": "3449700a19d9ee307cc379b504ac3861",
+    "mtime": 1782072755.2374616,
+    "ast_hash": "ac62cf8a09cd18db56f79410908f06d5",
     "semantic_hash": ""
   },
   "apps/backend/src/agent/agentMessages.ts": {
-    "mtime": 1781912944.7416036,
-    "ast_hash": "57c1fda8e7a9eb31198d1c2ed2c4bd1f",
+    "mtime": 1782072553.4889936,
+    "ast_hash": "d631b8973d268a4845515e6e8613d4dc",
     "semantic_hash": ""
   },
   "apps/backend/src/agent/agentPolicy.ts": {
@@ -220,8 +220,8 @@
     "semantic_hash": ""
   },
   "apps/backend/src/http/app.ts": {
-    "mtime": 1781913155.8250625,
-    "ast_hash": "ea0c8b98eb8b13b645bc48663aa27334",
+    "mtime": 1782072532.129048,
+    "ast_hash": "ab49f266c0f00491c96104a52b1eb7ec",
     "semantic_hash": ""
   },
   "apps/backend/src/index.ts": {
@@ -350,8 +350,8 @@
     "semantic_hash": ""
   },
   "apps/backend/src/tests/agentChat.test.ts": {
-    "mtime": 1781913493.484853,
-    "ast_hash": "db6b3bcd4b21017c84a86ebc58490471",
+    "mtime": 1782072684.9076505,
+    "ast_hash": "b119db0e096ea4e1074de1d1a5cae301",
     "semantic_hash": ""
   },
   "apps/backend/src/tests/agentMessages.test.ts": {
@@ -685,8 +685,8 @@
     "semantic_hash": ""
   },
   "apps/mobile/lib/data/repositories/nutrition_repository.dart": {
-    "mtime": 1781913000.888026,
-    "ast_hash": "0eeb8009ec6b5894f265b96be343f474",
+    "mtime": 1782072576.4979346,
+    "ast_hash": "a32f4b8739f5d43ea098c4a227bbc2a1",
     "semantic_hash": ""
   },
   "apps/mobile/lib/data/services/agent_chat_cache_store.dart": {
@@ -785,8 +785,8 @@
     "semantic_hash": ""
   },
   "apps/mobile/lib/generated/api/cal_tracker_api.dart": {
-    "mtime": 1781912990.9449532,
-    "ast_hash": "ad12d2395ea69dbb3237a0588aad982f",
+    "mtime": 1782072581.6209214,
+    "ast_hash": "689ae0e0cd91d7f7e74ddd9e639121d3",
     "semantic_hash": ""
   },
   "apps/mobile/lib/generated/api/openapi.json": {
@@ -800,18 +800,18 @@
     "semantic_hash": ""
   },
   "apps/mobile/lib/l10n/generated/app_localizations.dart": {
-    "mtime": 1781913286.1038158,
-    "ast_hash": "fa7d7625f5c13eb6710077269fa969d0",
+    "mtime": 1782072731.724525,
+    "ast_hash": "9b33811eb56f2e764a3fb871ae4a9434",
     "semantic_hash": ""
   },
   "apps/mobile/lib/l10n/generated/app_localizations_en.dart": {
-    "mtime": 1781913286.0768156,
-    "ast_hash": "12f9efd7b918dcad3a835ab544130ecd",
+    "mtime": 1782072731.706525,
+    "ast_hash": "c4f727dd46b08d764ede96e6e35d1061",
     "semantic_hash": ""
   },
   "apps/mobile/lib/l10n/generated/app_localizations_es.dart": {
-    "mtime": 1781913286.0878158,
-    "ast_hash": "9b5cf0d04f1970d9864eec5033b63f11",
+    "mtime": 1782072731.713525,
+    "ast_hash": "3c29cb1b0fb606ea26a8465beb1a3814",
     "semantic_hash": ""
   },
   "apps/mobile/lib/l10n/meal_label_localizations.dart": {
@@ -900,13 +900,13 @@
     "semantic_hash": ""
   },
   "apps/mobile/lib/ui/features/agent_chat/view_models/agent_chat_view_model.dart": {
-    "mtime": 1781913011.7191045,
-    "ast_hash": "92d2fa0e945efa44f4a8c30e85a5a37a",
+    "mtime": 1782072590.7358978,
+    "ast_hash": "461e257471bfa4cdd3ef6822c23f6da7",
     "semantic_hash": ""
   },
   "apps/mobile/lib/ui/features/agent_chat/views/agent_chat_screen.dart": {
-    "mtime": 1781913094.6926742,
-    "ast_hash": "01175652dd215e9a6e2ccf8c32efd2df",
+    "mtime": 1782072616.5698304,
+    "ast_hash": "99e39521b0c8dfd212f1e4ac083debdd",
     "semantic_hash": ""
   },
   "apps/mobile/lib/ui/features/auth/view_models/auth_view_model.dart": {
@@ -1200,8 +1200,8 @@
     "semantic_hash": ""
   },
   "apps/mobile/test/agent_chat_test.dart": {
-    "mtime": 1781913410.2944572,
-    "ast_hash": "74062c582e63e3df11c66aa264c4e5a9",
+    "mtime": 1782072643.1957607,
+    "ast_hash": "fb80625e0985aef04344ea801ac98b76",
     "semantic_hash": ""
   },
   "apps/mobile/test/api_client_locale_header_test.dart": {
@@ -1765,7 +1765,7 @@
     "semantic_hash": ""
   },
   "packages/contracts/openapi.json": {
-    "mtime": 1781913447.1506355,
+    "mtime": 1782072774.2647345,
     "ast_hash": "bca2fdb863e61874fef500d62c73ac27",
     "semantic_hash": ""
   },
@@ -1780,8 +1780,8 @@
     "semantic_hash": ""
   },
   "packages/contracts/src/api.ts": {
-    "mtime": 1781912758.195967,
-    "ast_hash": "9c8959ee1a4c419c7a3a20a28a418ad7",
+    "mtime": 1782072520.6640773,
+    "ast_hash": "38fa645745e9db9679726226a8609f97",
     "semantic_hash": ""
   },
   "packages/contracts/src/auth.ts": {
@@ -2705,18 +2705,18 @@
     "semantic_hash": ""
   },
   "apps/backend/src/agent/toolContent.ts": {
-    "mtime": 1781913189.303265,
-    "ast_hash": "aa3174d044de586381eb1bf995c8b78d",
+    "mtime": 1782072709.400585,
+    "ast_hash": "ada076203e25e496de12f85b5e1cdb01",
     "semantic_hash": ""
   },
   "apps/backend/src/tests/agentToolContent.test.ts": {
-    "mtime": 1781913311.5269525,
-    "ast_hash": "971c4366dde6037ed7886eea7cb50332",
+    "mtime": 1782072713.7185733,
+    "ast_hash": "04d05b7b152103d59985f1d4b5d3cf3a",
     "semantic_hash": ""
   },
   "docs/fix-agent-chat-duplicated-search.md": {
-    "mtime": 1781913473.1267583,
-    "ast_hash": "bc6cc9719bd5df13d8633e69d5b4f335",
+    "mtime": 1782072746.0244865,
+    "ast_hash": "03229893fff3cc92b29b953e8a64ded6",
     "semantic_hash": ""
   }
 }

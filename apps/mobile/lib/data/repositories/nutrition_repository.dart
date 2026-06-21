@@ -28,7 +28,6 @@ class AgentRunResult {
     this.input,
     this.clarificationOptions,
     this.candidateGroups,
-    this.selectionState,
     this.usualFoodDraft,
     this.usualMealDraft,
   });
@@ -50,64 +49,8 @@ class AgentRunResult {
   final dynamic input;
   final List<FoodCandidateGroup>? clarificationOptions;
   final List<FoodCandidateGroup>? candidateGroups;
-  final AgentCandidateSelectionState? selectionState;
   final UsualFoodDraft? usualFoodDraft;
   final UsualMealDraft? usualMealDraft;
-}
-
-class AgentCandidateSelection {
-  const AgentCandidateSelection({
-    required this.searchRef,
-    this.candidateRef,
-    this.groupIndex,
-    this.candidateIndex,
-  });
-
-  final String searchRef;
-  final String? candidateRef;
-  final int? groupIndex;
-  final int? candidateIndex;
-
-  Map<String, Object?> toJson() => {
-        'searchRef': searchRef,
-        if (candidateRef != null) 'candidateRef': candidateRef,
-        if (groupIndex != null) 'groupIndex': groupIndex,
-        if (candidateIndex != null) 'candidateIndex': candidateIndex,
-      };
-}
-
-class AgentCandidateSelectionState {
-  const AgentCandidateSelectionState({
-    required this.status,
-    required this.searchRef,
-    required this.candidateCount,
-    required this.groupCount,
-    required this.threshold,
-    this.topConfidence,
-    this.acceptedCandidateRef,
-  });
-
-  final String status;
-  final String searchRef;
-  final int candidateCount;
-  final int groupCount;
-  final double threshold;
-  final double? topConfidence;
-  final String? acceptedCandidateRef;
-
-  bool get isAwaitingUserSelection => status == 'awaiting_user_selection';
-
-  factory AgentCandidateSelectionState.fromJson(Map<String, Object?> json) {
-    return AgentCandidateSelectionState(
-      status: json['status'] as String? ?? '',
-      searchRef: json['searchRef'] as String? ?? '',
-      candidateCount: (json['candidateCount'] as num?)?.toInt() ?? 0,
-      groupCount: (json['groupCount'] as num?)?.toInt() ?? 0,
-      threshold: (json['threshold'] as num?)?.toDouble() ?? 0,
-      topConfidence: (json['topConfidence'] as num?)?.toDouble(),
-      acceptedCandidateRef: json['acceptedCandidateRef'] as String?,
-    );
-  }
 }
 
 class VoiceMealRunResult {
@@ -551,13 +494,11 @@ class NutritionRepository {
     String message, {
     String? conversationId,
     String? activeProposalId,
-    AgentCandidateSelection? candidateSelection,
   }) async* {
     await for (final json in _apiClient.streamAgentChat(
       message,
       conversationId: conversationId,
       activeProposalId: activeProposalId,
-      candidateSelection: candidateSelection?.toJson(),
     )) {
       final event = _parseAgentChatStreamEvent(json);
       final result = event.result;
@@ -1286,11 +1227,6 @@ AgentRunResult agentRunResultFromJson(Map<String, Object?> json) {
     clarificationOptions: _parseCandidateGroups(json['options']),
     candidateGroups: _parseCandidateGroups(json['candidateGroups']) ??
         _parseCandidateGroups(json['options']),
-    selectionState: json['selectionState'] is Map<String, Object?>
-        ? AgentCandidateSelectionState.fromJson(
-            json['selectionState'] as Map<String, Object?>,
-          )
-        : null,
     usualFoodDraft: json['usualFoodDraft'] == null
         ? _parseTopLevelUsualFoodDraft(json)
         : _parseNestedUsualFoodDraft(

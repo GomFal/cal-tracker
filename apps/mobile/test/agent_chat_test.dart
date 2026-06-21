@@ -86,13 +86,6 @@ void main() {
       ),
     );
     registerFallbackValue(<UsualFood>[]);
-    registerFallbackValue(
-      const AgentCandidateSelection(
-        searchRef: 'fallback',
-        groupIndex: 1,
-        candidateIndex: 1,
-      ),
-    );
   });
 
   test('CalTrackerApiClient parses split agent chat SSE events', () async {
@@ -186,50 +179,6 @@ void main() {
     expect(toolEntry.toolStatus, AgentChatToolStatus.completed);
     expect(toolEntry.result?.summary?.consumed.calories, 420);
     expect(viewModel.entries[2].text, 'You ate breakfast.');
-  });
-
-  test('AgentChatViewModel sends structured candidate selections', () async {
-    final repository = MockNutritionRepository();
-    final recorder = MockAudioRecorderService();
-    AgentCandidateSelection? sentSelection;
-    when(
-      () => repository.streamAgentChat(
-        any(),
-        conversationId: any(named: 'conversationId'),
-        activeProposalId: any(named: 'activeProposalId'),
-        candidateSelection: any(named: 'candidateSelection'),
-      ),
-    ).thenAnswer((invocation) {
-      sentSelection =
-          invocation.namedArguments[#candidateSelection]
-              as AgentCandidateSelection?;
-      return Stream.fromIterable([
-        const AgentChatStreamEvent(
-          type: 'assistant_delta',
-          delta: 'Using that ingredient.',
-        ),
-        const AgentChatStreamEvent(type: 'done'),
-      ]);
-    });
-    final viewModel = AgentChatViewModel(
-      nutritionRepository: repository,
-      audioRecorderService: recorder,
-    );
-
-    await viewModel.selectCandidate(
-      selection: const AgentCandidateSelection(
-        searchRef: 'search-action-1',
-        groupIndex: 1,
-        candidateIndex: 6,
-      ),
-      label: 'Selected result 6: Candidate 6',
-    );
-
-    expect(sentSelection?.searchRef, 'search-action-1');
-    expect(sentSelection?.groupIndex, 1);
-    expect(sentSelection?.candidateIndex, 6);
-    expect(viewModel.entries.first.text, 'Selected result 6: Candidate 6');
-    expect(viewModel.entries.last.text, 'Using that ingredient.');
   });
 
   test('AgentChatViewModel clears active proposal after meal commit', () async {

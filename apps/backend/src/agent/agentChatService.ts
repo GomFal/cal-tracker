@@ -233,7 +233,6 @@ export class AgentChatService {
     activeProposalId?: string;
     activeProposal?: MealProposal | null;
     inputMode?: "text" | "voice";
-    candidateSelection?: AgentChatCandidateSelection;
   }): AsyncGenerator<AgentChatEvent> {
     const runStarted = Date.now();
     const conversation = await this.resolveConversation(
@@ -256,16 +255,7 @@ export class AgentChatService {
       turnId: correlation.turnId,
     };
 
-    const selectedCandidate = input.candidateSelection
-      ? await this.resolveCandidateSelection(
-          input.context.actorUserId,
-          conversation.id,
-          input.candidateSelection,
-        )
-      : undefined;
-    const text = selectedCandidate
-      ? selectionMessage(input.text, selectedCandidate)
-      : input.text.trim();
+    const text = input.text.trim();
     if (!text) {
       yield {
         type: "assistant_delta",
@@ -1336,23 +1326,6 @@ function withSelectionState<T extends AgentChatMappedResult>(
     : mapped;
 }
 
-function selectionMessage(
-  text: string,
-  selected: {
-    registry: CandidateRegistryMetadata;
-    candidateRef: string;
-    item: MealItem;
-  },
-): string {
-  const prefix = text.trim() || "Selected a nutrition search result.";
-  return `${prefix}\n\nSelected nutrition candidate:\n${JSON.stringify(
-    selectedCandidateContent({
-      selection: { candidateRef: selected.candidateRef },
-      resolved: selected,
-    }).result,
-  )}`;
-}
-
 function extractLlmTokenMetrics(rawResponse: unknown): {
   promptTokens?: number;
   completionTokens?: number;
@@ -1425,7 +1398,7 @@ function candidateReferenceToolDefinition(): AgentToolDefinition {
           searchRef: {
             type: "string",
             description:
-              "The searchRef from the prior awaiting_user_selection result. Omit only when referring to the latest candidate list.",
+              "The searchRef from the prior candidate_preview result. Omit only when referring to the latest candidate list.",
           },
           candidateRef: {
             type: "string",

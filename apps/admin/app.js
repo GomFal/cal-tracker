@@ -2474,17 +2474,15 @@
         : `/v1/admin/telemetry/conversations/${encodeURIComponent(conversationId)}?includeHidden=${includeHidden ? "true" : "false"}`;
       const data = await apiGet(path);
       const rows = extractList(data?.messages, ["messages", "items", "data"]);
-      const [turnsData, providerData, toolData] = await Promise.all([
-        apiGet(ENDPOINTS.agentTurns || "/v1/admin/telemetry/agent-turns", {
-          params: { conversationId, limit: 500 },
-        }),
-        apiGet(ENDPOINTS.providerCalls || "/v1/admin/telemetry/llm-provider-calls", {
-          params: { conversationId, limit: 500 },
-        }),
-        apiGet(ENDPOINTS.agentToolCalls || "/v1/admin/telemetry/agent-tool-calls", {
-          params: { conversationId, limit: 500 },
-        }),
-      ]);
+      const turnsData = await apiGet(ENDPOINTS.agentTurns || "/v1/admin/telemetry/agent-turns", {
+        params: { conversationId, limit: 500 },
+      });
+      const providerData = await apiGet(ENDPOINTS.providerCalls || "/v1/admin/telemetry/llm-provider-calls", {
+        params: { conversationId, limit: 500 },
+      });
+      const toolData = await apiGet(ENDPOINTS.agentToolCalls || "/v1/admin/telemetry/agent-tool-calls", {
+        params: { conversationId, limit: 500 },
+      });
       const agentTurns = extractList(turnsData, ["agentTurns", "items", "data", "results"]);
       const providerCalls = extractList(providerData, ["providerCalls", "items", "data", "results"]);
       const agentToolCalls = extractList(toolData, ["agentToolCalls", "items", "data", "results"]);

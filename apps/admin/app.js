@@ -481,6 +481,8 @@
     renderLlmTable([]);
     renderConversationsTable([]);
     renderConversationDetail([]);
+    renderAgentTurnsTable([], "#conversation-turns-table tbody", "Select a conversation row.");
+    renderProviderCallsTable([], "#conversation-provider-calls-table tbody", "Select a conversation row.");
     renderAgentTurnsTable([]);
     renderActionCallsTable([]);
     renderLlmCostView(null);
@@ -968,20 +970,6 @@
     return total;
   }
 
-  function sumMetric(rows, field) {
-    let total = 0;
-    let seen = false;
-    for (const row of rows || []) {
-      const raw = row?.[field];
-      if (raw == null || raw === "") continue;
-      const value = Number(raw);
-      if (!Number.isFinite(value)) continue;
-      total += value;
-      seen = true;
-    }
-    return seen ? total : undefined;
-  }
-
   function tokenCell(row, field) {
     return el("td", { class: "numeric", text: formatNumber(row?.[field]) });
   }
@@ -993,50 +981,6 @@
       tokenCell(row, "totalTokens"),
       tokenCell(row, "reasoningTokens"),
     ];
-  }
-
-  function buildTurnMetricMaps(agentTurns = [], providerCalls = []) {
-    const byTurnId = new Map();
-    for (const turn of agentTurns || []) {
-      if (!turn?.turnId) continue;
-      byTurnId.set(turn.turnId, {
-        promptTokens: turn.promptTokens,
-        completionTokens: turn.completionTokens,
-        totalTokens: turn.totalTokens,
-        reasoningTokens: turn.reasoningTokens,
-        providerCostAmount: turn.providerCostAmount,
-        estimatedCostAmount: turn.estimatedCostAmount,
-        totalCostAmount: turn.totalCostAmount,
-        costCurrency: turn.costCurrency,
-        providerCallCount: 0,
-      });
-    }
-
-    const callsByTurnId = new Map();
-    for (const call of providerCalls || []) {
-      if (!call?.turnId) continue;
-      const calls = callsByTurnId.get(call.turnId) || [];
-      calls.push(call);
-      callsByTurnId.set(call.turnId, calls);
-    }
-
-    for (const [turnId, calls] of callsByTurnId.entries()) {
-      const existing = byTurnId.get(turnId) || {};
-      byTurnId.set(turnId, {
-        ...existing,
-        promptTokens: existing.promptTokens ?? sumMetric(calls, "promptTokens"),
-        completionTokens: existing.completionTokens ?? sumMetric(calls, "completionTokens"),
-        totalTokens: existing.totalTokens ?? sumMetric(calls, "totalTokens"),
-        reasoningTokens: existing.reasoningTokens ?? sumMetric(calls, "reasoningTokens"),
-        providerCostAmount: existing.providerCostAmount ?? sumMetric(calls, "providerCostAmount"),
-        estimatedCostAmount: existing.estimatedCostAmount ?? sumMetric(calls, "estimatedCostAmount"),
-        totalCostAmount: existing.totalCostAmount ?? sumMetric(calls, "totalCostAmount"),
-        costCurrency: existing.costCurrency ?? calls.find((call) => call.costCurrency)?.costCurrency,
-        providerCallCount: calls.length,
-      });
-    }
-
-    return byTurnId;
   }
 
   function median(values) {
@@ -1450,17 +1394,16 @@
     }
   }
 
-  function renderConversationDetail(rows, turnMetrics = new Map()) {
+  function renderConversationDetail(rows) {
     const tbody = $("#conversation-detail-table tbody");
     if (!tbody) return;
     tbody.replaceChildren();
     if (!rows || rows.length === 0) {
-      tbody.appendChild(renderEmptyRow(14, "Select a conversation row."));
+      tbody.appendChild(renderEmptyRow(8, "Select a conversation row."));
       return;
     }
     for (const row of rows) {
       const text = String(row.content || "");
-      const metrics = row.turnId ? turnMetrics.get(row.turnId) : null;
       const tr = el("tr", {});
       tr.append(
         el("td", { text: formatTimestamp(row.createdAt) }),
@@ -1472,22 +1415,23 @@
       tr.append(traceCell(row.traceId));
       tr.append(
         idCell(row.activeProposalId),
-        ...tokenCells(metrics),
-        el("td", { class: "numeric", text: formatNumber(metrics?.providerCallCount) }),
-        el("td", { class: "numeric", text: costAmount(metrics) }),
         el("td", { class: "wrap" }, renderExpandableValue(text)),
       );
       tbody.appendChild(tr);
     }
   }
 
-  function renderAgentTurnsTable(rows, selector = "#agent-turns-table tbody") {
+  function renderAgentTurnsTable(
+    rows,
+    selector = "#agent-turns-table tbody",
+    emptyText = "No agent turns match the current filters.",
+  ) {
     const tbody = $(selector);
     if (!tbody) return;
     if (selector === "#agent-turns-table tbody") rows = applyClientControls("agentTurns", rows);
     tbody.replaceChildren();
     if (!rows || rows.length === 0) {
-      tbody.appendChild(renderEmptyRow(17, "No agent turns match the current filters."));
+      tbody.appendChild(renderEmptyRow(17, emptyText));
       return;
     }
     if (selector === "#agent-turns-table tbody" && maybeRenderAggregateRows(tbody, "agentTurns", rows)) return;
@@ -1622,13 +1566,17 @@
     }
   }
 
-  function renderProviderCallsTable(rows, selector = "#provider-calls-table tbody") {
+  function renderProviderCallsTable(
+    rows,
+    selector = "#provider-calls-table tbody",
+    emptyText = "No provider calls match the current filters.",
+  ) {
     const tbody = $(selector);
     if (!tbody) return;
     if (selector === "#provider-calls-table tbody") rows = applyClientControls("providerCalls", rows);
     tbody.replaceChildren();
     if (!rows || rows.length === 0) {
-      tbody.appendChild(renderEmptyRow(16, "No provider calls match the current filters."));
+      tbody.appendChild(renderEmptyRow(16, emptyText));
       return;
     }
     if (selector === "#provider-calls-table tbody" && maybeRenderAggregateRows(tbody, "providerCalls", rows)) return;
@@ -1792,7 +1740,6 @@
       : Array.isArray(payload?.foodSearches)
         ? payload.foodSearches
         : [];
-    const traceTurnMetrics = buildTurnMetricMaps(agentTurns, providerCalls);
 
     const earliest = [
       events,
@@ -1890,11 +1837,10 @@
     const traceMessagesBody = $("#trace-messages-table tbody");
     traceMessagesBody.replaceChildren();
     if (conversationMessages.length === 0) {
-      traceMessagesBody.appendChild(renderEmptyRow(13, "No conversation messages recorded for this trace."));
+      traceMessagesBody.appendChild(renderEmptyRow(7, "No conversation messages recorded for this trace."));
     } else {
       for (const row of conversationMessages) {
         const text = String(row.content || "");
-        const metrics = row.turnId ? traceTurnMetrics.get(row.turnId) : null;
         const tr = el("tr", {});
         tr.append(
           el("td", { text: formatTimestamp(row.createdAt) }),
@@ -1903,9 +1849,6 @@
           el("td", { class: "mono", text: row.role || "—" }),
           el("td", { class: "mono", text: row.inputMode || "—" }),
           el("td", { class: "mono", text: row.source || "—" }),
-          ...tokenCells(metrics),
-          el("td", { class: "numeric", text: formatNumber(metrics?.providerCallCount) }),
-          el("td", { class: "numeric", text: costAmount(metrics) }),
           el("td", { class: "wrap" }, renderExpandableValue(text)),
         );
         traceMessagesBody.appendChild(tr);
@@ -2162,6 +2105,8 @@
       const rows = extractList(data, ["conversations", "items", "data", "results"]);
       renderConversationsTable(rows);
       renderConversationDetail([]);
+      renderAgentTurnsTable([], "#conversation-turns-table tbody", "Select a conversation row.");
+      renderProviderCallsTable([], "#conversation-provider-calls-table tbody", "Select a conversation row.");
       setStatusSuccess(`Loaded ${rows.length} conversation${rows.length === 1 ? "" : "s"}.`);
     } catch (err) {
       if (err.code === "aborted") return;
@@ -2187,11 +2132,23 @@
       });
       const agentTurns = extractList(turnsData, ["agentTurns", "items", "data", "results"]);
       const providerCalls = extractList(providerData, ["providerCalls", "items", "data", "results"]);
-      renderConversationDetail(rows, buildTurnMetricMaps(agentTurns, providerCalls));
+      renderConversationDetail(rows);
+      renderAgentTurnsTable(
+        agentTurns,
+        "#conversation-turns-table tbody",
+        "No agent turns recorded for this conversation.",
+      );
+      renderProviderCallsTable(
+        providerCalls,
+        "#conversation-provider-calls-table tbody",
+        "No provider calls recorded for this conversation.",
+      );
       setStatusSuccess(`Loaded ${rows.length} conversation message${rows.length === 1 ? "" : "s"} · ${agentTurns.length} turn${agentTurns.length === 1 ? "" : "s"} · ${providerCalls.length} provider call${providerCalls.length === 1 ? "" : "s"}.`);
     } catch (err) {
       if (err.code === "aborted") return;
       renderConversationDetail([]);
+      renderAgentTurnsTable([], "#conversation-turns-table tbody", "Select a conversation row.");
+      renderProviderCallsTable([], "#conversation-provider-calls-table tbody", "Select a conversation row.");
       setStatusError(err);
     }
   }

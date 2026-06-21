@@ -45,8 +45,8 @@
     "semantic_hash": ""
   },
   "apps/admin/app.js": {
-    "mtime": 1781894669.4473221,
-    "ast_hash": "88c276676abe2f013d5540877f4b72a1",
+    "mtime": 1782075261.1761105,
+    "ast_hash": "9c829260ce3c8461d4fe135d996e23c2",
     "semantic_hash": ""
   },
   "apps/admin/config.js": {
@@ -55,8 +55,8 @@
     "semantic_hash": ""
   },
   "apps/admin/validate.mjs": {
-    "mtime": 1781894669.4479337,
-    "ast_hash": "2ecea6eaf490b3df7c393eb926579c2a",
+    "mtime": 1782075266.154142,
+    "ast_hash": "bca643885400b949d11afc28acbb56b3",
     "semantic_hash": ""
   },
   "apps/backend/drizzle.config.ts": {
@@ -1990,8 +1990,8 @@
     "semantic_hash": ""
   },
   "apps/admin/index.html": {
-    "mtime": 1781894669.4478345,
-    "ast_hash": "e4a90adbae1dfb3f085c03a4ea1398ca",
+    "mtime": 1782075197.7356906,
+    "ast_hash": "dce413d03684380a9ad3d535eb662c64",
     "semantic_hash": ""
   },
   "apps/landing/README.md": {
@@ -2035,8 +2035,8 @@
     "semantic_hash": ""
   },
   "apps/mobile/pubspec.yaml": {
-    "mtime": 1781875529.2288327,
-    "ast_hash": "9a9db2c5987c7a160b82d77f717dc6a0",
+    "mtime": 1782071479.5410554,
+    "ast_hash": "fd410d07c303e2b2271a09d936daf8db",
     "semantic_hash": ""
   },
   "apps/mobile/web/index.html": {
@@ -2792,6 +2792,11 @@
   "design-artifacts/ui-soft-inspiration.webp": {
     "mtime": 1779126921.132868,
     "ast_hash": "18d10f4953318d129dd24ebaca491c0d",
+    "semantic_hash": ""
+  },
+  "docs/fix-agent-chat-duplicated-search.md": {
+    "mtime": 1781895819.5823107,
+    "ast_hash": "5597881760a1ebd5607fbd1f79c96552",
     "semantic_hash": ""
   }
 }

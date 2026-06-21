@@ -22,6 +22,8 @@ class FreshUnderlineTextField extends StatelessWidget {
     this.maxLines = 1,
     this.minLines,
     this.readOnly = false,
+    this.enabled = true,
+    this.obscureText = false,
     this.onChanged,
     this.onSubmitted,
   });
@@ -45,6 +47,8 @@ class FreshUnderlineTextField extends StatelessWidget {
   final int? maxLines;
   final int? minLines;
   final bool readOnly;
+  final bool enabled;
+  final bool obscureText;
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
 
@@ -77,6 +81,8 @@ class FreshUnderlineTextField extends StatelessWidget {
           maxLines: maxLines,
           minLines: minLines,
           readOnly: readOnly,
+          enabled: enabled,
+          obscureText: obscureText,
           onChanged: onChanged,
           onSubmitted: onSubmitted,
           style: style ??
@@ -430,7 +436,7 @@ class FreshGoalInput extends StatelessWidget {
                   color: palette.ink,
                   fontWeight: FontWeight.w800,
                   fontFeatures: const [FontFeature.tabularFigures()],
-                  letterSpacing: -1.2,
+                  letterSpacing: 0,
                 ),
                 suffix: Text(
                   unit,
@@ -517,7 +523,7 @@ class FreshSteppedValueInput extends StatelessWidget {
                         color: palette.ink,
                         fontWeight: FontWeight.w800,
                         fontFeatures: const [FontFeature.tabularFigures()],
-                        letterSpacing: -1.2,
+                        letterSpacing: 0,
                       ),
                     ),
                     const SizedBox(width: FreshSpacing.sm),

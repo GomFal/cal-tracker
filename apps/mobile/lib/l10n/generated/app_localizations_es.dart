@@ -235,12 +235,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get authHeroHeadline => 'Controla mejor\ntus calorías.';
 
   @override
-  String get darkModeSwitchToLight => 'Cambiar a modo claro';
-
-  @override
-  String get darkModeSwitchToDark => 'Cambiar a modo oscuro';
-
-  @override
   String get settingsTitle => 'Menú';
 
   @override
@@ -1574,10 +1568,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get mealProposalConfirm => 'Confirmar';
-
-  @override
-  String get mealConfirmationEmbedded =>
-      'La confirmación de comida está integrada en el flujo de registro.';
 
   @override
   String get localToolkitToolButtonTooltip => 'Abrir kit local';

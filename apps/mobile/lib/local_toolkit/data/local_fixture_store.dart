@@ -346,8 +346,37 @@ class LocalFixtureStore extends ChangeNotifier {
         aliases: const ['apple', 'fruit snack'],
       ),
     ];
+    _usualFoods = [
+      for (var index = 0; index < math.min(catalog.length, 10); index++)
+        _usualFoodFromCatalog(index, catalog[index]),
+    ];
     _sessionActive = true;
     notifyListeners();
+  }
+
+  UsualFood _usualFoodFromCatalog(int index, MealItem item) {
+    return UsualFood(
+      id: 'local-usual-food-fixture-${index + 1}',
+      name: item.name,
+      canonicalName: item.canonicalName,
+      servingGrams: item.resolvedGrams ?? item.quantity,
+      nutrition: NutritionSnapshot(
+        calories: item.calories,
+        proteinGrams: item.proteinGrams,
+        carbsGrams: item.carbsGrams,
+        fatGrams: item.fatGrams,
+      ),
+      aliases: item.originalText == null || item.originalText == item.name
+          ? const []
+          : [item.originalText!],
+      nutrients: {
+        'servingDescription':
+            '${_formatFixtureQuantity(item.quantity)} '
+            '${item.unit}',
+      },
+      createdAt: _now(),
+      updatedAt: _now(),
+    );
   }
 
   void addSampleMeal() {
@@ -699,7 +728,9 @@ class LocalFixtureStore extends ChangeNotifier {
 
   UsualMealDraft draftUsualMeal(String text) {
     final phrase = text.trim();
-    final words = phrase.isEmpty ? const <String>[] : phrase.split(RegExp(r'\s+'));
+    final words = phrase.isEmpty
+        ? const <String>[]
+        : phrase.split(RegExp(r'\s+'));
     final title = words.isEmpty
         ? 'Local drafted meal'
         : words.first[0].toUpperCase() + words.first.substring(1);
@@ -1341,6 +1372,11 @@ _MacroFields _macroFields({
 
 String _dateOnly(DateTime value) {
   return '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
+}
+
+String _formatFixtureQuantity(double value) {
+  if (value == value.roundToDouble()) return value.toStringAsFixed(0);
+  return value.toStringAsFixed(1);
 }
 
 const _defaultTarget = NutritionSnapshot(

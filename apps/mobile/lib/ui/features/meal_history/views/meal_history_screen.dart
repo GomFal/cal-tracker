@@ -6,6 +6,7 @@ import '../../../../l10n/app_localizations_context.dart';
 import '../../../../l10n/generated/app_localizations.dart';
 import '../../../core/content_frame.dart';
 import '../../../core/design_system.dart';
+import '../../../core/motion.dart';
 import '../../../shared/meal_item_editor_sheet.dart';
 import '../view_models/meal_history_view_model.dart';
 
@@ -30,7 +31,7 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
     final viewModel = context.watch<MealHistoryViewModel>();
     final palette = context.freshPalette;
     final l10n = context.l10n;
-    return ContentFrame(
+    return ContentSliverFrame(
       title: l10n.historyTitle,
       actions: [
         FreshIconButton(
@@ -39,56 +40,66 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
           onPressed: () => viewModel.load(forceRefresh: true),
         ),
       ],
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (viewModel.isLoading) ...[
-            const LinearProgressIndicator(minHeight: 3),
-            const SizedBox(height: FreshSpacing.md),
-          ],
-          if (viewModel.error != null) ...[
-            FreshStatusBanner(
-              icon: Icons.error_outline_rounded,
-              title: l10n.historyCouldNotLoadHistory,
-              message: viewModel.error!,
-              color: palette.coral,
-            ),
-            const SizedBox(height: FreshSpacing.md),
-          ],
-          _CaloriesChartSection(
-            summaries: viewModel.weekSummaries,
-            selectedDate: viewModel.selectedDate,
-            onSelectDate: viewModel.selectDate,
-          ),
-          const SizedBox(height: FreshSpacing.lg),
-          FreshSectionTitle(
-            title: l10n.historyLoggedMeals,
-            trailing: Text(
-              l10n.historyMealCount(viewModel.meals.length),
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: palette.inkMuted,
-                fontFeatures: const [FontFeature.tabularFigures()],
+      slivers: [
+        SliverToBoxAdapter(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (viewModel.isLoading) ...[
+                const LinearProgressIndicator(minHeight: 3),
+                const SizedBox(height: FreshSpacing.md),
+              ],
+              if (viewModel.error != null) ...[
+                FreshStatusBanner(
+                  icon: Icons.error_outline_rounded,
+                  title: l10n.historyCouldNotLoadHistory,
+                  message: viewModel.error!,
+                  color: palette.coral,
+                ),
+                const SizedBox(height: FreshSpacing.md),
+              ],
+              _CaloriesChartSection(
+                summaries: viewModel.weekSummaries,
+                selectedDate: viewModel.selectedDate,
+                onSelectDate: viewModel.selectDate,
               ),
-            ),
+              const SizedBox(height: FreshSpacing.lg),
+              FreshSectionTitle(
+                title: l10n.historyLoggedMeals,
+                trailing: Text(
+                  l10n.historyMealCount(viewModel.meals.length),
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: palette.inkMuted,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+              const SizedBox(height: FreshSpacing.md),
+            ],
           ),
-          const SizedBox(height: FreshSpacing.md),
-          if (viewModel.meals.isEmpty)
-            FreshEmptyState(
+        ),
+        if (viewModel.meals.isEmpty)
+          SliverToBoxAdapter(
+            child: FreshEmptyState(
               icon: Icons.history_rounded,
               title: l10n.historyNoMealsLogged,
               message: l10n.historyNoMealsMessage,
-            )
-          else
-            for (final meal in viewModel.meals)
-              Padding(
+            ),
+          )
+        else
+          SliverList(
+            delegate: SliverChildBuilderDelegate((context, index) {
+              final meal = viewModel.meals[index];
+              return Padding(
                 padding: const EdgeInsets.only(bottom: FreshSpacing.md),
                 child: _HistoryMealRow(
                   meal: meal,
                   onTap: () => _showMealActions(context, viewModel, meal),
                 ),
-              ),
-        ],
-      ),
+              );
+            }, childCount: viewModel.meals.length),
+          ),
+      ],
     );
   }
 
@@ -101,6 +112,7 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
     final palette = context.freshPalette;
     final action = await showModalBottomSheet<String>(
       context: context,
+      sheetAnimationStyle: freshSheetAnimationStyle(context),
       builder: (context) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(18, 12, 18, 22),
@@ -150,6 +162,7 @@ class _MealHistoryScreenState extends State<MealHistoryScreen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
+      sheetAnimationStyle: freshSheetAnimationStyle(context),
       builder: (context) =>
           MealItemEditorSheet(meal: meal, keyPrefix: 'history'),
     );

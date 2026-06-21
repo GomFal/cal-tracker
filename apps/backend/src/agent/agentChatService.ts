@@ -408,6 +408,7 @@ export class AgentChatService {
             role: "assistant",
             content: finalText,
             ...messageCorrelation(correlation, {
+              iteration,
               resultKind: "assistant_message",
               stopReason: "assistant_message",
             }),

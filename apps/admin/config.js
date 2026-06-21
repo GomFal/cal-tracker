@@ -33,6 +33,7 @@ Object.assign(window.AdminTelemetry, {
     conversation: (conversationId, includeHidden = true) =>
       `/v1/admin/telemetry/conversations/${encodeURIComponent(conversationId)}?includeHidden=${includeHidden ? "true" : "false"}`,
     agentTurns: "/v1/admin/telemetry/agent-turns",
+    agentToolCalls: "/v1/admin/telemetry/agent-tool-calls",
     actionCalls: "/v1/admin/telemetry/action-calls",
     llmCost: "/v1/admin/telemetry/llm-cost",
     providerCalls: "/v1/admin/telemetry/llm-provider-calls",

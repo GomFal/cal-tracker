@@ -40,6 +40,14 @@
     adminUsername: "",
     controllers: new Set(),
     tableRows: new Map(),
+    conversationDetail: {
+      conversationId: null,
+      messages: [],
+      agentTurns: [],
+      providerCalls: [],
+      agentToolCalls: [],
+      selectedMessageId: null,
+    },
   };
 
   const TABLES = {
@@ -480,7 +488,9 @@
     renderEventsTable([]);
     renderLlmTable([]);
     renderConversationsTable([]);
+    resetConversationDetailState();
     renderConversationDetail([]);
+    renderSelectedMessageAccounting(null);
     renderAgentTurnsTable([], "#conversation-turns-table tbody", "Select a conversation row.");
     renderProviderCallsTable([], "#conversation-provider-calls-table tbody", "Select a conversation row.");
     renderAgentTurnsTable([]);
@@ -671,6 +681,24 @@
   function costAmount(row) {
     const amount = row?.providerCostAmount ?? row?.estimatedCostAmount ?? row?.totalCostAmount;
     return formatMoney(amount, row?.costCurrency || "USD");
+  }
+
+  function costTotal(rows) {
+    let total = 0;
+    let found = false;
+    for (const row of rows || []) {
+      const value = optionalFiniteNumber(
+        row?.providerCostAmount ?? row?.estimatedCostAmount ?? row?.totalCostAmount,
+      );
+      if (value == null) continue;
+      total += value;
+      found = true;
+    }
+    return found ? total : null;
+  }
+
+  function currencyForRows(rows) {
+    return (rows || []).find((row) => row?.costCurrency)?.costCurrency || "USD";
   }
 
   function fullText(value) {
@@ -981,6 +1009,161 @@
       tokenCell(row, "totalTokens"),
       tokenCell(row, "reasoningTokens"),
     ];
+  }
+
+  function compactObject(value) {
+    return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  }
+
+  function metadataNumber(row, key) {
+    const value = compactObject(row?.metadata)?.[key];
+    const number = Number(value);
+    return Number.isFinite(number) ? number : null;
+  }
+
+  function createdAtMs(row) {
+    const value = Date.parse(row?.createdAt || row?.startedAt || "");
+    return Number.isFinite(value) ? value : null;
+  }
+
+  function sortByCreatedDesc(rows) {
+    return [...(rows || [])].sort((a, b) => {
+      const left = createdAtMs(a);
+      const right = createdAtMs(b);
+      if (left == null && right == null) return 0;
+      if (left == null) return 1;
+      if (right == null) return -1;
+      return right - left;
+    });
+  }
+
+  function sameTurnRows(rows, turnId) {
+    return (rows || []).filter((row) => row?.turnId && row.turnId === turnId);
+  }
+
+  function messageHasToolCalls(message) {
+    return Array.isArray(message?.toolCalls) && message.toolCalls.length > 0;
+  }
+
+  function safeParseMaybeJson(value) {
+    if (typeof value !== "string") return value;
+    try {
+      return JSON.parse(value);
+    } catch {
+      return value;
+    }
+  }
+
+  function nearestProviderCallForMessage(message, calls) {
+    const messageTime = createdAtMs(message);
+    const ordered = sortByCreatedDesc(calls);
+    if (messageTime == null) return ordered[0];
+    const before = ordered.find((call) => {
+      const callTime = createdAtMs(call);
+      return callTime != null && callTime <= messageTime;
+    });
+    return before || ordered[0];
+  }
+
+  function selectedProviderCallsForMessage(message) {
+    const turnCalls = sameTurnRows(
+      state.conversationDetail.providerCalls,
+      message?.turnId,
+    );
+    if (!message || turnCalls.length === 0) {
+      return { calls: [], relation: "no provider call", inferred: false };
+    }
+
+    if (message.role === "user") {
+      return {
+        calls: sortByCreatedDesc(turnCalls),
+        relation: "message included in prompt",
+        inferred: false,
+      };
+    }
+
+    if (message.role === "tool") {
+      const messageTime = createdAtMs(message);
+      const later = turnCalls.filter((call) => {
+        const callTime = createdAtMs(call);
+        return messageTime == null || callTime == null || callTime >= messageTime;
+      });
+      return {
+        calls: sortByCreatedDesc(later),
+        relation: "tool result included in later prompt",
+        inferred: false,
+      };
+    }
+
+    const relation = messageHasToolCalls(message)
+      ? "LLM generated tool call"
+      : "LLM generated assistant message";
+    const iteration = metadataNumber(message, "iteration");
+    if (iteration != null) {
+      const exact = turnCalls.filter((call) => metadataNumber(call, "iteration") === iteration);
+      if (exact.length > 0) {
+        return { calls: sortByCreatedDesc(exact), relation, inferred: false };
+      }
+    }
+    const nearest = nearestProviderCallForMessage(message, turnCalls);
+    return {
+      calls: nearest ? [nearest] : sortByCreatedDesc(turnCalls),
+      relation,
+      inferred: true,
+    };
+  }
+
+  function selectedToolCallsForMessage(message) {
+    const toolTelemetry = state.conversationDetail.agentToolCalls || [];
+    if (!message) return [];
+    if (message.role === "tool") {
+      return toolTelemetry
+        .filter((row) => row.toolCallId && row.toolCallId === message.toolCallId)
+        .map((row) => ({
+          ...row,
+          relation: "executed tool result for selected message",
+        }));
+    }
+    if (message.role === "assistant" && messageHasToolCalls(message)) {
+      return message.toolCalls.map((toolCall, index) => {
+        const match = toolTelemetry.find((row) => row.toolCallId && row.toolCallId === toolCall.id);
+        return {
+          ...match,
+          relation: "generated by selected LLM message",
+          toolCallId: toolCall.id,
+          actionId: toolCall.function?.name || match?.actionId || "unknown_tool",
+          arguments: match?.arguments ?? safeParseMaybeJson(toolCall.function?.arguments || "{}"),
+          resultSummary: match?.resultSummary,
+          status: match?.status || "generated",
+          createdAt: match?.createdAt || message.createdAt,
+          durationMs: match?.durationMs,
+          errorMessage: match?.errorMessage,
+          metadata: {
+            ...(match?.metadata || {}),
+            generatedToolIndex: index,
+          },
+        };
+      });
+    }
+    if (message.role === "user") {
+      return sortByCreatedDesc(sameTurnRows(toolTelemetry, message.turnId)).map((row) => ({
+        ...row,
+        relation: "tool call later in selected turn",
+      }));
+    }
+    return [];
+  }
+
+  function sumField(rows, field) {
+    let total = 0;
+    let found = false;
+    for (const row of rows || []) {
+      const value = Number(row?.[field]);
+      if (!Number.isFinite(value)) continue;
+      total += value;
+      found = true;
+    }
+    return found ? total : null;
   }
 
   function median(values) {
@@ -1400,11 +1583,33 @@
     tbody.replaceChildren();
     if (!rows || rows.length === 0) {
       tbody.appendChild(renderEmptyRow(8, "Select a conversation row."));
+      renderSelectedMessageAccounting(null);
       return;
     }
-    for (const row of rows) {
+    const orderedRows = [...rows].sort((a, b) => {
+      const left = Date.parse(a?.createdAt || "");
+      const right = Date.parse(b?.createdAt || "");
+      if (!Number.isFinite(left) && !Number.isFinite(right)) return 0;
+      if (!Number.isFinite(left)) return 1;
+      if (!Number.isFinite(right)) return -1;
+      return right - left;
+    });
+    for (const row of orderedRows) {
       const text = String(row.content || "");
-      const tr = el("tr", {});
+      const selected = row.id === state.conversationDetail.selectedMessageId;
+      const tr = el("tr", {
+        class: `is-clickable${selected ? " is-selected" : ""}`,
+        tabindex: "0",
+        role: "button",
+        "aria-selected": selected ? "true" : "false",
+        title: "Select message for LLM accounting",
+        onClick: () => selectConversationMessage(row.id),
+        onKeydown: (event) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          selectConversationMessage(row.id);
+        },
+      });
       tr.append(
         el("td", { text: formatTimestamp(row.createdAt) }),
         idCell(row.turnId),
@@ -1419,6 +1624,149 @@
       );
       tbody.appendChild(tr);
     }
+  }
+
+  function selectConversationMessage(messageId) {
+    state.conversationDetail.selectedMessageId = messageId;
+    renderConversationDetail(state.conversationDetail.messages);
+    renderSelectedMessageAccounting(messageId);
+  }
+
+  function renderSelectedMessageAccounting(messageId) {
+    const message = (state.conversationDetail.messages || []).find((row) => row.id === messageId);
+    const empty = $("#selected-message-empty");
+    const meta = $("#selected-message-meta");
+    const cards = $("#selected-message-cards");
+    const relationTag = $("#selected-message-relation");
+    const providerBody = $("#selected-provider-calls-table tbody");
+    const toolBody = $("#selected-tool-calls-table tbody");
+    if (!empty || !meta || !cards || !relationTag || !providerBody || !toolBody) return;
+
+    if (!message) {
+      empty.hidden = false;
+      meta.hidden = true;
+      cards.hidden = true;
+      relationTag.textContent = "select a message";
+      relationTag.className = "tag tag-neutral";
+      providerBody.replaceChildren(renderEmptyRow(12, "Select a conversation message."));
+      toolBody.replaceChildren(renderEmptyRow(8, "No tool call selected."));
+      return;
+    }
+
+    const providerMatch = selectedProviderCallsForMessage(message);
+    const toolRows = selectedToolCallsForMessage(message);
+    const providerRows = providerMatch.calls;
+    empty.hidden = true;
+    meta.hidden = false;
+    cards.hidden = false;
+    relationTag.textContent = providerMatch.inferred
+      ? `${providerMatch.relation} · inferred`
+      : providerMatch.relation;
+    relationTag.className = providerMatch.inferred ? "tag tag-warning" : "tag tag-info";
+
+    meta.replaceChildren(
+      selectedMetaItem("Role", message.role || "—"),
+      selectedMetaItem("Time", formatTimestamp(message.createdAt)),
+      selectedMetaItem("Message", copyableId(message.id)),
+      selectedMetaItem("Turn", copyableId(message.turnId)),
+      selectedMetaItem("Trace", copyableId(message.traceId)),
+      selectedMetaItem("Iteration", metadataNumber(message, "iteration") ?? "—"),
+    );
+
+    renderSelectedMetricCards(providerRows);
+    renderSelectedProviderRows(providerRows, providerMatch);
+    renderSelectedToolRows(toolRows);
+  }
+
+  function selectedMetaItem(label, value) {
+    const dt = el("dt", { text: label });
+    const dd = el("dd", { class: typeof value === "string" ? "mono" : "" });
+    if (typeof value === "string" || typeof value === "number") dd.textContent = String(value);
+    else dd.appendChild(value);
+    return el("div", {}, [dt, dd]);
+  }
+
+  function renderSelectedMetricCards(providerRows) {
+    const values = {
+      prompt: formatNumber(sumField(providerRows, "promptTokens")),
+      completion: formatNumber(sumField(providerRows, "completionTokens")),
+      total: formatNumber(sumField(providerRows, "totalTokens")),
+      reasoning: formatNumber(sumField(providerRows, "reasoningTokens")),
+      cost: formatMoney(costTotal(providerRows), currencyForRows(providerRows)),
+      latency: formatDuration(sumField(providerRows, "durationMs")),
+      status: providerRows.length
+        ? [...new Set(providerRows.map((row) => row.status || "unknown"))].join(", ")
+        : "—",
+    };
+    for (const [key, value] of Object.entries(values)) {
+      const card = document.querySelector(`[data-selected-card="${key}"] [data-value]`);
+      if (card) card.textContent = value;
+    }
+  }
+
+  function renderSelectedProviderRows(rows, match) {
+    const tbody = $("#selected-provider-calls-table tbody");
+    if (!tbody) return;
+    tbody.replaceChildren();
+    if (!rows || rows.length === 0) {
+      tbody.appendChild(renderEmptyRow(12, "No provider calls match the selected message."));
+      return;
+    }
+    for (const row of sortByCreatedDesc(rows)) {
+      const tr = el("tr", { class: row.status === "failure" ? "is-error" : "" });
+      tr.append(
+        el("td", { text: formatTimestamp(row.createdAt) }),
+        el("td", {}, match.inferred ? statusTag("inferred") : statusTag(match.relation)),
+        el("td", { class: "mono", text: row.provider || "—" }),
+        el("td", { class: "mono", text: row.servedModel || row.requestedModel || "—" }),
+        el("td", { class: "mono id-cell" }, copyableId(row.providerGenerationId || row.providerRequestId || row.id)),
+        ...tokenCells(row),
+        el("td", { class: "numeric", text: costAmount(row) }),
+        el("td", { class: "numeric", text: formatDuration(row.durationMs) }),
+        el("td", {}, statusTag(row.status)),
+      );
+      tbody.appendChild(tr);
+    }
+  }
+
+  function renderSelectedToolRows(rows) {
+    const tbody = $("#selected-tool-calls-table tbody");
+    if (!tbody) return;
+    tbody.replaceChildren();
+    if (!rows || rows.length === 0) {
+      tbody.appendChild(renderEmptyRow(8, "No generated or executed tool call matches this message."));
+      return;
+    }
+    for (const row of sortByCreatedDesc(rows)) {
+      const resultOrError = row.errorMessage
+        ? { error: row.errorMessage }
+        : row.resultSummary;
+      const tr = el("tr", {
+        class: row.status === "failed" ? "is-error" : "",
+      });
+      tr.append(
+        el("td", { text: formatTimestamp(row.createdAt || row.startedAt) }),
+        el("td", { class: "mono", text: row.relation || "—" }),
+        el("td", { class: "mono", text: row.actionId || "—" }),
+        idCell(row.toolCallId),
+        el("td", {}, statusTag(row.status)),
+        el("td", { class: "numeric", text: formatDuration(row.durationMs) }),
+        jsonCell(row.arguments),
+        jsonCell(resultOrError),
+      );
+      tbody.appendChild(tr);
+    }
+  }
+
+  function resetConversationDetailState() {
+    state.conversationDetail = {
+      conversationId: null,
+      messages: [],
+      agentTurns: [],
+      providerCalls: [],
+      agentToolCalls: [],
+      selectedMessageId: null,
+    };
   }
 
   function renderAgentTurnsTable(
@@ -2104,7 +2452,9 @@
       const data = await apiGet(ENDPOINTS.conversations || "/v1/admin/telemetry/conversations", { params });
       const rows = extractList(data, ["conversations", "items", "data", "results"]);
       renderConversationsTable(rows);
+      resetConversationDetailState();
       renderConversationDetail([]);
+      renderSelectedMessageAccounting(null);
       renderAgentTurnsTable([], "#conversation-turns-table tbody", "Select a conversation row.");
       renderProviderCallsTable([], "#conversation-provider-calls-table tbody", "Select a conversation row.");
       setStatusSuccess(`Loaded ${rows.length} conversation${rows.length === 1 ? "" : "s"}.`);
@@ -2124,15 +2474,31 @@
         : `/v1/admin/telemetry/conversations/${encodeURIComponent(conversationId)}?includeHidden=${includeHidden ? "true" : "false"}`;
       const data = await apiGet(path);
       const rows = extractList(data?.messages, ["messages", "items", "data"]);
-      const turnsData = await apiGet(ENDPOINTS.agentTurns || "/v1/admin/telemetry/agent-turns", {
-        params: { conversationId, limit: 500 },
-      });
-      const providerData = await apiGet(ENDPOINTS.providerCalls || "/v1/admin/telemetry/llm-provider-calls", {
-        params: { conversationId, limit: 500 },
-      });
+      const [turnsData, providerData, toolData] = await Promise.all([
+        apiGet(ENDPOINTS.agentTurns || "/v1/admin/telemetry/agent-turns", {
+          params: { conversationId, limit: 500 },
+        }),
+        apiGet(ENDPOINTS.providerCalls || "/v1/admin/telemetry/llm-provider-calls", {
+          params: { conversationId, limit: 500 },
+        }),
+        apiGet(ENDPOINTS.agentToolCalls || "/v1/admin/telemetry/agent-tool-calls", {
+          params: { conversationId, limit: 500 },
+        }),
+      ]);
       const agentTurns = extractList(turnsData, ["agentTurns", "items", "data", "results"]);
       const providerCalls = extractList(providerData, ["providerCalls", "items", "data", "results"]);
-      renderConversationDetail(rows);
+      const agentToolCalls = extractList(toolData, ["agentToolCalls", "items", "data", "results"]);
+      const orderedMessages = sortByCreatedDesc(rows);
+      state.conversationDetail = {
+        conversationId,
+        messages: orderedMessages,
+        agentTurns,
+        providerCalls,
+        agentToolCalls,
+        selectedMessageId: orderedMessages[0]?.id ?? null,
+      };
+      renderConversationDetail(orderedMessages);
+      renderSelectedMessageAccounting(state.conversationDetail.selectedMessageId);
       renderAgentTurnsTable(
         agentTurns,
         "#conversation-turns-table tbody",
@@ -2143,10 +2509,12 @@
         "#conversation-provider-calls-table tbody",
         "No provider calls recorded for this conversation.",
       );
-      setStatusSuccess(`Loaded ${rows.length} conversation message${rows.length === 1 ? "" : "s"} · ${agentTurns.length} turn${agentTurns.length === 1 ? "" : "s"} · ${providerCalls.length} provider call${providerCalls.length === 1 ? "" : "s"}.`);
+      setStatusSuccess(`Loaded ${rows.length} conversation message${rows.length === 1 ? "" : "s"} · ${agentTurns.length} turn${agentTurns.length === 1 ? "" : "s"} · ${providerCalls.length} provider call${providerCalls.length === 1 ? "" : "s"} · ${agentToolCalls.length} tool call${agentToolCalls.length === 1 ? "" : "s"}.`);
     } catch (err) {
       if (err.code === "aborted") return;
+      resetConversationDetailState();
       renderConversationDetail([]);
+      renderSelectedMessageAccounting(null);
       renderAgentTurnsTable([], "#conversation-turns-table tbody", "Select a conversation row.");
       renderProviderCallsTable([], "#conversation-provider-calls-table tbody", "Select a conversation row.");
       setStatusError(err);

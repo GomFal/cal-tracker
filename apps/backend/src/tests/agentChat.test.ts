@@ -155,11 +155,25 @@ describe("agent chat streaming", () => {
         turnId: [...turnIds][0],
       }),
     );
+    expect(body.messages[1]?.metadata).toEqual(
+      expect.objectContaining({
+        iteration: 1,
+        toolCallCount: 1,
+      }),
+    );
     expect(body.messages[2]?.metadata).toEqual(
       expect.objectContaining({
         actionId: "get_daily_summary",
         actionCallId: expect.any(String),
+        iteration: 1,
         resultKind: "summary",
+      }),
+    );
+    expect(body.messages[3]?.metadata).toEqual(
+      expect.objectContaining({
+        iteration: 2,
+        resultKind: "assistant_message",
+        stopReason: "assistant_message",
       }),
     );
 

@@ -10,6 +10,16 @@ The main focus is the duplicated nutrition-search tool result path, where the sa
 
 ## Ranked Token Augmenters
 
+## Measurement Command
+
+The model-facing serializer feature adds a deterministic local measurement script:
+
+```bash
+rtk summary bun apps/backend/scripts/measure-model-facing-serialization.ts
+```
+
+This compares legacy full JSON, compact JSON plus TON, ultra-TON replay, and old/new message metadata size using a synthetic nutrition-search payload with duplicated candidate arrays. It does not call the LLM provider.
+
 ### 1. Duplicated nutrition search tool result payloads
 
 Current source points:
@@ -157,4 +167,3 @@ Keep full templates inside backend execution, but send the LLM compact memory ma
 Why this stays performant:
 
 The model can decide whether a memory is relevant without reading the full template item payload.
-

@@ -26,6 +26,7 @@ import type {
   AgentToolCallTelemetryRecord,
   AgentTurnTelemetryFilter,
   AgentTurnTelemetryRecord,
+  AgentCandidateRegistryRecord,
   AgentConversationMessageRecord,
   AgentConversationRecord,
   AppRepository,
@@ -123,6 +124,7 @@ export class InMemoryRepository implements AppRepository {
     string,
     AgentConversationMessageRecord[]
   >();
+  private agentCandidateRegistries = new Map<string, AgentCandidateRegistryRecord>();
 
   static seeded(): InMemoryRepository {
     return new InMemoryRepository();
@@ -1026,6 +1028,41 @@ export class InMemoryRepository implements AppRepository {
     );
     if (!conversation) return [];
     return [...(this.agentConversationMessages.get(conversationId) ?? [])];
+  }
+
+  async saveAgentCandidateRegistry(
+    input: Omit<AgentCandidateRegistryRecord, "id" | "createdAt">,
+  ): Promise<AgentCandidateRegistryRecord> {
+    const key = `${input.userId}:${input.searchRef}`;
+    const existing = this.agentCandidateRegistries.get(key);
+    const registry: AgentCandidateRegistryRecord = {
+      ...input,
+      id: existing?.id ?? newId(),
+      messageId: input.messageId ?? existing?.messageId,
+      createdAt: existing?.createdAt ?? new Date().toISOString(),
+    };
+    this.agentCandidateRegistries.set(key, registry);
+    return registry;
+  }
+
+  async getAgentCandidateRegistryBySearchRef(
+    userId: string,
+    searchRef: string,
+  ): Promise<AgentCandidateRegistryRecord | undefined> {
+    return this.agentCandidateRegistries.get(`${userId}:${searchRef}`);
+  }
+
+  async getLatestAgentCandidateRegistry(
+    userId: string,
+    conversationId: string,
+  ): Promise<AgentCandidateRegistryRecord | undefined> {
+    return [...this.agentCandidateRegistries.values()]
+      .filter(
+        (registry) =>
+          registry.userId === userId &&
+          registry.conversationId === conversationId,
+      )
+      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
   }
 
   async deleteAgentConversation(

@@ -44,9 +44,12 @@ import { buildChatSystemMessage } from "./agentMessages.js";
 import { buildToolSchemas } from "./toolSchemas.js";
 import { filterToolsByPolicy } from "./agentPolicy.js";
 import {
+  MODEL_FACING_SERIALIZER_VERSION,
   buildToolContentForModel,
   resolveCandidateReferenceFromMessages,
+  resolveCandidateReferenceFromRegistry,
   selectedCandidateContent,
+  ultraCompactToolContent,
   type AgentCandidateSelectionState,
   type AgentChatCandidateSelection,
   type CandidateRegistryMetadata,
@@ -701,7 +704,7 @@ export class AgentChatService {
                 input: parsedInput,
                 error: "candidate_reference_not_found",
               };
-          const toolContent = safeToolContent(contentValue);
+          const toolContent = safeToolContent(JSON.stringify(contentValue));
           const toolMessage: AgentMessage = {
             role: "tool",
             toolCallId: toolCall.id,
@@ -890,14 +893,15 @@ export class AgentChatService {
             widget,
           };
 
-          const toolContent = safeToolContent(modelToolContent.contentValue);
+          const toolContent = safeToolContent(modelToolContent.modelContent);
           const toolMessage: AgentMessage = {
             role: "tool",
             toolCallId: toolCall.id,
             content: toolContent,
           };
           messages.push(toolMessage);
-          await this.repository.addAgentConversationMessage(
+          const candidateRegistry = modelToolContent.candidateRegistry;
+          const storedToolMessage = await this.repository.addAgentConversationMessage(
             input.context.actorUserId,
             conversation.id,
             {
@@ -910,18 +914,47 @@ export class AgentChatService {
                 iteration,
                 toolCallIndex: toolCallCount,
                 resultKind: mapped.kind,
-                candidateRegistry: modelToolContent.candidateRegistry,
+                ...(candidateRegistry
+                  ? {
+                      candidateRegistryRef: candidateRegistry.searchRef,
+                      searchRef: candidateRegistry.searchRef,
+                      candidateCount: candidateRegistry.candidateCount,
+                      groupCount: candidateRegistry.groupCount,
+                    }
+                  : {}),
                 selectionState: modelToolContent.selectionState,
                 toolContentCompacted: true,
+                serializerVersion: modelToolContent.serializerVersion,
+                modelFacingRepresentation: modelToolContent.representation,
                 rawToolContentChars: modelToolContent.rawContentChars,
                 rawToolContentApproxTokens:
                   modelToolContent.rawContentApproxTokens,
                 modelToolContentChars: modelToolContent.modelContentChars,
                 modelToolContentApproxTokens:
                   modelToolContent.modelContentApproxTokens,
+                compressionRatio: modelToolContent.compressionRatio,
+                omittedPaths: modelToolContent.omittedPaths,
+                preservedPaths: modelToolContent.preservedPaths,
+                tonTables: modelToolContent.tonTables,
               }),
             },
           );
+          if (candidateRegistry) {
+            await this.repository.saveAgentCandidateRegistry({
+              userId: input.context.actorUserId,
+              conversationId: conversation.id,
+              messageId: storedToolMessage.id,
+              traceId: correlation.traceId,
+              turnId: correlation.turnId,
+              actionCallId: result.actionCallId,
+              searchRef: candidateRegistry.searchRef,
+              actionId,
+              candidateCount: candidateRegistry.candidateCount,
+              groupCount: candidateRegistry.groupCount,
+              threshold: candidateRegistry.threshold,
+              registry: candidateRegistry,
+            });
+          }
           await this.recordToolCallTelemetry({
             correlation,
             userId: input.context.actorUserId,
@@ -1073,7 +1106,7 @@ export class AgentChatService {
     );
     return [
       buildChatSystemMessage(context, activeProposal),
-      ...stored.map(storedMessageToAgentMessage),
+      ...storedMessagesForModel(stored),
     ];
   }
 
@@ -1089,6 +1122,18 @@ export class AgentChatService {
       }
     | undefined
   > {
+    const storedRegistry = selection.searchRef
+      ? await this.repository.getAgentCandidateRegistryBySearchRef(
+          userId,
+          selection.searchRef,
+        )
+      : await this.repository.getLatestAgentCandidateRegistry(
+          userId,
+          conversationId,
+        );
+    const registry = candidateRegistryFromStoredValue(storedRegistry?.registry);
+    const resolved = resolveCandidateReferenceFromRegistry(registry, selection);
+    if (resolved) return resolved;
     const stored = await this.repository.listAgentConversationMessages(
       userId,
       conversationId,
@@ -1296,8 +1341,23 @@ export class AgentChatService {
   }
 }
 
+function storedMessagesForModel(
+  messages: AgentConversationMessageRecord[],
+): AgentMessage[] {
+  const recentTurnIds = lastTurnIds(messages, 2);
+  return messages.map((message) =>
+    storedMessageToAgentMessage(message, {
+      compactToolContent:
+        message.role === "tool" &&
+        message.turnId !== undefined &&
+        !recentTurnIds.has(message.turnId),
+    }),
+  );
+}
+
 function storedMessageToAgentMessage(
   message: AgentConversationMessageRecord,
+  options: { compactToolContent?: boolean } = {},
 ): AgentMessage {
   if (message.role === "assistant") {
     return {
@@ -1311,11 +1371,52 @@ function storedMessageToAgentMessage(
   if (message.role === "tool") {
     return {
       role: "tool",
-      content: message.content,
+      content: options.compactToolContent
+        ? compactStoredToolContentForReplay(message)
+        : message.content,
       toolCallId: message.toolCallId ?? "",
     };
   }
   return { role: "user", content: message.content };
+}
+
+function lastTurnIds(
+  messages: AgentConversationMessageRecord[],
+  count: number,
+): Set<string> {
+  const turnIds: string[] = [];
+  for (const message of messages) {
+    if (message.turnId && turnIds[turnIds.length - 1] !== message.turnId) {
+      turnIds.push(message.turnId);
+    }
+  }
+  return new Set(turnIds.slice(-count));
+}
+
+function compactStoredToolContentForReplay(
+  message: AgentConversationMessageRecord,
+): string {
+  const metadata = isRecord(message.metadata) ? message.metadata : {};
+  if (metadata.serializerVersion === MODEL_FACING_SERIALIZER_VERSION) {
+    return ultraCompactToolContent(message.content, metadata);
+  }
+  if (message.content.endsWith("...")) {
+    return [
+      `tool=${textValue(metadata.actionId, "unknown")}`,
+      `kind=${textValue(metadata.resultKind, "legacy_tool_result")}`,
+      `chars=${message.content.length}`,
+      "status=truncated_legacy_content",
+    ].join(" ");
+  }
+  return message.content;
+}
+
+function candidateRegistryFromStoredValue(
+  value: unknown,
+): CandidateRegistryMetadata | undefined {
+  return isRecord(value) && value.kind === "agent_candidate_registry"
+    ? (value as CandidateRegistryMetadata)
+    : undefined;
 }
 
 function withSelectionState<T extends AgentChatMappedResult>(
@@ -1755,8 +1856,7 @@ function widgetForResult(result: AgentChatMappedResult): AgentWidgetPayload {
   return { kind: result.kind, title: titles[result.kind], result };
 }
 
-function safeToolContent(value: unknown): string {
-  const content = JSON.stringify(value);
+function safeToolContent(content: string): string {
   if (content.length <= STORED_TOOL_RESULT_MAX_CHARS) return content;
   return `${content.slice(0, STORED_TOOL_RESULT_MAX_CHARS)}...`;
 }

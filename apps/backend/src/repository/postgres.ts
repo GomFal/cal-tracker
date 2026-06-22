@@ -31,6 +31,7 @@ import type {
   AgentToolCallTelemetryRecord,
   AgentTurnTelemetryFilter,
   AgentTurnTelemetryRecord,
+  AgentCandidateRegistryRecord,
   AgentConversationMessageRecord,
   AgentConversationRecord,
   AppRepository,
@@ -2088,6 +2089,70 @@ export class PostgresRepository implements AppRepository {
     return rows.map(mapAgentConversationMessage);
   }
 
+  async saveAgentCandidateRegistry(
+    input: Omit<AgentCandidateRegistryRecord, "id" | "createdAt">,
+  ): Promise<AgentCandidateRegistryRecord> {
+    const [row] = await this.execute(dbSql`
+      INSERT INTO agent_candidate_registries (
+        user_id, conversation_id, message_id, trace_id, turn_id, action_call_id,
+        search_ref, action_id, candidate_count, group_count, threshold,
+        registry_json
+      )
+      VALUES (
+        ${input.userId}, ${input.conversationId}, ${input.messageId ?? null},
+        ${input.traceId ?? null}, ${input.turnId ?? null}, ${input.actionCallId ?? null},
+        ${input.searchRef}, ${input.actionId}, ${input.candidateCount},
+        ${input.groupCount}, ${input.threshold ?? null}, ${jsonb(input.registry)}
+      )
+      ON CONFLICT (user_id, search_ref)
+      DO UPDATE SET
+        conversation_id = EXCLUDED.conversation_id,
+        message_id = COALESCE(EXCLUDED.message_id, agent_candidate_registries.message_id),
+        trace_id = EXCLUDED.trace_id,
+        turn_id = EXCLUDED.turn_id,
+        action_call_id = EXCLUDED.action_call_id,
+        action_id = EXCLUDED.action_id,
+        candidate_count = EXCLUDED.candidate_count,
+        group_count = EXCLUDED.group_count,
+        threshold = EXCLUDED.threshold,
+        registry_json = EXCLUDED.registry_json
+      RETURNING *
+    `);
+    return mapAgentCandidateRegistry(row);
+  }
+
+  async getAgentCandidateRegistryBySearchRef(
+    userId: string,
+    searchRef: string,
+  ): Promise<AgentCandidateRegistryRecord | undefined> {
+    const [row] = await this.execute(dbSql`
+      SELECT *
+      FROM agent_candidate_registries
+      WHERE user_id = ${userId}
+        AND search_ref = ${searchRef}
+      LIMIT 1
+    `);
+    return row ? mapAgentCandidateRegistry(row) : undefined;
+  }
+
+  async getLatestAgentCandidateRegistry(
+    userId: string,
+    conversationId: string,
+  ): Promise<AgentCandidateRegistryRecord | undefined> {
+    const [row] = await this.execute(dbSql`
+      SELECT registry.*
+      FROM agent_candidate_registries registry
+      JOIN agent_conversations conversation
+        ON conversation.id = registry.conversation_id
+      WHERE registry.user_id = ${userId}
+        AND registry.conversation_id = ${conversationId}
+        AND conversation.user_id = ${userId}
+      ORDER BY registry.created_at DESC, registry.id DESC
+      LIMIT 1
+    `);
+    return row ? mapAgentCandidateRegistry(row) : undefined;
+  }
+
   async listAdminAgentConversations(
     filter: AdminConversationFilter,
   ): Promise<AgentConversationRecord[]> {
@@ -3415,6 +3480,27 @@ function mapAgentConversationMessage(
     source: optionalString(row.source),
     activeProposalId: optionalString(row.active_proposal_id),
     metadata: row.metadata_json ?? undefined,
+    createdAt: toIso(row.created_at),
+  };
+}
+
+function mapAgentCandidateRegistry(
+  row: Record<string, unknown>,
+): AgentCandidateRegistryRecord {
+  return {
+    id: row.id as string,
+    userId: row.user_id as string,
+    conversationId: row.conversation_id as string,
+    messageId: optionalString(row.message_id),
+    traceId: optionalString(row.trace_id),
+    turnId: optionalString(row.turn_id),
+    actionCallId: optionalString(row.action_call_id),
+    searchRef: row.search_ref as string,
+    actionId: row.action_id as string,
+    candidateCount: Number(row.candidate_count),
+    groupCount: Number(row.group_count),
+    threshold: optionalNumber(row.threshold),
+    registry: row.registry_json,
     createdAt: toIso(row.created_at),
   };
 }

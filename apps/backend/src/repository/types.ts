@@ -633,6 +633,23 @@ export type AgentConversationMessageRecord = {
   createdAt: string;
 };
 
+export type AgentCandidateRegistryRecord = {
+  id: string;
+  userId: string;
+  conversationId: string;
+  messageId?: string;
+  traceId?: string;
+  turnId?: string;
+  actionCallId?: string;
+  searchRef: string;
+  actionId: string;
+  candidateCount: number;
+  groupCount: number;
+  threshold?: number;
+  registry: unknown;
+  createdAt: string;
+};
+
 export interface AppRepository {
   createUser(input: {
     email: string;
@@ -781,6 +798,17 @@ export interface AppRepository {
     userId: string,
     conversationId: string,
   ): Promise<AgentConversationMessageRecord[]>;
+  saveAgentCandidateRegistry(
+    input: Omit<AgentCandidateRegistryRecord, "id" | "createdAt">,
+  ): Promise<AgentCandidateRegistryRecord>;
+  getAgentCandidateRegistryBySearchRef(
+    userId: string,
+    searchRef: string,
+  ): Promise<AgentCandidateRegistryRecord | undefined>;
+  getLatestAgentCandidateRegistry(
+    userId: string,
+    conversationId: string,
+  ): Promise<AgentCandidateRegistryRecord | undefined>;
   deleteAgentConversation(
     userId: string,
     conversationId: string,

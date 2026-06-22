@@ -1318,6 +1318,46 @@ export const agentMessages = pgTable(
   ],
 );
 
+export const agentCandidateRegistries = pgTable(
+  "agent_candidate_registries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => agentConversations.id, { onDelete: "cascade" }),
+    messageId: uuid("message_id").references(() => agentMessages.id, {
+      onDelete: "set null",
+    }),
+    traceId: text("trace_id"),
+    turnId: uuid("turn_id"),
+    actionCallId: uuid("action_call_id"),
+    searchRef: text("search_ref").notNull(),
+    actionId: text("action_id").notNull(),
+    candidateCount: integer("candidate_count").notNull(),
+    groupCount: integer("group_count").notNull(),
+    threshold: numeric("threshold"),
+    registryJson: jsonb("registry_json").$type<JsonObject>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("agent_candidate_registries_user_search_ref_unique").on(
+      table.userId,
+      table.searchRef,
+    ),
+    index("agent_candidate_registries_conversation_created_idx").on(
+      table.conversationId,
+      sql`${table.createdAt} DESC`,
+    ),
+    index("agent_candidate_registries_turn_id_idx").on(table.turnId),
+    index("agent_candidate_registries_trace_id_idx").on(table.traceId),
+  ],
+);
+
 export const agentTurnTelemetry = pgTable(
   "agent_turn_telemetry",
   {
@@ -1680,6 +1720,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   foodSearchEvents: many(foodSearchEvents),
   agentConversations: many(agentConversations),
   agentMessages: many(agentMessages),
+  agentCandidateRegistries: many(agentCandidateRegistries),
 }));
 
 export const foodItemsRelations = relations(foodItems, ({ one, many }) => ({
@@ -1743,16 +1784,42 @@ export const agentConversationsRelations = relations(
     toolCalls: many(agentToolCallTelemetry),
     providerCalls: many(llmProviderCalls),
     transcriptionRecords: many(transcriptionRecords),
+    candidateRegistries: many(agentCandidateRegistries),
   }),
 );
 
-export const agentMessagesRelations = relations(agentMessages, ({ one }) => ({
-  user: one(users, { fields: [agentMessages.userId], references: [users.id] }),
-  conversation: one(agentConversations, {
-    fields: [agentMessages.conversationId],
-    references: [agentConversations.id],
+export const agentMessagesRelations = relations(
+  agentMessages,
+  ({ one, many }) => ({
+    user: one(users, {
+      fields: [agentMessages.userId],
+      references: [users.id],
+    }),
+    conversation: one(agentConversations, {
+      fields: [agentMessages.conversationId],
+      references: [agentConversations.id],
+    }),
+    candidateRegistries: many(agentCandidateRegistries),
   }),
-}));
+);
+
+export const agentCandidateRegistriesRelations = relations(
+  agentCandidateRegistries,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [agentCandidateRegistries.userId],
+      references: [users.id],
+    }),
+    conversation: one(agentConversations, {
+      fields: [agentCandidateRegistries.conversationId],
+      references: [agentConversations.id],
+    }),
+    message: one(agentMessages, {
+      fields: [agentCandidateRegistries.messageId],
+      references: [agentMessages.id],
+    }),
+  }),
+);
 
 export const agentTurnTelemetryRelations = relations(
   agentTurnTelemetry,

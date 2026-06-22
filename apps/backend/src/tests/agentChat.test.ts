@@ -236,7 +236,6 @@ describe("agent chat streaming", () => {
             function: {
               name: "resolve_candidate_reference",
               arguments: JSON.stringify({
-                searchRef: "search-action-1",
                 candidateRef: "g1c6",
               }),
             },
@@ -276,11 +275,31 @@ describe("agent chat streaming", () => {
       rawOutput: { items: candidates, candidateGroups: [{ candidates }] },
       threshold: 0.75,
     });
-    await repository.addAgentConversationMessage(user.id, conversation.id, {
+    const storedToolMessage = await repository.addAgentConversationMessage(user.id, conversation.id, {
       role: "tool",
-      content: JSON.stringify(toolContent.contentValue),
+      content: toolContent.modelContent,
       toolCallId: "call_search",
-      metadata: { candidateRegistry: toolContent.candidateRegistry },
+      metadata: {
+        candidateRegistryRef: toolContent.candidateRegistry?.searchRef,
+        searchRef: toolContent.candidateRegistry?.searchRef,
+        candidateCount: toolContent.candidateRegistry?.candidateCount,
+        groupCount: toolContent.candidateRegistry?.groupCount,
+        serializerVersion: toolContent.serializerVersion,
+      },
+    });
+    expect(storedToolMessage.metadata).not.toHaveProperty("candidateRegistry");
+    expect(toolContent.candidateRegistry).toBeDefined();
+    await repository.saveAgentCandidateRegistry({
+      userId: user.id,
+      conversationId: conversation.id,
+      messageId: storedToolMessage.id,
+      searchRef: toolContent.candidateRegistry!.searchRef,
+      actionId: toolContent.candidateRegistry!.actionId,
+      actionCallId: toolContent.candidateRegistry!.actionCallId,
+      candidateCount: toolContent.candidateRegistry!.candidateCount,
+      groupCount: toolContent.candidateRegistry!.groupCount,
+      threshold: toolContent.candidateRegistry!.threshold,
+      registry: toolContent.candidateRegistry!,
     });
 
     const response = await request("http://localhost/v1/agent/chat", {

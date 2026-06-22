@@ -559,7 +559,9 @@ class _CenterVoiceButtonState extends State<_CenterVoiceButton> {
               ),
               child: Center(
                 child: Icon(
-                  isRecording ? Icons.stop_rounded : Icons.add_rounded,
+                  isRecording
+                      ? Icons.stop_rounded
+                      : Icons.support_agent_rounded,
                   color: isRecording ? palette.coral : palette.lime,
                   size: 28,
                 ),

@@ -187,7 +187,7 @@ void main() {
       });
     }
 
-    testWidgets('uses an add icon, opens chat on tap, and returns back', (
+    testWidgets('uses an agent icon, opens chat on tap, and returns back', (
       tester,
     ) async {
       _setPhoneViewport(tester);
@@ -196,7 +196,8 @@ void main() {
       await tester.pump();
       await tester.pump();
 
-      expect(find.byIcon(Icons.add_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.support_agent_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.add_rounded), findsNothing);
       expect(find.byIcon(Icons.mic_rounded), findsNothing);
 
       await tester

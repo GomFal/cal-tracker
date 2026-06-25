@@ -7,6 +7,7 @@ DIST_DIR="$ROOT_DIR/dist/mobile/android"
 REMOTE_HOST="${BETTERCALORIES_APK_SSH_HOST:-root@bettercalories.app}"
 ENVIRONMENT="${1:-all}"
 ALLOW_NON_INCREMENTAL_VERSION="${ALLOW_NON_INCREMENTAL_APK_VERSION:-0}"
+SKIP_ANDROID_BUILD="${SKIP_ANDROID_BUILD:-0}"
 
 DEV_PUBLIC_BASE_URL="${DEV_PUBLIC_BASE_URL:-https://dev-api.bettercalories.app}"
 PROD_PUBLIC_BASE_URL="${PROD_PUBLIC_BASE_URL:-https://api.bettercalories.app}"
@@ -23,6 +24,7 @@ Environment variables:
   DEV_PUBLIC_BASE_URL                Defaults to https://dev-api.bettercalories.app
   PROD_PUBLIC_BASE_URL               Defaults to https://api.bettercalories.app
   ALLOW_NON_INCREMENTAL_APK_VERSION  Set to 1 to republish the same/lower versionCode
+  SKIP_ANDROID_BUILD=1               Publish an already-built APK from dist/mobile/android
 
 Important:
   The in-app updater only prompts users when latest.json has a greater
@@ -74,9 +76,13 @@ fi
 # the installed app versionCode. Bump apps/mobile/pubspec.yaml's +N build number
 # before publishing any APK that should trigger an automatic update prompt.
 
-for command in flutter ssh scp sha256sum stat curl sed find awk date; do
+for command in ssh scp sha256sum stat curl sed find awk date; do
   require_command "$command"
 done
+
+if [[ "$SKIP_ANDROID_BUILD" != "1" ]]; then
+  require_command flutter
+fi
 
 publish_flavor() {
   local flavor="$1"
@@ -99,7 +105,11 @@ publish_flavor() {
     exit 1
   fi
 
-  ALLOW_DEBUG_SIGNING=1 "$ROOT_DIR/scripts/mobile/build-android.sh" "$flavor"
+  if [[ "$SKIP_ANDROID_BUILD" == "1" ]]; then
+    echo "Using prebuilt Android APKs from $DIST_DIR"
+  else
+    ALLOW_DEBUG_SIGNING=1 "$ROOT_DIR/scripts/mobile/build-android.sh" "$flavor"
+  fi
 
   source_apk="$(find "$DIST_DIR" -maxdepth 1 -type f -name "bettercalories-$flavor-${version_name}-${version_code}-*.apk" | sort | tail -n 1)"
   if [[ -z "$source_apk" || ! -f "$source_apk" ]]; then

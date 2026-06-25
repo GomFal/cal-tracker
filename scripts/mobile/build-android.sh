@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 MOBILE_DIR="$ROOT_DIR/apps/mobile"
 DIST_DIR="$ROOT_DIR/dist/mobile/android"
+MOBILE_CONFIG_DIR="${MOBILE_CONFIG_DIR:-$MOBILE_DIR/config}"
 
 ENVIRONMENT="${1:-all}"
 BUILD_MODE="${BUILD_MODE:-release}"
@@ -20,6 +21,7 @@ Usage:
 Environment variables:
   DEV_API_BASE_URL       Defaults to https://dev-api.bettercalories.app
   PROD_API_BASE_URL      Defaults to https://api.bettercalories.app
+  MOBILE_CONFIG_DIR      Defaults to apps/mobile/config
   BUILD_MODE             Defaults to release
   ALLOW_DEBUG_SIGNING=1  Allows prod release builds without android/key.properties
 USAGE
@@ -66,7 +68,7 @@ MESSAGE
     exit 1
   fi
 
-  local define_file="$MOBILE_DIR/config/$flavor.json"
+  local define_file="$MOBILE_CONFIG_DIR/$flavor.json"
   if [[ ! -f "$define_file" ]]; then
     echo "Missing Flutter dart-define file: $define_file" >&2
     exit 1

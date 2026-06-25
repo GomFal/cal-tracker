@@ -1,0 +1,155 @@
+name: Mobile APK Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: APK environment to build and publish
+        required: true
+        type: choice
+        default: dev
+        options:
+          - dev
+          - prod
+      allow_non_incremental_version:
+        description: Allow republishing the same or lower mobile versionCode
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-apk-deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment == 'prod' && 'production' || 'development' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager --install "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.41.9"
+          cache: true
+
+      - name: Generate mobile build config
+        env:
+          INPUT_ENVIRONMENT: ${{ inputs.environment }}
+          DEV_API_BASE_URL: ${{ secrets.MOBILE_DEV_API_BASE_URL }}
+          DEV_GOOGLE_SERVER_CLIENT_ID: ${{ secrets.MOBILE_DEV_GOOGLE_SERVER_CLIENT_ID }}
+          DEV_GOOGLE_ANDROID_CLIENT_ID: ${{ secrets.MOBILE_DEV_GOOGLE_ANDROID_CLIENT_ID }}
+          PROD_API_BASE_URL: ${{ secrets.MOBILE_PROD_API_BASE_URL }}
+          PROD_GOOGLE_SERVER_CLIENT_ID: ${{ secrets.MOBILE_PROD_GOOGLE_SERVER_CLIENT_ID }}
+          PROD_GOOGLE_ANDROID_CLIENT_ID: ${{ secrets.MOBILE_PROD_GOOGLE_ANDROID_CLIENT_ID }}
+        run: |
+          set -euo pipefail
+
+          config_dir="$RUNNER_TEMP/mobile-config"
+          mkdir -p "$config_dir"
+
+          case "$INPUT_ENVIRONMENT" in
+            dev)
+              flavor="dev"
+              api_base_url="$DEV_API_BASE_URL"
+              google_server_client_id="$DEV_GOOGLE_SERVER_CLIENT_ID"
+              google_android_client_id="$DEV_GOOGLE_ANDROID_CLIENT_ID"
+              ;;
+            prod)
+              flavor="prod"
+              api_base_url="$PROD_API_BASE_URL"
+              google_server_client_id="$PROD_GOOGLE_SERVER_CLIENT_ID"
+              google_android_client_id="$PROD_GOOGLE_ANDROID_CLIENT_ID"
+              ;;
+            *)
+              echo "Unsupported mobile environment: $INPUT_ENVIRONMENT" >&2
+              exit 1
+              ;;
+          esac
+
+          if [[ -z "$api_base_url" || -z "$google_server_client_id" || -z "$google_android_client_id" ]]; then
+            echo "Missing one or more MOBILE_${flavor^^}_* GitHub secrets." >&2
+            exit 1
+          fi
+
+          CONFIG_PATH="$config_dir/$flavor.json" \
+          API_BASE_URL="$api_base_url" \
+          GOOGLE_SERVER_CLIENT_ID="$google_server_client_id" \
+          GOOGLE_ANDROID_CLIENT_ID="$google_android_client_id" \
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          config = {
+              "API_BASE_URL": os.environ["API_BASE_URL"],
+              "GOOGLE_SERVER_CLIENT_ID": os.environ["GOOGLE_SERVER_CLIENT_ID"],
+              "GOOGLE_ANDROID_CLIENT_ID": os.environ["GOOGLE_ANDROID_CLIENT_ID"],
+          }
+          Path(os.environ["CONFIG_PATH"]).write_text(
+              json.dumps(config, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+          {
+            printf 'MOBILE_FLAVOR=%s\n' "$flavor"
+            printf 'MOBILE_CONFIG_DIR=%s\n' "$config_dir"
+            if [[ "$flavor" == "dev" ]]; then
+              printf 'DEV_API_BASE_URL=%s\n' "$api_base_url"
+            else
+              printf 'PROD_API_BASE_URL=%s\n' "$api_base_url"
+            fi
+          } >> "$GITHUB_ENV"
+
+      - name: Build Android APK
+        run: |
+          set -euo pipefail
+          ALLOW_DEBUG_SIGNING=1 scripts/mobile/build-android.sh "$MOBILE_FLAVOR"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bettercalories-${{ inputs.environment }}-android-apk
+          path: |
+            dist/mobile/android/bettercalories-${{ inputs.environment }}-*.apk
+            dist/mobile/android/bettercalories-${{ inputs.environment }}-*.apk.sha256
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Configure SSH
+        env:
+          VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
+
+      - name: Publish APK to server
+        env:
+          ALLOW_NON_INCREMENTAL_APK_VERSION: ${{ inputs.allow_non_incremental_version && '1' || '0' }}
+          BETTERCALORIES_APK_SSH_HOST: ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}
+          DEV_PUBLIC_BASE_URL: ${{ secrets.MOBILE_DEV_API_BASE_URL }}
+          PROD_PUBLIC_BASE_URL: ${{ secrets.MOBILE_PROD_API_BASE_URL }}
+        run: |
+          set -euo pipefail
+          SKIP_ANDROID_BUILD=1 scripts/mobile/deploy-server-apks.sh "$MOBILE_FLAVOR"

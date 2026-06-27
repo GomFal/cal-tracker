@@ -70,70 +70,91 @@ class _FoodSearchPanelState extends State<FoodSearchPanel> {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final palette = context.freshPalette;
-    return FreshCard(
-      padding: const EdgeInsets.all(14),
-      color: palette.surfaceSoft,
-      shadow: false,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          TextField(
-            key: ValueKey('${widget.keyPrefix}_field'),
-            controller: _queryController,
-            autofocus: widget.autofocus,
-            textInputAction: TextInputAction.search,
-            onSubmitted: (_) => _search(),
-            decoration: InputDecoration(
-              labelText: l10n.foodSearchHint,
-              suffixIcon: IconButton(
-                key: ValueKey('${widget.keyPrefix}_submit'),
-                onPressed: _isSearching ? null : _search,
-                icon: _isSearching
-                    ? const SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.search_rounded),
-              ),
-            ),
+    final textTheme = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        FreshUnderlineTextField(
+          fieldKey: ValueKey('${widget.keyPrefix}_field'),
+          label: l10n.foodSearchHint,
+          controller: _queryController,
+          autofocus: widget.autofocus,
+          textInputAction: TextInputAction.search,
+          onSubmitted: (_) => _search(),
+          suffix: IconButton(
+            key: ValueKey('${widget.keyPrefix}_submit'),
+            onPressed: _isSearching ? null : _search,
+            icon: _isSearching
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.search_rounded),
           ),
-          if (_error != null) ...[
-            const SizedBox(height: FreshSpacing.sm),
-            Text(
-              _error!,
-              key: ValueKey('${widget.keyPrefix}_message'),
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: palette.coral),
-            ),
-          ],
-          if (_results.isNotEmpty) ...[
-            const SizedBox(height: FreshSpacing.md),
-            for (var index = 0; index < _results.length; index++)
-              ListTile(
-                key: ValueKey('${widget.keyPrefix}_result_$index'),
-                contentPadding: EdgeInsets.zero,
-                onTap: () => _select(_results[index]),
-                title: Text(_results[index].name),
-                subtitle: Text(_foodSubtitle(_results[index])),
-                trailing: FilledButton.icon(
-                  onPressed: () => _select(_results[index]),
-                  icon: Icon(widget.actionIcon, size: 18),
-                  label: Text(widget.actionLabel ?? l10n.foodSearchAddAction),
-                ),
-              ),
-          ],
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              key: ValueKey('${widget.keyPrefix}_${widget.closeKeySuffix}'),
-              onPressed: widget.onClose,
-              icon: const Icon(Icons.keyboard_arrow_up_rounded),
-              label: Text(l10n.foodSearchHideSearch),
-            ),
+        ),
+        if (_error != null) ...[
+          const SizedBox(height: FreshSpacing.sm),
+          Text(
+            _error!,
+            key: ValueKey('${widget.keyPrefix}_message'),
+            style: textTheme.bodySmall?.copyWith(color: palette.coral),
           ),
         ],
-      ),
+        if (_results.isNotEmpty) ...[
+          const SizedBox(height: FreshSpacing.md),
+          for (var index = 0; index < _results.length; index++)
+            InkWell(
+              key: ValueKey('${widget.keyPrefix}_result_$index'),
+              onTap: () => _select(_results[index]),
+              borderRadius: BorderRadius.circular(FreshRadii.sm),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _results[index].name,
+                            style: textTheme.bodyLarge?.copyWith(
+                              color: palette.ink,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: FreshSpacing.xs),
+                          Text(
+                            _foodSubtitle(_results[index]),
+                            style: textTheme.bodySmall?.copyWith(
+                              color: palette.inkMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    TextButton.icon(
+                      key: ValueKey('${widget.keyPrefix}_result_button_$index'),
+                      onPressed: () => _select(_results[index]),
+                      icon: Icon(widget.actionIcon, size: 18),
+                      label: Text(
+                        widget.actionLabel ?? l10n.foodSearchAddAction,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            key: ValueKey('${widget.keyPrefix}_${widget.closeKeySuffix}'),
+            onPressed: widget.onClose,
+            icon: const Icon(Icons.keyboard_arrow_up_rounded),
+            label: Text(l10n.foodSearchHideSearch),
+          ),
+        ),
+      ],
     );
   }
 

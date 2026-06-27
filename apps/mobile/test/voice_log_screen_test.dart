@@ -863,41 +863,47 @@ void main() {
         findsNothing,
       );
 
-      final nutritionButtonFinder = find.byKey(
-        const ValueKey('edit_proposal_item_nutrition_0'),
+      final actionsFinder = find.byKey(
+        const ValueKey('proposal_item_actions_0'),
       );
-      await tester.ensureVisible(nutritionButtonFinder);
+      await tester.ensureVisible(actionsFinder);
       await tester.pumpAndSettle();
-      await tester.tap(nutritionButtonFinder.hitTestable());
+      await tester.tap(actionsFinder.hitTestable());
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find
+            .byKey(const ValueKey('proposal_item_edit_details_0'))
+            .hitTestable(),
+      );
       await tester.pumpAndSettle();
 
       expect(
-        find.byKey(const ValueKey('proposal_nutrition_calories_0')),
+        find.byKey(const ValueKey('proposal_item_calories_0')),
         findsOneWidget,
       );
       expect(
-        find.byKey(const ValueKey('proposal_nutrition_protein_0')),
+        find.byKey(const ValueKey('proposal_item_protein_0')),
         findsOneWidget,
       );
       await tester.enterText(
-        find.byKey(const ValueKey('proposal_nutrition_protein_0')),
+        find.byKey(const ValueKey('proposal_item_protein_0')),
         '70',
       );
       await tester.enterText(
-        find.byKey(const ValueKey('proposal_nutrition_carbs_0')),
+        find.byKey(const ValueKey('proposal_item_carbs_0')),
         '0',
       );
       await tester.enterText(
-        find.byKey(const ValueKey('proposal_nutrition_fat_0')),
+        find.byKey(const ValueKey('proposal_item_fat_0')),
         '0',
       );
       await tester.pumpAndSettle();
       await tester.tap(
-        find.byKey(const ValueKey('proposal_nutrition_apply_suggestion_0')),
+        find.byKey(const ValueKey('proposal_item_apply_suggestion_0')),
       );
       await tester.pumpAndSettle();
       final caloriesField = tester.widget<TextField>(
-        find.byKey(const ValueKey('proposal_nutrition_calories_0')),
+        find.byKey(const ValueKey('proposal_item_calories_0')),
       );
       expect(caloriesField.controller!.text, '280');
     });
@@ -983,13 +989,24 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('edit_proposal_button')));
       await tester.pumpAndSettle();
+      final actionsFinder = find.byKey(
+        const ValueKey('proposal_item_actions_0'),
+      );
+      await tester.ensureVisible(actionsFinder);
+      await tester.tap(actionsFinder.hitTestable());
+      await tester.pumpAndSettle();
       await tester.tap(
-        find.byKey(const ValueKey('proposal_item_0_search_toggle')),
+        find
+            .byKey(const ValueKey('proposal_item_0_search_toggle'))
+            .hitTestable(),
       );
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const ValueKey('proposal_item_0_search_field')),
         'bread',
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('proposal_item_0_search_submit')),
       );
       await tester.pump(const Duration(milliseconds: 350));
       await tester.pumpAndSettle();
@@ -1086,13 +1103,24 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('add_proposal_item_button')));
       await tester.pumpAndSettle();
+      final actionsFinder = find.byKey(
+        const ValueKey('proposal_item_actions_0'),
+      );
+      await tester.ensureVisible(actionsFinder);
+      await tester.tap(actionsFinder.hitTestable());
+      await tester.pumpAndSettle();
       await tester.tap(
-        find.byKey(const ValueKey('proposal_item_0_search_toggle')),
+        find
+            .byKey(const ValueKey('proposal_item_0_search_toggle'))
+            .hitTestable(),
       );
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const ValueKey('proposal_item_0_search_field')),
         'bread',
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('proposal_item_0_search_submit')),
       );
       await tester.pump(const Duration(milliseconds: 350));
       await tester.pumpAndSettle();

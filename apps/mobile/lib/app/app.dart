@@ -321,6 +321,7 @@ class _CalTrackerAppState extends State<_CalTrackerApp> {
     final themeMode = context.watch<ThemeModeViewModel>().themeMode;
     final locale = context.watch<LocaleViewModel>().locale;
     return MaterialApp.router(
+      scrollBehavior: const CalTrackerScrollBehavior(),
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
       debugShowCheckedModeBanner: false,
       locale: locale,

@@ -4,17 +4,19 @@ import '../../domain/models/nutrition_edit.dart';
 import '../../domain/models/nutrition_models.dart';
 import '../../l10n/app_localizations_context.dart';
 import '../core/design_system.dart';
+import '../core/motion.dart';
 import 'editable_meal_item_controller.dart';
 import 'food_search_panel.dart';
 import 'nutrition_edit_components.dart';
 import 'nutrition_edit_sheet.dart';
 
-typedef MealItemHeaderBuilder = Widget? Function(
-  BuildContext context,
-  EditableMealItemController item,
-  int index,
-  ValueChanged<MealItem> onReplace,
-);
+typedef MealItemHeaderBuilder =
+    Widget? Function(
+      BuildContext context,
+      EditableMealItemController item,
+      int index,
+      ValueChanged<MealItem> onReplace,
+    );
 
 class MealItemEditorSheet extends StatefulWidget {
   const MealItemEditorSheet({
@@ -192,8 +194,8 @@ class _MealItemEditorSheetState extends State<MealItemEditorSheet> {
                       ),
                       const SizedBox(height: FreshSpacing.xs),
                       if (widget.searchFoods != null) ...[
-                        AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 160),
+                        FreshAnimatedSwitcher(
+                          duration: FreshMotion.fast,
                           child: _addSearchExpanded
                               ? FoodSearchPanel(
                                   key: ValueKey(
@@ -267,14 +269,14 @@ class _MealItemEditorSheetState extends State<MealItemEditorSheet> {
                           },
                           onReplacementSearchRequested:
                               widget.searchFoods == null
-                                  ? null
-                                  : () {
-                                      setState(() {
-                                        _expandedIndex = index;
-                                        _replacementSearchIndex = index;
-                                        _addSearchExpanded = false;
-                                      });
-                                    },
+                              ? null
+                              : () {
+                                  setState(() {
+                                    _expandedIndex = index;
+                                    _replacementSearchIndex = index;
+                                    _addSearchExpanded = false;
+                                  });
+                                },
                           onReplacementSearchClosed: () {
                             setState(() => _replacementSearchIndex = null);
                           },
@@ -288,9 +290,9 @@ class _MealItemEditorSheetState extends State<MealItemEditorSheet> {
                             setState(() {
                               final scaledReplacement =
                                   _replacementWithCurrentQuantity(
-                                _items[index],
-                                replacement,
-                              );
+                                    _items[index],
+                                    replacement,
+                                  );
                               _items[index].dispose();
                               _items[index] = EditableMealItemController(
                                 scaledReplacement,
@@ -590,8 +592,9 @@ class _IngredientEditorCard extends StatelessWidget {
                 NutritionMacroWarningBanner(
                   key: ValueKey('${keyPrefix}_item_macro_warning_$index'),
                   title: l10n.mealEditorCaloriesMismatchTitle,
-                  message:
-                      l10n.mealEditorCaloriesMismatchMessage(macroCalories),
+                  message: l10n.mealEditorCaloriesMismatchMessage(
+                    macroCalories,
+                  ),
                 ),
               ],
               if (isReplacementSearchActive && searchFoods != null) ...[
@@ -878,11 +881,7 @@ class _OverflowMenuRow extends StatelessWidget {
         Icon(icon, size: 18),
         const SizedBox(width: FreshSpacing.sm),
         Expanded(
-          child: Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
+          child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
         ),
       ],
     );

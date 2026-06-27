@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../domain/models/nutrition_models.dart';
 import '../l10n/app_localizations_context.dart';
 import '../ui/core/app_shell.dart';
+import '../ui/core/motion.dart';
 import '../ui/core/shell_modal_lock.dart';
 import '../ui/features/agent_chat/views/agent_chat_screen.dart';
 import '../ui/features/auth/view_models/auth_view_model.dart';
@@ -44,35 +45,44 @@ GoRouter buildRouter(
       return null;
     },
     routes: [
-      GoRoute(
-        path: '/auth',
-        builder: (context, state) => const AuthScreen(),
-      ),
+      GoRoute(path: '/auth', builder: (context, state) => const AuthScreen()),
       GoRoute(
         path: '/agent',
-        builder: (context, state) => _AuthRestoreGate(
-          authViewModel: authViewModel,
-          child: const AgentChatScreen(),
+        pageBuilder: (context, state) => freshTransitionPage<void>(
+          context: context,
+          state: state,
+          child: _AuthRestoreGate(
+            authViewModel: authViewModel,
+            child: const AgentChatScreen(),
+          ),
         ),
       ),
       GoRoute(
         path: '/meal/create',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final extra = state.extra;
-          return _AuthRestoreGate(
-            authViewModel: authViewModel,
-            child: MealCreateScreen(
-              initialItems:
-                  extra is MealCreateInitialItems ? extra.items : const [],
+          return freshTransitionPage<void>(
+            context: context,
+            state: state,
+            child: _AuthRestoreGate(
+              authViewModel: authViewModel,
+              child: MealCreateScreen(
+                initialItems:
+                    extra is MealCreateInitialItems ? extra.items : const [],
+              ),
             ),
           );
         },
       ),
       GoRoute(
         path: '/templates/ingredients/scan',
-        builder: (context, state) => _AuthRestoreGate(
-          authViewModel: authViewModel,
-          child: const UsualFoodScanScreen(),
+        pageBuilder: (context, state) => freshTransitionPage<void>(
+          context: context,
+          state: state,
+          child: _AuthRestoreGate(
+            authViewModel: authViewModel,
+            child: const UsualFoodScanScreen(),
+          ),
         ),
       ),
       StatefulShellRoute(
@@ -142,41 +152,57 @@ GoRouter buildRouter(
                 routes: [
                   GoRoute(
                     path: 'ingredients/new',
-                    builder: (context, state) => _AuthRestoreGate(
-                      authViewModel: authViewModel,
-                      child: UsualFoodEditorScreen(
-                        initialDraft: state.extra is UsualFoodDraft
-                            ? state.extra as UsualFoodDraft
-                            : null,
+                    pageBuilder: (context, state) => freshTransitionPage<void>(
+                      context: context,
+                      state: state,
+                      child: _AuthRestoreGate(
+                        authViewModel: authViewModel,
+                        child: UsualFoodEditorScreen(
+                          initialDraft: state.extra is UsualFoodDraft
+                              ? state.extra as UsualFoodDraft
+                              : null,
+                        ),
                       ),
                     ),
                   ),
                   GoRoute(
                     path: 'ingredients/:id/edit',
-                    builder: (context, state) => _AuthRestoreGate(
-                      authViewModel: authViewModel,
-                      child: UsualFoodEditorScreen(
-                        foodId: state.pathParameters['id'],
+                    pageBuilder: (context, state) => freshTransitionPage<void>(
+                      context: context,
+                      state: state,
+                      child: _AuthRestoreGate(
+                        authViewModel: authViewModel,
+                        child: UsualFoodEditorScreen(
+                          foodId: state.pathParameters['id'],
+                        ),
                       ),
                     ),
                   ),
                   GoRoute(
                     path: 'meals/new',
-                    builder: (context, state) => _AuthRestoreGate(
-                      authViewModel: authViewModel,
-                      child: MealTemplateEditorScreen(
-                        initialDraft: state.extra is UsualMealDraft
-                            ? state.extra as UsualMealDraft
-                            : null,
+                    pageBuilder: (context, state) => freshTransitionPage<void>(
+                      context: context,
+                      state: state,
+                      child: _AuthRestoreGate(
+                        authViewModel: authViewModel,
+                        child: MealTemplateEditorScreen(
+                          initialDraft: state.extra is UsualMealDraft
+                              ? state.extra as UsualMealDraft
+                              : null,
+                        ),
                       ),
                     ),
                   ),
                   GoRoute(
                     path: 'meals/:id/edit',
-                    builder: (context, state) => _AuthRestoreGate(
-                      authViewModel: authViewModel,
-                      child: MealTemplateEditorScreen(
-                        templateId: state.pathParameters['id'],
+                    pageBuilder: (context, state) => freshTransitionPage<void>(
+                      context: context,
+                      state: state,
+                      child: _AuthRestoreGate(
+                        authViewModel: authViewModel,
+                        child: MealTemplateEditorScreen(
+                          templateId: state.pathParameters['id'],
+                        ),
                       ),
                     ),
                   ),

@@ -8,6 +8,7 @@ import '../../../../domain/models/nutrition_models.dart';
 import '../../../../l10n/app_localizations_context.dart';
 import '../../../../l10n/generated/app_localizations.dart';
 import '../../../core/design_system.dart';
+import '../../../core/motion.dart';
 import '../../../core/user_visible_error.dart';
 import '../models/calorie_target_validation.dart';
 import 'macro_distribution_sheet.dart';
@@ -40,7 +41,8 @@ class CalorieTargetSheet extends StatefulWidget {
     required String activityLevel,
     required String goal,
     String? pace,
-  }) estimateCalories;
+  })
+  estimateCalories;
 
   @override
   State<CalorieTargetSheet> createState() => _CalorieTargetSheetState();
@@ -131,8 +133,9 @@ class _CalorieTargetSheetState extends State<CalorieTargetSheet> {
   void _step(int delta) {
     final current =
         int.tryParse(_controller.text.trim()) ?? widget.initialValue;
-    final next =
-        (current + delta).clamp(kMinDailyCalories, kMaxDailyCalories).toInt();
+    final next = (current + delta)
+        .clamp(kMinDailyCalories, kMaxDailyCalories)
+        .toInt();
     setState(() {
       _source = 'manual';
       _error = null;
@@ -233,16 +236,16 @@ class _CalculatorMacroPrompt extends StatelessWidget {
             onPressed: () async {
               final config =
                   await showModalBottomSheet<MacroDistributionConfig>(
-                context: context,
-                isScrollControlled: true,
-                useSafeArea: true,
-                useRootNavigator: true,
-                builder: (context) => MacroDistributionSheet(
-                  calories: calories,
-                  presetOnly: true,
-                  title: l10n.calorieCalculatorChooseYourMacrosTitle,
-                ),
-              );
+                    context: context,
+                    isScrollControlled: true,
+                    useSafeArea: true,
+                    useRootNavigator: true,
+                    builder: (context) => MacroDistributionSheet(
+                      calories: calories,
+                      presetOnly: true,
+                      title: l10n.calorieCalculatorChooseYourMacrosTitle,
+                    ),
+                  );
               if (context.mounted && config != null) {
                 Navigator.of(context).pop(config);
               }
@@ -334,7 +337,8 @@ class CalorieCalculatorWizard extends StatefulWidget {
     required String activityLevel,
     required String goal,
     String? pace,
-  }) estimateCalories;
+  })
+  estimateCalories;
 
   @override
   State<CalorieCalculatorWizard> createState() =>
@@ -432,14 +436,13 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
               ],
               const SizedBox(height: FreshSpacing.md),
               Expanded(
-                child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 220),
-                  switchInCurve: Curves.easeOutCubic,
-                  switchOutCurve: Curves.easeInCubic,
+                child: FreshAnimatedSwitcher(
+                  duration: FreshMotion.normal,
                   child: KeyedSubtree(
                     key: ValueKey(_isLoading ? 'loading' : activeStep.name),
-                    child:
-                        _isLoading ? const _LoadingPlanStep() : _bodyForStep(),
+                    child: _isLoading
+                        ? const _LoadingPlanStep()
+                        : _bodyForStep(),
                   ),
                 ),
               ),
@@ -573,7 +576,8 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
       month: requestedMonth,
       day: requestedDay,
     );
-    final needsWheelSync = next.year != requestedYear ||
+    final needsWheelSync =
+        next.year != requestedYear ||
         next.month != requestedMonth ||
         next.day != requestedDay;
     setState(() {
@@ -839,8 +843,9 @@ class _CalorieCalculatorWizardState extends State<CalorieCalculatorWizard> {
   Widget _paceStep() {
     final l10n = context.l10n;
     final isLoss = _goal == 'lose_fat';
-    final paceOptions =
-        isLoss ? _lossPaceOptions(l10n) : _gainPaceOptions(l10n);
+    final paceOptions = isLoss
+        ? _lossPaceOptions(l10n)
+        : _gainPaceOptions(l10n);
     return _WizardQuestionPage(
       title: isLoss
           ? l10n.calorieWizardLossPaceTitle
@@ -1065,37 +1070,37 @@ class _WizardOption {
 }
 
 List<_WizardOption> _activityOptions(AppLocalizations l10n) => [
-      _WizardOption(
-        value: 'sedentary',
-        label: l10n.calorieWizardActivitySedentary,
-        message: l10n.calorieWizardActivitySedentaryMessage,
-        icon: Icons.weekend_rounded,
-      ),
-      _WizardOption(
-        value: 'lightly_active',
-        label: l10n.calorieWizardActivityLightlyActive,
-        message: l10n.calorieWizardActivityLightlyActiveMessage,
-        icon: Icons.directions_walk_rounded,
-      ),
-      _WizardOption(
-        value: 'moderately_active',
-        label: l10n.calorieWizardActivityModeratelyActive,
-        message: l10n.calorieWizardActivityModeratelyActiveMessage,
-        icon: Icons.fitness_center_rounded,
-      ),
-      _WizardOption(
-        value: 'very_active',
-        label: l10n.calorieWizardActivityVeryActive,
-        message: l10n.calorieWizardActivityVeryActiveMessage,
-        icon: Icons.local_fire_department_rounded,
-      ),
-      _WizardOption(
-        value: 'extra_active',
-        label: l10n.calorieWizardActivitySuperActive,
-        message: l10n.calorieWizardActivitySuperActiveMessage,
-        icon: Icons.speed_rounded,
-      ),
-    ];
+  _WizardOption(
+    value: 'sedentary',
+    label: l10n.calorieWizardActivitySedentary,
+    message: l10n.calorieWizardActivitySedentaryMessage,
+    icon: Icons.weekend_rounded,
+  ),
+  _WizardOption(
+    value: 'lightly_active',
+    label: l10n.calorieWizardActivityLightlyActive,
+    message: l10n.calorieWizardActivityLightlyActiveMessage,
+    icon: Icons.directions_walk_rounded,
+  ),
+  _WizardOption(
+    value: 'moderately_active',
+    label: l10n.calorieWizardActivityModeratelyActive,
+    message: l10n.calorieWizardActivityModeratelyActiveMessage,
+    icon: Icons.fitness_center_rounded,
+  ),
+  _WizardOption(
+    value: 'very_active',
+    label: l10n.calorieWizardActivityVeryActive,
+    message: l10n.calorieWizardActivityVeryActiveMessage,
+    icon: Icons.local_fire_department_rounded,
+  ),
+  _WizardOption(
+    value: 'extra_active',
+    label: l10n.calorieWizardActivitySuperActive,
+    message: l10n.calorieWizardActivitySuperActiveMessage,
+    icon: Icons.speed_rounded,
+  ),
+];
 
 List<BoxShadow> _calorieWizardCardShadow(BuildContext context) {
   if (Theme.of(context).brightness == Brightness.light) return const [];
@@ -1109,67 +1114,67 @@ List<BoxShadow> _calorieWizardCardShadow(BuildContext context) {
 }
 
 List<_WizardOption> _goalOptions(AppLocalizations l10n) => [
-      _WizardOption(
-        value: 'lose_fat',
-        label: l10n.calorieWizardGoalLoseWeight,
-        message: l10n.calorieWizardGoalLoseWeightMessage,
-        icon: Icons.flag_rounded,
-      ),
-      _WizardOption(
-        value: 'gain_muscle',
-        label: l10n.calorieWizardGoalGainMuscle,
-        message: l10n.calorieWizardGoalGainMuscleMessage,
-        icon: Icons.fitness_center_rounded,
-      ),
-      _WizardOption(
-        value: 'maintain',
-        label: l10n.calorieWizardGoalMaintainWeight,
-        message: l10n.calorieWizardGoalMaintainWeightMessage,
-        icon: Icons.balance_rounded,
-      ),
-    ];
+  _WizardOption(
+    value: 'lose_fat',
+    label: l10n.calorieWizardGoalLoseWeight,
+    message: l10n.calorieWizardGoalLoseWeightMessage,
+    icon: Icons.flag_rounded,
+  ),
+  _WizardOption(
+    value: 'gain_muscle',
+    label: l10n.calorieWizardGoalGainMuscle,
+    message: l10n.calorieWizardGoalGainMuscleMessage,
+    icon: Icons.fitness_center_rounded,
+  ),
+  _WizardOption(
+    value: 'maintain',
+    label: l10n.calorieWizardGoalMaintainWeight,
+    message: l10n.calorieWizardGoalMaintainWeightMessage,
+    icon: Icons.balance_rounded,
+  ),
+];
 
 List<_WizardOption> _lossPaceOptions(AppLocalizations l10n) => [
-      _WizardOption(
-        value: 'slow',
-        label: l10n.calorieWizardPaceSlow,
-        message: l10n.calorieWizardPaceSlowMessage,
-        icon: Icons.eco_rounded,
-      ),
-      _WizardOption(
-        value: 'moderate',
-        label: l10n.calorieWizardPaceModerate,
-        message: l10n.calorieWizardPaceModerateMessage,
-        icon: Icons.check_circle_outline_rounded,
-      ),
-      _WizardOption(
-        value: 'aggressive',
-        label: l10n.calorieWizardPaceAggressive,
-        message: l10n.calorieWizardLossPaceAggressiveMessage,
-        icon: Icons.bolt_rounded,
-      ),
-    ];
+  _WizardOption(
+    value: 'slow',
+    label: l10n.calorieWizardPaceSlow,
+    message: l10n.calorieWizardPaceSlowMessage,
+    icon: Icons.eco_rounded,
+  ),
+  _WizardOption(
+    value: 'moderate',
+    label: l10n.calorieWizardPaceModerate,
+    message: l10n.calorieWizardPaceModerateMessage,
+    icon: Icons.check_circle_outline_rounded,
+  ),
+  _WizardOption(
+    value: 'aggressive',
+    label: l10n.calorieWizardPaceAggressive,
+    message: l10n.calorieWizardLossPaceAggressiveMessage,
+    icon: Icons.bolt_rounded,
+  ),
+];
 
 List<_WizardOption> _gainPaceOptions(AppLocalizations l10n) => [
-      _WizardOption(
-        value: 'lean',
-        label: l10n.calorieWizardPaceLean,
-        message: l10n.calorieWizardPaceLeanMessage,
-        icon: Icons.eco_rounded,
-      ),
-      _WizardOption(
-        value: 'standard',
-        label: l10n.calorieWizardPaceStandard,
-        message: l10n.calorieWizardPaceStandardMessage,
-        icon: Icons.check_circle_outline_rounded,
-      ),
-      _WizardOption(
-        value: 'aggressive',
-        label: l10n.calorieWizardPaceAggressive,
-        message: l10n.calorieWizardGainPaceAggressiveMessage,
-        icon: Icons.bolt_rounded,
-      ),
-    ];
+  _WizardOption(
+    value: 'lean',
+    label: l10n.calorieWizardPaceLean,
+    message: l10n.calorieWizardPaceLeanMessage,
+    icon: Icons.eco_rounded,
+  ),
+  _WizardOption(
+    value: 'standard',
+    label: l10n.calorieWizardPaceStandard,
+    message: l10n.calorieWizardPaceStandardMessage,
+    icon: Icons.check_circle_outline_rounded,
+  ),
+  _WizardOption(
+    value: 'aggressive',
+    label: l10n.calorieWizardPaceAggressive,
+    message: l10n.calorieWizardGainPaceAggressiveMessage,
+    icon: Icons.bolt_rounded,
+  ),
+];
 
 class _WizardTopBar extends StatelessWidget {
   const _WizardTopBar({
@@ -1498,9 +1503,9 @@ class _BirthdayWheelLabel extends StatelessWidget {
         text,
         textAlign: TextAlign.center,
         style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w600,
-            ),
+          color: color,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
@@ -1548,10 +1553,12 @@ class _BirthdayWheel extends StatelessWidget {
                 style:
                     (selected ? textTheme.headlineSmall : textTheme.titleLarge)
                         ?.copyWith(
-                  color: selected ? palette.lime : palette.inkMuted,
-                  fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
+                          color: selected ? palette.lime : palette.inkMuted,
+                          fontWeight: selected
+                              ? FontWeight.w800
+                              : FontWeight.w500,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
               ),
             );
           },
@@ -1637,24 +1644,24 @@ class _CompactUnitSegment extends StatelessWidget {
             ),
             boxShadow:
                 selected || Theme.of(context).brightness == Brightness.light
-                    ? const []
-                    : [
-                        BoxShadow(
-                          color: context.freshShadowColor(
-                            lightAlpha: 0.08,
-                            darkAlpha: 0.36,
-                          ),
-                          blurRadius: 16,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
+                ? const []
+                : [
+                    BoxShadow(
+                      color: context.freshShadowColor(
+                        lightAlpha: 0.08,
+                        darkAlpha: 0.36,
+                      ),
+                      blurRadius: 16,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
           ),
           child: Text(
             label,
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: palette.ink,
-                  fontWeight: FontWeight.w800,
-                ),
+              color: palette.ink,
+              fontWeight: FontWeight.w800,
+            ),
           ),
         ),
       ),
@@ -1740,7 +1747,8 @@ class _SlidingRulerScaleState extends State<_SlidingRulerScale> {
   double? _lastCommittedValue;
 
   double _snap(double rawValue) {
-    final snapped = widget.min +
+    final snapped =
+        widget.min +
         (((rawValue - widget.min) / widget.valueStep).round() *
             widget.valueStep);
     return snapped.clamp(widget.min, widget.max).toDouble();

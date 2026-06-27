@@ -65,7 +65,10 @@ class _MealTemplatesScreenState extends State<MealTemplatesScreen> {
               ),
               ButtonSegment(
                 value: _UsualSection.ingredients,
-                label: Text(l10n.usualsIngredientsTab),
+                label: KeyedSubtree(
+                  key: const ValueKey('usuals_tab_ingredients'),
+                  child: Text(l10n.usualsIngredientsTab),
+                ),
                 icon: const Icon(Icons.shopping_basket_rounded),
               ),
             ],
@@ -145,7 +148,8 @@ class _MealsSection extends StatelessWidget {
             onEdit: () => context.push(
               MealTemplateEditorScreen.editRoute(template.id),
             ),
-            onDelete: () => _confirmDeleteTemplate(context, viewModel, template),
+            onDelete: () =>
+                _confirmDeleteTemplate(context, viewModel, template),
           ),
       ],
     );
@@ -199,7 +203,8 @@ class _IngredientsSection extends StatelessWidget {
         for (final food in viewModel.usualFoods)
           _UsualFoodCard(
             food: food,
-            onEdit: () => context.push(UsualFoodEditorScreen.editRoute(food.id)),
+            onEdit: () =>
+                context.push(UsualFoodEditorScreen.editRoute(food.id)),
             onDelete: () => _confirmDeleteFood(context, viewModel, food),
           ),
       ],
@@ -440,7 +445,8 @@ class _TemplateCard extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(template.title, style: Theme.of(context).textTheme.titleMedium),
+              Text(template.title,
+                  style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: FreshSpacing.md),
               TextButton.icon(
                 key: ValueKey('meal_template_edit_${template.id}'),

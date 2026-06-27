@@ -34,8 +34,8 @@ import 'router.dart';
 import 'theme.dart';
 import 'theme_mode_view_model.dart';
 
-typedef CalTrackerAppWrapperBuilder = Widget Function(
-    BuildContext context, Widget child, GoRouter router);
+typedef CalTrackerAppWrapperBuilder =
+    Widget Function(BuildContext context, Widget child, GoRouter router);
 
 class CalTrackerBootstrap extends StatefulWidget {
   const CalTrackerBootstrap({
@@ -141,9 +141,7 @@ class _CalTrackerBootstrapState extends State<CalTrackerBootstrap> {
             preferencesRepository: composition.preferencesRepository,
           )..load(),
         ),
-        ChangeNotifierProvider(
-          create: (_) => PerformanceOverlayViewModel(),
-        ),
+        ChangeNotifierProvider(create: (_) => PerformanceOverlayViewModel()),
         ChangeNotifierProvider(
           create: (_) =>
               AuthViewModel(authRepository: composition.authRepository)
@@ -220,12 +218,14 @@ class _CalTrackerComposition {
 
   factory _CalTrackerComposition.create(CalTrackerBootstrap widget) {
     final tokenStorage = widget.tokenStorage ?? const SecureTokenStorage();
-    final preferencesRepository = widget.preferencesRepository ??
+    final preferencesRepository =
+        widget.preferencesRepository ??
         AppPreferencesRepository(storage: AppPreferencesStorage());
     final metadataProvider =
         widget.clientMetadataProvider ?? ClientMetadataProvider();
     final ownsTelemetryService = widget.clientTelemetryService == null;
-    final telemetryService = widget.clientTelemetryService ??
+    final telemetryService =
+        widget.clientTelemetryService ??
         ClientTelemetryService(
           apiConfig: widget.apiConfig,
           tokenStorage: tokenStorage,
@@ -244,9 +244,11 @@ class _CalTrackerComposition {
       metadataProvider: metadataProvider,
       telemetryService: telemetryService,
     );
-    final authRepository = widget.authRepository ??
+    final authRepository =
+        widget.authRepository ??
         AuthRepository(apiClient: apiClient, tokenStorage: tokenStorage);
-    final nutritionRepository = widget.nutritionRepository ??
+    final nutritionRepository =
+        widget.nutritionRepository ??
         NutritionRepository(
           apiClient: apiClient,
           cacheStore: NutritionCacheStore(storage: AppPreferencesStorage()),
@@ -258,7 +260,8 @@ class _CalTrackerComposition {
       preferencesRepository: preferencesRepository,
       authRepository: authRepository,
       nutritionRepository: nutritionRepository,
-      mobileUpdateService: widget.mobileUpdateService ??
+      mobileUpdateService:
+          widget.mobileUpdateService ??
           MobileUpdateService(apiConfig: widget.apiConfig),
       audioRecorderService:
           widget.audioRecorderService ?? AudioRecorderService(),
@@ -321,6 +324,7 @@ class _CalTrackerAppState extends State<_CalTrackerApp> {
     final themeMode = context.watch<ThemeModeViewModel>().themeMode;
     final locale = context.watch<LocaleViewModel>().locale;
     return MaterialApp.router(
+      scrollBehavior: const CalTrackerScrollBehavior(),
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
       debugShowCheckedModeBanner: false,
       locale: locale,
@@ -341,11 +345,8 @@ class _CalTrackerAppState extends State<_CalTrackerApp> {
           child: child ?? const SizedBox.shrink(),
         );
         final preloadedApp = _AuthenticatedDataPreloader(child: app);
-        final wrappedApp = widget.appWrapperBuilder?.call(
-              context,
-              preloadedApp,
-              _router!,
-            ) ??
+        final wrappedApp =
+            widget.appWrapperBuilder?.call(context, preloadedApp, _router!) ??
             preloadedApp;
         return PerformanceOverlayHost(child: wrappedApp);
       },
@@ -432,7 +433,8 @@ class _AuthenticatedDataPreloaderState
     await _ignorePreloadError(() => context.read<SettingsViewModel>().load());
     if (!mounted) return;
     await _ignorePreloadError(
-        () => context.read<MealTemplatesViewModel>().load());
+      () => context.read<MealTemplatesViewModel>().load(),
+    );
   }
 
   Future<void> _ignorePreloadError(Future<void> Function() operation) async {

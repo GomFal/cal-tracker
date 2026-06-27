@@ -122,20 +122,19 @@ class _MealItemEditorSheetState extends State<MealItemEditorSheet> {
                             setState(() => _addSearchExpanded = false);
                           },
                         )
-                      : Align(
+                      : KeyedSubtree(
                           key: ValueKey(
                             '${widget.keyPrefix}_food_search_collapsed',
                           ),
-                          alignment: Alignment.centerLeft,
-                          child: OutlinedButton.icon(
+                          child: FreshSearchActionRow(
                             key: ValueKey(
                               '${widget.keyPrefix}_add_from_search_button',
                             ),
-                            onPressed: () {
+                            icon: Icons.add_rounded,
+                            label: l10n.mealTemplateEditorAddFromSearch,
+                            onTap: () {
                               setState(() => _addSearchExpanded = true);
                             },
-                            icon: const Icon(Icons.search_rounded),
-                            label: Text(l10n.mealTemplateEditorAddFromSearch),
                           ),
                         ),
                 ),
@@ -320,14 +319,11 @@ class _IngredientEditorCard extends StatelessWidget {
     final nutrition = item.currentNutrition();
     final macroCalories = nutrition.macroCalories;
     final hasWarning = nutrition.hasCalorieMismatch;
-    final nameField = TextField(
-      key: ValueKey('${keyPrefix}_item_name_$index'),
+    final nameField = FreshUnderlineTextField(
+      fieldKey: ValueKey('${keyPrefix}_item_name_$index'),
+      label: l10n.commonIngredient,
       controller: item.nameController,
       onChanged: (_) => onChanged(),
-      decoration: InputDecoration(
-        labelText: l10n.commonIngredient,
-        isDense: true,
-      ),
     );
     final caloriesPill = DecoratedBox(
       decoration: BoxDecoration(
@@ -402,53 +398,25 @@ class _IngredientEditorCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: FreshSpacing.xs),
-          Row(
-            children: [
-              _QuantityStepButton(
-                key: ValueKey('${keyPrefix}_item_decrease_10_$index'),
-                label: item.isGramUnit ? '-10g' : '-1',
-                onPressed: () {
-                  item.adjustQuantity(item.isGramUnit ? -10 : -1);
-                  onChanged();
-                },
-              ),
-              const SizedBox(width: FreshSpacing.sm),
-              Expanded(
-                child: TextField(
-                  key: ValueKey('${keyPrefix}_item_quantity_field_$index'),
-                  controller: item.quantityController,
-                  onChanged: (_) => onChanged(),
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  textAlign: TextAlign.center,
-                  style: textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                  decoration: const InputDecoration(isDense: true),
-                ),
-              ),
-              const SizedBox(width: FreshSpacing.sm),
-              SizedBox(
-                width: 64,
-                child: TextField(
-                  key: ValueKey('${keyPrefix}_item_unit_$index'),
-                  controller: item.unitController,
-                  onChanged: (_) => onChanged(),
-                  textAlign: TextAlign.center,
-                  decoration: const InputDecoration(isDense: true),
-                ),
-              ),
-              const SizedBox(width: FreshSpacing.sm),
-              _QuantityStepButton(
-                key: ValueKey('${keyPrefix}_item_increase_10_$index'),
-                label: item.isGramUnit ? '+10g' : '+1',
-                onPressed: () {
-                  item.adjustQuantity(item.isGramUnit ? 10 : 1);
-                  onChanged();
-                },
-              ),
-            ],
+          FreshInlineAmountStepper(
+            amountFieldKey: ValueKey('${keyPrefix}_item_quantity_field_$index'),
+            unitFieldKey: ValueKey('${keyPrefix}_item_unit_$index'),
+            amountController: item.quantityController,
+            unitController: item.unitController,
+            decrementLabel: item.isGramUnit ? '−10g' : '−1',
+            incrementLabel: item.isGramUnit ? '+10g' : '+1',
+            decrementKey: ValueKey('${keyPrefix}_item_decrease_10_$index'),
+            incrementKey: ValueKey('${keyPrefix}_item_increase_10_$index'),
+            onAmountChanged: (_) => onChanged(),
+            onUnitChanged: (_) => onChanged(),
+            onDecrement: () {
+              item.adjustQuantity(item.isGramUnit ? -10 : -1);
+              onChanged();
+            },
+            onIncrement: () {
+              item.adjustQuantity(item.isGramUnit ? 10 : 1);
+              onChanged();
+            },
           ),
           if (item.isGramUnit) ...[
             const SizedBox(height: FreshSpacing.sm),
@@ -577,14 +545,11 @@ class _InlineReplacementFoodSearchState
   Widget build(BuildContext context) {
     final searchKeyPrefix = '${widget.keyPrefix}_item_${widget.index}_search';
     if (!_expanded) {
-      return Align(
-        alignment: Alignment.centerLeft,
-        child: TextButton.icon(
-          key: ValueKey('${searchKeyPrefix}_toggle'),
-          onPressed: () => setState(() => _expanded = true),
-          icon: const Icon(Icons.search_rounded, size: 18),
-          label: Text(context.l10n.foodSearchReplaceSearch),
-        ),
+      return FreshSearchActionRow(
+        key: ValueKey('${searchKeyPrefix}_toggle'),
+        icon: Icons.search_rounded,
+        label: context.l10n.foodSearchReplaceSearch,
+        onTap: () => setState(() => _expanded = true),
       );
     }
 
@@ -600,41 +565,6 @@ class _InlineReplacementFoodSearchState
       actionIcon: Icons.swap_horiz_rounded,
       initialQuery: widget.item.nameController.text,
       closeKeySuffix: 'collapse',
-    );
-  }
-}
-
-class _QuantityStepButton extends StatelessWidget {
-  const _QuantityStepButton({
-    super.key,
-    required this.label,
-    required this.onPressed,
-  });
-
-  final String label;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.freshPalette;
-    return SizedBox(
-      width: 52,
-      height: 48,
-      child: TextButton(
-        onPressed: onPressed,
-        style: TextButton.styleFrom(
-          foregroundColor: palette.limeDeep,
-          overlayColor: palette.lime.withValues(alpha: 0.12),
-          padding: EdgeInsets.zero,
-          minimumSize: const Size(52, 48),
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          textStyle: Theme.of(
-            context,
-          ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800),
-          shape: const StadiumBorder(),
-        ),
-        child: Text(label),
-      ),
     );
   }
 }

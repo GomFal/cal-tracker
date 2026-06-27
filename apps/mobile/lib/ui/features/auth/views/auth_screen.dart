@@ -80,96 +80,96 @@ class _AuthScreenState extends State<AuthScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                            if (_registerMode) ...[
-                              TextField(
-                                key: const ValueKey('display_name_field'),
-                                controller: _nameController,
-                                onChanged: (_) =>
-                                    _clearErrors(name: true, remote: true),
-                                decoration: InputDecoration(
-                                  labelText: l10n.authNameLabel,
-                                  errorText: _nameError,
-                                  prefixIcon: const Icon(Icons.person_outline),
-                                ),
-                              ),
-                              const SizedBox(height: FreshSpacing.md),
-                            ],
+                          if (_registerMode) ...[
                             TextField(
-                              key: const ValueKey('email_field'),
-                              controller: _emailController,
-                              keyboardType: TextInputType.emailAddress,
+                              key: const ValueKey('display_name_field'),
+                              controller: _nameController,
                               onChanged: (_) =>
-                                  _clearErrors(email: true, remote: true),
+                                  _clearErrors(name: true, remote: true),
                               decoration: InputDecoration(
-                                labelText: l10n.authEmailLabel,
-                                errorText: _emailError,
-                                prefixIcon: const Icon(
-                                  Icons.alternate_email_rounded,
-                                ),
+                                labelText: l10n.authNameLabel,
+                                errorText: _nameError,
+                                prefixIcon: const Icon(Icons.person_outline),
                               ),
                             ),
                             const SizedBox(height: FreshSpacing.md),
-                            TextField(
-                              key: const ValueKey('password_field'),
-                              controller: _passwordController,
-                              obscureText: true,
-                              onChanged: (_) =>
-                                  _clearErrors(password: true, remote: true),
-                              decoration: InputDecoration(
-                                labelText: l10n.authPasswordLabel,
-                                errorText: _passwordError,
-                                prefixIcon:
-                                    const Icon(Icons.lock_outline_rounded),
-                              ),
-                            ),
-                            const SizedBox(height: FreshSpacing.lg),
-                            FilledButton.icon(
-                              key: const ValueKey('auth_submit_button'),
-                              onPressed: viewModel.isLoading ? null : _submit,
-                              icon: viewModel.isLoading
-                                  ? const SizedBox.square(
-                                      dimension: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Icon(
-                                      Icons.keyboard_double_arrow_right_rounded,
-                                    ),
-                              label: Text(
-                                _registerMode
-                                    ? l10n.authCreateAccountButton
-                                    : l10n.authGetStartedButton,
-                              ),
-                            ),
-                            const SizedBox(height: FreshSpacing.sm),
-                            _GoogleSignInButton(
-                              isEnabled: !viewModel.isLoading,
-                              label: l10n.authContinueWithGoogleButton,
-                              onPressed: () => viewModel.loginWithGoogle(),
-                            ),
-                            TextButton(
-                              key: const ValueKey('auth_toggle_mode_button'),
-                              onPressed: _toggleMode,
-                              child: Text(
-                                _registerMode
-                                    ? l10n.authUseExistingAccountButton
-                                    : l10n.authCreateAccountLink,
-                              ),
-                            ),
-                            if (viewModel.error != null) ...[
-                              const SizedBox(height: FreshSpacing.sm),
-                              FreshStatusBanner(
-                                icon: Icons.error_outline_rounded,
-                                title: _authErrorTitle(
-                                    l10n, viewModel.errorSource),
-                                message: viewModel.error!,
-                                color: palette.coral,
-                              ),
-                            ],
                           ],
-                        ),
-                      ],
+                          TextField(
+                            key: const ValueKey('email_field'),
+                            controller: _emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            onChanged: (_) =>
+                                _clearErrors(email: true, remote: true),
+                            decoration: InputDecoration(
+                              labelText: l10n.authEmailLabel,
+                              errorText: _emailError,
+                              prefixIcon: const Icon(
+                                Icons.alternate_email_rounded,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: FreshSpacing.md),
+                          TextField(
+                            key: const ValueKey('password_field'),
+                            controller: _passwordController,
+                            obscureText: true,
+                            onChanged: (_) =>
+                                _clearErrors(password: true, remote: true),
+                            decoration: InputDecoration(
+                              labelText: l10n.authPasswordLabel,
+                              errorText: _passwordError,
+                              prefixIcon:
+                                  const Icon(Icons.lock_outline_rounded),
+                            ),
+                          ),
+                          const SizedBox(height: FreshSpacing.lg),
+                          FilledButton.icon(
+                            key: const ValueKey('auth_submit_button'),
+                            onPressed: viewModel.isLoading ? null : _submit,
+                            icon: viewModel.isLoading
+                                ? const SizedBox.square(
+                                    dimension: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.keyboard_double_arrow_right_rounded,
+                                  ),
+                            label: Text(
+                              _registerMode
+                                  ? l10n.authCreateAccountButton
+                                  : l10n.authGetStartedButton,
+                            ),
+                          ),
+                          const SizedBox(height: FreshSpacing.sm),
+                          _GoogleSignInButton(
+                            isEnabled: !viewModel.isLoading,
+                            label: l10n.authContinueWithGoogleButton,
+                            onPressed: () => viewModel.loginWithGoogle(),
+                          ),
+                          TextButton(
+                            key: const ValueKey('auth_toggle_mode_button'),
+                            onPressed: _toggleMode,
+                            child: Text(
+                              _registerMode
+                                  ? l10n.authUseExistingAccountButton
+                                  : l10n.authCreateAccountLink,
+                            ),
+                          ),
+                          if (viewModel.error != null) ...[
+                            const SizedBox(height: FreshSpacing.sm),
+                            FreshStatusBanner(
+                              icon: Icons.error_outline_rounded,
+                              title:
+                                  _authErrorTitle(l10n, viewModel.errorSource),
+                              message: viewModel.error!,
+                              color: palette.coral,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -460,16 +460,18 @@ class _LoginHeroCarouselState extends State<_LoginHeroCarousel>
       child: DecoratedBox(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(FreshRadii.xl),
-          boxShadow: [
-            BoxShadow(
-              color: context.freshShadowColor(
-                lightAlpha: 0.12,
-                darkAlpha: 0.42,
-              ),
-              blurRadius: 28,
-              offset: const Offset(0, 16),
-            ),
-          ],
+          boxShadow: Theme.of(context).brightness == Brightness.dark
+              ? [
+                  BoxShadow(
+                    color: context.freshShadowColor(
+                      lightAlpha: 0.12,
+                      darkAlpha: 0.42,
+                    ),
+                    blurRadius: 28,
+                    offset: const Offset(0, 16),
+                  ),
+                ]
+              : const [],
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(FreshRadii.xl),

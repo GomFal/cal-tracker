@@ -23,7 +23,7 @@ describe("usual foods", () => {
   it("creates, lists, updates, searches, and archives current-user usual foods", async () => {
     const { request } = buildTestApp();
     const userA = await registerAndAuth(request);
-    const userB = await registerUser(request, "other@example.com");
+    const userB = await registerAndAuth(request, { email: "other@example.com" });
 
     const createdResponse = await request("http://localhost/v1/usual-foods", {
       method: "POST",
@@ -406,30 +406,3 @@ describe("usual foods", () => {
     });
   });
 });
-
-async function registerUser(
-  request: (input: string, init?: RequestInit) => Promise<Response>,
-  email: string,
-) {
-  const response = await request("http://localhost/v1/auth/register", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      email,
-      password: "password123",
-      displayName: "Test User",
-    }),
-  });
-  const body = (await response.json()) as {
-    accessToken: string;
-    refreshToken: string;
-    user: { id: string };
-  };
-  return {
-    ...body,
-    authHeader: {
-      authorization: `Bearer ${body.accessToken}`,
-      "content-type": "application/json",
-    },
-  };
-}

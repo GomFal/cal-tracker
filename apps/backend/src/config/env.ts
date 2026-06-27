@@ -33,6 +33,12 @@ const envSchema = z.object({
   STT_MODEL: z.string().min(1).default("whisper-large-v3-turbo"),
   STT_BASE_URL: z.string().url().default("https://api.groq.com/openai/v1"),
   FOOD_RESOLVER_MIN_CONFIDENCE: z.coerce.number().min(0).max(1).default(0.75),
+  RESEND_API_KEY: z.string().default(""),
+  RESEND_FROM_EMAIL: z.string().default(""),
+  AUTH_EMAIL_CONFIRMATION_TTL_MINUTES: z.coerce.number().int().min(5).max(1440).default(30),
+  MOBILE_ANDROID_APP_LINK_PACKAGES: z.string().default("app.bettercalories,app.bettercalories.dev"),
+  MOBILE_ANDROID_SHA256_CERT_FINGERPRINTS: z.string().default(""),
+  MOBILE_IOS_APP_IDS: z.string().default(""),
   EMBEDDINGS_ENABLED: stringBooleanSchema.default(false),
   EMBEDDING_PROVIDER: z.string().min(1).default("openrouter"),
   EMBEDDING_MODEL: z.string().min(1).default("baai/bge-m3"),
@@ -63,6 +69,9 @@ export type AppConfig = Omit<z.infer<typeof envSchema>, "AGENT_RUN_LOG_ENABLED" 
   adminEmails: string[];
   adminPanelEnabled: boolean;
   adminPanelUsername: string;
+  mobileAndroidAppLinkPackages: string[];
+  mobileAndroidSha256CertFingerprints: string[];
+  mobileIosAppIds: string[];
 };
 
 export function loadConfig(input: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -87,6 +96,12 @@ export function loadConfig(input: NodeJS.ProcessEnv = process.env): AppConfig {
         STT_MODEL: "test-stt-model",
         STT_BASE_URL: "http://localhost:9999",
         FOOD_RESOLVER_MIN_CONFIDENCE: "0.75",
+        RESEND_API_KEY: "",
+        RESEND_FROM_EMAIL: "BetterCalories <auth@bettercalories.test>",
+        AUTH_EMAIL_CONFIRMATION_TTL_MINUTES: "30",
+        MOBILE_ANDROID_APP_LINK_PACKAGES: "app.bettercalories,app.bettercalories.dev",
+        MOBILE_ANDROID_SHA256_CERT_FINGERPRINTS: "",
+        MOBILE_IOS_APP_IDS: "",
         EMBEDDINGS_ENABLED: "false",
         EMBEDDING_PROVIDER: "openrouter",
         EMBEDDING_MODEL: "baai/bge-m3",
@@ -122,6 +137,9 @@ export function loadConfig(input: NodeJS.ProcessEnv = process.env): AppConfig {
       "ADMIN_PANEL_USERNAME, ADMIN_PANEL_PASSWORD_HASH, and ADMIN_PANEL_TOKEN_SECRET must be set together.",
     );
   }
+  if (parsed.NODE_ENV === "production" && (!parsed.RESEND_API_KEY.trim() || !parsed.RESEND_FROM_EMAIL.trim())) {
+    throw new Error("RESEND_API_KEY and RESEND_FROM_EMAIL must be set in production.");
+  }
   const databaseUrl = withSearchPath(parsed.DATABASE_URL, parsed.DATABASE_SCHEMA);
   return {
     ...parsed,
@@ -134,8 +152,15 @@ export function loadConfig(input: NodeJS.ProcessEnv = process.env): AppConfig {
     corsAllowedOrigins: parsed.CORS_ALLOWED_ORIGINS.split(",").map((origin) => origin.trim()),
     adminEmails: parsed.ADMIN_EMAILS.split(",").map((email) => email.trim().toLowerCase()).filter(Boolean),
     adminPanelEnabled,
-    adminPanelUsername: parsed.ADMIN_PANEL_USERNAME.trim().toLowerCase()
+    adminPanelUsername: parsed.ADMIN_PANEL_USERNAME.trim().toLowerCase(),
+    mobileAndroidAppLinkPackages: splitCsv(parsed.MOBILE_ANDROID_APP_LINK_PACKAGES),
+    mobileAndroidSha256CertFingerprints: splitCsv(parsed.MOBILE_ANDROID_SHA256_CERT_FINGERPRINTS),
+    mobileIosAppIds: splitCsv(parsed.MOBILE_IOS_APP_IDS)
   };
+}
+
+function splitCsv(value: string): string[] {
+  return value.split(",").map((entry) => entry.trim()).filter(Boolean);
 }
 
 function withSearchPath(databaseUrl: string, schema: string): string {

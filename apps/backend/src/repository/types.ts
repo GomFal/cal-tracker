@@ -23,6 +23,18 @@ export type StoredUser = AuthUser & {
   scopes: PermissionScope[];
 };
 
+export type PendingRegistrationRecord = {
+  id: string;
+  email: string;
+  displayName: string;
+  passwordHash: string;
+  tokenHash: string;
+  expiresAt: string;
+  consumedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type UpdateDailyGoalsInput = {
   date: string;
   calories?: number;
@@ -380,11 +392,21 @@ export interface AppRepository {
     email: string;
     displayName: string;
     passwordHash?: string;
+    emailVerifiedAt?: string;
     scopes: PermissionScope[];
   }): Promise<StoredUser>;
   findUserByEmail(email: string): Promise<StoredUser | undefined>;
   findUserById(id: string): Promise<StoredUser | undefined>;
   updateTrustedMode(userId: string, enabled: boolean): Promise<StoredUser>;
+  upsertPendingRegistration(input: {
+    email: string;
+    displayName: string;
+    passwordHash: string;
+    tokenHash: string;
+    expiresAt: string;
+  }): Promise<PendingRegistrationRecord>;
+  findPendingRegistrationByEmail(email: string): Promise<PendingRegistrationRecord | undefined>;
+  consumePendingRegistration(tokenHash: string): Promise<PendingRegistrationRecord | undefined>;
   findAuthIdentity(
     provider: AuthIdentityProvider,
     providerUserId: string,

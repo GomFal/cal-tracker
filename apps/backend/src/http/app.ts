@@ -4,6 +4,7 @@ import {
   agentRunRequestSchema,
   calorieEstimateRequestSchema,
   dailyHydrationUpdateSchema,
+  emailConfirmationRequestSchema,
   executeActionRequestSchema,
   foodSearchRequestSchema,
   goalsUpdateSchema,
@@ -311,6 +312,10 @@ export function createApp(input: {
       ),
     ),
   );
+  app.post("/v1/auth/email/confirm", async (c) => {
+    const body = emailConfirmationRequestSchema.parse(await c.req.json());
+    return c.json(await authService.confirmEmail(body.token));
+  });
   app.post("/v1/auth/refresh", async (c) => {
     const body = refreshRequestSchema.parse(await c.req.json());
     return c.json(await authService.refresh(body.refreshToken));
@@ -322,6 +327,11 @@ export function createApp(input: {
     await authService.logout(body.refreshToken);
     return c.json({ ok: true });
   });
+  app.get("/auth/email/confirm", (c) => c.html(emailConfirmationFallbackHtml()));
+  app.get("/.well-known/assetlinks.json", (c) => c.json(androidAssetLinks(config)));
+  app.get("/.well-known/apple-app-site-association", (c) =>
+    c.json(appleAppSiteAssociation(config)),
+  );
   app.post("/v1/auth/password-reset/request", async (c) => {
     const body = passwordResetRequestSchema.parse(await c.req.json());
     return c.json(await authService.requestPasswordReset(body.email));
@@ -343,6 +353,7 @@ export function createApp(input: {
       "/v1/health",
       "/v1/auth/register",
       "/v1/auth/login",
+      "/v1/auth/email/confirm",
       "/v1/auth/google/login",
       "/v1/auth/refresh",
       "/v1/auth/logout",
@@ -1397,6 +1408,51 @@ function isReviewedUsualWriteAction(actionId: string): boolean {
 function publicUser(user: StoredUser) {
   const { passwordHash: _passwordHash, scopes: _scopes, ...publicValue } = user;
   return publicValue;
+}
+
+function emailConfirmationFallbackHtml(): string {
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Confirm BetterCalories</title>
+  </head>
+  <body style="font-family:Arial,sans-serif;color:#18201b;line-height:1.5;margin:32px">
+    <h1>Open BetterCalories</h1>
+    <p>If the app is installed, this link opens it and finishes your sign in.</p>
+    <p>If nothing happened, install or open BetterCalories and tap the email link again.</p>
+  </body>
+</html>`;
+}
+
+function androidAssetLinks(config: AppConfig) {
+  if (config.mobileAndroidSha256CertFingerprints.length === 0) return [];
+  return config.mobileAndroidAppLinkPackages.map((packageName) => ({
+    relation: ["delegate_permission/common.handle_all_urls"],
+    target: {
+      namespace: "android_app",
+      package_name: packageName,
+      sha256_cert_fingerprints: config.mobileAndroidSha256CertFingerprints,
+    },
+  }));
+}
+
+function appleAppSiteAssociation(config: AppConfig) {
+  return {
+    applinks: {
+      apps: [],
+      details: config.mobileIosAppIds.map((appID) => ({
+        appIDs: [appID],
+        components: [
+          {
+            "/": "/auth/email/confirm",
+            comment: "BetterCalories email confirmation links",
+          },
+        ],
+      })),
+    },
+  };
 }
 
 function recordBackendTelemetry(input: {

@@ -41,4 +41,20 @@ describe("config", () => {
     expect(config.OPENROUTER_PROVIDER_REQUIRE_PARAMETERS).toBe(true);
     expect(config.OPENROUTER_PROVIDER_ALLOW_FALLBACKS).toBe(false);
   });
+
+  it("requires Resend sender configuration in production", () => {
+    expect(() =>
+      loadConfig({
+        DATABASE_URL: "postgres://cal_tracker:cal_tracker@localhost:5432/cal_tracker",
+        JWT_ACCESS_SECRET: "test-access-secret-with-more-than-32-characters",
+        SESSION_TOKEN_PEPPER: "test-session-pepper-with-more-than-32-characters",
+        OPENROUTER_API_KEY: "test-openrouter-key",
+        OPENROUTER_MODEL: "test-model",
+        STT_API_KEY: "test-stt-key",
+        APP_BASE_URL: "https://api.bettercalories.app",
+        CORS_ALLOWED_ORIGINS: "https://api.bettercalories.app",
+        NODE_ENV: "production",
+      } as NodeJS.ProcessEnv),
+    ).toThrow("RESEND_API_KEY and RESEND_FROM_EMAIL must be set in production.");
+  });
 });

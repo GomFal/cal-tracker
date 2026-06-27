@@ -74,12 +74,20 @@ class LocalAuthRepository extends AuthRepository {
   }
 
   @override
-  Future<AuthSession> register({
+  Future<void> register({
     required String email,
     required String password,
     required String displayName,
-  }) {
-    return _authenticate(email: email, displayName: displayName);
+  }) async {
+    store.setSessionActive(false);
+  }
+
+  @override
+  Future<AuthSession> confirmEmail(String token) {
+    return _authenticate(
+      email: store.user.email,
+      displayName: store.user.displayName,
+    );
   }
 
   @override

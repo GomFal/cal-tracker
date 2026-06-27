@@ -18,6 +18,7 @@ import {
   dailyHydrationResponseSchema,
   dailyHydrationUpdateSchema,
   errorResponseSchema,
+  emailConfirmationRequestSchema,
   executeActionRequestSchema,
   executeActionResponseSchema,
   foodSearchRequestSchema,
@@ -30,6 +31,7 @@ import {
   passwordResetRequestSchema,
   refreshRequestSchema,
   registerRequestSchema,
+  registrationPendingResponseSchema,
   settingsUpdateSchema,
   telemetryEventsResponseSchema,
   telemetryFoodSearchResponseSchema,
@@ -117,10 +119,12 @@ const spec = {
     schemas: {
       ErrorResponse: schema("ErrorResponse", errorResponseSchema),
       RegisterRequest: schema("RegisterRequest", registerRequestSchema),
+      RegistrationPendingResponse: schema("RegistrationPendingResponse", registrationPendingResponseSchema),
       LoginRequest: schema("LoginRequest", loginRequestSchema),
       AdminLoginRequest: schema("AdminLoginRequest", adminLoginRequestSchema),
       AdminTokenResponse: schema("AdminTokenResponse", adminTokenResponseSchema),
       GoogleLoginRequest: schema("GoogleLoginRequest", googleLoginRequestSchema),
+      EmailConfirmationRequest: schema("EmailConfirmationRequest", emailConfirmationRequestSchema),
       RefreshRequest: schema("RefreshRequest", refreshRequestSchema),
       PasswordResetRequest: schema("PasswordResetRequest", passwordResetRequestSchema),
       PasswordResetConfirm: schema("PasswordResetConfirm", passwordResetConfirmSchema),
@@ -178,6 +182,18 @@ const spec = {
         requestBody: {
           required: true,
           content: { "application/json": { schema: { $ref: "#/components/schemas/RegisterRequest" } } }
+        },
+        responses: {
+          "200": { description: "Confirmation email sent", content: { "application/json": { schema: { $ref: "#/components/schemas/RegistrationPendingResponse" } } } }
+        }
+      }
+    },
+    "/v1/auth/email/confirm": {
+      post: {
+        operationId: "confirmEmail",
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/EmailConfirmationRequest" } } }
         },
         responses: {
           "200": { description: "Token pair", content: { "application/json": { schema: { $ref: "#/components/schemas/TokenPair" } } } }

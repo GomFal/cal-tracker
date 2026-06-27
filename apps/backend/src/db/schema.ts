@@ -47,6 +47,7 @@ export const users = pgTable(
     trustedModeEnabled: boolean("trusted_mode_enabled")
       .notNull()
       .default(false),
+    emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -56,6 +57,33 @@ export const users = pgTable(
     uniqueIndex("users_active_email_unique")
       .on(sql`lower(${table.email})`)
       .where(sql`${table.deletedAt} IS NULL`),
+  ],
+);
+
+export const pendingRegistrations = pgTable(
+  "pending_registrations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    email: text("email").notNull(),
+    displayName: text("display_name").notNull(),
+    passwordHash: text("password_hash").notNull(),
+    tokenHash: text("token_hash").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("pending_registrations_active_email_unique")
+      .on(sql`lower(${table.email})`)
+      .where(sql`${table.consumedAt} IS NULL`),
+    uniqueIndex("pending_registrations_active_token_unique")
+      .on(table.tokenHash)
+      .where(sql`${table.consumedAt} IS NULL`),
   ],
 );
 

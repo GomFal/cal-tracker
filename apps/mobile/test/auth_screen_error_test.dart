@@ -66,6 +66,32 @@ void main() {
     expect(find.textContaining('trace-secret'), findsNothing);
   });
 
+  testWidgets('successful registration shows check email notice', (
+    tester,
+  ) async {
+    final repository = _FakeAuthRepository();
+    await tester.pumpWidget(_AuthTestApp(repository: repository));
+    await tester.pump();
+
+    await _tapVisible(tester, const ValueKey('auth_toggle_mode_button'));
+    await tester.pump();
+    await _tapVisible(tester, const ValueKey('auth_submit_button'));
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey('auth_check_email_banner')),
+      findsOneWidget,
+    );
+    expect(find.text('Check your email'), findsOneWidget);
+    expect(
+      find.text(
+        'We sent a confirmation link to demo@example.com. Open it to finish creating your account.',
+      ),
+      findsOneWidget,
+    );
+    expect(repository.registerCalls, 1);
+  });
+
   testWidgets('login failure hides account lookup details', (tester) async {
     final repository = _FakeAuthRepository(
       loginError: const ApiException(
@@ -84,6 +110,29 @@ void main() {
     expect(find.text('Email or password does not match.'), findsOneWidget);
     expect(find.textContaining('invalid_credentials'), findsNothing);
     expect(find.textContaining('401'), findsNothing);
+  });
+
+  testWidgets('login before confirmation asks the user to check email', (
+    tester,
+  ) async {
+    final repository = _FakeAuthRepository(
+      loginError: const ApiException(
+        403,
+        'Confirm your email before signing in.',
+        code: 'email_not_verified',
+      ),
+    );
+    await tester.pumpWidget(_AuthTestApp(repository: repository));
+    await tester.pump();
+
+    await _tapVisible(tester, const ValueKey('auth_submit_button'));
+    await tester.pump();
+
+    expect(find.text('Sign in failed'), findsOneWidget);
+    expect(
+      find.text('Check your email and confirm your account before signing in.'),
+      findsOneWidget,
+    );
   });
 }
 
@@ -132,15 +181,18 @@ class _FakeAuthRepository extends AuthRepository {
   }
 
   @override
-  Future<AuthSession> register({
+  Future<void> register({
     required String email,
     required String password,
     required String displayName,
   }) async {
     registerCalls += 1;
     if (registerError != null) throw registerError!;
-    return _session(email, displayName: displayName);
   }
+
+  @override
+  Future<AuthSession> confirmEmail(String token) async =>
+      _session('demo@example.com');
 
   @override
   Future<AuthSession?> loginWithGoogle() async => null;

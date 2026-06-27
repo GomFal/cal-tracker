@@ -4,12 +4,14 @@ class AuthUser {
     required this.email,
     required this.displayName,
     required this.trustedModeEnabled,
+    this.emailVerifiedAt,
   });
 
   final String id;
   final String email;
   final String displayName;
   final bool trustedModeEnabled;
+  final String? emailVerifiedAt;
 
   factory AuthUser.fromJson(Map<String, Object?> json) {
     return AuthUser(
@@ -17,6 +19,7 @@ class AuthUser {
       email: json['email'] as String,
       displayName: json['displayName'] as String,
       trustedModeEnabled: json['trustedModeEnabled'] as bool,
+      emailVerifiedAt: json['emailVerifiedAt'] as String?,
     );
   }
 }

@@ -488,6 +488,24 @@ abstract class AppLocalizations {
   /// **'Account creation failed'**
   String get authCreateAccountFailedTitle;
 
+  /// No description provided for @authConfirmEmailFailedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Email confirmation failed'**
+  String get authConfirmEmailFailedTitle;
+
+  /// No description provided for @authCheckEmailTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Check your email'**
+  String get authCheckEmailTitle;
+
+  /// No description provided for @authCheckEmailMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'We sent a confirmation link to {email}. Open it to finish creating your account.'**
+  String authCheckEmailMessage(String email);
+
   /// No description provided for @authEmailInvalidError.
   ///
   /// In en, this message translates to:

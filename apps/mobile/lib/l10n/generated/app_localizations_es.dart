@@ -219,6 +219,17 @@ class AppLocalizationsEs extends AppLocalizations {
   String get authCreateAccountFailedTitle => 'No se pudo crear la cuenta';
 
   @override
+  String get authConfirmEmailFailedTitle => 'No se pudo confirmar el correo';
+
+  @override
+  String get authCheckEmailTitle => 'Revisa tu correo';
+
+  @override
+  String authCheckEmailMessage(String email) {
+    return 'Te enviamos un enlace de confirmación a $email. Ábrelo para terminar de crear tu cuenta.';
+  }
+
+  @override
   String get authEmailInvalidError =>
       'Introduce un correo válido, como nombre@example.com.';
 

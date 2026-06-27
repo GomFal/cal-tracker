@@ -55,6 +55,10 @@ function authErrorMessage(code: string): string {
       return "An account already exists for this email";
     case "invalid_credentials":
       return "Invalid email or password";
+    case "email_not_verified":
+      return "Confirm your email before signing in.";
+    case "invalid_email_confirmation_token":
+      return "That confirmation link is invalid or expired.";
     case "invalid_google_token":
       return "Google sign-in did not finish. Try again.";
     case "invalid_refresh_token":

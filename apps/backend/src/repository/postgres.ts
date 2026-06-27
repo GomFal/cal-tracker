@@ -42,6 +42,7 @@ import type {
   LlmRunFilter,
   LlmRunRecord,
   MemoryMatch,
+  PendingRegistrationRecord,
   StoredSession,
   StoredUser,
   TelemetryEventFilter,
@@ -132,15 +133,17 @@ export class PostgresRepository implements AppRepository {
     email: string;
     displayName: string;
     passwordHash?: string;
+    emailVerifiedAt?: string;
     scopes: PermissionScope[];
   }): Promise<StoredUser> {
     return this.db.transaction(async (tx) => {
+      const emailVerifiedAt = input.emailVerifiedAt ?? new Date().toISOString();
       const [row] = await executeRows(
         tx,
         dbSql`
-        INSERT INTO users (email, display_name)
-        VALUES (${input.email.toLowerCase()}, ${input.displayName})
-        RETURNING id, email, display_name, trusted_mode_enabled, created_at
+        INSERT INTO users (email, display_name, email_verified_at)
+        VALUES (${input.email.toLowerCase()}, ${input.displayName}, ${emailVerifiedAt})
+        RETURNING id, email, display_name, trusted_mode_enabled, email_verified_at, created_at
       `,
       );
       if (input.passwordHash) {
@@ -165,7 +168,7 @@ export class PostgresRepository implements AppRepository {
 
   async findUserByEmail(email: string): Promise<StoredUser | undefined> {
     const [row] = await this.execute(dbSql`
-      SELECT u.id, u.email, u.display_name, u.trusted_mode_enabled, u.created_at, c.password_hash
+      SELECT u.id, u.email, u.display_name, u.trusted_mode_enabled, u.email_verified_at, u.created_at, c.password_hash
       FROM users u
       LEFT JOIN user_credentials c ON c.user_id = u.id
       WHERE lower(u.email) = lower(${email}) AND u.deleted_at IS NULL
@@ -181,7 +184,7 @@ export class PostgresRepository implements AppRepository {
 
   async findUserById(id: string): Promise<StoredUser | undefined> {
     const [row] = await this.execute(dbSql`
-      SELECT u.id, u.email, u.display_name, u.trusted_mode_enabled, u.created_at, c.password_hash
+      SELECT u.id, u.email, u.display_name, u.trusted_mode_enabled, u.email_verified_at, u.created_at, c.password_hash
       FROM users u
       LEFT JOIN user_credentials c ON c.user_id = u.id
       WHERE u.id = ${id} AND u.deleted_at IS NULL
@@ -205,6 +208,59 @@ export class PostgresRepository implements AppRepository {
     const user = await this.findUserById(userId);
     if (!user) throw new Error("user_not_found");
     return user;
+  }
+
+  async upsertPendingRegistration(input: {
+    email: string;
+    displayName: string;
+    passwordHash: string;
+    tokenHash: string;
+    expiresAt: string;
+  }): Promise<PendingRegistrationRecord> {
+    return this.db.transaction(async (tx) => {
+      await executeRows(
+        tx,
+        dbSql`
+          UPDATE pending_registrations
+          SET consumed_at = now(), updated_at = now()
+          WHERE lower(email) = lower(${input.email}) AND consumed_at IS NULL
+        `,
+      );
+      const [row] = await executeRows(
+        tx,
+        dbSql`
+          INSERT INTO pending_registrations (email, display_name, password_hash, token_hash, expires_at)
+          VALUES (${input.email.toLowerCase()}, ${input.displayName}, ${input.passwordHash}, ${input.tokenHash}, ${input.expiresAt})
+          RETURNING *
+        `,
+      );
+      return mapPendingRegistration(row);
+    });
+  }
+
+  async findPendingRegistrationByEmail(
+    email: string,
+  ): Promise<PendingRegistrationRecord | undefined> {
+    const [row] = await this.execute(dbSql`
+      SELECT *
+      FROM pending_registrations
+      WHERE lower(email) = lower(${email}) AND consumed_at IS NULL AND expires_at > now()
+      ORDER BY created_at DESC
+      LIMIT 1
+    `);
+    return row ? mapPendingRegistration(row) : undefined;
+  }
+
+  async consumePendingRegistration(
+    tokenHash: string,
+  ): Promise<PendingRegistrationRecord | undefined> {
+    const [row] = await this.execute(dbSql`
+      UPDATE pending_registrations
+      SET consumed_at = now(), updated_at = now()
+      WHERE token_hash = ${tokenHash} AND consumed_at IS NULL AND expires_at > now()
+      RETURNING *
+    `);
+    return row ? mapPendingRegistration(row) : undefined;
   }
 
   async findAuthIdentity(
@@ -2611,11 +2667,28 @@ export class PostgresRepository implements AppRepository {
       email: row.email as string,
       displayName: row.display_name as string,
       trustedModeEnabled: Boolean(row.trusted_mode_enabled),
+      emailVerifiedAt: row.email_verified_at ? toIso(row.email_verified_at) : undefined,
       createdAt: toIso(row.created_at),
       ...(passwordHash ? { passwordHash } : {}),
       scopes,
     };
   }
+}
+
+function mapPendingRegistration(
+  row: Record<string, unknown>,
+): PendingRegistrationRecord {
+  return {
+    id: row.id as string,
+    email: row.email as string,
+    displayName: row.display_name as string,
+    passwordHash: row.password_hash as string,
+    tokenHash: row.token_hash as string,
+    expiresAt: toIso(row.expires_at),
+    ...(row.consumed_at ? { consumedAt: toIso(row.consumed_at) } : {}),
+    createdAt: toIso(row.created_at),
+    updatedAt: toIso(row.updated_at),
+  };
 }
 
 function mapAuthIdentity(row: Record<string, unknown>): AuthIdentityRecord {

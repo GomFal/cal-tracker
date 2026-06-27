@@ -35,6 +35,8 @@
   "commonAddAtLeastOneIngredient": "Add at least one ingredient.",
   "mealEditorMealTotal": "Meal total",
   "mealEditorIngredientsSection": "Ingredients",
+  "mealEditorSearchOrAddIngredient": "Search or add ingredient...",
+  "mealEditorReplaceFood": "Replace food",
   "mealEditorEditDetails": "Edit details",
   "mealEditorNutritionDetails": "Nutrition details",
   "mealEditorApplySuggestion": "Apply suggestion",

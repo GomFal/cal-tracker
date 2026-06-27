@@ -95,7 +95,7 @@ abstract class AppLocalizations {
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
     Locale('en'),
-    Locale('es')
+    Locale('es'),
   ];
 
   /// No description provided for @appTitle.
@@ -307,6 +307,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Ingredients'**
   String get mealEditorIngredientsSection;
+
+  /// No description provided for @mealEditorSearchOrAddIngredient.
+  ///
+  /// In en, this message translates to:
+  /// **'Search or add ingredient...'**
+  String get mealEditorSearchOrAddIngredient;
+
+  /// No description provided for @mealEditorReplaceFood.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace food'**
+  String get mealEditorReplaceFood;
 
   /// No description provided for @mealEditorEditDetails.
   ///
@@ -571,7 +583,11 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{preset}: {protein}% protein, {carbs}% carbs, {fat}% fat'**
   String settingsMacroPresetSubtitle(
-      String preset, int protein, int carbs, int fat);
+    String preset,
+    int protein,
+    int carbs,
+    int fat,
+  );
 
   /// No description provided for @settingsMacroPercentSubtitle.
   ///
@@ -3307,8 +3323,9 @@ AppLocalizations lookupAppLocalizations(Locale locale) {
   }
 
   throw FlutterError(
-      'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
-      'an issue with the localizations generation tool. Please file an issue '
-      'on GitHub with a reproducible sample app and the gen-l10n configuration '
-      'that was used.');
+    'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
+    'an issue with the localizations generation tool. Please file an issue '
+    'on GitHub with a reproducible sample app and the gen-l10n configuration '
+    'that was used.',
+  );
 }

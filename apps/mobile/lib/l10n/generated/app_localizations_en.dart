@@ -115,6 +115,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mealEditorIngredientsSection => 'Ingredients';
 
   @override
+  String get mealEditorSearchOrAddIngredient => 'Search or add ingredient...';
+
+  @override
+  String get mealEditorReplaceFood => 'Replace food';
+
+  @override
   String get mealEditorEditDetails => 'Edit details';
 
   @override
@@ -262,7 +268,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String settingsMacroPresetSubtitle(
-      String preset, int protein, int carbs, int fat) {
+    String preset,
+    int protein,
+    int carbs,
+    int fat,
+  ) {
     return '$preset: $protein% protein, $carbs% carbs, $fat% fat';
   }
 

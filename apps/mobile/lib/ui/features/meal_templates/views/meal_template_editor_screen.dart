@@ -339,32 +339,24 @@ class _MealTemplateBasicsSection extends StatelessWidget {
         Text(
           l10n.mealTemplateEditorDetailsSection,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            color: palette.ink,
-            fontWeight: FontWeight.w700,
-          ),
+                color: palette.ink,
+                fontWeight: FontWeight.w700,
+              ),
         ),
         const SizedBox(height: FreshSpacing.md),
-        TextField(
-          key: const ValueKey('meal_template_title_field'),
+        FreshUnderlineTextField(
+          fieldKey: const ValueKey('meal_template_title_field'),
           controller: titleController,
+          label: l10n.mealTemplateEditorTitleLabel,
+          placeholder: l10n.mealTemplateEditorTitleHint,
           textInputAction: TextInputAction.next,
-          decoration: InputDecoration(
-            labelText: l10n.mealTemplateEditorTitleLabel,
-            hintText: l10n.mealTemplateEditorTitleHint,
-            filled: true,
-            fillColor: palette.surfaceSoft,
-          ),
         ),
         const SizedBox(height: FreshSpacing.md),
-        TextField(
-          key: const ValueKey('meal_template_aliases_field'),
+        FreshUnderlineTextField(
+          fieldKey: const ValueKey('meal_template_aliases_field'),
           controller: aliasesController,
-          decoration: InputDecoration(
-            labelText: l10n.mealTemplateEditorAliasesLabel,
-            hintText: l10n.mealTemplateEditorAliasesHint,
-            filled: true,
-            fillColor: palette.surfaceSoft,
-          ),
+          label: l10n.mealTemplateEditorAliasesLabel,
+          placeholder: l10n.mealTemplateEditorAliasesHint,
         ),
         Divider(height: 24, color: palette.rule),
       ],
@@ -392,9 +384,9 @@ class _CandidateGroupsSection extends StatelessWidget {
         Text(
           l10n.mealTemplateEditorCandidatesSection,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            color: palette.ink,
-            fontWeight: FontWeight.w700,
-          ),
+                color: palette.ink,
+                fontWeight: FontWeight.w700,
+              ),
         ),
         const SizedBox(height: FreshSpacing.xs),
         Text(
@@ -474,23 +466,21 @@ class _TemplateItemsSectionState extends State<_TemplateItemsSection> {
               ? FoodSearchPanel(
                   key: const ValueKey('meal_template_food_search_panel'),
                   keyPrefix: 'meal_template_food_search',
-                  searchFoods: context
-                      .read<MealTemplatesViewModel>()
-                      .searchFoods,
+                  searchFoods:
+                      context.read<MealTemplatesViewModel>().searchFoods,
                   onSelected: (item) {
                     widget.onAddFood(item);
                     setState(() => _searchExpanded = false);
                   },
                   onClose: () => setState(() => _searchExpanded = false),
                 )
-              : Align(
+              : KeyedSubtree(
                   key: const ValueKey('meal_template_food_search_collapsed'),
-                  alignment: Alignment.centerLeft,
-                  child: OutlinedButton.icon(
+                  child: FreshSearchActionRow(
                     key: const ValueKey('meal_template_add_from_search_button'),
-                    onPressed: () => setState(() => _searchExpanded = true),
-                    icon: const Icon(Icons.search_rounded),
-                    label: Text(l10n.mealTemplateEditorAddFromSearch),
+                    icon: Icons.search_rounded,
+                    label: l10n.mealTemplateEditorAddFromSearch,
+                    onTap: () => setState(() => _searchExpanded = true),
                   ),
                 ),
         ),
@@ -551,9 +541,9 @@ class _TemplateItemCardState extends State<_TemplateItemCard> {
                 child: Text(
                   '${l10n.commonIngredient} ${widget.index + 1}',
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: palette.ink,
-                    fontWeight: FontWeight.w700,
-                  ),
+                        color: palette.ink,
+                        fontWeight: FontWeight.w700,
+                      ),
                 ),
               ),
               IconButton(
@@ -566,106 +556,79 @@ class _TemplateItemCardState extends State<_TemplateItemCard> {
             ],
           ),
           const SizedBox(height: FreshSpacing.sm),
-          TextField(
-            key: ValueKey('meal_template_item_name_${widget.index}'),
+          FreshUnderlineTextField(
+            fieldKey: ValueKey('meal_template_item_name_${widget.index}'),
             controller: widget.item.nameController,
-            decoration: InputDecoration(
-              labelText: l10n.foodSearchName,
-              filled: true,
-              fillColor: palette.surfaceSoft,
-              isDense: true,
+            label: l10n.foodSearchName,
+            onChanged: (_) => _notifyChanged(),
+          ),
+          const SizedBox(height: FreshSpacing.sm),
+          Text(
+            l10n.commonAmount,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: palette.inkMuted,
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          const SizedBox(height: FreshSpacing.xs),
+          FreshInlineAmountStepper(
+            amountFieldKey: ValueKey(
+              'meal_template_item_quantity_${widget.index}',
             ),
-            onChanged: (_) {
-              setState(() {});
-              widget.onItemChanged?.call();
+            unitFieldKey: ValueKey('meal_template_item_unit_${widget.index}'),
+            amountController: widget.item.quantityController,
+            unitController: widget.item.unitController,
+            decrementLabel: widget.item.isGramUnit ? '−10g' : '−1',
+            incrementLabel: widget.item.isGramUnit ? '+10g' : '+1',
+            decrementKey: ValueKey(
+              'meal_template_item_decrease_10_${widget.index}',
+            ),
+            incrementKey: ValueKey(
+              'meal_template_item_increase_10_${widget.index}',
+            ),
+            onAmountChanged: (_) => _notifyChanged(),
+            onUnitChanged: (_) => _notifyChanged(),
+            onDecrement: () {
+              widget.item.adjustQuantity(widget.item.isGramUnit ? -10 : -1);
+              _notifyChanged();
+            },
+            onIncrement: () {
+              widget.item.adjustQuantity(widget.item.isGramUnit ? 10 : 1);
+              _notifyChanged();
             },
           ),
           const SizedBox(height: FreshSpacing.sm),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  key: ValueKey('meal_template_item_quantity_${widget.index}'),
-                  controller: widget.item.quantityController,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  decoration: InputDecoration(
-                    labelText: l10n.commonAmount,
-                    filled: true,
-                    fillColor: palette.surfaceSoft,
-                    isDense: true,
-                  ),
-                  onChanged: (_) {
-                    setState(() {});
-                    widget.onItemChanged?.call();
-                  },
-                ),
-              ),
-              const SizedBox(width: FreshSpacing.sm),
-              SizedBox(
-                width: 92,
-                child: TextField(
-                  key: ValueKey('meal_template_item_unit_${widget.index}'),
-                  controller: widget.item.unitController,
-                  decoration: InputDecoration(
-                    labelText: l10n.commonUnit,
-                    filled: true,
-                    fillColor: palette.surfaceSoft,
-                    isDense: true,
-                  ),
-                  onChanged: (_) {
-                    setState(() {});
-                    widget.onItemChanged?.call();
-                  },
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: FreshSpacing.sm),
-          TextField(
-            key: ValueKey('meal_template_item_calories_${widget.index}'),
+          FreshNumberUnitField(
+            fieldKey: ValueKey('meal_template_item_calories_${widget.index}'),
+            label: l10n.commonCalories,
             controller: widget.item.caloriesController,
+            unit: l10n.commonKcal,
             keyboardType: TextInputType.number,
-            decoration: InputDecoration(
-              labelText: l10n.commonCalories,
-              filled: true,
-              fillColor: palette.surfaceSoft,
-              isDense: true,
-            ),
-            onChanged: (_) {
-              setState(() {});
-              widget.onItemChanged?.call();
-            },
+            onChanged: (_) => _notifyChanged(),
           ),
           const SizedBox(height: FreshSpacing.sm),
-          Row(
-            children: [
-              Expanded(
-                child: _macroField(
-                  context,
-                  key: 'meal_template_item_protein_${widget.index}',
-                  controller: widget.item.proteinController,
-                  label: l10n.commonProtein,
-                ),
+          FreshMacroFields(
+            fields: [
+              FreshMacroFieldData(
+                key: ValueKey('meal_template_item_protein_${widget.index}'),
+                label: l10n.commonProtein,
+                controller: widget.item.proteinController,
+                color: palette.coral,
+                onChanged: (_) => _notifyChanged(),
               ),
-              const SizedBox(width: FreshSpacing.sm),
-              Expanded(
-                child: _macroField(
-                  context,
-                  key: 'meal_template_item_carbs_${widget.index}',
-                  controller: widget.item.carbsController,
-                  label: l10n.commonCarbs,
-                ),
+              FreshMacroFieldData(
+                key: ValueKey('meal_template_item_carbs_${widget.index}'),
+                label: l10n.commonCarbs,
+                controller: widget.item.carbsController,
+                color: palette.orange,
+                onChanged: (_) => _notifyChanged(),
               ),
-              const SizedBox(width: FreshSpacing.sm),
-              Expanded(
-                child: _macroField(
-                  context,
-                  key: 'meal_template_item_fat_${widget.index}',
-                  controller: widget.item.fatController,
-                  label: l10n.commonFat,
-                ),
+              FreshMacroFieldData(
+                key: ValueKey('meal_template_item_fat_${widget.index}'),
+                label: l10n.commonFat,
+                controller: widget.item.fatController,
+                color: palette.yellow,
+                onChanged: (_) => _notifyChanged(),
               ),
             ],
           ),
@@ -686,28 +649,9 @@ class _TemplateItemCardState extends State<_TemplateItemCard> {
     );
   }
 
-  Widget _macroField(
-    BuildContext context, {
-    required String key,
-    required TextEditingController controller,
-    required String label,
-  }) {
-    final palette = context.freshPalette;
-    return TextField(
-      key: ValueKey(key),
-      controller: controller,
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      decoration: InputDecoration(
-        labelText: label,
-        filled: true,
-        fillColor: palette.surfaceSoft,
-        isDense: true,
-      ),
-      onChanged: (_) {
-        setState(() {});
-        widget.onItemChanged?.call();
-      },
-    );
+  void _notifyChanged() {
+    setState(() {});
+    widget.onItemChanged?.call();
   }
 }
 
@@ -830,13 +774,13 @@ class _TemplateMealItemController {
     this.needsReview,
     this.resolvedGrams,
     this.portionDescription,
-  }) : nameController = TextEditingController(text: name),
-       quantityController = TextEditingController(text: quantity),
-       unitController = TextEditingController(text: unit),
-       caloriesController = TextEditingController(text: calories),
-       proteinController = TextEditingController(text: protein),
-       carbsController = TextEditingController(text: carbs),
-       fatController = TextEditingController(text: fat);
+  })  : nameController = TextEditingController(text: name),
+        quantityController = TextEditingController(text: quantity),
+        unitController = TextEditingController(text: unit),
+        caloriesController = TextEditingController(text: calories),
+        proteinController = TextEditingController(text: protein),
+        carbsController = TextEditingController(text: carbs),
+        fatController = TextEditingController(text: fat);
 
   factory _TemplateMealItemController.empty() {
     return _TemplateMealItemController(
@@ -919,6 +863,14 @@ class _TemplateMealItemController {
       carbsGrams: roundMacroToTenth(carbs),
       fatGrams: roundMacroToTenth(fat),
     );
+  }
+
+  bool get isGramUnit => unitController.text.trim().toLowerCase() == 'g';
+
+  void adjustQuantity(double delta) {
+    final current = _parseDouble(quantityController.text) ?? 0;
+    final next = current + delta;
+    quantityController.text = _formatQuantity(next < 0.1 ? 0.1 : next);
   }
 
   void replaceWith(MealItem item) {

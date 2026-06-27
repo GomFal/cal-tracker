@@ -28,6 +28,8 @@ class MealItemEditorSheet extends StatefulWidget {
 class _MealItemEditorSheetState extends State<MealItemEditorSheet> {
   late final List<EditableMealItemController> _items;
   bool _addSearchExpanded = false;
+  int? _expandedIndex;
+  int? _replacementSearchIndex;
   String? _error;
 
   @override
@@ -38,6 +40,7 @@ class _MealItemEditorSheetState extends State<MealItemEditorSheet> {
     ];
     if (_items.isEmpty) {
       _items.add(EditableMealItemController.empty());
+      _expandedIndex = 0;
     }
   }
 
@@ -55,11 +58,13 @@ class _MealItemEditorSheetState extends State<MealItemEditorSheet> {
     final textTheme = Theme.of(context).textTheme;
     final l10n = context.l10n;
     final palette = context.freshPalette;
+    final maxHeight = MediaQuery.sizeOf(context).height * 0.92;
     return DecoratedBox(
       decoration: BoxDecoration(color: palette.surface),
       child: Padding(
         padding: EdgeInsets.fromLTRB(18, 12, 18, bottomInset + 18),
-        child: SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: maxHeight),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -74,14 +79,50 @@ class _MealItemEditorSheetState extends State<MealItemEditorSheet> {
                   ),
                 ),
               ),
-              const SizedBox(height: FreshSpacing.lg),
-              Text(l10n.commonEditIngredients, style: textTheme.titleLarge),
-              const SizedBox(height: FreshSpacing.xs),
-              Text(
-                widget.meal.title,
-                style: textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
-              ),
               const SizedBox(height: FreshSpacing.md),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          l10n.commonEditIngredients,
+                          style: textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          widget.meal.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: palette.inkMuted,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: FreshSpacing.sm),
+                  FilledButton(
+                    key: ValueKey('save_${widget.keyPrefix}_item_edits_button'),
+                    onPressed: _save,
+                    style: FilledButton.styleFrom(
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 9,
+                      ),
+                    ),
+                    child: Text(l10n.commonSave),
+                  ),
+                ],
+              ),
+              const SizedBox(height: FreshSpacing.sm),
               _MealTotalSummary(items: _items),
               const SizedBox(height: FreshSpacing.md),
               if (_error != null) ...[
@@ -93,101 +134,152 @@ class _MealItemEditorSheetState extends State<MealItemEditorSheet> {
                 ),
                 const SizedBox(height: FreshSpacing.md),
               ],
-              Text(
-                l10n.mealEditorIngredientsSection,
-                style: textTheme.labelLarge?.copyWith(
-                  color: palette.inkMuted,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: FreshSpacing.sm),
-              if (widget.searchFoods != null) ...[
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 160),
-                  child: _addSearchExpanded
-                      ? FoodSearchPanel(
-                          key: ValueKey(
-                            '${widget.keyPrefix}_food_search_panel',
-                          ),
-                          keyPrefix: '${widget.keyPrefix}_food_search',
-                          searchFoods: widget.searchFoods!,
-                          onSelected: (item) {
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        l10n.mealEditorIngredientsSection,
+                        style: textTheme.labelLarge?.copyWith(
+                          color: palette.inkMuted,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: FreshSpacing.xs),
+                      if (widget.searchFoods != null) ...[
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 160),
+                          child: _addSearchExpanded
+                              ? FoodSearchPanel(
+                                  key: ValueKey(
+                                    '${widget.keyPrefix}_food_search_panel',
+                                  ),
+                                  keyPrefix: '${widget.keyPrefix}_food_search',
+                                  searchFoods: widget.searchFoods!,
+                                  onSelected: (item) {
+                                    setState(() {
+                                      final newIndex = _items.length;
+                                      _items.add(
+                                        EditableMealItemController(item),
+                                      );
+                                      _expandedIndex = newIndex;
+                                      _replacementSearchIndex = null;
+                                      _addSearchExpanded = false;
+                                      _error = null;
+                                    });
+                                  },
+                                  onClose: () {
+                                    setState(() => _addSearchExpanded = false);
+                                  },
+                                )
+                              : KeyedSubtree(
+                                  key: ValueKey(
+                                    '${widget.keyPrefix}_food_search_collapsed',
+                                  ),
+                                  child: _CompactSearchAddBar(
+                                    key: ValueKey(
+                                      '${widget.keyPrefix}_add_from_search_button',
+                                    ),
+                                    label: l10n.mealEditorSearchOrAddIngredient,
+                                    onTap: () {
+                                      setState(() {
+                                        _addSearchExpanded = true;
+                                        _replacementSearchIndex = null;
+                                      });
+                                    },
+                                  ),
+                                ),
+                        ),
+                        const SizedBox(height: FreshSpacing.sm),
+                      ],
+                      for (var index = 0; index < _items.length; index++) ...[
+                        _IngredientEditorCard(
+                          key: ValueKey('${widget.keyPrefix}_item_card_$index'),
+                          item: _items[index],
+                          index: index,
+                          keyPrefix: widget.keyPrefix,
+                          searchFoods: widget.searchFoods,
+                          isExpanded: _expandedIndex == index,
+                          isReplacementSearchActive:
+                              _replacementSearchIndex == index,
+                          onExpand: () {
                             setState(() {
-                              _items.add(EditableMealItemController(item));
-                              _addSearchExpanded = false;
+                              _expandedIndex = index;
+                              _replacementSearchIndex = null;
+                            });
+                          },
+                          onReplacementSearchRequested:
+                              widget.searchFoods == null
+                                  ? null
+                                  : () {
+                                      setState(() {
+                                        _expandedIndex = index;
+                                        _replacementSearchIndex = index;
+                                        _addSearchExpanded = false;
+                                      });
+                                    },
+                          onReplacementSearchClosed: () {
+                            setState(() => _replacementSearchIndex = null);
+                          },
+                          onChanged: () {
+                            if (_error != null) {
+                              _error = null;
+                            }
+                            setState(() {});
+                          },
+                          onReplace: (replacement) {
+                            setState(() {
+                              _items[index].dispose();
+                              _items[index] = EditableMealItemController(
+                                replacement,
+                              );
+                              _expandedIndex = index;
+                              _replacementSearchIndex = null;
                               _error = null;
                             });
                           },
-                          onClose: () {
-                            setState(() => _addSearchExpanded = false);
-                          },
-                        )
-                      : Align(
-                          key: ValueKey(
-                            '${widget.keyPrefix}_food_search_collapsed',
-                          ),
-                          alignment: Alignment.centerLeft,
-                          child: OutlinedButton.icon(
-                            key: ValueKey(
-                              '${widget.keyPrefix}_add_from_search_button',
-                            ),
-                            onPressed: () {
-                              setState(() => _addSearchExpanded = true);
-                            },
-                            icon: const Icon(Icons.search_rounded),
-                            label: Text(l10n.mealTemplateEditorAddFromSearch),
-                          ),
+                          onDelete: _items.length == 1
+                              ? null
+                              : () {
+                                  setState(() {
+                                    _items.removeAt(index).dispose();
+                                    if (_expandedIndex == index) {
+                                      _expandedIndex = null;
+                                    } else if (_expandedIndex != null &&
+                                        _expandedIndex! > index) {
+                                      _expandedIndex = _expandedIndex! - 1;
+                                    }
+                                    if (_replacementSearchIndex == index) {
+                                      _replacementSearchIndex = null;
+                                    } else if (_replacementSearchIndex !=
+                                            null &&
+                                        _replacementSearchIndex! > index) {
+                                      _replacementSearchIndex =
+                                          _replacementSearchIndex! - 1;
+                                    }
+                                  });
+                                },
                         ),
-                ),
-                const SizedBox(height: FreshSpacing.md),
-              ],
-              for (var index = 0; index < _items.length; index++) ...[
-                _IngredientEditorCard(
-                  key: ValueKey('${widget.keyPrefix}_item_card_$index'),
-                  item: _items[index],
-                  index: index,
-                  keyPrefix: widget.keyPrefix,
-                  searchFoods: widget.searchFoods,
-                  onChanged: () {
-                    if (_error != null) {
-                      _error = null;
-                    }
-                    setState(() {});
-                  },
-                  onReplace: (replacement) {
-                    setState(() {
-                      _items[index].dispose();
-                      _items[index] = EditableMealItemController(replacement);
-                      _error = null;
-                    });
-                  },
-                  onDelete: _items.length == 1
-                      ? null
-                      : () {
+                        const SizedBox(height: FreshSpacing.sm),
+                      ],
+                      OutlinedButton.icon(
+                        key: ValueKey('add_${widget.keyPrefix}_item_button'),
+                        onPressed: () {
                           setState(() {
-                            _items.removeAt(index).dispose();
+                            final newIndex = _items.length;
+                            _items.add(EditableMealItemController.empty());
+                            _expandedIndex = newIndex;
+                            _replacementSearchIndex = null;
+                            _error = null;
                           });
                         },
+                        icon: const Icon(Icons.add_rounded),
+                        label: Text(l10n.commonAddIngredient),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: FreshSpacing.lg),
-              ],
-              OutlinedButton.icon(
-                key: ValueKey('add_${widget.keyPrefix}_item_button'),
-                onPressed: () {
-                  setState(() {
-                    _items.add(EditableMealItemController.empty());
-                    _error = null;
-                  });
-                },
-                icon: const Icon(Icons.add_rounded),
-                label: Text(l10n.commonAddIngredient),
-              ),
-              const SizedBox(height: FreshSpacing.md),
-              FilledButton.icon(
-                key: ValueKey('save_${widget.keyPrefix}_item_edits_button'),
-                onPressed: _save,
-                icon: const Icon(Icons.check_rounded),
-                label: Text(l10n.commonSaveEdits),
               ),
             ],
           ),
@@ -230,63 +322,67 @@ class _MealTotalSummary extends StatelessWidget {
     ]);
     final palette = context.freshPalette;
     final textTheme = Theme.of(context).textTheme;
-    final caloriesText = Text(
-      context.l10n.caloriesValue(total.calories),
-      style: textTheme.headlineMedium?.copyWith(
-        color: palette.ink,
-        fontWeight: FontWeight.w800,
-      ),
-    );
-    final macrosText = Text(
-      _macroSummary(context, total),
-      textAlign: TextAlign.end,
-      style: textTheme.bodySmall?.copyWith(
-        color: palette.inkSoft,
-        height: 1.25,
-      ),
-    );
-    return Container(
+    return KeyedSubtree(
       key: const ValueKey('meal_editor_total_card'),
-      decoration: BoxDecoration(
-        color: palette.surface,
-        borderRadius: BorderRadius.circular(FreshRadii.md),
-        border: Border.all(color: palette.rule),
+      child: Text(
+        '${context.l10n.caloriesValue(total.calories)}   '
+        '${_compactMacroSummary(context, total)}',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: textTheme.bodyMedium?.copyWith(
+          color: palette.ink,
+          fontWeight: FontWeight.w800,
+          fontFeatures: const [FontFeature.tabularFigures()],
+        ),
       ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            context.l10n.mealEditorMealTotal,
-            style: textTheme.labelLarge?.copyWith(
-              color: palette.limeDeep,
-              fontWeight: FontWeight.w800,
-            ),
+    );
+  }
+}
+
+class _CompactSearchAddBar extends StatelessWidget {
+  const _CompactSearchAddBar({
+    super.key,
+    required this.label,
+    required this.onTap,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.freshPalette;
+    final textTheme = Theme.of(context).textTheme;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(FreshRadii.md),
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(FreshRadii.md),
+            border: Border.all(color: palette.rule),
+            color: palette.surface,
           ),
-          const SizedBox(height: FreshSpacing.xs),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              if (constraints.maxWidth < 260) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    caloriesText,
-                    const SizedBox(height: FreshSpacing.xs),
-                    macrosText,
-                  ],
-                );
-              }
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  caloriesText,
-                  const Spacer(),
-                  Flexible(child: macrosText),
-                ],
-              );
-            },
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          child: Row(
+            children: [
+              Icon(Icons.search_rounded, color: palette.inkMuted, size: 18),
+              const SizedBox(width: FreshSpacing.sm),
+              Expanded(
+                child: Text(
+                  label,
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: palette.inkMuted,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: FreshSpacing.sm),
+              Icon(Icons.add_rounded, color: palette.lime, size: 20),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -299,6 +395,11 @@ class _IngredientEditorCard extends StatelessWidget {
     required this.index,
     required this.keyPrefix,
     required this.searchFoods,
+    required this.isExpanded,
+    required this.isReplacementSearchActive,
+    required this.onExpand,
+    required this.onReplacementSearchRequested,
+    required this.onReplacementSearchClosed,
     required this.onChanged,
     required this.onReplace,
     required this.onDelete,
@@ -308,6 +409,11 @@ class _IngredientEditorCard extends StatelessWidget {
   final int index;
   final String keyPrefix;
   final FoodSearchCallback? searchFoods;
+  final bool isExpanded;
+  final bool isReplacementSearchActive;
+  final VoidCallback onExpand;
+  final VoidCallback? onReplacementSearchRequested;
+  final VoidCallback onReplacementSearchClosed;
   final VoidCallback onChanged;
   final ValueChanged<MealItem> onReplace;
   final VoidCallback? onDelete;
@@ -320,14 +426,21 @@ class _IngredientEditorCard extends StatelessWidget {
     final nutrition = item.currentNutrition();
     final macroCalories = nutrition.macroCalories;
     final hasWarning = nutrition.hasCalorieMismatch;
-    final nameField = TextField(
-      key: ValueKey('${keyPrefix}_item_name_$index'),
+    if (!isExpanded) {
+      return _CompactIngredientRow(
+        item: item,
+        index: index,
+        keyPrefix: keyPrefix,
+        nutrition: nutrition,
+        onTap: onExpand,
+      );
+    }
+
+    final nameField = FreshUnderlineTextField(
+      fieldKey: ValueKey('${keyPrefix}_item_name_$index'),
       controller: item.nameController,
+      placeholder: l10n.commonIngredient,
       onChanged: (_) => onChanged(),
-      decoration: InputDecoration(
-        labelText: l10n.commonIngredient,
-        isDense: true,
-      ),
     );
     final caloriesPill = DecoratedBox(
       decoration: BoxDecoration(
@@ -363,119 +476,75 @@ class _IngredientEditorCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: palette.surface,
         borderRadius: BorderRadius.circular(FreshRadii.md),
+        border: Border.all(color: palette.lime.withValues(alpha: 0.42)),
       ),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              if (constraints.maxWidth < 260) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    nameField,
-                    const SizedBox(height: FreshSpacing.sm),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: caloriesPill,
-                    ),
-                  ],
-                );
-              }
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: nameField),
-                  const SizedBox(width: FreshSpacing.sm),
-                  caloriesPill,
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: FreshSpacing.md),
-          Text(
-            l10n.commonAmount,
-            style: textTheme.labelMedium?.copyWith(
-              color: palette.inkMuted,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: FreshSpacing.xs),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _QuantityStepButton(
-                key: ValueKey('${keyPrefix}_item_decrease_10_$index'),
-                label: item.isGramUnit ? '-10g' : '-1',
-                onPressed: () {
-                  item.adjustQuantity(item.isGramUnit ? -10 : -1);
-                  onChanged();
-                },
-              ),
+              Expanded(child: nameField),
               const SizedBox(width: FreshSpacing.sm),
-              Expanded(
-                child: TextField(
-                  key: ValueKey('${keyPrefix}_item_quantity_field_$index'),
-                  controller: item.quantityController,
-                  onChanged: (_) => onChanged(),
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  textAlign: TextAlign.center,
-                  style: textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                  decoration: const InputDecoration(isDense: true),
-                ),
-              ),
-              const SizedBox(width: FreshSpacing.sm),
-              SizedBox(
-                width: 64,
-                child: TextField(
-                  key: ValueKey('${keyPrefix}_item_unit_$index'),
-                  controller: item.unitController,
-                  onChanged: (_) => onChanged(),
-                  textAlign: TextAlign.center,
-                  decoration: const InputDecoration(isDense: true),
-                ),
-              ),
-              const SizedBox(width: FreshSpacing.sm),
-              _QuantityStepButton(
-                key: ValueKey('${keyPrefix}_item_increase_10_$index'),
-                label: item.isGramUnit ? '+10g' : '+1',
-                onPressed: () {
-                  item.adjustQuantity(item.isGramUnit ? 10 : 1);
-                  onChanged();
-                },
+              caloriesPill,
+              _IngredientOverflowMenu(
+                index: index,
+                keyPrefix: keyPrefix,
+                canReplace: searchFoods != null,
+                canDelete: onDelete != null,
+                onReplaceFood: onReplacementSearchRequested,
+                onEditDetails: () => _showNutritionDetails(context),
+                onDelete: onDelete,
               ),
             ],
           ),
+          const SizedBox(height: FreshSpacing.sm),
+          _CompactAmountStepper(
+            amountFieldKey: ValueKey('${keyPrefix}_item_quantity_field_$index'),
+            unitFieldKey: ValueKey('${keyPrefix}_item_unit_$index'),
+            amountController: item.quantityController,
+            unitController: item.unitController,
+            decrementKey: ValueKey('${keyPrefix}_item_decrease_10_$index'),
+            incrementKey: ValueKey('${keyPrefix}_item_increase_10_$index'),
+            onAmountChanged: (_) => onChanged(),
+            onUnitChanged: (_) => onChanged(),
+            onDecrement: () {
+              item.adjustQuantity(item.isGramUnit ? -10 : -1);
+              onChanged();
+            },
+            onIncrement: () {
+              item.adjustQuantity(item.isGramUnit ? 10 : 1);
+              onChanged();
+            },
+          ),
           if (item.isGramUnit) ...[
             const SizedBox(height: FreshSpacing.sm),
-            Center(
-              child: Wrap(
-                key: ValueKey('${keyPrefix}_item_quantity_presets_$index'),
-                alignment: WrapAlignment.center,
-                runAlignment: WrapAlignment.center,
-                spacing: FreshSpacing.xs,
-                runSpacing: FreshSpacing.xs,
-                children: [
-                  for (final preset in const [50.0, 100.0, 150.0, 200.0])
-                    ActionChip(
-                      key: ValueKey(
-                        '${keyPrefix}_item_quantity_preset_${preset.toInt()}_$index',
-                      ),
-                      label: Text('${preset.toInt()}g'),
-                      onPressed: () {
-                        item.setQuantity(preset);
-                        onChanged();
-                      },
+            Wrap(
+              key: ValueKey('${keyPrefix}_item_quantity_presets_$index'),
+              alignment: WrapAlignment.center,
+              runAlignment: WrapAlignment.center,
+              spacing: FreshSpacing.xs,
+              runSpacing: FreshSpacing.xs,
+              children: [
+                for (final preset in const [50.0, 100.0, 150.0, 200.0])
+                  ActionChip(
+                    key: ValueKey(
+                      '${keyPrefix}_item_quantity_preset_${preset.toInt()}_$index',
                     ),
-                ],
-              ),
+                    label: Text('${preset.toInt()}'),
+                    visualDensity: VisualDensity.compact,
+                    labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+                    padding: EdgeInsets.zero,
+                    onPressed: () {
+                      item.setQuantity(preset);
+                      onChanged();
+                    },
+                  ),
+              ],
             ),
           ],
-          const SizedBox(height: FreshSpacing.md),
+          const SizedBox(height: FreshSpacing.sm),
           NutritionMacroSummaryText(nutrition: nutrition),
           if (hasWarning) ...[
             const SizedBox(height: FreshSpacing.sm),
@@ -485,62 +554,326 @@ class _IngredientEditorCard extends StatelessWidget {
               message: l10n.mealEditorCaloriesMismatchMessage(macroCalories),
             ),
           ],
-          if (searchFoods != null) ...[
+          if (isReplacementSearchActive && searchFoods != null) ...[
             const SizedBox(height: FreshSpacing.sm),
-            _InlineReplacementFoodSearch(
+            FoodSearchPanel(
               key: ValueKey('${keyPrefix}_item_search_$index'),
-              index: index,
-              item: item,
-              keyPrefix: keyPrefix,
+              keyPrefix: '${keyPrefix}_item_${index}_search',
               searchFoods: searchFoods!,
               onSelected: onReplace,
+              onClose: onReplacementSearchClosed,
+              actionLabel: context.l10n.foodSearchReplaceAction,
+              actionIcon: Icons.swap_horiz_rounded,
+              initialQuery: item.nameController.text,
+              closeKeySuffix: 'collapse',
             ),
           ],
-          const SizedBox(height: FreshSpacing.sm),
-          Row(
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showNutritionDetails(BuildContext context) async {
+    final edited = await showModalBottomSheet<NutritionEdit>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (sheetContext) => NutritionEditSheet(
+        initialNutrition: item.currentNutrition(),
+        ingredientName: item.nameController.text.trim(),
+        title: sheetContext.l10n.mealEditorNutritionDetails,
+        subtitleFallback: sheetContext.l10n.commonIngredient,
+        keyPrefix: keyPrefix,
+        index: index,
+        fieldKeySuffix: 'item',
+        saveButtonKeySuffix: 'item_save_details',
+        useMacroFieldStyle: true,
+        useSafeArea: false,
+      ),
+    );
+    if (edited == null) return;
+    item.setNutritionOverride(edited);
+    onChanged();
+  }
+}
+
+class _CompactIngredientRow extends StatelessWidget {
+  const _CompactIngredientRow({
+    required this.item,
+    required this.index,
+    required this.keyPrefix,
+    required this.nutrition,
+    required this.onTap,
+  });
+
+  final EditableMealItemController item;
+  final int index;
+  final String keyPrefix;
+  final NutritionEdit nutrition;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.freshPalette;
+    final textTheme = Theme.of(context).textTheme;
+    final name = item.nameController.text.trim();
+    final title = name.isEmpty ? context.l10n.commonIngredient : name;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: ValueKey('${keyPrefix}_item_compact_$index'),
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(FreshRadii.md),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: palette.surface,
+            borderRadius: BorderRadius.circular(FreshRadii.md),
+            border: Border.all(color: palette.rule),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Flexible(
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton.icon(
-                    key: ValueKey('${keyPrefix}_item_edit_details_$index'),
-                    onPressed: () async {
-                      final edited = await showModalBottomSheet<NutritionEdit>(
-                        context: context,
-                        isScrollControlled: true,
-                        useSafeArea: true,
-                        builder: (sheetContext) => NutritionEditSheet(
-                          initialNutrition: item.currentNutrition(),
-                          ingredientName: item.nameController.text.trim(),
-                          title: sheetContext.l10n.mealEditorNutritionDetails,
-                          subtitleFallback: sheetContext.l10n.commonIngredient,
-                          keyPrefix: keyPrefix,
-                          index: index,
-                          fieldKeySuffix: 'item',
-                          saveButtonKeySuffix: 'item_save_details',
-                          useMacroFieldStyle: true,
-                          useSafeArea: false,
-                        ),
-                      );
-                      if (edited == null) return;
-                      item.setNutritionOverride(edited);
-                      onChanged();
-                    },
-                    icon: const Icon(Icons.tune_rounded, size: 18),
-                    label: Text(
-                      l10n.mealEditorEditDetails,
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
+                      style: textTheme.bodyLarge?.copyWith(
+                        color: palette.ink,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
+                  const SizedBox(width: FreshSpacing.sm),
+                  Flexible(
+                    child: Text(
+                      '${item.quantityController.text.trim()} '
+                      '${item.unitController.text.trim()}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: palette.inkMuted,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: FreshSpacing.sm),
+                  Flexible(
+                    child: Text(
+                      context.l10n.caloriesValue(nutrition.calories),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: palette.ink,
+                        fontWeight: FontWeight.w900,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 3),
+              Text(
+                _compactMacroSummary(context, nutrition),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.bodySmall?.copyWith(
+                  color: palette.inkSoft,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-              IconButton(
-                key: ValueKey('delete_${keyPrefix}_item_$index'),
-                onPressed: onDelete,
-                icon: const Icon(Icons.delete_outline_rounded),
-                tooltip: l10n.commonDeleteIngredient,
-              ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+enum _IngredientOverflowAction { replace, editDetails, delete }
+
+class _IngredientOverflowMenu extends StatelessWidget {
+  const _IngredientOverflowMenu({
+    required this.index,
+    required this.keyPrefix,
+    required this.canReplace,
+    required this.canDelete,
+    required this.onReplaceFood,
+    required this.onEditDetails,
+    required this.onDelete,
+  });
+
+  final int index;
+  final String keyPrefix;
+  final bool canReplace;
+  final bool canDelete;
+  final VoidCallback? onReplaceFood;
+  final VoidCallback onEditDetails;
+  final VoidCallback? onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return PopupMenuButton<_IngredientOverflowAction>(
+      key: ValueKey('${keyPrefix}_item_actions_$index'),
+      tooltip: MaterialLocalizations.of(context).moreButtonTooltip,
+      icon: const Icon(Icons.more_vert_rounded),
+      onSelected: (action) {
+        switch (action) {
+          case _IngredientOverflowAction.replace:
+            onReplaceFood?.call();
+            break;
+          case _IngredientOverflowAction.editDetails:
+            onEditDetails();
+            break;
+          case _IngredientOverflowAction.delete:
+            onDelete?.call();
+            break;
+        }
+      },
+      itemBuilder: (context) => [
+        if (canReplace)
+          PopupMenuItem(
+            key: ValueKey('${keyPrefix}_item_${index}_search_toggle'),
+            value: _IngredientOverflowAction.replace,
+            child: _OverflowMenuRow(
+              icon: Icons.swap_horiz_rounded,
+              label: l10n.mealEditorReplaceFood,
+            ),
+          ),
+        PopupMenuItem(
+          key: ValueKey('${keyPrefix}_item_edit_details_$index'),
+          value: _IngredientOverflowAction.editDetails,
+          child: _OverflowMenuRow(
+            icon: Icons.tune_rounded,
+            label: l10n.mealEditorEditDetails,
+          ),
+        ),
+        PopupMenuItem(
+          key: ValueKey('delete_${keyPrefix}_item_$index'),
+          value: _IngredientOverflowAction.delete,
+          enabled: canDelete,
+          child: _OverflowMenuRow(
+            icon: Icons.delete_outline_rounded,
+            label: l10n.commonDeleteIngredient,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _OverflowMenuRow extends StatelessWidget {
+  const _OverflowMenuRow({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 18),
+        const SizedBox(width: FreshSpacing.sm),
+        Expanded(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CompactAmountStepper extends StatelessWidget {
+  const _CompactAmountStepper({
+    required this.amountFieldKey,
+    required this.unitFieldKey,
+    required this.amountController,
+    required this.unitController,
+    required this.decrementKey,
+    required this.incrementKey,
+    required this.onDecrement,
+    required this.onIncrement,
+    required this.onAmountChanged,
+    required this.onUnitChanged,
+  });
+
+  final Key amountFieldKey;
+  final Key unitFieldKey;
+  final TextEditingController amountController;
+  final TextEditingController unitController;
+  final Key decrementKey;
+  final Key incrementKey;
+  final VoidCallback onDecrement;
+  final VoidCallback onIncrement;
+  final ValueChanged<String> onAmountChanged;
+  final ValueChanged<String> onUnitChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.freshPalette;
+    final textTheme = Theme.of(context).textTheme;
+    final valueStyle = textTheme.titleMedium?.copyWith(
+      color: palette.ink,
+      fontWeight: FontWeight.w900,
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(FreshRadii.md),
+        border: Border.all(color: palette.rule),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      child: Row(
+        children: [
+          _CompactStepperAction(
+            key: decrementKey,
+            label: '−',
+            onPressed: onDecrement,
+          ),
+          Expanded(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 64,
+                  child: TextField(
+                    key: amountFieldKey,
+                    controller: amountController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    textAlign: TextAlign.end,
+                    onChanged: onAmountChanged,
+                    style: valueStyle,
+                    decoration: freshBorderlessInputDecoration(context),
+                  ),
+                ),
+                const SizedBox(width: FreshSpacing.xs),
+                SizedBox(
+                  width: 42,
+                  child: TextField(
+                    key: unitFieldKey,
+                    controller: unitController,
+                    textAlign: TextAlign.start,
+                    onChanged: onUnitChanged,
+                    style: valueStyle?.copyWith(color: palette.inkMuted),
+                    decoration: freshBorderlessInputDecoration(context),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          _CompactStepperAction(
+            key: incrementKey,
+            label: '+',
+            onPressed: onIncrement,
           ),
         ],
       ),
@@ -548,64 +881,8 @@ class _IngredientEditorCard extends StatelessWidget {
   }
 }
 
-class _InlineReplacementFoodSearch extends StatefulWidget {
-  const _InlineReplacementFoodSearch({
-    super.key,
-    required this.index,
-    required this.item,
-    required this.keyPrefix,
-    required this.searchFoods,
-    required this.onSelected,
-  });
-
-  final int index;
-  final EditableMealItemController item;
-  final String keyPrefix;
-  final FoodSearchCallback searchFoods;
-  final ValueChanged<MealItem> onSelected;
-
-  @override
-  State<_InlineReplacementFoodSearch> createState() =>
-      _InlineReplacementFoodSearchState();
-}
-
-class _InlineReplacementFoodSearchState
-    extends State<_InlineReplacementFoodSearch> {
-  bool _expanded = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final searchKeyPrefix = '${widget.keyPrefix}_item_${widget.index}_search';
-    if (!_expanded) {
-      return Align(
-        alignment: Alignment.centerLeft,
-        child: TextButton.icon(
-          key: ValueKey('${searchKeyPrefix}_toggle'),
-          onPressed: () => setState(() => _expanded = true),
-          icon: const Icon(Icons.search_rounded, size: 18),
-          label: Text(context.l10n.foodSearchReplaceSearch),
-        ),
-      );
-    }
-
-    return FoodSearchPanel(
-      keyPrefix: searchKeyPrefix,
-      searchFoods: widget.searchFoods,
-      onSelected: (item) {
-        widget.onSelected(item);
-        setState(() => _expanded = false);
-      },
-      onClose: () => setState(() => _expanded = false),
-      actionLabel: context.l10n.foodSearchReplaceAction,
-      actionIcon: Icons.swap_horiz_rounded,
-      initialQuery: widget.item.nameController.text,
-      closeKeySuffix: 'collapse',
-    );
-  }
-}
-
-class _QuantityStepButton extends StatelessWidget {
-  const _QuantityStepButton({
+class _CompactStepperAction extends StatelessWidget {
+  const _CompactStepperAction({
     super.key,
     required this.label,
     required this.onPressed,
@@ -616,30 +893,23 @@ class _QuantityStepButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = context.freshPalette;
-    return SizedBox(
-      width: 52,
-      height: 48,
-      child: TextButton(
-        onPressed: onPressed,
-        style: TextButton.styleFrom(
-          foregroundColor: palette.limeDeep,
-          overlayColor: palette.lime.withValues(alpha: 0.12),
-          padding: EdgeInsets.zero,
-          minimumSize: const Size(52, 48),
-          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          textStyle: Theme.of(
-            context,
-          ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w800),
-          shape: const StadiumBorder(),
-        ),
-        child: Text(label),
+    return TextButton(
+      onPressed: onPressed,
+      style: TextButton.styleFrom(
+        foregroundColor: context.freshPalette.lime,
+        minimumSize: const Size(40, 40),
+        padding: EdgeInsets.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        textStyle: Theme.of(
+          context,
+        ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
       ),
+      child: Text(label),
     );
   }
 }
 
-String _macroSummary(BuildContext context, NutritionEdit nutrition) {
+String _compactMacroSummary(BuildContext context, NutritionEdit nutrition) {
   final l10n = context.l10n;
   return '${l10n.commonProtein} ${formatMacro(nutrition.proteinGrams)}g · '
       '${l10n.commonCarbs} ${formatMacro(nutrition.carbsGrams)}g · '

@@ -98,49 +98,20 @@ class _CalorieTargetSheetState extends State<CalorieTargetSheet> {
               style: textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
             ),
             const SizedBox(height: FreshSpacing.lg),
-            FreshCard(
-              shadow: false,
-              color: palette.surfaceSoft,
-              padding: const EdgeInsets.all(14),
-              child: Row(
-                children: [
-                  _StepButton(
-                    key: const ValueKey('calorie_target_decrement'),
-                    icon: Icons.remove_rounded,
-                    onTap: () => _step(-50),
-                  ),
-                  const SizedBox(width: FreshSpacing.md),
-                  Expanded(
-                    child: TextField(
-                      key: const ValueKey('dashboard_calorie_target_field'),
-                      controller: _controller,
-                      textAlign: TextAlign.center,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                      ],
-                      style: textTheme.displaySmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                      ),
-                      decoration: InputDecoration(
-                        suffixText: l10n.commonKcal,
-                        errorText: _error,
-                      ),
-                      onChanged: (_) => setState(() {
-                        _source = 'manual';
-                        _error = null;
-                      }),
-                    ),
-                  ),
-                  const SizedBox(width: FreshSpacing.md),
-                  _StepButton(
-                    key: const ValueKey('calorie_target_increment'),
-                    icon: Icons.add_rounded,
-                    onTap: () => _step(50),
-                  ),
-                ],
-              ),
+            FreshGoalInput(
+              decrementKey: const ValueKey('calorie_target_decrement'),
+              incrementKey: const ValueKey('calorie_target_increment'),
+              fieldKey: const ValueKey('dashboard_calorie_target_field'),
+              controller: _controller,
+              unit: l10n.commonKcal,
+              errorText: _error,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              onDecrement: () => _step(-50),
+              onIncrement: () => _step(50),
+              onChanged: (_) => setState(() {
+                _source = 'manual';
+                _error = null;
+              }),
             ),
             const SizedBox(height: FreshSpacing.md),
             TextButton(
@@ -1125,6 +1096,7 @@ List<_WizardOption> _activityOptions(AppLocalizations l10n) => [
     ];
 
 List<BoxShadow> _calorieWizardCardShadow(BuildContext context) {
+  if (Theme.of(context).brightness == Brightness.light) return const [];
   return [
     BoxShadow(
       color: context.freshShadowColor(lightAlpha: 0.05, darkAlpha: 0.36),
@@ -1196,30 +1168,6 @@ List<_WizardOption> _gainPaceOptions(AppLocalizations l10n) => [
         icon: Icons.bolt_rounded,
       ),
     ];
-
-class _StepButton extends StatelessWidget {
-  const _StepButton({
-    super.key,
-    required this.icon,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.l10n;
-    return FreshIconButton(
-      icon: icon,
-      tooltip: icon == Icons.add_rounded
-          ? l10n.calorieTargetIncreaseTooltip
-          : l10n.calorieTargetDecreaseTooltip,
-      onPressed: onTap,
-      backgroundColor: context.freshPalette.surface,
-    );
-  }
-}
 
 class _WizardTopBar extends StatelessWidget {
   const _WizardTopBar({
@@ -1688,18 +1636,19 @@ class _CompactUnitSegment extends StatelessWidget {
             border: Border.all(
               color: selected ? palette.lime : palette.ruleSoft,
             ),
-            boxShadow: selected
-                ? const []
-                : [
-                    BoxShadow(
-                      color: context.freshShadowColor(
-                        lightAlpha: 0.08,
-                        darkAlpha: 0.36,
-                      ),
-                      blurRadius: 16,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
+            boxShadow:
+                selected || Theme.of(context).brightness == Brightness.light
+                    ? const []
+                    : [
+                        BoxShadow(
+                          color: context.freshShadowColor(
+                            lightAlpha: 0.08,
+                            darkAlpha: 0.36,
+                          ),
+                          blurRadius: 16,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
           ),
           child: Text(
             label,

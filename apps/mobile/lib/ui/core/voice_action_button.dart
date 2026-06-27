@@ -92,6 +92,7 @@ class _VoiceActionButtonChromeState extends State<VoiceActionButtonChrome>
         MediaQuery.maybeOf(context)?.disableAnimations ?? false;
     final scale = widget.isRecording ? widget.recordingScale : 1.0;
     final shadowColor = widget.isRecording ? palette.coral : palette.lime;
+    final showShadow = Theme.of(context).brightness == Brightness.dark;
 
     return SizedBox.square(
       dimension: widget.dimension,
@@ -118,14 +119,16 @@ class _VoiceActionButtonChromeState extends State<VoiceActionButtonChrome>
               decoration: BoxDecoration(
                 color: widget.backgroundColor,
                 shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: shadowColor.withValues(alpha: 0.22),
-                    blurRadius: widget.isRecording ? 28 : 22,
-                    offset: const Offset(0, 10),
-                    spreadRadius: widget.isRecording ? 1 : 0,
-                  ),
-                ],
+                boxShadow: showShadow
+                    ? [
+                        BoxShadow(
+                          color: shadowColor.withValues(alpha: 0.22),
+                          blurRadius: widget.isRecording ? 28 : 22,
+                          offset: const Offset(0, 10),
+                          spreadRadius: widget.isRecording ? 1 : 0,
+                        ),
+                      ]
+                    : const [],
               ),
               child: SizedBox.square(
                 dimension: widget.dimension,

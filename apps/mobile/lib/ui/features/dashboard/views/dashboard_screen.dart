@@ -92,8 +92,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _MealSection(
             summary: summary,
             onEditMeal: (meal) => _showMealItemEditor(context, viewModel, meal),
-            onDeleteMeal: (meal) =>
-                _confirmDeleteMeal(context, viewModel, meal),
           ),
           const SizedBox(height: FreshSpacing.lg),
         ],
@@ -114,13 +112,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         meal: meal,
         keyPrefix: 'dashboard',
         searchFoods: viewModel.searchFoods,
+        onDeleteMeal: () => _confirmDeleteMeal(context, viewModel, meal),
       ),
     );
     if (!context.mounted || items == null) return;
     await viewModel.correctMealItems(meal, items);
   }
 
-  Future<void> _confirmDeleteMeal(
+  Future<bool> _confirmDeleteMeal(
     BuildContext context,
     DashboardViewModel viewModel,
     Meal meal,
@@ -142,17 +141,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ],
       ),
     );
-    if (!context.mounted || confirmed != true) return;
+    if (!context.mounted || confirmed != true) return false;
 
     final deleted = await viewModel.deleteMeal(meal);
-    if (!context.mounted) return;
+    if (!context.mounted) return false;
     if (!deleted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(context.l10n.dashboardCouldNotDeleteMeal)),
       );
-      return;
+      return false;
     }
     await context.read<MealHistoryViewModel>().load(forceRefresh: true);
+    return true;
   }
 
   Future<void> _showCalorieTargetSheet(
@@ -791,12 +791,10 @@ class _MealSection extends StatelessWidget {
   const _MealSection({
     required this.summary,
     required this.onEditMeal,
-    required this.onDeleteMeal,
   });
 
   final DailySummary? summary;
   final ValueChanged<Meal> onEditMeal;
-  final ValueChanged<Meal> onDeleteMeal;
 
   @override
   Widget build(BuildContext context) {
@@ -834,7 +832,6 @@ class _MealSection extends StatelessWidget {
               child: _MealRow(
                 meal: meal,
                 onEdit: () => onEditMeal(meal),
-                onDelete: () => onDeleteMeal(meal),
               ),
             ),
       ],
@@ -904,69 +901,67 @@ class _MealRow extends StatelessWidget {
   const _MealRow({
     required this.meal,
     required this.onEdit,
-    required this.onDelete,
   });
 
   final Meal meal;
   final VoidCallback onEdit;
-  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final palette = context.freshPalette;
     final l10n = context.l10n;
-    return Container(
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: palette.rule, width: 1),
-        ),
-      ),
-      padding: const EdgeInsets.symmetric(vertical: FreshSpacing.md),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (meal.mealLabel != null) ...[
-                  _MealLabelChip(label: meal.mealLabel!),
-                  const SizedBox(height: FreshSpacing.xs),
-                ],
-                Text(
-                  meal.title,
-                  style: textTheme.bodyLarge?.copyWith(
-                    color: palette.ink,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                Text(
-                  l10n.caloriesValue(meal.nutrition.calories),
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: palette.inkMuted,
-                  ),
-                ),
-              ],
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: ValueKey('dashboard_meal_row_${meal.id}'),
+        onTap: onEdit,
+        borderRadius: BorderRadius.circular(FreshRadii.sm),
+        child: Ink(
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: palette.rule, width: 1),
             ),
           ),
-          const SizedBox(width: FreshSpacing.sm),
-          FreshIconButton(
-            key: ValueKey('dashboard_delete_meal_${meal.id}'),
-            icon: Icons.delete_outline_rounded,
-            tooltip: l10n.dashboardDeleteMealTooltip,
-            foregroundColor: palette.coral,
-            size: 40,
-            onPressed: onDelete,
+          padding: const EdgeInsets.symmetric(vertical: FreshSpacing.md),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (meal.mealLabel != null) ...[
+                      _MealLabelChip(label: meal.mealLabel!),
+                      const SizedBox(height: FreshSpacing.xs),
+                    ],
+                    Text(
+                      meal.title,
+                      style: textTheme.bodyLarge?.copyWith(
+                        color: palette.ink,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: FreshSpacing.sm),
+              Text(
+                l10n.caloriesValue(meal.nutrition.calories),
+                style: textTheme.bodyMedium?.copyWith(
+                  color: palette.ink,
+                  fontWeight: FontWeight.w800,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+              const SizedBox(width: FreshSpacing.sm),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: palette.inkMuted,
+                size: 22,
+              ),
+            ],
           ),
-          const SizedBox(width: FreshSpacing.xs),
-          FreshIconButton(
-            key: ValueKey('dashboard_edit_meal_${meal.id}'),
-            icon: Icons.edit_rounded,
-            tooltip: l10n.dashboardEditIngredientsTooltip,
-            size: 40,
-            onPressed: onEdit,
-          ),
-        ],
+        ),
       ),
     );
   }

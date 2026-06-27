@@ -1,7 +1,11 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:cal_tracker_mobile/data/repositories/nutrition_repository.dart';
+import 'package:cal_tracker_mobile/data/services/app_preferences_storage.dart';
+import 'package:cal_tracker_mobile/data/services/nutrition_cache_store.dart';
 import 'package:cal_tracker_mobile/domain/models/macro_distribution.dart';
+import 'package:cal_tracker_mobile/domain/models/nutrition_models.dart';
 import 'package:cal_tracker_mobile/generated/api/cal_tracker_api.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -16,6 +20,90 @@ void main() {
   });
 
   group('NutritionRepository', () {
+    test(
+      'dedupes in-flight usual foods refresh and writes through cache',
+      () async {
+        final apiClient = MockCalTrackerApiClient();
+        final cacheStore = NutritionCacheStore(
+          storage: _MemoryPreferencesStorage(),
+          now: () => DateTime.utc(2026, 5, 10, 12),
+        );
+        final repository = NutritionRepository(
+          apiClient: apiClient,
+          cacheStore: cacheStore,
+        )..activateCacheForUser('user-a');
+        final response = Completer<Map<String, Object?>>();
+        when(
+          () => apiClient.getUsualFoods(),
+        ).thenAnswer((_) => response.future);
+
+        final firstRefresh = repository.refreshUsualFoods();
+        final secondRefresh = repository.refreshUsualFoods();
+
+        verify(() => apiClient.getUsualFoods()).called(1);
+
+        response.complete({
+          'output': {
+            'usualFoods': [_usualFoodJson('food-fresh', name: 'Fresh rice')],
+          },
+        });
+
+        final results = await Future.wait([firstRefresh, secondRefresh]);
+
+        expect(results[0].single.id, 'food-fresh');
+        expect(results[1].single.name, 'Fresh rice');
+        final cached = await repository.cachedUsualFoods();
+        expect(cached?.value.single.id, 'food-fresh');
+      },
+    );
+
+    test(
+      'uses cached usual foods during cooldown and force bypasses it',
+      () async {
+        final apiClient = MockCalTrackerApiClient();
+        var now = DateTime.utc(2026, 5, 10, 12);
+        var backendCalls = 0;
+        final cacheStore = NutritionCacheStore(
+          storage: _MemoryPreferencesStorage(),
+          now: () => now,
+        );
+        final repository = NutritionRepository(
+          apiClient: apiClient,
+          cacheStore: cacheStore,
+          backgroundRefreshCooldown: const Duration(minutes: 1),
+          now: () => now,
+        )..activateCacheForUser('user-a');
+        when(() => apiClient.getUsualFoods()).thenAnswer((_) async {
+          backendCalls += 1;
+          return {
+            'output': {
+              'usualFoods': [
+                _usualFoodJson(
+                  'food-$backendCalls',
+                  name: 'Food $backendCalls',
+                ),
+              ],
+            },
+          };
+        });
+
+        final first = await repository.refreshUsualFoods();
+        final cooledDown = await repository.refreshUsualFoods();
+        now = now.add(const Duration(seconds: 10));
+        final forced = await repository.refreshUsualFoods(force: true);
+
+        expect(first.single.id, 'food-1');
+        expect(cooledDown.single.id, 'food-1');
+        expect(forced.single.id, 'food-2');
+        expect(backendCalls, 2);
+        verify(() => apiClient.getUsualFoods()).called(2);
+        expect(
+          (await repository.cachedUsualFoods())?.value.single.id,
+          'food-2',
+        );
+      },
+    );
+
     test('parses all 10 food candidates from agent options', () async {
       final apiClient = MockCalTrackerApiClient();
       final repository = NutritionRepository(apiClient: apiClient);
@@ -470,4 +558,43 @@ void main() {
       expect(summary.waterConsumedLiters, 1.25);
     });
   });
+}
+
+class _MemoryPreferencesStorage implements AppPreferencesStorage {
+  final values = <String, String>{};
+
+  @override
+  Future<String?> readString(String key) async => values[key];
+
+  @override
+  Future<void> writeString(String key, String value) async {
+    values[key] = value;
+  }
+
+  @override
+  Future<void> remove(String key) async {
+    values.remove(key);
+  }
+
+  @override
+  Future<Set<String>> readKeys() async => values.keys.toSet();
+
+  @override
+  Future<void> removeWhere(bool Function(String key) test) async {
+    values.removeWhere((key, value) => test(key));
+  }
+}
+
+Map<String, Object?> _usualFoodJson(String id, {required String name}) {
+  return UsualFood(
+    id: id,
+    name: name,
+    servingGrams: 100,
+    nutrition: const NutritionSnapshot(
+      calories: 130,
+      proteinGrams: 2.7,
+      carbsGrams: 28,
+      fatGrams: 0.3,
+    ),
+  ).toJson();
 }

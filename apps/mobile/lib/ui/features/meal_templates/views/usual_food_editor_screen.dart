@@ -107,9 +107,8 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
 
     final isWaitingForEditFood =
         _isEditing && food == null && (viewModel.isLoading || !_loadComplete);
-    final title = _isEditing
-        ? l10n.usualFoodsEditTitle
-        : l10n.usualFoodsCreateTitle;
+    final title =
+        _isEditing ? l10n.usualFoodsEditTitle : l10n.usualFoodsCreateTitle;
     return Scaffold(
       backgroundColor: context.freshPalette.screen,
       body: SafeArea(
@@ -143,8 +142,8 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
                   child: isWaitingForEditFood
                       ? const Center(child: CircularProgressIndicator())
                       : food == null && _isEditing
-                      ? _NotFoundState(onBack: _leaveEditor)
-                      : _buildForm(viewModel, food),
+                          ? _NotFoundState(onBack: _leaveEditor)
+                          : _buildForm(viewModel, food),
                 ),
                 if (!isWaitingForEditFood && (food != null || !_isEditing))
                   _BottomSaveBar(
@@ -342,16 +341,31 @@ class _UsualFoodEditorScreenState extends State<UsualFoodEditorScreen> {
     TextInputAction? textInputAction,
     bool autofocus = false,
   }) {
+    final palette = context.freshPalette;
+    final textTheme = Theme.of(context).textTheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: FreshSpacing.md),
-      child: TextFormField(
-        key: ValueKey(key),
-        controller: controller,
-        autofocus: autofocus,
-        keyboardType: keyboardType,
-        textInputAction: textInputAction,
-        validator: validator,
-        decoration: InputDecoration(labelText: label),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            label,
+            style: textTheme.labelMedium?.copyWith(
+              color: palette.inkMuted,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: FreshSpacing.xs),
+          TextFormField(
+            key: ValueKey(key),
+            controller: controller,
+            autofocus: autofocus,
+            keyboardType: keyboardType,
+            textInputAction: textInputAction,
+            validator: validator,
+            decoration: freshUnderlineInputDecoration(context),
+          ),
+        ],
       ),
     );
   }
@@ -566,10 +580,10 @@ class _EditorSection extends StatelessWidget {
         Text(
           title,
           style: Theme.of(context).textTheme.titleSmall?.copyWith(
-            color: palette.ink,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.2,
-          ),
+                color: palette.ink,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.2,
+              ),
         ),
         const SizedBox(height: FreshSpacing.md),
         child,
@@ -602,9 +616,9 @@ class _OptionalNutrientsSection extends StatelessWidget {
             title: Text(
               context.l10n.usualFoodsOptionalSectionTitle,
               style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                color: palette.ink,
-                fontWeight: FontWeight.w700,
-              ),
+                    color: palette.ink,
+                    fontWeight: FontWeight.w700,
+                  ),
             ),
             subtitle: Text(
               context.l10n.usualFoodsOptionalSectionSubtitle,
@@ -690,10 +704,7 @@ class _BottomSaveBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
     return DecoratedBox(
-      decoration: BoxDecoration(
-        color: palette.screen,
-        border: Border(top: BorderSide(color: palette.rule)),
-      ),
+      decoration: BoxDecoration(color: palette.screen),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
         child: Row(
@@ -781,15 +792,15 @@ class _ScanFromPhotoCta extends StatelessWidget {
                       Text(
                         l10n.usualFoodsScanTitle,
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
+                              fontWeight: FontWeight.w700,
+                            ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         l10n.usualFoodsScanHint,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: palette.inkMuted,
-                        ),
+                              color: palette.inkMuted,
+                            ),
                       ),
                     ],
                   ),

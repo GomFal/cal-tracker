@@ -4,7 +4,7 @@ import 'app_preferences_storage.dart';
 
 class AppPreferencesRepository {
   const AppPreferencesRepository({required AppPreferencesStorage storage})
-      : _storage = storage;
+    : _storage = storage;
 
   static const _themeModeKey = 'theme_mode';
   static const _themeModeLight = 'light';
@@ -18,6 +18,7 @@ class AppPreferencesRepository {
   Future<ThemeMode> loadThemeMode() async {
     final value = await _storage.readString(_themeModeKey);
     return switch (value) {
+      _themeModeLight => ThemeMode.light,
       _themeModeDark => ThemeMode.dark,
       _themeModeSystem => ThemeMode.system,
       _ => ThemeMode.system,

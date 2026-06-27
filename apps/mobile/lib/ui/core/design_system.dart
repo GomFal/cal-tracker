@@ -223,10 +223,7 @@ extension FreshPaletteLookup on BuildContext {
     if (!isDark) return const [];
     return [
       BoxShadow(
-        color: freshShadowColor(
-          lightAlpha: lightAlpha,
-          darkAlpha: darkAlpha,
-        ),
+        color: freshShadowColor(lightAlpha: lightAlpha, darkAlpha: darkAlpha),
         blurRadius: isDark ? blurRadius * 0.65 : blurRadius,
         offset: isDark ? Offset(offset.dx, offset.dy * 0.55) : offset,
       ),
@@ -359,7 +356,7 @@ class FreshHeader extends StatelessWidget {
                 title,
                 style: textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w800,
-                  letterSpacing: -0.6,
+                  letterSpacing: 0,
                   color: palette.ink,
                 ),
               ),
@@ -600,9 +597,7 @@ class FreshStatusBanner extends StatelessWidget {
                 const SizedBox(height: FreshSpacing.xs),
                 Text(
                   message!,
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: palette.inkSoft,
-                  ),
+                  style: textTheme.bodyMedium?.copyWith(color: palette.inkSoft),
                 ),
               ],
               if (action != null) ...[
@@ -753,11 +748,7 @@ class FreshMiniBars extends StatelessWidget {
 }
 
 class FreshFoodStack extends StatelessWidget {
-  const FreshFoodStack({
-    super.key,
-    this.assets = const [],
-    this.size = 38,
-  });
+  const FreshFoodStack({super.key, this.assets = const [], this.size = 38});
 
   final List<String> assets;
   final double size;
@@ -845,11 +836,7 @@ class FreshEmptyState extends StatelessWidget {
 }
 
 class FreshSectionTitle extends StatelessWidget {
-  const FreshSectionTitle({
-    super.key,
-    required this.title,
-    this.trailing,
-  });
+  const FreshSectionTitle({super.key, required this.title, this.trailing});
 
   final String title;
   final Widget? trailing;
@@ -859,10 +846,7 @@ class FreshSectionTitle extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-          child: Text(
-            title,
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
+          child: Text(title, style: Theme.of(context).textTheme.titleLarge),
         ),
         if (trailing != null) trailing!,
       ],

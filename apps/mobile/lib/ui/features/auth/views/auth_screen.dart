@@ -81,46 +81,37 @@ class _AuthScreenState extends State<AuthScreen> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           if (_registerMode) ...[
-                            TextField(
-                              key: const ValueKey('display_name_field'),
+                            FreshUnderlineTextField(
+                              fieldKey: const ValueKey('display_name_field'),
+                              label: l10n.authNameLabel,
                               controller: _nameController,
                               onChanged: (_) =>
                                   _clearErrors(name: true, remote: true),
-                              decoration: InputDecoration(
-                                labelText: l10n.authNameLabel,
-                                errorText: _nameError,
-                                prefixIcon: const Icon(Icons.person_outline),
-                              ),
+                              errorText: _nameError,
+                              prefix: const Icon(Icons.person_outline),
                             ),
                             const SizedBox(height: FreshSpacing.md),
                           ],
-                          TextField(
-                            key: const ValueKey('email_field'),
+                          FreshUnderlineTextField(
+                            fieldKey: const ValueKey('email_field'),
+                            label: l10n.authEmailLabel,
                             controller: _emailController,
                             keyboardType: TextInputType.emailAddress,
                             onChanged: (_) =>
                                 _clearErrors(email: true, remote: true),
-                            decoration: InputDecoration(
-                              labelText: l10n.authEmailLabel,
-                              errorText: _emailError,
-                              prefixIcon: const Icon(
-                                Icons.alternate_email_rounded,
-                              ),
-                            ),
+                            errorText: _emailError,
+                            prefix: const Icon(Icons.alternate_email_rounded),
                           ),
                           const SizedBox(height: FreshSpacing.md),
-                          TextField(
-                            key: const ValueKey('password_field'),
+                          FreshUnderlineTextField(
+                            fieldKey: const ValueKey('password_field'),
+                            label: l10n.authPasswordLabel,
                             controller: _passwordController,
                             obscureText: true,
                             onChanged: (_) =>
                                 _clearErrors(password: true, remote: true),
-                            decoration: InputDecoration(
-                              labelText: l10n.authPasswordLabel,
-                              errorText: _passwordError,
-                              prefixIcon:
-                                  const Icon(Icons.lock_outline_rounded),
-                            ),
+                            errorText: _passwordError,
+                            prefix: const Icon(Icons.lock_outline_rounded),
                           ),
                           const SizedBox(height: FreshSpacing.lg),
                           FilledButton.icon(
@@ -161,8 +152,10 @@ class _AuthScreenState extends State<AuthScreen> {
                             const SizedBox(height: FreshSpacing.sm),
                             FreshStatusBanner(
                               icon: Icons.error_outline_rounded,
-                              title:
-                                  _authErrorTitle(l10n, viewModel.errorSource),
+                              title: _authErrorTitle(
+                                l10n,
+                                viewModel.errorSource,
+                              ),
                               message: viewModel.error!,
                               color: palette.coral,
                             ),
@@ -190,13 +183,14 @@ class _AuthScreenState extends State<AuthScreen> {
     final nextNameError = _registerMode && displayName.isEmpty
         ? l10n.authNameRequiredError
         : null;
-    final nextEmailError =
-        _isValidEmail(email) ? null : l10n.authEmailInvalidError;
+    final nextEmailError = _isValidEmail(email)
+        ? null
+        : l10n.authEmailInvalidError;
     final nextPasswordError = password.isEmpty
         ? l10n.authPasswordRequiredError
         : _registerMode && password.length < 8
-            ? l10n.authPasswordTooShortError
-            : null;
+        ? l10n.authPasswordTooShortError
+        : null;
 
     setState(() {
       _nameError = nextNameError;
@@ -508,9 +502,7 @@ class _LoginHeroCarouselState extends State<_LoginHeroCarousel>
                     top: height < 340 ? 22 : 28,
                     child: Align(
                       alignment: Alignment.centerLeft,
-                      child: _HeroHeadline(
-                        text: context.l10n.authHeroHeadline,
-                      ),
+                      child: _HeroHeadline(text: context.l10n.authHeroHeadline),
                     ),
                   ),
                 ],
@@ -532,11 +524,11 @@ class _HeroHeadline extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
     final baseStyle = Theme.of(context).textTheme.displayLarge?.copyWith(
-          color: palette.ink,
-          fontSize: 38,
-          fontWeight: FontWeight.w800,
-          height: 1.08,
-        );
+      color: palette.ink,
+      fontSize: 38,
+      fontWeight: FontWeight.w800,
+      height: 1.08,
+    );
     final split = _splitHighlight(text);
     return Text.rich(
       TextSpan(

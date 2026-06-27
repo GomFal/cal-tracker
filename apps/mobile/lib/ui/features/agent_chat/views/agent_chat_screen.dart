@@ -94,9 +94,8 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
                             key: const ValueKey('agent_chat_history_button'),
                             icon: Icons.history_rounded,
                             tooltip: context.l10n.agentChatHistoryTooltip,
-                            onPressed: () => unawaited(
-                              _showConversationHistory(context),
-                            ),
+                            onPressed: () =>
+                                unawaited(_showConversationHistory(context)),
                           ),
                         ],
                       ),
@@ -283,14 +282,16 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
                     const SizedBox(height: FreshSpacing.md),
                     if (conversations.isEmpty && model.isLoadingHistory)
                       const Padding(
-                        padding:
-                            EdgeInsets.symmetric(vertical: FreshSpacing.xl),
+                        padding: EdgeInsets.symmetric(
+                          vertical: FreshSpacing.xl,
+                        ),
                         child: Center(child: CircularProgressIndicator()),
                       )
                     else if (conversations.isEmpty)
                       Padding(
                         padding: const EdgeInsets.symmetric(
-                            vertical: FreshSpacing.xl),
+                          vertical: FreshSpacing.xl,
+                        ),
                         child: Text(context.l10n.agentChatHistoryEmpty),
                       )
                     else
@@ -454,26 +455,19 @@ class _UserBubble extends StatelessWidget {
       alignment: Alignment.centerRight,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 320),
-        child: DecoratedBox(
+        child: Padding(
           key: const ValueKey('agent_user_message'),
-          decoration: BoxDecoration(
-            border: Border(
-              right: BorderSide(color: palette.limeDeep, width: 3),
-            ),
+          padding: const EdgeInsets.symmetric(
+            horizontal: FreshSpacing.md,
+            vertical: FreshSpacing.sm,
           ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: FreshSpacing.md,
-              vertical: FreshSpacing.sm,
-            ),
-            child: Text(
-              text,
-              textAlign: TextAlign.right,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: palette.ink,
-                    fontWeight: FontWeight.w600,
-                  ),
-            ),
+          child: Text(
+            text,
+            textAlign: TextAlign.right,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: palette.ink,
+                  fontWeight: FontWeight.w600,
+                ),
           ),
         ),
       ),
@@ -847,9 +841,9 @@ class _UsualFoodDraftReview extends StatelessWidget {
     if (!context.mounted || saved == null) return;
     final message = context.l10n.agentChatUsualFoodSaved(saved.name);
     context.read<AgentChatViewModel>().markEntryCompleted(entryId, message);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }
 
@@ -939,9 +933,9 @@ class _UsualMealDraftReview extends StatelessWidget {
     if (!context.mounted || saved == null) return;
     final message = context.l10n.agentChatUsualMealSaved(saved.title);
     context.read<AgentChatViewModel>().markEntryCompleted(entryId, message);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }
 
@@ -1339,7 +1333,8 @@ class _AgentInputBar extends StatelessWidget {
                   maxLines: 4,
                   textInputAction: TextInputAction.send,
                   enabled: !viewModel.isBusy && !isRecording,
-                  decoration: InputDecoration(
+                  decoration: freshUnderlineInputDecoration(
+                    context,
                     hintText: context.l10n.agentChatInputHint,
                   ),
                   onSubmitted: (_) => onSubmitted(),

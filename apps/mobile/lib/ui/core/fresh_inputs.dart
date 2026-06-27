@@ -22,6 +22,8 @@ class FreshUnderlineTextField extends StatelessWidget {
     this.maxLines = 1,
     this.minLines,
     this.readOnly = false,
+    this.enabled = true,
+    this.obscureText = false,
     this.onChanged,
     this.onSubmitted,
   });
@@ -45,6 +47,8 @@ class FreshUnderlineTextField extends StatelessWidget {
   final int? maxLines;
   final int? minLines;
   final bool readOnly;
+  final bool enabled;
+  final bool obscureText;
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
 
@@ -77,9 +81,12 @@ class FreshUnderlineTextField extends StatelessWidget {
           maxLines: maxLines,
           minLines: minLines,
           readOnly: readOnly,
+          enabled: enabled,
+          obscureText: obscureText,
           onChanged: onChanged,
           onSubmitted: onSubmitted,
-          style: style ??
+          style:
+              style ??
               textTheme.bodyLarge?.copyWith(
                 color: palette.ink,
                 fontWeight: FontWeight.w600,
@@ -154,7 +161,8 @@ class FreshNumberUnitField extends StatelessWidget {
       focusColor: focusColor,
       errorText: errorText,
       onChanged: onChanged,
-      style: style ??
+      style:
+          style ??
           textTheme.bodyLarge?.copyWith(
             color: palette.ink,
             fontWeight: FontWeight.w700,
@@ -427,11 +435,11 @@ class FreshGoalInput extends StatelessWidget {
                 onChanged: onChanged,
                 style: (textTheme.displayMedium ?? textTheme.displaySmall)
                     ?.copyWith(
-                  color: palette.ink,
-                  fontWeight: FontWeight.w800,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                  letterSpacing: -1.2,
-                ),
+                      color: palette.ink,
+                      fontWeight: FontWeight.w800,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                      letterSpacing: 0,
+                    ),
                 suffix: Text(
                   unit,
                   style: textTheme.titleLarge?.copyWith(
@@ -514,11 +522,11 @@ class FreshSteppedValueInput extends StatelessWidget {
                       key: valueKey,
                       style: (textTheme.displayMedium ?? textTheme.displaySmall)
                           ?.copyWith(
-                        color: palette.ink,
-                        fontWeight: FontWeight.w800,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                        letterSpacing: -1.2,
-                      ),
+                            color: palette.ink,
+                            fontWeight: FontWeight.w800,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                            letterSpacing: 0,
+                          ),
                     ),
                     const SizedBox(width: FreshSpacing.sm),
                     Padding(
@@ -700,9 +708,9 @@ class _FreshInlineTextAction extends StatelessWidget {
         padding: EdgeInsets.symmetric(horizontal: large ? 12 : 6),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         textStyle: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w900,
-              fontSize: large ? 28 : null,
-            ),
+          fontWeight: FontWeight.w900,
+          fontSize: large ? 28 : null,
+        ),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(FreshRadii.sm),
         ),

@@ -1,6 +1,9 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+part 'fresh_inputs.dart';
 
 class FreshColors {
   const FreshColors._();
@@ -53,26 +56,26 @@ class FreshPalette extends ThemeExtension<FreshPalette> {
   });
 
   static const light = FreshPalette(
-    appBg: FreshColors.appBg,
-    screen: FreshColors.screen,
-    surface: FreshColors.surface,
-    surfaceSoft: FreshColors.surfaceSoft,
-    surfaceMuted: FreshColors.surfaceMuted,
-    ink: FreshColors.ink,
-    inkSoft: FreshColors.inkSoft,
-    inkMuted: FreshColors.inkMuted,
-    rule: FreshColors.rule,
-    ruleSoft: FreshColors.ruleSoft,
-    lime: FreshColors.lime,
-    limeDeep: FreshColors.limeDeep,
-    limeSoft: FreshColors.limeSoft,
-    limeWash: FreshColors.limeWash,
-    leaf: FreshColors.leaf,
-    water: FreshColors.water,
-    orange: FreshColors.orange,
-    mint: FreshColors.mint,
-    coral: FreshColors.coral,
-    yellow: FreshColors.yellow,
+    appBg: Color(0xfff7f8f2),
+    screen: Color(0xffffffff),
+    surface: Color(0xffffffff),
+    surfaceSoft: Color(0xfff4f5ef),
+    surfaceMuted: Color(0xffe9ebe2),
+    ink: Color(0xff10120d),
+    inkSoft: Color(0xff393d33),
+    inkMuted: Color(0xff74796d),
+    rule: Color(0xffdde1d4),
+    ruleSoft: Color(0xffecefe5),
+    lime: Color(0xff8fbd20),
+    limeDeep: Color(0xff5f850f),
+    limeSoft: Color(0xffe7f5c4),
+    limeWash: Color(0xfff3fae4),
+    leaf: Color(0xff407f19),
+    water: Color(0xff087fa0),
+    orange: Color(0xffb85f14),
+    mint: Color(0xff238f67),
+    coral: Color(0xffd5485a),
+    yellow: Color(0xff846000),
   );
 
   static const dark = FreshPalette(
@@ -217,6 +220,7 @@ extension FreshPaletteLookup on BuildContext {
     required Offset offset,
   }) {
     final isDark = Theme.of(this).brightness == Brightness.dark;
+    if (!isDark) return const [];
     return [
       BoxShadow(
         color: freshShadowColor(

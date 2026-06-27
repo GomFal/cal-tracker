@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -12,8 +13,13 @@ import '../../../core/design_system.dart';
 import '../view_models/voice_log_helpers.dart';
 import '../view_models/voice_log_view_model.dart';
 import '../../../shared/editable_meal_item_controller.dart';
+import '../../../shared/meal_item_editor_sheet.dart';
 import '../../../shared/nutrition_edit_components.dart' hide normalizedText;
 import '../../../shared/nutrition_edit_sheet.dart';
+
+part 'widgets/voice_transcript_card.dart';
+part 'widgets/voice_status_banners.dart';
+part 'widgets/voice_summary_cards.dart';
 
 class MealCreateScreen extends StatefulWidget {
   const MealCreateScreen({super.key, this.initialItems = const []});
@@ -182,15 +188,41 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
   ) async {
     final proposal = viewModel.proposal;
     if (proposal == null) return;
+    final proposalMeal = Meal(
+      id: proposal.id,
+      title: proposal.title,
+      occurredAt: DateTime.now(),
+      nutrition: proposal.nutrition,
+      items: proposal.items,
+    );
+    final candidateGroups = viewModel.candidateGroups ?? const [];
     final items = await showModalBottomSheet<List<MealItem>>(
       context: context,
       isScrollControlled: true,
-      builder: (context) => _ProposalEditorSheet(
-        proposal: proposal,
-        candidateGroups: viewModel.candidateGroups ?? const [],
+      useSafeArea: true,
+      builder: (context) => MealItemEditorSheet(
+        meal: proposalMeal,
+        keyPrefix: 'proposal',
+        searchFoods: viewModel.searchFoods,
+        initiallyExpandFirst: true,
+        ensureInitialItem: proposal.items.isNotEmpty,
+        itemHeaderBuilder: (context, item, index, onReplace) {
+          final candidates = _candidateOptionsForProposalItem(
+            item.original,
+            candidateGroups,
+          );
+          if (candidates.isEmpty) return null;
+          return _CandidateSwapStrip(
+            index: index,
+            candidates: candidates,
+            selectedItem: item.original,
+            onSelected: onReplace,
+          );
+        },
       ),
     );
     if (items == null || !context.mounted) return;
+    if (mealItemListsMateriallyEqual(proposal.items, items)) return;
     await viewModel.updateProposalItems(items);
   }
 
@@ -251,53 +283,6 @@ bool _canStartOver(VoiceLogViewModel viewModel) {
     VoiceLogState.agentRunning => false,
     _ => true,
   };
-}
-
-class _VoiceTranscriptCard extends StatelessWidget {
-  const _VoiceTranscriptCard({required this.transcript});
-
-  final String transcript;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.freshPalette;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Padding(
-      key: const ValueKey('voice_transcript_card'),
-      padding: const EdgeInsets.symmetric(
-        horizontal: FreshSpacing.xs,
-        vertical: FreshSpacing.xs,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.graphic_eq_rounded, color: palette.limeDeep, size: 18),
-          const SizedBox(width: FreshSpacing.sm),
-          Text(
-            context.l10n.voiceTranscriptHeardLabel,
-            style: textTheme.labelLarge?.copyWith(
-              color: palette.inkMuted,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(width: FreshSpacing.sm),
-          Expanded(
-            child: Text(
-              transcript,
-              style: textTheme.bodySmall?.copyWith(
-                color: palette.inkSoft,
-                height: 1.25,
-                letterSpacing: 0,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _ManualFoodSearchPanel extends StatefulWidget {
@@ -372,7 +357,7 @@ class _ManualFoodSearchPanelState extends State<_ManualFoodSearchPanel> {
               ),
             ),
           ),
-          Divider(color: palette.ruleSoft, height: FreshSpacing.lg),
+          const SizedBox(height: FreshSpacing.lg),
           Row(
             children: [
               Icon(Icons.search_rounded, color: palette.inkMuted, size: 20),
@@ -425,7 +410,7 @@ class _ManualFoodSearchPanelState extends State<_ManualFoodSearchPanel> {
                 },
               ),
               if (index != _items.length - 1)
-                const Divider(height: FreshSpacing.lg),
+                const SizedBox(height: FreshSpacing.lg),
             ],
             const SizedBox(height: FreshSpacing.md),
             FilledButton.icon(
@@ -524,38 +509,54 @@ class _ManualDraftIngredientRow extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          TextField(
-            key: ValueKey('manual_food_item_name_$index'),
+          FreshUnderlineTextField(
+            fieldKey: ValueKey('manual_food_item_name_$index'),
+            label: context.l10n.foodSearchName,
             controller: item.nameController,
             onChanged: (_) => onChanged(),
-            decoration: InputDecoration(labelText: context.l10n.foodSearchName),
           ),
           const SizedBox(height: FreshSpacing.sm),
           Row(
             children: [
               Expanded(
-                child: TextField(
-                  key: ValueKey('manual_food_item_quantity_$index'),
-                  controller: item.quantityController,
-                  onChanged: (_) => onChanged(),
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  decoration: InputDecoration(
-                    labelText: context.l10n.foodSearchQuantity,
-                  ),
-                ),
-              ),
-              const SizedBox(width: FreshSpacing.sm),
-              SizedBox(
-                width: 82,
-                child: TextField(
-                  key: ValueKey('manual_food_item_unit_$index'),
-                  controller: item.unitController,
-                  onChanged: (_) => onChanged(),
-                  decoration: InputDecoration(
-                    labelText: context.l10n.foodSearchUnit,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      context.l10n.foodSearchQuantity,
+                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: context.freshPalette.inkMuted,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: FreshSpacing.xs),
+                    FreshInlineAmountStepper(
+                      amountFieldKey: ValueKey(
+                        'manual_food_item_quantity_$index',
+                      ),
+                      unitFieldKey: ValueKey('manual_food_item_unit_$index'),
+                      amountController: item.quantityController,
+                      unitController: item.unitController,
+                      decrementKey: ValueKey(
+                        'manual_food_item_decrease_10_$index',
+                      ),
+                      incrementKey: ValueKey(
+                        'manual_food_item_increase_10_$index',
+                      ),
+                      decrementLabel: item.isGramUnit ? '−10g' : '−1',
+                      incrementLabel: item.isGramUnit ? '+10g' : '+1',
+                      onAmountChanged: (_) => onChanged(),
+                      onUnitChanged: (_) => onChanged(),
+                      onDecrement: () {
+                        item.adjustQuantity(item.isGramUnit ? -10 : -1);
+                        onChanged();
+                      },
+                      onIncrement: () {
+                        item.adjustQuantity(item.isGramUnit ? 10 : 1);
+                        onChanged();
+                      },
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(width: FreshSpacing.sm),
@@ -564,28 +565,6 @@ class _ManualDraftIngredientRow extends StatelessWidget {
                 onPressed: onDelete,
                 icon: const Icon(Icons.delete_outline_rounded),
                 tooltip: context.l10n.foodSearchRemoveDraft,
-              ),
-            ],
-          ),
-          const SizedBox(height: FreshSpacing.sm),
-          Row(
-            children: [
-              _VoiceQuantityButton(
-                key: ValueKey('manual_food_item_decrease_10_$index'),
-                label: item.isGramUnit ? '-10g' : '-1',
-                onPressed: () {
-                  item.adjustQuantity(item.isGramUnit ? -10 : -1);
-                  onChanged();
-                },
-              ),
-              const SizedBox(width: FreshSpacing.sm),
-              _VoiceQuantityButton(
-                key: ValueKey('manual_food_item_increase_10_$index'),
-                label: item.isGramUnit ? '+10g' : '+1',
-                onPressed: () {
-                  item.adjustQuantity(item.isGramUnit ? 10 : 1);
-                  onChanged();
-                },
               ),
             ],
           ),
@@ -644,74 +623,6 @@ class _ManualDraftIngredientRow extends StatelessWidget {
             ),
           ],
         ],
-      ),
-    );
-  }
-}
-
-class _VoiceQuantityButton extends StatelessWidget {
-  const _VoiceQuantityButton({
-    super.key,
-    required this.label,
-    required this.onPressed,
-  });
-
-  final String label;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 40,
-      child: OutlinedButton(
-        onPressed: onPressed,
-        style: OutlinedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(FreshRadii.md),
-          ),
-        ),
-        child: Text(label),
-      ),
-    );
-  }
-}
-
-class _ProposalChangeSuccessToast extends StatelessWidget {
-  const _ProposalChangeSuccessToast();
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final palette = context.freshPalette;
-    return DecoratedBox(
-      key: const ValueKey('proposal_change_success_toast'),
-      decoration: BoxDecoration(
-        border: Border(left: BorderSide(color: palette.limeDeep, width: 3)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: FreshSpacing.md,
-          vertical: FreshSpacing.sm,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.check_rounded, color: palette.limeDeep, size: 20),
-            const SizedBox(width: FreshSpacing.sm),
-            Flexible(
-              child: Text(
-                context.l10n.voiceChangesApplied,
-                style: textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: palette.ink,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -969,36 +880,27 @@ class _FoodSearchBoxState extends State<_FoodSearchBox> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        TextField(
-          key: ValueKey('${widget.keyPrefix}_field'),
+        FreshUnderlineTextField(
+          fieldKey: ValueKey('${widget.keyPrefix}_field'),
           controller: _controller,
           textInputAction: TextInputAction.search,
           onChanged: (_) => _scheduleSearch(),
           onSubmitted: (_) => _scheduleSearch(immediate: true),
-          decoration: InputDecoration(
-            hintText: widget.hintText,
-            prefixIcon: const Icon(Icons.search_rounded),
-            suffixIconConstraints: const BoxConstraints(
-              minWidth: 56,
-              minHeight: 48,
-            ),
-            suffixIcon: _controller.text.trim().isEmpty
-                ? null
-                : Padding(
-                    padding: const EdgeInsetsDirectional.only(end: 8),
-                    child: IconButton(
-                      key: ValueKey('${widget.keyPrefix}_clear'),
-                      tooltip: context.l10n.foodSearchClear,
-                      constraints: const BoxConstraints.tightFor(
-                        width: 40,
-                        height: 40,
-                      ),
-                      padding: EdgeInsets.zero,
-                      icon: const Icon(Icons.close_rounded),
-                      onPressed: _clear,
-                    ),
+          placeholder: widget.hintText,
+          prefix: const Icon(Icons.search_rounded),
+          suffix: _controller.text.trim().isEmpty
+              ? null
+              : IconButton(
+                  key: ValueKey('${widget.keyPrefix}_clear'),
+                  tooltip: context.l10n.foodSearchClear,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 40,
+                    height: 40,
                   ),
-          ),
+                  padding: EdgeInsets.zero,
+                  icon: const Icon(Icons.close_rounded),
+                  onPressed: _clear,
+                ),
         ),
         if (_loading) ...[
           const SizedBox(height: FreshSpacing.sm),
@@ -1339,90 +1241,85 @@ class _CandidateMealLine extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final palette = context.freshPalette;
     final metadata = _candidateMetadata(candidate);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: palette.ruleSoft)),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onSelected,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: FreshSpacing.sm),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  selected
-                      ? Icons.check_circle_rounded
-                      : Icons.radio_button_unchecked_rounded,
-                  color: selected ? palette.limeDeep : palette.inkMuted,
-                  size: 22,
-                ),
-                const SizedBox(width: FreshSpacing.sm),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        candidate.name,
-                        style: textTheme.bodyLarge,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      if (metadata.isNotEmpty) ...[
-                        const SizedBox(height: 3),
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 3,
-                          children: [
-                            for (final item in metadata)
-                              Text(
-                                item,
-                                style: textTheme.labelMedium?.copyWith(
-                                  color: palette.inkMuted,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onSelected,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: FreshSpacing.sm),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                selected
+                    ? Icons.check_circle_rounded
+                    : Icons.radio_button_unchecked_rounded,
+                color: selected ? palette.limeDeep : palette.inkMuted,
+                size: 22,
+              ),
+              const SizedBox(width: FreshSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      candidate.name,
+                      style: textTheme.bodyLarge,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (metadata.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 3,
+                        children: [
+                          for (final item in metadata)
+                            Text(
+                              item,
+                              style: textTheme.labelMedium?.copyWith(
+                                color: palette.inkMuted,
                               ),
-                          ],
-                        ),
-                      ],
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                        ],
+                      ),
                     ],
-                  ),
+                  ],
                 ),
-                const SizedBox(width: FreshSpacing.sm),
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 74),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerRight,
-                        child: Text(
-                          '${candidate.calories} Kcal',
-                          textAlign: TextAlign.right,
-                          style: textTheme.labelLarge?.copyWith(
-                            fontFeatures: const [FontFeature.tabularFigures()],
-                          ),
+              ),
+              const SizedBox(width: FreshSpacing.sm),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 74),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        '${candidate.calories} Kcal',
+                        textAlign: TextAlign.right,
+                        style: textTheme.labelLarge?.copyWith(
+                          fontFeatures: const [FontFeature.tabularFigures()],
                         ),
                       ),
-                      if (candidate.confidence != null) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          '${(candidate.confidence! * 100).round()}%',
-                          style: textTheme.labelSmall?.copyWith(
-                            color: palette.limeDeep,
-                            fontFeatures: const [FontFeature.tabularFigures()],
-                          ),
+                    ),
+                    if (candidate.confidence != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        '${(candidate.confidence! * 100).round()}%',
+                        style: textTheme.labelSmall?.copyWith(
+                          color: palette.limeDeep,
+                          fontFeatures: const [FontFeature.tabularFigures()],
                         ),
-                      ],
+                      ),
                     ],
-                  ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -1467,264 +1364,6 @@ class _PortionChoiceChip extends StatelessWidget {
       label: Text(label),
       avatar: Icon(canSelect ? Icons.check_rounded : Icons.edit_rounded),
       onPressed: canSelect ? () => onSelected(choice) : null,
-    );
-  }
-}
-
-class _InfoBanner extends StatelessWidget {
-  const _InfoBanner({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return FreshStatusBanner(
-      icon: Icons.info_outline_rounded,
-      title: 'Update',
-      message: message,
-      color: context.freshPalette.water,
-    );
-  }
-}
-
-class _RecordingIndicator extends StatelessWidget {
-  const _RecordingIndicator({required this.duration});
-
-  final Duration duration;
-
-  @override
-  Widget build(BuildContext context) {
-    final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return FreshStatusBanner(
-      icon: Icons.fiber_manual_record_rounded,
-      title: '$minutes:$seconds',
-      message: 'Recording voice input from the emulator microphone.',
-      color: context.freshPalette.coral,
-    );
-  }
-}
-
-class _ErrorBanner extends StatelessWidget {
-  const _ErrorBanner({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return FreshStatusBanner(
-      icon: Icons.error_outline_rounded,
-      title: 'Something went wrong',
-      message: message,
-      color: context.freshPalette.coral,
-      action: TextButton.icon(
-        onPressed: onRetry,
-        icon: const Icon(Icons.refresh_rounded),
-        label: const Text('Try again'),
-      ),
-    );
-  }
-}
-
-class _LoggedMealBanner extends StatelessWidget {
-  const _LoggedMealBanner({required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return FreshStatusBanner(
-      icon: Icons.check_rounded,
-      title: title,
-      message: context.l10n.voiceLoggedMessage,
-      color: context.freshPalette.limeDeep,
-    );
-  }
-}
-
-class _OpenSection extends StatelessWidget {
-  const _OpenSection({required this.title, required this.child});
-
-  final String title;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.freshPalette;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: FreshSpacing.xs),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          FreshSectionTitle(title: title),
-          const SizedBox(height: FreshSpacing.sm),
-          Divider(color: palette.ruleSoft, height: 1),
-          const SizedBox(height: FreshSpacing.sm),
-          child,
-        ],
-      ),
-    );
-  }
-}
-
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({required this.summary});
-
-  final DailySummary summary;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.freshPalette;
-    final l10n = context.l10n;
-    return _OpenSection(
-      title: l10n.commonToday,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: _MetricBlock(
-                  label: l10n.commonConsumed,
-                  value: '${summary.consumed.calories}',
-                  unit: l10n.commonKcal,
-                  color: palette.lime,
-                ),
-              ),
-              const SizedBox(width: FreshSpacing.md),
-              Expanded(
-                child: _MetricBlock(
-                  label: l10n.commonRemaining,
-                  value: '${summary.remaining.calories}',
-                  unit: l10n.commonKcal,
-                  color: palette.water,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MealsCard extends StatelessWidget {
-  const _MealsCard({required this.meals});
-
-  final List<Meal> meals;
-
-  @override
-  Widget build(BuildContext context) {
-    return _OpenSection(
-      title: 'Meals',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (meals.isEmpty)
-            const FreshEmptyState(
-              icon: Icons.restaurant_rounded,
-              title: 'No meals yet',
-              message: 'Logged meals will appear here.',
-            )
-          else
-            for (final meal in meals)
-              _MealLine(
-                title: meal.title,
-                subtitle: '${meal.items.length} items',
-                calories: meal.nutrition.calories,
-              ),
-        ],
-      ),
-    );
-  }
-}
-
-class _NutritionItemsCard extends StatelessWidget {
-  const _NutritionItemsCard({required this.items});
-
-  final List<MealItem> items;
-
-  @override
-  Widget build(BuildContext context) {
-    return _OpenSection(
-      title: 'Nutrition matches',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          for (final item in items)
-            _MealLine(
-              title: item.name,
-              subtitle: '${formatQuantity(item.quantity)} ${item.unit}',
-              calories: item.calories,
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TemplatesCard extends StatelessWidget {
-  const _TemplatesCard({required this.templates});
-
-  final List<MealTemplate> templates;
-
-  @override
-  Widget build(BuildContext context) {
-    return _OpenSection(
-      title: 'Usual meals',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          for (final template in templates)
-            _MealLine(
-              title: template.title,
-              subtitle: template.aliases.join(', '),
-              calories: template.nutrition.calories,
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RemainingCard extends StatelessWidget {
-  const _RemainingCard({required this.remaining});
-
-  final NutritionSnapshot remaining;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.freshPalette;
-    final l10n = context.l10n;
-    return _OpenSection(
-      title: l10n.commonRemaining,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: _MetricBlock(
-                  label: l10n.commonCalories,
-                  value: '${remaining.calories}',
-                  unit: l10n.commonKcal,
-                  color: palette.lime,
-                ),
-              ),
-              const SizedBox(width: FreshSpacing.md),
-              Expanded(
-                child: _MetricBlock(
-                  label: l10n.commonProtein,
-                  value: formatQuantity(remaining.proteinGrams),
-                  unit: 'g',
-                  color: palette.orange,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 }
@@ -1815,17 +1454,25 @@ class _MealLabelSheetState extends State<_MealLabelSheet> {
           ),
           if (_showOther) ...[
             const SizedBox(height: FreshSpacing.lg),
-            TextField(
-              key: const ValueKey('meal_label_other_field'),
+            FreshUnderlineTextField(
+              fieldKey: const ValueKey('meal_label_other_field'),
               controller: _otherController,
               autofocus: true,
-              maxLength: 40,
-              decoration: const InputDecoration(
-                labelText: 'Custom meal type',
-                hintText: 'Brunch',
-                prefixIcon: Icon(Icons.edit_rounded),
-              ),
+              label: 'Custom meal type',
+              placeholder: 'Brunch',
+              prefix: const Icon(Icons.edit_rounded),
+              inputFormatters: [LengthLimitingTextInputFormatter(40)],
               onChanged: (_) => setState(() {}),
+            ),
+            Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: Text(
+                '${_otherController.text.length}/40',
+                style: textTheme.labelSmall?.copyWith(
+                  color: palette.inkMuted,
+                  letterSpacing: 0,
+                ),
+              ),
             ),
             const SizedBox(height: FreshSpacing.sm),
             FilledButton.icon(
@@ -1951,358 +1598,6 @@ class _ProposalCard extends StatelessWidget {
   }
 }
 
-class _ProposalEditorSheet extends StatefulWidget {
-  const _ProposalEditorSheet({
-    required this.proposal,
-    required this.candidateGroups,
-  });
-
-  final MealProposal proposal;
-  final List<FoodCandidateGroup> candidateGroups;
-
-  @override
-  State<_ProposalEditorSheet> createState() => _ProposalEditorSheetState();
-}
-
-class _ProposalEditorSheetState extends State<_ProposalEditorSheet> {
-  late final List<EditableMealItemController> _items;
-
-  @override
-  void initState() {
-    super.initState();
-    _items = [
-      for (final item in widget.proposal.items)
-        EditableMealItemController(item),
-    ];
-  }
-
-  @override
-  void dispose() {
-    for (final item in _items) {
-      item.dispose();
-    }
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-    final textTheme = Theme.of(context).textTheme;
-    final palette = context.freshPalette;
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(18, 12, 18, bottomInset + 18),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Container(
-                  width: 44,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: palette.rule,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-              ),
-              const SizedBox(height: FreshSpacing.lg),
-              Text('Edit ingredients', style: textTheme.titleLarge),
-              const SizedBox(height: FreshSpacing.md),
-              for (var index = 0; index < _items.length; index++) ...[
-                _EditableIngredientRow(
-                  key: ValueKey('proposal_item_editor_$index'),
-                  item: _items[index],
-                  index: index,
-                  candidates: _candidateOptionsFor(_items[index].original),
-                  onCandidateSelected: (candidate) {
-                    setState(() {
-                      _items[index].replaceWith(candidate);
-                    });
-                  },
-                  onSearchReplacementSelected: (candidate) {
-                    setState(() {
-                      _items[index].replaceWith(
-                        _replacementCandidateFor(_items[index], candidate),
-                      );
-                    });
-                  },
-                  onChanged: () => setState(() {}),
-                  onNutritionEdit: () => _editNutrition(index),
-                  onDelete: _items.length == 1
-                      ? null
-                      : () {
-                          setState(() {
-                            _items.removeAt(index).dispose();
-                          });
-                        },
-                ),
-                const SizedBox(height: FreshSpacing.md),
-              ],
-              OutlinedButton.icon(
-                key: const ValueKey('add_proposal_item_button'),
-                onPressed: () {
-                  setState(() {
-                    _items.add(EditableMealItemController.empty());
-                  });
-                },
-                icon: const Icon(Icons.add_rounded),
-                label: const Text('Add ingredient'),
-              ),
-              const SizedBox(height: FreshSpacing.md),
-              FilledButton(
-                key: const ValueKey('save_proposal_edits_button'),
-                onPressed: _save,
-                child: const Text('Save edits'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _save() {
-    final edited = <MealItem>[];
-    for (final item in _items) {
-      final name = item.nameController.text.trim();
-      final quantity = double.tryParse(item.quantityController.text.trim());
-      final unit = item.unitController.text.trim();
-      if (name.isEmpty || quantity == null || quantity <= 0 || unit.isEmpty) {
-        continue;
-      }
-      edited.add(
-        item.toMealItemWith(name: name, quantity: quantity, unit: unit),
-      );
-    }
-    if (edited.isEmpty) return;
-    if (mealItemListsMateriallyEqual(widget.proposal.items, edited)) {
-      Navigator.of(context).pop();
-      return;
-    }
-    Navigator.of(context).pop(edited);
-  }
-
-  Future<void> _editNutrition(int index) async {
-    final item = _items[index];
-    final palette = context.freshPalette;
-    final edited = await showModalBottomSheet<NutritionEdit>(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => NutritionEditSheet(
-        initialNutrition: item.currentNutrition(),
-        ingredientName: item.nameController.text.trim(),
-        title: 'Edit nutrition',
-        subtitleFallback: 'Manual ingredient',
-        keyPrefix: 'proposal',
-        index: index,
-        fieldKeySuffix: 'nutrition',
-        saveButtonKeySuffix: 'save_nutrition_button',
-        macroColors: {
-          NutritionMacroKind.protein: palette.coral,
-          NutritionMacroKind.carbs: palette.orange,
-          NutritionMacroKind.fat: palette.leaf,
-        },
-        useMacroFieldStyle: false,
-        errorTitle: 'Check nutrition',
-        errorMessage: 'Use non-negative numbers for calories and macros.',
-        useSafeArea: true,
-      ),
-    );
-    if (edited == null) return;
-    setState(() {
-      _items[index].setNutritionOverride(edited);
-    });
-  }
-
-  List<MealItem> _candidateOptionsFor(MealItem item) {
-    for (final group in widget.candidateGroups) {
-      if (_itemMatchesCandidateGroup(item, group)) {
-        return group.candidates.take(_candidateDisplayLimit).toList();
-      }
-    }
-    return const [];
-  }
-
-  MealItem _replacementCandidateFor(
-    EditableMealItemController item,
-    MealItem candidate,
-  ) {
-    final quantity = double.tryParse(item.quantityController.text.trim());
-    final unit = item.unitController.text.trim();
-    if (quantity == null || quantity <= 0 || unit.isEmpty) return candidate;
-    return _candidateWithQuantity(candidate, quantity: quantity, unit: unit);
-  }
-}
-
-class _EditableIngredientRow extends StatelessWidget {
-  const _EditableIngredientRow({
-    super.key,
-    required this.item,
-    required this.index,
-    required this.candidates,
-    required this.onCandidateSelected,
-    required this.onSearchReplacementSelected,
-    required this.onChanged,
-    required this.onNutritionEdit,
-    required this.onDelete,
-  });
-
-  final EditableMealItemController item;
-  final int index;
-  final List<MealItem> candidates;
-  final ValueChanged<MealItem> onCandidateSelected;
-  final ValueChanged<MealItem> onSearchReplacementSelected;
-  final VoidCallback onChanged;
-  final VoidCallback onNutritionEdit;
-  final VoidCallback? onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    final nutrition = item.currentNutrition();
-    final hasWarning = nutrition.hasCalorieMismatch;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: FreshSpacing.sm),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          if (candidates.isNotEmpty) ...[
-            _CandidateSwapStrip(
-              index: index,
-              candidates: candidates,
-              selectedItem: item.original,
-              onSelected: onCandidateSelected,
-            ),
-            const SizedBox(height: FreshSpacing.sm),
-          ],
-          _InlineReplacementFoodSearch(
-            index: index,
-            item: item,
-            onSelected: onSearchReplacementSelected,
-          ),
-          const SizedBox(height: FreshSpacing.sm),
-          TextField(
-            key: ValueKey('proposal_item_name_$index'),
-            controller: item.nameController,
-            onChanged: (_) => onChanged(),
-            decoration: const InputDecoration(labelText: 'Ingredient'),
-          ),
-          const SizedBox(height: FreshSpacing.sm),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  key: ValueKey('proposal_item_quantity_$index'),
-                  controller: item.quantityController,
-                  onChanged: (_) => onChanged(),
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  decoration: const InputDecoration(labelText: 'Quantity'),
-                ),
-              ),
-              const SizedBox(width: FreshSpacing.sm),
-              SizedBox(
-                width: 82,
-                child: TextField(
-                  key: ValueKey('proposal_item_unit_$index'),
-                  controller: item.unitController,
-                  onChanged: (_) => onChanged(),
-                  decoration: const InputDecoration(labelText: 'Unit'),
-                ),
-              ),
-              const SizedBox(width: FreshSpacing.sm),
-              IconButton(
-                key: ValueKey('delete_proposal_item_$index'),
-                onPressed: onDelete,
-                icon: const Icon(Icons.delete_outline_rounded),
-                tooltip: 'Delete ingredient',
-              ),
-            ],
-          ),
-          const SizedBox(height: FreshSpacing.sm),
-          Row(
-            children: [
-              _VoiceQuantityButton(
-                key: ValueKey('proposal_item_decrease_10_$index'),
-                label: item.isGramUnit ? '-10g' : '-1',
-                onPressed: () {
-                  item.adjustQuantity(item.isGramUnit ? -10 : -1);
-                  onChanged();
-                },
-              ),
-              const SizedBox(width: FreshSpacing.sm),
-              _VoiceQuantityButton(
-                key: ValueKey('proposal_item_increase_10_$index'),
-                label: item.isGramUnit ? '+10g' : '+1',
-                onPressed: () {
-                  item.adjustQuantity(item.isGramUnit ? 10 : 1);
-                  onChanged();
-                },
-              ),
-            ],
-          ),
-          if (item.isGramUnit) ...[
-            const SizedBox(height: FreshSpacing.sm),
-            Wrap(
-              spacing: FreshSpacing.xs,
-              runSpacing: FreshSpacing.xs,
-              children: [
-                for (final preset in const [50.0, 100.0, 150.0, 200.0])
-                  ActionChip(
-                    key: ValueKey(
-                      'proposal_item_quantity_preset_${preset.toInt()}_$index',
-                    ),
-                    label: Text('${preset.toInt()}g'),
-                    onPressed: () {
-                      item.setQuantity(preset);
-                      onChanged();
-                    },
-                  ),
-              ],
-            ),
-          ],
-          const SizedBox(height: FreshSpacing.sm),
-          NutritionMacroSummaryText(
-            nutrition: nutrition,
-            baseStyle: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: context.freshPalette.inkMuted,
-              letterSpacing: 0,
-            ),
-            overflow: TextOverflow.ellipsis,
-            macroColors: {
-              NutritionMacroKind.protein: context.freshPalette.coral,
-              NutritionMacroKind.carbs: context.freshPalette.orange,
-              NutritionMacroKind.fat: context.freshPalette.leaf,
-            },
-          ),
-          const SizedBox(height: FreshSpacing.xs),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              key: ValueKey('edit_proposal_item_nutrition_$index'),
-              onPressed: onNutritionEdit,
-              icon: const Icon(Icons.tune_rounded, size: 18),
-              label: Text(context.l10n.mealEditorEditDetails),
-            ),
-          ),
-          if (hasWarning) ...[
-            const SizedBox(height: FreshSpacing.sm),
-            NutritionMacroWarningBanner(
-              key: ValueKey('proposal_item_macro_warning_$index'),
-              title: context.l10n.mealEditorCaloriesMismatchTitle,
-              message: context.l10n.mealEditorCaloriesMismatchMessage(
-                nutrition.macroCalories,
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
 class _CandidateSwapStrip extends StatefulWidget {
   const _CandidateSwapStrip({
     required this.index,
@@ -2338,66 +1633,16 @@ class _CandidateSwapStripState extends State<_CandidateSwapStrip> {
   }
 }
 
-class _InlineReplacementFoodSearch extends StatefulWidget {
-  const _InlineReplacementFoodSearch({
-    required this.index,
-    required this.item,
-    required this.onSelected,
-  });
-
-  final int index;
-  final EditableMealItemController item;
-  final ValueChanged<MealItem> onSelected;
-
-  @override
-  State<_InlineReplacementFoodSearch> createState() =>
-      _InlineReplacementFoodSearchState();
-}
-
-class _InlineReplacementFoodSearchState
-    extends State<_InlineReplacementFoodSearch> {
-  bool _expanded = false;
-
-  @override
-  Widget build(BuildContext context) {
-    if (!_expanded) {
-      return Align(
-        alignment: Alignment.centerLeft,
-        child: TextButton.icon(
-          key: ValueKey('proposal_item_${widget.index}_search_toggle'),
-          onPressed: () => setState(() => _expanded = true),
-          icon: const Icon(Icons.search_rounded, size: 18),
-          label: Text(context.l10n.foodSearchReplaceSearch),
-        ),
-      );
+List<MealItem> _candidateOptionsForProposalItem(
+  MealItem item,
+  List<FoodCandidateGroup> groups,
+) {
+  for (final group in groups) {
+    if (_itemMatchesCandidateGroup(item, group)) {
+      return group.candidates.take(_candidateDisplayLimit).toList();
     }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _FoodSearchBox(
-          keyPrefix: 'proposal_item_${widget.index}_search',
-          actionLabel: context.l10n.foodSearchReplaceAction,
-          actionIcon: Icons.swap_horiz_rounded,
-          hintText: context.l10n.foodSearchHint,
-          initialQuery: widget.item.nameController.text,
-          onSelected: (candidate) {
-            widget.onSelected(candidate);
-            setState(() => _expanded = false);
-          },
-        ),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            key: ValueKey('proposal_item_${widget.index}_search_collapse'),
-            onPressed: () => setState(() => _expanded = false),
-            icon: const Icon(Icons.keyboard_arrow_up_rounded, size: 18),
-            label: Text(context.l10n.foodSearchHideSearch),
-          ),
-        ),
-      ],
-    );
   }
+  return const [];
 }
 
 MealItem _candidateWithMentionQuantity(
@@ -2450,102 +1695,6 @@ bool _itemMatchesCandidateGroup(MealItem item, FoodCandidateGroup group) {
   }
   return item.canonicalName == group.mention.canonicalName ||
       item.originalText == group.mention.originalText;
-}
-
-class _MetricBlock extends StatelessWidget {
-  const _MetricBlock({
-    required this.label,
-    required this.value,
-    required this.unit,
-    required this.color,
-  });
-
-  final String label;
-  final String value;
-  final String unit;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: textTheme.labelMedium?.copyWith(color: color)),
-        const SizedBox(height: FreshSpacing.xs),
-        Wrap(
-          crossAxisAlignment: WrapCrossAlignment.end,
-          spacing: 4,
-          children: [
-            Text(
-              value,
-              style: textTheme.headlineMedium?.copyWith(
-                fontFeatures: const [FontFeature.tabularFigures()],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 5),
-              child: Text(unit, style: textTheme.bodyMedium),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _MealLine extends StatelessWidget {
-  const _MealLine({
-    required this.title,
-    required this.subtitle,
-    required this.calories,
-  });
-
-  final String title;
-  final String subtitle;
-  final int calories;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final palette = context.freshPalette;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: palette.ruleSoft)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: textTheme.bodyLarge),
-                  if (subtitle.isNotEmpty)
-                    Text(
-                      subtitle,
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: palette.inkMuted,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(width: FreshSpacing.sm),
-            Text(
-              '$calories Kcal',
-              style: textTheme.labelLarge?.copyWith(
-                color: palette.orange,
-                fontFeatures: const [FontFeature.tabularFigures()],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 String _mealItemDisplayName(MealItem item) =>

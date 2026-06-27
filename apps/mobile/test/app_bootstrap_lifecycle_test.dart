@@ -1,4 +1,5 @@
 import 'package:cal_tracker_mobile/app/app.dart';
+import 'package:cal_tracker_mobile/app/theme.dart';
 import 'package:cal_tracker_mobile/data/repositories/auth_repository.dart';
 import 'package:cal_tracker_mobile/data/repositories/nutrition_repository.dart';
 import 'package:cal_tracker_mobile/data/services/api_config.dart';
@@ -57,6 +58,33 @@ void main() {
     expect(
       identical(nutritionRepositories.first, nutritionRepositories.last),
       isTrue,
+    );
+
+    await tester.pumpWidget(const SizedBox.expand());
+    await tester.pump();
+  });
+
+  testWidgets('CalTrackerBootstrap clamps scroll boundaries globally', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      CalTrackerBootstrap(
+        apiConfig: const ApiConfig(baseUrl: 'http://localhost'),
+        tokenStorage: _MemoryTokenStorage(),
+        preferencesRepository: _FakePreferencesRepository(),
+        nutritionRepository: _FakeNutritionRepository(),
+        checkForUpdates: false,
+      ),
+    );
+    await tester.pump();
+
+    final materialApp = tester.widget<MaterialApp>(find.byType(MaterialApp));
+    final behavior = materialApp.scrollBehavior;
+
+    expect(behavior, isA<CalTrackerScrollBehavior>());
+    expect(
+      behavior!.getScrollPhysics(tester.element(find.byType(MaterialApp))),
+      isA<ClampingScrollPhysics>(),
     );
 
     await tester.pumpWidget(const SizedBox.expand());

@@ -344,18 +344,28 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(find.byKey(const ValueKey('dashboard_edit_meal_meal-1')));
+    await tester.tap(find.byKey(const ValueKey('dashboard_meal_row_meal-1')));
     await tester.pumpAndSettle();
 
     expect(find.text('Edit ingredients'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('dashboard_item_compact_0')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('dashboard_item_name_0')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('dashboard_item_compact_0')));
+    await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('dashboard_item_name_0')), findsOneWidget);
 
-    final detailsFinder = find.byKey(
-      const ValueKey('dashboard_item_edit_details_0'),
-    );
-    await tester.ensureVisible(detailsFinder);
+    final actionsFinder =
+        find.byKey(const ValueKey('dashboard_item_actions_0'));
+    await tester.ensureVisible(actionsFinder);
     await tester.pumpAndSettle();
-    await tester.tap(detailsFinder.hitTestable());
+    await tester.tap(actionsFinder.hitTestable());
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('dashboard_item_edit_details_0')).hitTestable(),
+    );
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const ValueKey('dashboard_item_protein_0')),
@@ -418,7 +428,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('dashboard_edit_meal_meal-1')));
+    await tester.tap(find.byKey(const ValueKey('dashboard_meal_row_meal-1')));
     await tester.pumpAndSettle();
     await tester.tap(
       find
@@ -490,12 +500,19 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('dashboard_edit_meal_meal-1')));
+    await tester.tap(find.byKey(const ValueKey('dashboard_meal_row_meal-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('dashboard_item_compact_0')));
     await tester.pumpAndSettle();
     final searchToggle = find.byKey(
       const ValueKey('dashboard_item_0_search_toggle'),
     );
-    await tester.ensureVisible(searchToggle);
+    final actionsFinder =
+        find.byKey(const ValueKey('dashboard_item_actions_0'));
+    await tester.ensureVisible(actionsFinder);
+    await tester.pumpAndSettle();
+    await tester.tap(actionsFinder.hitTestable());
+    await tester.pumpAndSettle();
     await tester.tap(searchToggle.hitTestable());
     await tester.pumpAndSettle();
     await tester.enterText(
@@ -504,6 +521,10 @@ void main() {
     );
     await tester.tap(
       find.byKey(const ValueKey('dashboard_item_0_search_submit')),
+    );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('dashboard_item_0_search_result_0')),
     );
     await tester.pumpAndSettle();
     await tester.tap(
@@ -533,7 +554,8 @@ void main() {
     expect(nutritionRepository.lastCorrectedItems!.single.externalId, 'bread');
   });
 
-  testWidgets('dashboard meal cards delete after confirmation', (tester) async {
+  testWidgets('dashboard meal editor deletes after confirmation',
+      (tester) async {
     final nutritionRepository = _FakeNutritionRepository(
       dailySummary: _summaryWithMeal,
     );
@@ -565,13 +587,24 @@ void main() {
 
     expect(find.text('Oats bowl'), findsOneWidget);
     expect(
-      find.byKey(const ValueKey('dashboard_delete_meal_meal-1')),
+      find.byKey(const ValueKey('dashboard_meal_row_meal-1')),
       findsOneWidget,
     );
-
-    await tester.tap(
-      find.byKey(const ValueKey('dashboard_delete_meal_meal-1')),
+    expect(
+      find.byKey(const ValueKey('dashboard_edit_meal_meal-1')),
+      findsNothing,
     );
+    expect(
+      find.byKey(const ValueKey('dashboard_delete_meal_meal-1')),
+      findsNothing,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('dashboard_meal_row_meal-1')));
+    await tester.pumpAndSettle();
+    expect(find.text('Edit ingredients'), findsOneWidget);
+
+    await tester
+        .tap(find.byKey(const ValueKey('dashboard_delete_meal_meal-1')));
     await tester.pumpAndSettle();
 
     expect(find.text('Delete meal?'), findsOneWidget);
@@ -581,7 +614,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(nutritionRepository.deletedMealIds, isEmpty);
-    expect(find.text('Oats bowl'), findsOneWidget);
+    expect(find.text('Oats bowl'), findsWidgets);
 
     await tester.tap(
       find.byKey(const ValueKey('dashboard_delete_meal_meal-1')),

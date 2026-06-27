@@ -308,6 +308,18 @@ abstract class AppLocalizations {
   /// **'Ingredients'**
   String get mealEditorIngredientsSection;
 
+  /// No description provided for @mealEditorSearchOrAddIngredient.
+  ///
+  /// In en, this message translates to:
+  /// **'Search or add ingredient...'**
+  String get mealEditorSearchOrAddIngredient;
+
+  /// No description provided for @mealEditorReplaceFood.
+  ///
+  /// In en, this message translates to:
+  /// **'Replace food'**
+  String get mealEditorReplaceFood;
+
   /// No description provided for @mealEditorEditDetails.
   ///
   /// In en, this message translates to:

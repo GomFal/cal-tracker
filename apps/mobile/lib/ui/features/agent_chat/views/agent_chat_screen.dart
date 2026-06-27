@@ -9,6 +9,7 @@ import '../../../../data/repositories/nutrition_repository.dart';
 import '../../../../domain/models/nutrition_models.dart';
 import '../../../../l10n/app_localizations_context.dart';
 import '../../../core/design_system.dart';
+import '../../../core/motion.dart';
 import '../../../core/voice_action_button.dart';
 import '../../meal_templates/views/meal_template_editor_screen.dart';
 import '../../meal_templates/views/usual_food_editor_screen.dart';
@@ -94,9 +95,8 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
                             key: const ValueKey('agent_chat_history_button'),
                             icon: Icons.history_rounded,
                             tooltip: context.l10n.agentChatHistoryTooltip,
-                            onPressed: () => unawaited(
-                              _showConversationHistory(context),
-                            ),
+                            onPressed: () =>
+                                unawaited(_showConversationHistory(context)),
                           ),
                         ],
                       ),
@@ -108,7 +108,7 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
                         padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
                         children: [
                           if (viewModel.errorMessage != null) ...[
-                            _FadeIn(
+                            FreshFadeSlide(
                               child: FreshStatusBanner(
                                 icon: Icons.error_outline_rounded,
                                 title: context.l10n.agentChatErrorTitle,
@@ -119,14 +119,14 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
                             const SizedBox(height: FreshSpacing.md),
                           ],
                           if (viewModel.entries.isEmpty) ...[
-                            _FadeIn(
+                            FreshFadeSlide(
                               child: _AgentWelcomeCard(
                                 onPromptSelected: _sendPrompt,
                               ),
                             ),
                           ] else ...[
                             for (final entry in viewModel.entries) ...[
-                              _FadeIn(
+                              FreshFadeSlide(
                                 key: ValueKey('agent_timeline_${entry.id}'),
                                 child: _AgentTimelineEntry(entry: entry),
                               ),
@@ -135,7 +135,7 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
                           ],
                           if (viewModel.statusMessage != null &&
                               viewModel.isBusy) ...[
-                            _FadeIn(
+                            FreshFadeSlide(
                               key: ValueKey(
                                 'agent_status_${viewModel.statusMessage}',
                               ),
@@ -283,14 +283,16 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
                     const SizedBox(height: FreshSpacing.md),
                     if (conversations.isEmpty && model.isLoadingHistory)
                       const Padding(
-                        padding:
-                            EdgeInsets.symmetric(vertical: FreshSpacing.xl),
+                        padding: EdgeInsets.symmetric(
+                          vertical: FreshSpacing.xl,
+                        ),
                         child: Center(child: CircularProgressIndicator()),
                       )
                     else if (conversations.isEmpty)
                       Padding(
                         padding: const EdgeInsets.symmetric(
-                            vertical: FreshSpacing.xl),
+                          vertical: FreshSpacing.xl,
+                        ),
                         child: Text(context.l10n.agentChatHistoryEmpty),
                       )
                     else
@@ -354,24 +356,6 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
     final date = MaterialLocalizations.of(context).formatShortDate(local);
     final time = TimeOfDay.fromDateTime(local).format(context);
     return '$date $time';
-  }
-}
-
-class _FadeIn extends StatelessWidget {
-  const _FadeIn({super.key, required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: 1),
-      duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOutCubic,
-      builder: (context, opacity, child) =>
-          Opacity(opacity: opacity, child: child),
-      child: child,
-    );
   }
 }
 
@@ -694,7 +678,7 @@ class _ToolCallCard extends StatelessWidget {
             ],
             if (entry.result != null) ...[
               const SizedBox(height: FreshSpacing.lg),
-              _FadeIn(
+              FreshFadeSlide(
                 key: ValueKey(
                   'agent_result_${toolCall?.id ?? entry.id}_${entry.result!.kind}',
                 ),
@@ -847,9 +831,9 @@ class _UsualFoodDraftReview extends StatelessWidget {
     if (!context.mounted || saved == null) return;
     final message = context.l10n.agentChatUsualFoodSaved(saved.name);
     context.read<AgentChatViewModel>().markEntryCompleted(entryId, message);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }
 
@@ -939,9 +923,9 @@ class _UsualMealDraftReview extends StatelessWidget {
     if (!context.mounted || saved == null) return;
     final message = context.l10n.agentChatUsualMealSaved(saved.title);
     context.read<AgentChatViewModel>().markEntryCompleted(entryId, message);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 }
 

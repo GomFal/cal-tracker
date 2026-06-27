@@ -4,14 +4,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'design_system.dart';
+import 'motion.dart';
 
 const voiceActionRecordingPulseKey = ValueKey('voice_action_recording_pulse');
-const voiceActionRecordingStaticRingKey =
-    ValueKey('voice_action_recording_static_ring');
-const voiceActionProcessingSpinnerKey =
-    ValueKey('voice_action_processing_spinner');
-const voiceActionProcessingStaticRingKey =
-    ValueKey('voice_action_processing_static_ring');
+const voiceActionRecordingStaticRingKey = ValueKey(
+  'voice_action_recording_static_ring',
+);
+const voiceActionProcessingSpinnerKey = ValueKey(
+  'voice_action_processing_spinner',
+);
+const voiceActionProcessingStaticRingKey = ValueKey(
+  'voice_action_processing_static_ring',
+);
 
 class VoiceActionHaptics {
   const VoiceActionHaptics._();
@@ -50,9 +54,7 @@ class VoiceActionButtonChrome extends StatefulWidget {
 
 class _VoiceActionButtonChromeState extends State<VoiceActionButtonChrome>
     with SingleTickerProviderStateMixin {
-  static const _scaleDuration = Duration(milliseconds: 180);
   static const _pulseDuration = Duration(milliseconds: 1250);
-  static const _easeOut = Cubic(0.22, 1, 0.36, 1);
 
   late final AnimationController _pulseController;
 
@@ -113,8 +115,8 @@ class _VoiceActionButtonChromeState extends State<VoiceActionButtonChrome>
             ),
           AnimatedScale(
             scale: scale,
-            duration: reduceMotion ? Duration.zero : _scaleDuration,
-            curve: _easeOut,
+            duration: FreshMotion.duration(context, FreshMotion.normal),
+            curve: FreshMotion.easeOutQuint,
             child: DecoratedBox(
               decoration: BoxDecoration(
                 color: widget.backgroundColor,
@@ -192,11 +194,7 @@ class _RecordingPulse extends StatelessWidget {
 }
 
 class _PulseRing extends StatelessWidget {
-  const _PulseRing({
-    super.key,
-    required this.size,
-    required this.opacity,
-  });
+  const _PulseRing({super.key, required this.size, required this.opacity});
 
   final double size;
   final double opacity;

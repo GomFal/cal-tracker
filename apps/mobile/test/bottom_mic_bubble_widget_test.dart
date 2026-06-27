@@ -252,7 +252,7 @@ void main() {
         find.byKey(const ValueKey('bottom_voice_action_button')),
       );
       await tester.pump();
-      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
 
       expect(find.text(bubbleText), findsNothing);
     });
@@ -267,7 +267,7 @@ void main() {
 
       // Advance past the 6-second auto-dismiss timer
       await tester.pump(const Duration(seconds: 7));
-      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
 
       expect(find.text(bubbleText), findsNothing);
     });

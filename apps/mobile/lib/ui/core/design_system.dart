@@ -3,6 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'motion.dart';
+
 part 'fresh_inputs.dart';
 
 class FreshColors {
@@ -223,10 +225,7 @@ extension FreshPaletteLookup on BuildContext {
     if (!isDark) return const [];
     return [
       BoxShadow(
-        color: freshShadowColor(
-          lightAlpha: lightAlpha,
-          darkAlpha: darkAlpha,
-        ),
+        color: freshShadowColor(lightAlpha: lightAlpha, darkAlpha: darkAlpha),
         blurRadius: isDark ? blurRadius * 0.65 : blurRadius,
         offset: isDark ? Offset(offset.dx, offset.dy * 0.55) : offset,
       ),
@@ -406,14 +405,29 @@ class FreshCard extends StatelessWidget {
       child: Padding(padding: padding, child: child),
     );
     if (onTap == null) return decorated;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: borderRadius,
-        onTap: onTap,
-        child: decorated,
-      ),
+    return FreshPressable(
+      borderRadius: borderRadius,
+      onTap: onTap,
+      child: decorated,
     );
+  }
+}
+
+class FreshMotionCard extends StatelessWidget {
+  const FreshMotionCard({
+    super.key,
+    required this.child,
+    this.offset = const Offset(0, 8),
+    this.duration = FreshMotion.normal,
+  });
+
+  final Widget child;
+  final Offset offset;
+  final Duration duration;
+
+  @override
+  Widget build(BuildContext context) {
+    return FreshFadeSlide(offset: offset, duration: duration, child: child);
   }
 }
 
@@ -600,9 +614,7 @@ class FreshStatusBanner extends StatelessWidget {
                 const SizedBox(height: FreshSpacing.xs),
                 Text(
                   message!,
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: palette.inkSoft,
-                  ),
+                  style: textTheme.bodyMedium?.copyWith(color: palette.inkSoft),
                 ),
               ],
               if (action != null) ...[
@@ -638,6 +650,56 @@ class FreshProgressRing extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
+    final targetProgress = progress.clamp(0, 1).toDouble();
+    final reduceMotion = FreshMotion.disableAnimations(context);
+    if (reduceMotion) {
+      return _ProgressRingFrame(
+        progress: targetProgress,
+        center: center,
+        size: size,
+        color: color,
+        trackColor: trackColor ?? palette.rule,
+        strokeWidth: strokeWidth,
+      );
+    }
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(end: targetProgress),
+      duration: FreshMotion.medium,
+      curve: FreshMotion.easeOutQuart,
+      builder: (context, value, child) {
+        return _ProgressRingFrame(
+          progress: value,
+          center: child!,
+          size: size,
+          color: color,
+          trackColor: trackColor ?? palette.rule,
+          strokeWidth: strokeWidth,
+        );
+      },
+      child: center,
+    );
+  }
+}
+
+class _ProgressRingFrame extends StatelessWidget {
+  const _ProgressRingFrame({
+    required this.progress,
+    required this.center,
+    required this.size,
+    required this.color,
+    required this.trackColor,
+    required this.strokeWidth,
+  });
+
+  final double progress;
+  final Widget center;
+  final double size;
+  final Color color;
+  final Color trackColor;
+  final double? strokeWidth;
+
+  @override
+  Widget build(BuildContext context) {
     return SizedBox.square(
       dimension: size,
       child: Stack(
@@ -647,9 +709,9 @@ class FreshProgressRing extends StatelessWidget {
             child: CustomPaint(
               size: Size.square(size),
               painter: _RingPainter(
-                progress: progress.clamp(0, 1).toDouble(),
+                progress: progress,
                 color: color,
-                trackColor: trackColor ?? palette.rule,
+                trackColor: trackColor,
                 strokeWidth: strokeWidth,
               ),
             ),
@@ -753,11 +815,7 @@ class FreshMiniBars extends StatelessWidget {
 }
 
 class FreshFoodStack extends StatelessWidget {
-  const FreshFoodStack({
-    super.key,
-    this.assets = const [],
-    this.size = 38,
-  });
+  const FreshFoodStack({super.key, this.assets = const [], this.size = 38});
 
   final List<String> assets;
   final double size;
@@ -845,11 +903,7 @@ class FreshEmptyState extends StatelessWidget {
 }
 
 class FreshSectionTitle extends StatelessWidget {
-  const FreshSectionTitle({
-    super.key,
-    required this.title,
-    this.trailing,
-  });
+  const FreshSectionTitle({super.key, required this.title, this.trailing});
 
   final String title;
   final Widget? trailing;
@@ -859,10 +913,7 @@ class FreshSectionTitle extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-          child: Text(
-            title,
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
+          child: Text(title, style: Theme.of(context).textTheme.titleLarge),
         ),
         if (trailing != null) trailing!,
       ],

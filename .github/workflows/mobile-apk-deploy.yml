@@ -119,10 +119,69 @@ jobs:
             fi
           } >> "$GITHUB_ENV"
 
-      - name: Build Android APK
+      - name: Prepare protected production signing material
+        if: ${{ inputs.environment == 'prod' }}
+        env:
+          ANDROID_RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+          ANDROID_RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_STORE_PASSWORD }}
+          ANDROID_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+          ANDROID_RELEASE_CERT_SHA256: ${{ secrets.ANDROID_RELEASE_CERT_SHA256 }}
         run: |
           set -euo pipefail
-          ALLOW_DEBUG_SIGNING=1 scripts/mobile/build-android.sh "$MOBILE_FLAVOR"
+          for required in \
+            ANDROID_RELEASE_KEYSTORE_BASE64 \
+            ANDROID_RELEASE_STORE_PASSWORD \
+            ANDROID_RELEASE_KEY_ALIAS \
+            ANDROID_RELEASE_KEY_PASSWORD \
+            ANDROID_RELEASE_CERT_SHA256; do
+            [[ -n "${!required}" ]] || {
+              echo "Missing protected production Android signing secret: $required" >&2
+              exit 1
+            }
+          done
+
+          signing_dir="$RUNNER_TEMP/android-production-signing"
+          umask 077
+          mkdir -p "$signing_dir"
+          printf '%s' "$ANDROID_RELEASE_KEYSTORE_BASE64" \
+            | base64 --decode > "$signing_dir/release-keystore.jks"
+          [[ -s "$signing_dir/release-keystore.jks" ]] || {
+            echo "Decoded Android release keystore is empty." >&2
+            exit 1
+          }
+
+      - name: Build Android APK
+        env:
+          ANDROID_RELEASE_STORE_FILE: ${{ inputs.environment == 'prod' && format('{0}/android-production-signing/release-keystore.jks', runner.temp) || '' }}
+          ANDROID_RELEASE_STORE_PASSWORD: ${{ inputs.environment == 'prod' && secrets.ANDROID_RELEASE_STORE_PASSWORD || '' }}
+          ANDROID_RELEASE_KEY_ALIAS: ${{ inputs.environment == 'prod' && secrets.ANDROID_RELEASE_KEY_ALIAS || '' }}
+          ANDROID_RELEASE_KEY_PASSWORD: ${{ inputs.environment == 'prod' && secrets.ANDROID_RELEASE_KEY_PASSWORD || '' }}
+          ANDROID_RELEASE_CERT_SHA256: ${{ inputs.environment == 'prod' && secrets.ANDROID_RELEASE_CERT_SHA256 || '' }}
+        run: |
+          set -euo pipefail
+          scripts/mobile/build-android.sh "$MOBILE_FLAVOR"
+
+      - name: Verify production APK publisher certificate
+        if: ${{ inputs.environment == 'prod' }}
+        env:
+          ANDROID_RELEASE_CERT_SHA256: ${{ secrets.ANDROID_RELEASE_CERT_SHA256 }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          apks=(dist/mobile/android/bettercalories-prod-*.apk)
+          [[ "${#apks[@]}" -eq 1 ]] || {
+            echo "Expected exactly one production APK to verify." >&2
+            exit 1
+          }
+          scripts/mobile/verify-apk-signing.sh "${apks[0]}" "$ANDROID_RELEASE_CERT_SHA256"
+
+      - name: Remove temporary production signing material
+        if: ${{ always() && inputs.environment == 'prod' }}
+        run: |
+          set -euo pipefail
+          rm -rf "$RUNNER_TEMP/android-production-signing"
+          rm -f apps/mobile/android/key.properties
 
       - uses: actions/upload-artifact@v4
         with:
@@ -157,6 +216,7 @@ jobs:
           BETTERCALORIES_DEPLOY_ACTOR: ${{ github.actor }}
           DEV_PUBLIC_BASE_URL: ${{ secrets.MOBILE_DEV_API_BASE_URL }}
           PROD_PUBLIC_BASE_URL: ${{ secrets.MOBILE_PROD_API_BASE_URL }}
+          ANDROID_RELEASE_CERT_SHA256: ${{ inputs.environment == 'prod' && secrets.ANDROID_RELEASE_CERT_SHA256 || '' }}
         run: |
           set -euo pipefail
           SKIP_ANDROID_BUILD=1 scripts/mobile/deploy-server-apks.sh "$MOBILE_FLAVOR"

@@ -23,7 +23,11 @@ Environment variables:
   PROD_API_BASE_URL      Defaults to https://api.bettercalories.app
   MOBILE_CONFIG_DIR      Defaults to apps/mobile/config
   BUILD_MODE             Defaults to release
-  ALLOW_DEBUG_SIGNING=1  Allows prod release builds without android/key.properties
+  ANDROID_RELEASE_CERT_SHA256  Approved production certificate SHA-256
+
+Production signing can be provided by apps/mobile/android/key.properties or by
+ANDROID_RELEASE_STORE_FILE, ANDROID_RELEASE_STORE_PASSWORD,
+ANDROID_RELEASE_KEY_ALIAS, and ANDROID_RELEASE_KEY_PASSWORD.
 USAGE
 }
 
@@ -44,6 +48,10 @@ if [[ "$BUILD_MODE" != "release" ]]; then
   exit 1
 fi
 
+if [[ "$ENVIRONMENT" == "prod" || "$ENVIRONMENT" == "all" ]]; then
+  "$ROOT_DIR/scripts/mobile/validate-android-release-signing.sh"
+fi
+
 version="$(sed -n 's/^version:[[:space:]]*//p' "$MOBILE_DIR/pubspec.yaml" | head -n 1 | tr '+' '-')"
 short_sha="$(git -C "$ROOT_DIR" rev-parse --short HEAD 2>/dev/null || printf 'local')"
 mkdir -p "$DIST_DIR"
@@ -56,17 +64,6 @@ fi
 build_flavor() {
   local flavor="$1"
   local api_base_url="$2"
-
-  if [[ "$flavor" == "prod" && ! -f "$MOBILE_DIR/android/key.properties" && "${ALLOW_DEBUG_SIGNING:-}" != "1" ]]; then
-    cat >&2 <<'MESSAGE'
-Refusing to build prod with the debug signing key.
-
-Create apps/mobile/android/key.properties from key.properties.example and point it
-to a local .jks/.keystore file, or set ALLOW_DEBUG_SIGNING=1 for a local-only
-test artifact.
-MESSAGE
-    exit 1
-  fi
 
   local define_file="$MOBILE_CONFIG_DIR/$flavor.json"
   if [[ ! -f "$define_file" ]]; then
@@ -87,6 +84,12 @@ MESSAGE
 
   local source_apk="$MOBILE_DIR/build/app/outputs/flutter-apk/app-$flavor-release.apk"
   local output_apk="$DIST_DIR/bettercalories-$flavor-$version-$short_sha.apk"
+
+  if [[ "$flavor" == "prod" ]]; then
+    "$ROOT_DIR/scripts/mobile/verify-apk-signing.sh" \
+      "$source_apk" \
+      "${ANDROID_RELEASE_CERT_SHA256:-}"
+  fi
 
   cp "$source_apk" "$output_apk"
   sha256sum "$output_apk" > "$output_apk.sha256"

@@ -38,31 +38,41 @@ PROD_API_BASE_URL=https://api.bettercalories.app bun run mobile:build:prod
 
 ## Android Release Signing
 
-Production release builds should be signed with a real upload key, not the
-debug key.
+Production release builds require the controlled release key and the approved
+SHA-256 certificate fingerprint. They cannot fall back to the Android debug
+key. Development and local debug builds do not require production material.
 
 Create a local keystore and keep it out of git:
 
 ```bash
 cd apps/mobile/android
 keytool -genkeypair -v \
-  -keystore upload-keystore.jks \
-  -storetype JKS \
+  -keystore bettercalories-release.jks \
+  -storetype PKCS12 \
   -keyalg RSA \
-  -keysize 2048 \
+  -keysize 4096 \
   -validity 10000 \
-  -alias upload
+  -alias bettercalories-release
 cp key.properties.example key.properties
 ```
 
 Then edit `apps/mobile/android/key.properties` with the keystore passwords.
 `key.properties`, `*.jks`, and `*.keystore` are ignored by git.
 
-For a local-only production test APK without a release key:
+Read the certificate fingerprint without exposing the private key, then provide
+it when building:
 
 ```bash
-ALLOW_DEBUG_SIGNING=1 bun run mobile:build:prod
+keytool -list -v \
+  -keystore apps/mobile/android/bettercalories-release.jks \
+  -alias bettercalories-release
+ANDROID_RELEASE_CERT_SHA256=<approved-sha256> bun run mobile:build:prod
 ```
+
+The build verifies the resulting APK with `apksigner` before copying it into
+`dist/`. See
+[`docs/trusted-production-apk-signing.md`](../../docs/trusted-production-apk-signing.md)
+for CI secrets, offline custody, recovery and rotation.
 
 ## Publish APKs To GitHub
 
@@ -101,6 +111,11 @@ repository secrets before running the Android build:
 - `MOBILE_PROD_API_BASE_URL`
 - `MOBILE_PROD_GOOGLE_SERVER_CLIENT_ID`
 - `MOBILE_PROD_GOOGLE_ANDROID_CLIENT_ID`
+
+Production additionally reconstructs its release keystore temporarily from the
+protected `production` GitHub environment and verifies the publisher
+certificate before upload. Configure the five `ANDROID_RELEASE_*` secrets in
+the signing runbook; do not configure them in the `development` environment.
 
 It then publishes the already-built APK through
 `scripts/mobile/deploy-server-apks.sh`.

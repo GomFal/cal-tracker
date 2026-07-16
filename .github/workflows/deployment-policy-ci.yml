@@ -10,11 +10,14 @@ on:
       - ".github/workflows/mobile-apk-deploy.yml"
       - ".github/workflows/deployment-policy-ci.yml"
       - "apps/backend/Dockerfile"
+      - "apps/mobile/android/app/build.gradle.kts"
       - "infra/deploy/**"
       - "scripts/deploy/**"
       - "scripts/deploy-landing.sh"
       - "scripts/mobile/build-android.sh"
       - "scripts/mobile/deploy-server-apks.sh"
+      - "scripts/mobile/validate-android-release-signing.sh"
+      - "scripts/mobile/verify-apk-signing.sh"
   push:
     branches:
       - main
@@ -27,11 +30,14 @@ on:
       - ".github/workflows/mobile-apk-deploy.yml"
       - ".github/workflows/deployment-policy-ci.yml"
       - "apps/backend/Dockerfile"
+      - "apps/mobile/android/app/build.gradle.kts"
       - "infra/deploy/**"
       - "scripts/deploy/**"
       - "scripts/deploy-landing.sh"
       - "scripts/mobile/build-android.sh"
       - "scripts/mobile/deploy-server-apks.sh"
+      - "scripts/mobile/validate-android-release-signing.sh"
+      - "scripts/mobile/verify-apk-signing.sh"
 
 permissions:
   contents: read
@@ -52,11 +58,15 @@ jobs:
             scripts/deploy/test-configure-ssh.sh \
             scripts/deploy/test-deployment-policy.sh \
             scripts/deploy/test-provision-deploy-user.sh \
+            scripts/deploy/test-apk-signing-policy.sh \
             scripts/deploy/test-supply-chain-policy.sh \
+            scripts/deploy/validate-apk-signing-policy.sh \
             scripts/deploy/validate-supply-chain-policy.sh \
             scripts/deploy-landing.sh \
             scripts/mobile/build-android.sh \
             scripts/mobile/deploy-server-apks.sh \
+            scripts/mobile/validate-android-release-signing.sh \
+            scripts/mobile/verify-apk-signing.sh \
             infra/deploy/bettercalories-deploy \
             infra/deploy/provision-deploy-user.sh \
             infra/deploy/publish-landing.sh \
@@ -69,5 +79,6 @@ jobs:
           scripts/deploy/test-configure-ssh.sh
           scripts/deploy/test-container-runtime-policy.sh
           scripts/deploy/test-provision-deploy-user.sh
+          scripts/deploy/test-apk-signing-policy.sh
           scripts/deploy/test-deployment-policy.sh
           scripts/deploy/test-supply-chain-policy.sh

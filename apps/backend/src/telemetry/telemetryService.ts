@@ -10,6 +10,10 @@
  */
 
 import { createHash } from "node:crypto";
+import {
+  redactSensitiveLogValue,
+  safeErrorDiagnosticMessage,
+} from "../observability/sensitiveDataRedaction.js";
 
 export type LlmTelemetryEvent = {
   flow: "llm_run";
@@ -369,31 +373,31 @@ export class ConsoleTelemetryService implements TelemetryService {
   constructor(private readonly logger: (line: string) => void = console.log) {}
 
   async recordLlmRun(event: LlmTelemetryEvent): Promise<void> {
-    this.safe(() => this.logger(`telemetry.llm_run ${JSON.stringify(stripUndefined(event))}`));
+    this.safe(() => this.logger(`telemetry.llm_run ${safeTelemetryJson(event)}`));
   }
   async recordAgentTurn(event: AgentTurnTelemetryEvent): Promise<void> {
-    this.safe(() => this.logger(`telemetry.agent_turn ${JSON.stringify(stripUndefined(event))}`));
+    this.safe(() => this.logger(`telemetry.agent_turn ${safeTelemetryJson(event)}`));
   }
   async recordAgentToolCall(event: AgentToolCallTelemetryEvent): Promise<void> {
-    this.safe(() => this.logger(`telemetry.agent_tool_call ${JSON.stringify(stripUndefined(event))}`));
+    this.safe(() => this.logger(`telemetry.agent_tool_call ${safeTelemetryJson(event)}`));
   }
   async recordLlmProviderCall(event: LlmProviderCallTelemetryEvent): Promise<void> {
-    this.safe(() => this.logger(`telemetry.llm_provider_call ${JSON.stringify(stripUndefined(event))}`));
+    this.safe(() => this.logger(`telemetry.llm_provider_call ${safeTelemetryJson(event)}`));
   }
   async recordTranscriptionRecord(event: TranscriptionTelemetryRecordEvent): Promise<void> {
-    this.safe(() => this.logger(`telemetry.transcription_record ${JSON.stringify(stripUndefined(event))}`));
+    this.safe(() => this.logger(`telemetry.transcription_record ${safeTelemetryJson(event)}`));
   }
   async recordSttEvent(event: SttTelemetryEvent): Promise<void> {
-    this.safe(() => this.logger(`telemetry.stt ${JSON.stringify(stripUndefined(event))}`));
+    this.safe(() => this.logger(`telemetry.stt ${safeTelemetryJson(event)}`));
   }
   async recordVoiceMealRunEvent(event: VoiceMealRunTelemetryEvent): Promise<void> {
-    this.safe(() => this.logger(`telemetry.voice_meal_run ${JSON.stringify(stripUndefined(event))}`));
+    this.safe(() => this.logger(`telemetry.voice_meal_run ${safeTelemetryJson(event)}`));
   }
   async recordFoodSearchEvent(event: FoodSearchTelemetryEvent): Promise<void> {
-    this.safe(() => this.logger(`telemetry.food_search ${JSON.stringify(stripUndefined(event))}`));
+    this.safe(() => this.logger(`telemetry.food_search ${safeTelemetryJson(event)}`));
   }
   async recordFoodResolverEvent(event: FoodResolverTelemetryEvent): Promise<void> {
-    this.safe(() => this.logger(`telemetry.food_resolver ${JSON.stringify(stripUndefined(event))}`));
+    this.safe(() => this.logger(`telemetry.food_resolver ${safeTelemetryJson(event)}`));
   }
 
   private safe(emit: () => void): void {
@@ -406,8 +410,11 @@ export class ConsoleTelemetryService implements TelemetryService {
 }
 
 function describeError(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  return String(error);
+  return safeErrorDiagnosticMessage(error);
+}
+
+function safeTelemetryJson(event: Record<string, unknown>): string {
+  return JSON.stringify(redactSensitiveLogValue(stripUndefined(event)));
 }
 
 function stripUndefined<T extends Record<string, unknown>>(value: T): Partial<T> {

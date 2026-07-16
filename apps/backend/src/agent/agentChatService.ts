@@ -32,6 +32,12 @@ import {
   DEFAULT_TELEMETRY_SERVICE,
   type TelemetryService,
 } from "../telemetry/telemetryService.js";
+import {
+  classifyPublicAiError,
+  createPublicAiError,
+  type PublicAiError,
+} from "../errors/publicAiErrors.js";
+import { safeErrorDiagnosticMessage } from "../observability/sensitiveDataRedaction.js";
 import { resolveLlmCost, type LlmCostResult } from "../telemetry/llmCost.js";
 import type {
   AgentMessage,
@@ -213,10 +219,10 @@ export type AgentChatEvent =
       type: "tool_call_failed";
       conversationId: string;
       toolCall: AgentToolFeedback;
-      error: string;
+      error: PublicAiError;
     }
   | { type: "done"; conversationId: string }
-  | { type: "error"; conversationId?: string; error: string };
+  | { type: "error"; conversationId?: string; error: PublicAiError };
 
 export class AgentChatService {
   constructor(
@@ -361,7 +367,7 @@ export class AgentChatService {
           conversationId: conversation.id,
           inputText: text,
           inputMode,
-          error: summarizeError(error),
+          errorDiagnostic: summarizeError(error),
           timingsMs: { total: Date.now() - runStarted },
         });
         await this.recordTurnTelemetry({
@@ -373,13 +379,16 @@ export class AgentChatService {
           toolCallCount,
           status: "failure",
           errorCode: "provider_error",
-          errorMessage: error instanceof Error ? error.message : String(error),
+          errorMessage: safeErrorDiagnosticMessage(error),
           totalMs: Date.now() - runStarted,
         });
         yield {
           type: "error",
           conversationId: conversation.id,
-          error: "The assistant is temporarily unavailable.",
+          error: createPublicAiError(
+            "provider_unavailable",
+            correlation.traceId,
+          ),
         };
         return;
       }
@@ -503,7 +512,7 @@ export class AgentChatService {
         yield {
           type: "error",
           conversationId: conversation.id,
-          error: "The assistant reached the tool-call limit for this turn.",
+          error: createPublicAiError("internal_error", correlation.traceId),
         };
         return;
       }
@@ -543,7 +552,7 @@ export class AgentChatService {
             type: "tool_call_failed",
             conversationId: conversation.id,
             toolCall: feedback,
-            error,
+            error: createPublicAiError("validation_error", correlation.traceId),
           };
           await this.addToolErrorMessage(
             input.context.actorUserId,
@@ -577,7 +586,7 @@ export class AgentChatService {
               type: "tool_call_failed",
               conversationId: conversation.id,
               toolCall: feedback,
-              error,
+              error: createPublicAiError("validation_error", correlation.traceId),
             };
             await this.addToolErrorMessage(
               input.context.actorUserId,
@@ -742,7 +751,7 @@ export class AgentChatService {
               type: "tool_call_failed",
               conversationId: conversation.id,
               toolCall: feedback,
-              error: "Candidate reference not found.",
+              error: createPublicAiError("validation_error", correlation.traceId),
             };
           }
           await this.recordToolCallTelemetry({
@@ -769,7 +778,7 @@ export class AgentChatService {
             type: "tool_call_failed",
             conversationId: conversation.id,
             toolCall: feedback,
-            error,
+            error: createPublicAiError("validation_error", correlation.traceId),
           };
           await this.addToolErrorMessage(
             input.context.actorUserId,
@@ -817,7 +826,7 @@ export class AgentChatService {
             type: "tool_call_failed",
             conversationId: conversation.id,
             toolCall: feedback,
-            error,
+            error: createPublicAiError("internal_error", correlation.traceId),
           };
           await this.addToolErrorMessage(
             input.context.actorUserId,
@@ -969,13 +978,15 @@ export class AgentChatService {
             durationMs: actionMs,
           });
         } catch (error) {
-          const errorText =
-            error instanceof Error ? error.message : String(error);
+          const errorText = safeToolFailureForModel(error);
           yield {
             type: "tool_call_failed",
             conversationId: conversation.id,
             toolCall: feedback,
-            error: errorText,
+            error: createPublicAiError(
+              classifyPublicAiError(error, "internal_error"),
+              correlation.traceId,
+            ),
           };
           const toolMessage: AgentMessage = {
             role: "tool",
@@ -1007,7 +1018,7 @@ export class AgentChatService {
             actionId,
             arguments: parsedInput,
             status: "failed",
-            errorMessage: errorText,
+            errorMessage: safeErrorDiagnosticMessage(error),
             iteration,
             toolCallIndex: toolCallCount,
             durationMs: actionMs,
@@ -1019,7 +1030,7 @@ export class AgentChatService {
     yield {
       type: "error",
       conversationId: conversation.id,
-      error: "The assistant stopped after the maximum number of steps.",
+      error: createPublicAiError("internal_error", correlation.traceId),
     };
     await this.recordTurnTelemetry({
       correlation,
@@ -1859,6 +1870,14 @@ function widgetForResult(result: AgentChatMappedResult): AgentWidgetPayload {
 function safeToolContent(content: string): string {
   if (content.length <= STORED_TOOL_RESULT_MAX_CHARS) return content;
   return `${content.slice(0, STORED_TOOL_RESULT_MAX_CHARS)}...`;
+}
+
+function safeToolFailureForModel(error: unknown): string {
+  const rawCode = isRecord(error) ? error.code : undefined;
+  const code = typeof rawCode === "string" && /^[a-z0-9_.-]{1,80}$/i.test(rawCode)
+    ? rawCode
+    : classifyPublicAiError(error, "internal_error");
+  return JSON.stringify({ code });
 }
 
 function conversationTitleFromInput(input?: string): string {

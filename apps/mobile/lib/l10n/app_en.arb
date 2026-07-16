@@ -872,5 +872,10 @@
     }
   },
   "agentChatHistoryRefreshing": "Refreshing...",
-  "agentChatOpenAction": "Open agent chat. Hold to speak"
+  "agentChatOpenAction": "Open agent chat. Hold to speak",
+  "aiErrorValidation": "Check the request and try again.",
+  "aiErrorAuthentication": "Your session expired. Sign in again.",
+  "aiErrorRateLimit": "You've reached the current limit. Wait before trying again.",
+  "aiErrorProviderUnavailable": "The nutrition assistant is temporarily unavailable. Try again shortly.",
+  "aiErrorInternal": "Something went wrong on our side. Try again."
 }

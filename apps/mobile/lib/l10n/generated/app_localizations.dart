@@ -63,7 +63,7 @@ import 'app_localizations_es.dart';
 /// property.
 abstract class AppLocalizations {
   AppLocalizations(String locale)
-      : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+    : localeName = intl.Intl.canonicalizedLocale(locale.toString());
 
   final String localeName;
 
@@ -86,16 +86,16 @@ abstract class AppLocalizations {
   /// of delegates is preferred or required.
   static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
       <LocalizationsDelegate<dynamic>>[
-    delegate,
-    GlobalMaterialLocalizations.delegate,
-    GlobalCupertinoLocalizations.delegate,
-    GlobalWidgetsLocalizations.delegate,
-  ];
+        delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ];
 
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
     Locale('en'),
-    Locale('es')
+    Locale('es'),
   ];
 
   /// No description provided for @appTitle.
@@ -589,7 +589,11 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{preset}: {protein}% protein, {carbs}% carbs, {fat}% fat'**
   String settingsMacroPresetSubtitle(
-      String preset, int protein, int carbs, int fat);
+    String preset,
+    int protein,
+    int carbs,
+    int fat,
+  );
 
   /// No description provided for @settingsMacroPercentSubtitle.
   ///
@@ -3350,6 +3354,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open agent chat. Hold to speak'**
   String get agentChatOpenAction;
+
+  /// No description provided for @aiErrorValidation.
+  ///
+  /// In en, this message translates to:
+  /// **'Check the request and try again.'**
+  String get aiErrorValidation;
+
+  /// No description provided for @aiErrorAuthentication.
+  ///
+  /// In en, this message translates to:
+  /// **'Your session expired. Sign in again.'**
+  String get aiErrorAuthentication;
+
+  /// No description provided for @aiErrorRateLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'ve reached the current limit. Wait before trying again.'**
+  String get aiErrorRateLimit;
+
+  /// No description provided for @aiErrorProviderUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The nutrition assistant is temporarily unavailable. Try again shortly.'**
+  String get aiErrorProviderUnavailable;
+
+  /// No description provided for @aiErrorInternal.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong on our side. Try again.'**
+  String get aiErrorInternal;
 }
 
 class _AppLocalizationsDelegate
@@ -3379,8 +3413,9 @@ AppLocalizations lookupAppLocalizations(Locale locale) {
   }
 
   throw FlutterError(
-      'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
-      'an issue with the localizations generation tool. Please file an issue '
-      'on GitHub with a reproducible sample app and the gen-l10n configuration '
-      'that was used.');
+    'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
+    'an issue with the localizations generation tool. Please file an issue '
+    'on GitHub with a reproducible sample app and the gen-l10n configuration '
+    'that was used.',
+  );
 }

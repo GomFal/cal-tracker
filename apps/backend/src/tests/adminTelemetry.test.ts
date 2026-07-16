@@ -301,7 +301,7 @@ describe("admin telemetry routes", () => {
       model: "test-model",
       audioMimeType: "audio/m4a",
       audioBytes: 345,
-      transcriptText: "I ate bread",
+      transcriptText: "[redacted]",
       transcriptLength: 11,
       status: "completed",
       durationMs: 30
@@ -357,7 +357,7 @@ describe("admin telemetry routes", () => {
       totalTokens: 33,
     });
     expect(body.transcriptions[0]).toMatchObject({
-      transcriptText: "I ate bread",
+      transcriptText: "[redacted]",
       conversationId: conversation.id,
     });
   });
@@ -528,7 +528,7 @@ describe("admin telemetry routes", () => {
       providerCalls: [expect.objectContaining({ providerGenerationId: "gen_list" })],
     });
     await expect(transcriptions.json()).resolves.toMatchObject({
-      transcriptions: [expect.objectContaining({ transcriptText: "commit it" })],
+      transcriptions: [expect.objectContaining({ transcriptText: "[redacted]" })],
     });
     await expect(cost.json()).resolves.toMatchObject({
       totalProviderCostAmount: 0.001,

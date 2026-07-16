@@ -272,7 +272,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String settingsMacroPresetSubtitle(
-      String preset, int protein, int carbs, int fat) {
+    String preset,
+    int protein,
+    int carbs,
+    int fat,
+  ) {
     return '$preset: $protein% protein, $carbs% carbs, $fat% fat';
   }
 
@@ -1812,4 +1816,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get agentChatOpenAction => 'Open agent chat. Hold to speak';
+
+  @override
+  String get aiErrorValidation => 'Check the request and try again.';
+
+  @override
+  String get aiErrorAuthentication => 'Your session expired. Sign in again.';
+
+  @override
+  String get aiErrorRateLimit =>
+      'You\'ve reached the current limit. Wait before trying again.';
+
+  @override
+  String get aiErrorProviderUnavailable =>
+      'The nutrition assistant is temporarily unavailable. Try again shortly.';
+
+  @override
+  String get aiErrorInternal => 'Something went wrong on our side. Try again.';
 }

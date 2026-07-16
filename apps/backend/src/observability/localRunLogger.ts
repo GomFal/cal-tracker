@@ -1,6 +1,10 @@
 import { mkdir, appendFile } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
 import { activeProfileSnapshot } from "./profiler.js";
+import {
+  redactSensitiveLogValue,
+  safeErrorDiagnostic,
+} from "./sensitiveDataRedaction.js";
 
 export type LocalRunLogger = {
   enabled: boolean;
@@ -35,7 +39,11 @@ class JsonlRunLogger implements LocalRunLogger {
     const profile = activeProfileSnapshot();
     await appendFile(
       file,
-      `${JSON.stringify({ timestamp: timestamp.toISOString(), ...event, profile })}\n`,
+      `${JSON.stringify(redactSensitiveLogValue({
+        timestamp: timestamp.toISOString(),
+        ...event,
+        profile,
+      }))}\n`,
       "utf8",
     );
   }
@@ -67,13 +75,7 @@ export function extractGenerationId(rawResponse: unknown): string | undefined {
 }
 
 export function summarizeError(error: unknown): Record<string, unknown> {
-  if (error instanceof Error) {
-    return {
-      name: error.name,
-      message: error.message,
-    };
-  }
-  return { message: String(error) };
+  return safeErrorDiagnostic(error);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

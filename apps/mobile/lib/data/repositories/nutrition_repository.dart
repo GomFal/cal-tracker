@@ -126,7 +126,7 @@ class AgentChatStreamEvent {
   final String? message;
   final String? delta;
   final String? transcript;
-  final String? error;
+  final ApiErrorDetails? error;
   final AgentToolCallFeedback? toolCall;
   final AgentRunResult? result;
   final List<AgentChatSuggestion> suggestions;
@@ -616,7 +616,9 @@ class NutritionRepository {
       message: json['message'] as String?,
       delta: json['delta'] as String?,
       transcript: json['transcript'] as String?,
-      error: json['error'] as String?,
+      error: json['error'] is Map<String, Object?>
+          ? ApiErrorDetails.fromJson(json['error'] as Map<String, Object?>)
+          : null,
       toolCall: toolCallJson is Map<String, Object?>
           ? AgentToolCallFeedback.fromJson(toolCallJson)
           : null,

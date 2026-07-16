@@ -4,6 +4,41 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 import '../../generated/api/cal_tracker_api.dart';
+import '../../l10n/generated/app_localizations.dart';
+
+const publicAiErrorCodes = <String>{
+  'validation_error',
+  'authentication_required',
+  'rate_limit_exceeded',
+  'provider_unavailable',
+  'internal_error',
+};
+
+String? publicAiErrorCode(Object error) {
+  if (error is! ApiException) return null;
+  return publicAiErrorCodes.contains(error.code) ? error.code : null;
+}
+
+String localizedPublicAiErrorMessage(
+  AppLocalizations l10n,
+  String? code, {
+  required String fallback,
+}) {
+  switch (code) {
+    case 'validation_error':
+      return l10n.aiErrorValidation;
+    case 'authentication_required':
+      return l10n.aiErrorAuthentication;
+    case 'rate_limit_exceeded':
+      return l10n.aiErrorRateLimit;
+    case 'provider_unavailable':
+      return l10n.aiErrorProviderUnavailable;
+    case 'internal_error':
+      return l10n.aiErrorInternal;
+    default:
+      return fallback;
+  }
+}
 
 enum UserErrorContext {
   authLogin,
@@ -57,7 +92,8 @@ String userVisibleErrorMessage(
         code == 'invalid_google_token') {
       return 'Google sign-in did not finish. Try again.';
     }
-    if (error.statusCode == 401 ||
+    if (code == 'authentication_required' ||
+        error.statusCode == 401 ||
         code == 'token_expired' ||
         code == 'authentication_required') {
       return 'Your session expired. Sign in again.';
@@ -74,10 +110,11 @@ String userVisibleErrorMessage(
     if (error.statusCode == 415) {
       return 'That file type is not supported.';
     }
-    if (error.statusCode == 429) {
+    if (code == 'rate_limit_exceeded' || error.statusCode == 429) {
       return 'Too many tries. Wait a moment and try again.';
     }
-    if (code == 'agent_provider_unavailable') {
+    if (code == 'provider_unavailable' ||
+        code == 'agent_provider_unavailable') {
       if (context == UserErrorContext.voiceAgent) {
         return 'We could not understand that meal yet. Try adding a little more detail.';
       }

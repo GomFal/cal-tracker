@@ -25,6 +25,35 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
+class ApiErrorDetails {
+  const ApiErrorDetails({
+    required this.code,
+    required this.message,
+    required this.traceId,
+  });
+
+  final String code;
+  final String message;
+  final String traceId;
+
+  factory ApiErrorDetails.fromJson(Map<String, Object?> json) {
+    const publicCodes = <String>{
+      'validation_error',
+      'authentication_required',
+      'rate_limit_exceeded',
+      'provider_unavailable',
+      'internal_error',
+    };
+    final rawCode = json['code'] as String?;
+    return ApiErrorDetails(
+      code: publicCodes.contains(rawCode) ? rawCode! : 'internal_error',
+      message: json['message'] as String? ??
+          'We could not complete that request. Try again.',
+      traceId: json['traceId'] as String? ?? '',
+    );
+  }
+}
+
 class ApiCallResult<T> {
   const ApiCallResult({required this.body, required this.requestId});
 
@@ -528,13 +557,47 @@ class CalTrackerApiClient {
     }
 
     final pending = StringBuffer();
-    await for (final chunk in response.stream.transform(utf8.decoder)) {
-      for (final event in _parseSseEvents(chunk, pending)) {
-        yield event;
+    var terminalEventReceived = false;
+    final traceId = response.headers['x-request-id'] ??
+        response.headers['X-Request-Id'] ??
+        _lastRequestId;
+    try {
+      await for (final chunk in response.stream.transform(utf8.decoder)) {
+        for (final event in _parseSseEvents(chunk, pending)) {
+          terminalEventReceived =
+              terminalEventReceived || _isTerminalSseEvent(event);
+          yield event;
+        }
       }
+      final lastEvent = _parsePendingSseEvent(pending);
+      if (lastEvent != null) {
+        terminalEventReceived =
+            terminalEventReceived || _isTerminalSseEvent(lastEvent);
+        yield lastEvent;
+      }
+    } on ApiException {
+      rethrow;
+    } on Object {
+      throw ApiException(
+        500,
+        'We could not complete that request. Try again.',
+        code: 'internal_error',
+        traceId: traceId,
+      );
     }
-    final lastEvent = _parsePendingSseEvent(pending);
-    if (lastEvent != null) yield lastEvent;
+    if (!terminalEventReceived) {
+      throw ApiException(
+        500,
+        'We could not complete that request. Try again.',
+        code: 'internal_error',
+        traceId: traceId,
+      );
+    }
+  }
+
+  bool _isTerminalSseEvent(Map<String, Object?> event) {
+    final type = event['type'];
+    return type == 'done' || type == 'error';
   }
 
   Iterable<Map<String, Object?>> _parseSseEvents(

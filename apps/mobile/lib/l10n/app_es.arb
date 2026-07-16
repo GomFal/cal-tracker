@@ -566,5 +566,10 @@
     }
   },
   "agentChatHistoryRefreshing": "Actualizando...",
-  "agentChatOpenAction": "Abrir chat con el agente. Mantén pulsado para hablar"
+  "agentChatOpenAction": "Abrir chat con el agente. Mantén pulsado para hablar",
+  "aiErrorValidation": "Revisa la solicitud e inténtalo de nuevo.",
+  "aiErrorAuthentication": "Tu sesión ha caducado. Inicia sesión de nuevo.",
+  "aiErrorRateLimit": "Has alcanzado el límite actual. Espera antes de volver a intentarlo.",
+  "aiErrorProviderUnavailable": "El asistente de nutrición no está disponible temporalmente. Inténtalo de nuevo en breve.",
+  "aiErrorInternal": "Algo ha fallado por nuestra parte. Inténtalo de nuevo."
 }

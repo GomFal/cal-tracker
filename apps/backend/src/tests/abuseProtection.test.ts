@@ -397,7 +397,11 @@ describe("abuse protection HTTP integration", () => {
 
     const first = await chat();
     expect(first.status).toBe(200);
-    expect((await chat()).status).toBe(429);
+    const blocked = await chat();
+    expect(blocked.status).toBe(429);
+    expect(await blocked.json()).toMatchObject({
+      error: { code: "rate_limit_exceeded" },
+    });
     await first.body?.cancel();
 
     const afterCancel = await chat();

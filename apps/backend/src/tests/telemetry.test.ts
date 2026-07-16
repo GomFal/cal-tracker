@@ -161,7 +161,7 @@ describe("AgentService LLM telemetry", () => {
       providerError: true,
       traceId: "trace-provider-error",
       timingsMs: expect.objectContaining({ total: expect.any(Number) }),
-      errorMessage: expect.stringContaining("provider_unavailable"),
+      errorMessage: expect.stringContaining("messageSha256"),
     });
   });
 
@@ -342,11 +342,13 @@ describe("HTTP route telemetry", () => {
   });
 
   it("emits started/failed STT telemetry when the provider throws", async () => {
+    const leaked =
+      "Antonio comió arroz at https://stt.invalid/debug?token=secret-value sk_sttsecret123";
     const recorder = new RecordingTelemetryService();
     telemetry.push(recorder);
     const throwingProvider: import("../stt/speechToTextProvider.js").SpeechToTextProvider = {
       async transcribe(): Promise<never> {
-        throw new Error("stt blew up");
+        throw new Error(leaked);
       },
     };
     const { request } = buildTestApp({
@@ -362,12 +364,29 @@ describe("HTTP route telemetry", () => {
       headers: { authorization: authHeader.authorization },
       body,
     });
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(503);
+    const raw = await res.text();
+    const bodyJson = JSON.parse(raw) as {
+      error: { code: string; message: string; traceId: string };
+    };
+    expect(bodyJson.error).toEqual({
+      code: "provider_unavailable",
+      message:
+        "The nutrition assistant is temporarily unavailable. Try again shortly.",
+      traceId: res.headers.get("x-request-id"),
+    });
+    expect(raw).not.toContain("Antonio");
+    expect(raw).not.toContain("stt.invalid");
+    expect(raw).not.toContain("sttsecret");
     expect(recorder.stt.map((e) => e.outcome)).toEqual(["started", "failed"]);
     expect(recorder.stt[1]).toMatchObject({
       outcome: "failed",
-      errorMessage: "stt blew up",
+      errorMessage: expect.stringContaining("messageSha256"),
     });
+    const recordedFailure = JSON.stringify(recorder.stt[1]);
+    expect(recordedFailure).not.toContain("Antonio");
+    expect(recordedFailure).not.toContain("stt.invalid");
+    expect(recordedFailure).not.toContain("sttsecret");
   });
 
   it("emits zero-results food search telemetry when the query matches nothing", async () => {

@@ -8,9 +8,54 @@ import { AdminAuthError } from "../auth/adminService.js";
 import { AuthError } from "../auth/service.js";
 import { AbuseLimitExceededError } from "../security/abuseProtection.js";
 import { getTraceId } from "./requestContext.js";
+import {
+  PublicAiErrorException,
+  classifyPublicAiError,
+  createPublicAiError,
+  isPublicAiEndpoint,
+  publicAiErrorStatus,
+} from "../errors/publicAiErrors.js";
+import { safeErrorDiagnostic } from "../observability/sensitiveDataRedaction.js";
 
 export function formatErrorResponse(c: Context, error: unknown) {
   const traceId = getTraceId(c);
+  const path = new URL(c.req.url).pathname;
+  if (error instanceof PublicAiErrorException) {
+    return c.json({ error: error.publicError }, error.status);
+  }
+  if (isPublicAiEndpoint(path)) {
+    const code = error instanceof AbuseLimitExceededError
+      ? "rate_limit_exceeded"
+      : error instanceof ZodError
+        ? "validation_error"
+        : error instanceof HTTPException &&
+            (error.status === 401 || error.status === 403)
+          ? "authentication_required"
+          : error instanceof HTTPException && error.status === 400
+            ? "validation_error"
+            : error instanceof ActionExecutionError
+              ? error.code === "permission_denied"
+                ? "authentication_required"
+                : classifyPublicAiError(error, "validation_error")
+              : classifyPublicAiError(error);
+    if (error instanceof AbuseLimitExceededError) {
+      c.header("Retry-After", String(error.retryAfterSeconds));
+    }
+    const status = error instanceof AbuseLimitExceededError
+      ? 429
+      : error instanceof HTTPException && (error.status === 401 || error.status === 403)
+        ? 401
+        : publicAiErrorStatus(code);
+    if (code === "internal_error") {
+      console.error("request.ai_unhandled_error", {
+        traceId,
+        method: c.req.method,
+        path,
+        error: safeErrorDiagnostic(error),
+      });
+    }
+    return c.json({ error: createPublicAiError(code, traceId) }, status);
+  }
   if (error instanceof ZodError) {
     return c.json({ error: { code: "validation_error", message: "Invalid request", traceId, details: error.flatten() } }, 400);
   }
@@ -50,12 +95,12 @@ export function formatErrorResponse(c: Context, error: unknown) {
   if (error instanceof HTTPException) {
     return c.json({ error: { code: httpErrorCode(error.status), message: httpErrorMessage(error.status), traceId } }, error.status);
   }
-  const message = error instanceof Error ? error.message : "Unexpected error";
+  const diagnostic = safeErrorDiagnostic(error);
   console.error("request.unhandled_error", {
     traceId,
     method: c.req.method,
     path: new URL(c.req.url).pathname,
-    message,
+    error: diagnostic,
     stack: error instanceof Error ? error.stack : undefined,
   });
   return c.json({ error: { code: "internal_error", message: "We could not complete that request. Try again.", traceId } }, 500);

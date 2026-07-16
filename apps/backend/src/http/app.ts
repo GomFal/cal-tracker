@@ -80,6 +80,14 @@ import {
   InMemoryAbuseProtection,
   type CostOperationLease,
 } from "../security/abuseProtection.js";
+import {
+  PublicAiErrorException,
+  createPublicAiError,
+} from "../errors/publicAiErrors.js";
+import {
+  safeErrorDiagnostic,
+  safeErrorDiagnosticMessage,
+} from "../observability/sensitiveDataRedaction.js";
 
 const AUTH_RATE_LIMITED_PATHS = new Set([
   "/auth/password-reset/confirm",
@@ -702,7 +710,7 @@ export function createApp(input: {
             userId: user.id,
             source: upload.source ?? "flutter",
             errorStage: "stt",
-            error: summarizeError(error),
+            errorDiagnostic: summarizeError(error),
             timingsMs: { total: Date.now() - routeStarted },
           });
           recordTranscriptionTelemetry({
@@ -717,13 +725,13 @@ export function createApp(input: {
               durationMs: Date.now() - routeStarted,
               status: "failed",
               errorCode: "stt_provider_failed",
-              errorMessage: error instanceof Error ? error.message : String(error),
+              errorMessage: safeErrorDiagnosticMessage(error),
               metadata: { filename: upload.filename, source: upload.source ?? "flutter" },
             },
           });
           yield {
             type: "error",
-            error: error instanceof Error ? error.message : String(error),
+            error: createPublicAiError("provider_unavailable", traceId),
           } as AgentChatEvent;
           return;
         }
@@ -855,10 +863,9 @@ export function createApp(input: {
       console.error("stt.transcription.failed", {
         traceId,
         userId: user.id,
-        filename: upload.filename,
         mimeType: upload.mimeType,
         bytes: upload.buffer.byteLength,
-        error: error instanceof Error ? error.message : String(error),
+        error: safeErrorDiagnostic(error),
       });
       recordSttTelemetry({
         telemetryService,
@@ -873,7 +880,7 @@ export function createApp(input: {
           mimeType: upload.mimeType,
           bytes: upload.buffer.byteLength,
           errorCode: "stt_provider_failed",
-          errorMessage: error instanceof Error ? error.message : String(error),
+          errorMessage: safeErrorDiagnosticMessage(error),
         },
       });
       recordTranscriptionTelemetry({
@@ -887,11 +894,16 @@ export function createApp(input: {
           transcriptLength: 0,
           status: "failed",
           errorCode: "stt_provider_failed",
-          errorMessage: error instanceof Error ? error.message : String(error),
+          errorMessage: safeErrorDiagnosticMessage(error),
           metadata: { filename: upload.filename },
         },
       });
-      throw error;
+      throw new PublicAiErrorException(
+        "provider_unavailable",
+        traceId,
+        503,
+        error,
+      );
     }
 
     console.info("stt.transcription.completed", {
@@ -1004,10 +1016,9 @@ export function createApp(input: {
       console.error("voice.meal_run.transcription_failed", {
         traceId,
         userId: user.id,
-        filename: upload.filename,
         mimeType: upload.mimeType,
         bytes: upload.buffer.byteLength,
-        error: error instanceof Error ? error.message : String(error),
+        error: safeErrorDiagnostic(error),
       });
       await logLocalRun(runLogger, {
         type: "voice.meal_run",
@@ -1020,7 +1031,7 @@ export function createApp(input: {
           bytes: upload.buffer.byteLength,
         },
         errorStage: "stt",
-        error: summarizeError(error),
+        errorDiagnostic: summarizeError(error),
         timingsMs: {
           stt: Date.now() - routeStarted,
           total: Date.now() - routeStarted,
@@ -1040,7 +1051,7 @@ export function createApp(input: {
           bytes: upload.buffer.byteLength,
           source: upload.source ?? "flutter",
           errorStage: "stt",
-          errorMessage: error instanceof Error ? error.message : String(error),
+          errorMessage: safeErrorDiagnosticMessage(error),
           timingsMs: {
             stt: Date.now() - routeStarted,
             total: Date.now() - routeStarted,
@@ -1060,11 +1071,16 @@ export function createApp(input: {
           durationMs: Date.now() - routeStarted,
           status: "failed",
           errorCode: "stt_provider_failed",
-          errorMessage: error instanceof Error ? error.message : String(error),
+          errorMessage: safeErrorDiagnosticMessage(error),
           metadata: { filename: upload.filename, source: upload.source ?? "flutter" },
         },
       });
-      throw error;
+      throw new PublicAiErrorException(
+        "provider_unavailable",
+        traceId,
+        503,
+        error,
+      );
     }
 
     const transcript = transcription.text;
@@ -1344,15 +1360,11 @@ async function parseAudioUpload(
     console.warn(`${logPrefix}.invalid_multipart`, {
       traceId,
       userId: user.id,
-      error: error instanceof Error ? error.message : String(error),
+      error: safeErrorDiagnostic(error),
     });
     return c.json(
       {
-        error: {
-          code: "validation_error",
-          message: "Invalid multipart/form-data request.",
-          traceId,
-        },
+        error: createPublicAiError("validation_error", traceId),
       },
       400,
     );
@@ -1365,15 +1377,12 @@ async function parseAudioUpload(
     console.warn(`${logPrefix}.invalid_source`, {
       traceId,
       userId: user.id,
-      source: body.source,
+      sourcePresent: body.source !== undefined,
+      sourceType: typeof body.source,
     });
     return c.json(
       {
-        error: {
-          code: "validation_error",
-          message: "Invalid source.",
-          traceId,
-        },
+        error: createPublicAiError("validation_error", traceId),
       },
       400,
     );
@@ -1383,15 +1392,12 @@ async function parseAudioUpload(
     console.warn(`${logPrefix}.invalid_active_proposal`, {
       traceId,
       userId: user.id,
-      activeProposalId: body.activeProposalId,
+      activeProposalIdPresent: body.activeProposalId !== undefined,
+      activeProposalIdType: typeof body.activeProposalId,
     });
     return c.json(
       {
-        error: {
-          code: "validation_error",
-          message: "Invalid active proposal id.",
-          traceId,
-        },
+        error: createPublicAiError("validation_error", traceId),
       },
       400,
     );
@@ -1401,15 +1407,12 @@ async function parseAudioUpload(
     console.warn(`${logPrefix}.invalid_conversation`, {
       traceId,
       userId: user.id,
-      conversationId: body.conversationId,
+      conversationIdPresent: body.conversationId !== undefined,
+      conversationIdType: typeof body.conversationId,
     });
     return c.json(
       {
-        error: {
-          code: "validation_error",
-          message: "Invalid conversation id.",
-          traceId,
-        },
+        error: createPublicAiError("validation_error", traceId),
       },
       400,
     );
@@ -1423,11 +1426,7 @@ async function parseAudioUpload(
     });
     return c.json(
       {
-        error: {
-          code: "validation_error",
-          message: "Missing audio file.",
-          traceId,
-        },
+        error: createPublicAiError("validation_error", traceId),
       },
       400,
     );
@@ -1444,7 +1443,7 @@ async function parseAudioUpload(
     });
     return c.json(
       {
-        error: { code: "validation_error", message: validation.error, traceId },
+        error: createPublicAiError("validation_error", traceId),
       },
       validation.status,
     );
@@ -1461,11 +1460,12 @@ async function parseAudioUpload(
 }
 
 function streamAgentChat(
-  _c: Context,
+  c: Context,
   events: AsyncIterable<AgentChatEvent>,
   lease?: CostOperationLease,
 ): Response {
   const encoder = new TextEncoder();
+  const traceId = getTraceId(c);
   const iterator = events[Symbol.asyncIterator]();
   let closed = false;
 
@@ -1501,12 +1501,16 @@ function streamAgentChat(
             encoder.encode(
               `data: ${JSON.stringify({
                 type: "error",
-                error: error instanceof Error ? error.message : String(error),
+                error: createPublicAiError("internal_error", traceId),
               })}\n\n`,
             ),
           );
           controller.close();
         } finally {
+          console.error("agent.chat_stream.failed", {
+            traceId,
+            error: safeErrorDiagnostic(error),
+          });
           await finish();
         }
       }

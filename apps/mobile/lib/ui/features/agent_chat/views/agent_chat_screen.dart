@@ -10,6 +10,7 @@ import '../../../../domain/models/nutrition_models.dart';
 import '../../../../l10n/app_localizations_context.dart';
 import '../../../core/design_system.dart';
 import '../../../core/motion.dart';
+import '../../../core/user_visible_error.dart';
 import '../../../core/voice_action_button.dart';
 import '../../meal_templates/views/meal_template_editor_screen.dart';
 import '../../meal_templates/views/usual_food_editor_screen.dart';
@@ -112,7 +113,11 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
                               child: FreshStatusBanner(
                                 icon: Icons.error_outline_rounded,
                                 title: context.l10n.agentChatErrorTitle,
-                                message: viewModel.errorMessage,
+                                message: localizedPublicAiErrorMessage(
+                                  context.l10n,
+                                  viewModel.errorCode,
+                                  fallback: viewModel.errorMessage!,
+                                ),
                                 color: palette.coral,
                               ),
                             ),
@@ -655,7 +660,11 @@ class _ToolCallCard extends StatelessWidget {
                       ),
                       const SizedBox(height: FreshSpacing.xs),
                       Text(
-                        entry.error ?? toolCall?.summary ?? '',
+                        localizedPublicAiErrorMessage(
+                          context.l10n,
+                          entry.errorCode,
+                          fallback: entry.error ?? toolCall?.summary ?? '',
+                        ),
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               color: palette.inkSoft,
                             ),

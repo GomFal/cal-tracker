@@ -275,7 +275,11 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String settingsMacroPresetSubtitle(
-      String preset, int protein, int carbs, int fat) {
+    String preset,
+    int protein,
+    int carbs,
+    int fat,
+  ) {
     return '$preset: $protein % proteína, $carbs % carbohidratos, $fat % grasa';
   }
 
@@ -1834,4 +1838,23 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get agentChatOpenAction =>
       'Abrir chat con el agente. Mantén pulsado para hablar';
+
+  @override
+  String get aiErrorValidation => 'Revisa la solicitud e inténtalo de nuevo.';
+
+  @override
+  String get aiErrorAuthentication =>
+      'Tu sesión ha caducado. Inicia sesión de nuevo.';
+
+  @override
+  String get aiErrorRateLimit =>
+      'Has alcanzado el límite actual. Espera antes de volver a intentarlo.';
+
+  @override
+  String get aiErrorProviderUnavailable =>
+      'El asistente de nutrición no está disponible temporalmente. Inténtalo de nuevo en breve.';
+
+  @override
+  String get aiErrorInternal =>
+      'Algo ha fallado por nuestra parte. Inténtalo de nuevo.';
 }

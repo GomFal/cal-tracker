@@ -21,6 +21,7 @@ Current authoritative files:
 | `trusted-production-deployments.md` | Pinned SSH host identity, dedicated deployment account, immutable backend image references and release traceability. | GitHub environment approvals, signed tags, or deployment execution. |
 | `container-runtime-hardening.md` | Backend container privilege, capability and resource policy; isolated runtime smoke and operational tuning. | Read-only filesystems or additional PostgreSQL hardening. |
 | `software-supply-chain-controls.md` | Bun and production base-image versions, frozen lockfile policy and the MVP update procedure. | SBOM, attestations, container signing, new scanners or commit-pinned Actions. |
+| `runtime-dependency-remediation.md` | Runtime dependency security updates, audit evidence and temporary non-applicable development-tool findings. | A general vulnerability-management SLA or automatic dependency updates. |
 
 This split is intentional:
 

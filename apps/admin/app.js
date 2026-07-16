@@ -2,7 +2,7 @@
  * Vanilla JS application logic for the static admin panel.
  *
  * Features:
- *  - Configurable API base URL persisted in localStorage.
+ *  - Approved API environment persisted in localStorage.
  *  - Admin username/password login; token persisted in sessionStorage.
  *  - Tabs: Overview, Events, LLM runs, Food search, Trace lookup.
  *  - Filter forms for each list view.
@@ -22,9 +22,12 @@
   "use strict";
 
   const cfg = window.AdminTelemetry || {};
+  const originPolicy = window.AdminOriginPolicy;
+  if (!originPolicy) throw new Error("Admin origin policy failed to load.");
   const STORAGE = {
     apiBase: cfg.storageKeys?.apiBase || "bc.admin.apiBase",
     apiToken: cfg.storageKeys?.apiToken || "bc.admin.apiToken",
+    apiTokenOrigin: cfg.storageKeys?.apiTokenOrigin || "bc.admin.apiTokenOrigin",
     adminUsername: cfg.storageKeys?.adminUsername || "bc.admin.username",
     tableWidths: "bc.admin.tableWidths",
   };
@@ -173,7 +176,6 @@
       if (v == null || v === false) continue;
       if (k === "class") node.className = v;
       else if (k === "text") node.textContent = v;
-      else if (k === "html") node.innerHTML = v;
       else if (k === "data") {
         for (const [dk, dv] of Object.entries(v)) node.dataset[dk] = dv;
       } else if (k.startsWith("on") && typeof v === "function") {
@@ -196,11 +198,25 @@
   /* ========== Storage ========== */
 
   function readStoredConfig() {
-    migrateLegacyToken();
+    removeLegacyToken();
     try {
+      let apiBase;
+      try {
+        apiBase = normalizeBase(localStorage.getItem(STORAGE.apiBase) || DEFAULT_API_BASE);
+      } catch (_) {
+        localStorage.removeItem(STORAGE.apiBase);
+        clearSession();
+        apiBase = normalizeBase(DEFAULT_API_BASE);
+      }
+      const apiToken = sessionStorage.getItem(STORAGE.apiToken) || "";
+      const apiTokenOrigin = sessionStorage.getItem(STORAGE.apiTokenOrigin) || "";
+      if (apiToken && apiTokenOrigin !== apiBase) {
+        clearSession();
+        return { apiBase, apiToken: "", adminUsername: "" };
+      }
       return {
-        apiBase: localStorage.getItem(STORAGE.apiBase) || "",
-        apiToken: sessionStorage.getItem(STORAGE.apiToken) || "",
+        apiBase,
+        apiToken,
         adminUsername: sessionStorage.getItem(STORAGE.adminUsername) || "",
       };
     } catch (err) {
@@ -209,10 +225,11 @@
     }
   }
 
-  function writeStoredConfig({ apiBase, apiToken, adminUsername }) {
+  function writeStoredConfig({ apiBase, apiToken, apiTokenOrigin, adminUsername }) {
     try {
       if (apiBase != null) localStorage.setItem(STORAGE.apiBase, apiBase);
       if (apiToken != null) sessionStorage.setItem(STORAGE.apiToken, apiToken);
+      if (apiTokenOrigin != null) sessionStorage.setItem(STORAGE.apiTokenOrigin, apiTokenOrigin);
       if (adminUsername != null) sessionStorage.setItem(STORAGE.adminUsername, adminUsername);
     } catch (err) {
       console.warn("browser storage write failed", err);
@@ -222,6 +239,7 @@
   function clearSession() {
     try {
       sessionStorage.removeItem(STORAGE.apiToken);
+      sessionStorage.removeItem(STORAGE.apiTokenOrigin);
       sessionStorage.removeItem(STORAGE.adminUsername);
       localStorage.removeItem(STORAGE.apiToken);
     } catch (err) {
@@ -229,11 +247,13 @@
     }
   }
 
-  function migrateLegacyToken() {
+  function removeLegacyToken() {
     try {
-      const legacy = localStorage.getItem(STORAGE.apiToken);
-      if (legacy && !sessionStorage.getItem(STORAGE.apiToken)) {
-        sessionStorage.setItem(STORAGE.apiToken, legacy);
+      // Tokens previously stored without an origin binding cannot be trusted
+      // after an environment change. Force a one-time reauthentication.
+      if (sessionStorage.getItem(STORAGE.apiToken) && !sessionStorage.getItem(STORAGE.apiTokenOrigin)) {
+        sessionStorage.removeItem(STORAGE.apiToken);
+        sessionStorage.removeItem(STORAGE.adminUsername);
       }
       localStorage.removeItem(STORAGE.apiToken);
     } catch (_) {
@@ -246,14 +266,13 @@
   const statusPill = () => $("#status-pill");
   const statusMessage = () => $("#status-message");
 
-  function setStatus(state_, message, opts = {}) {
+  function setStatus(state_, message) {
     const pill = statusPill();
     const msg = statusMessage();
     if (!pill || !msg) return;
     pill.dataset.state = state_;
     pill.textContent = state_;
-    if (opts.html) msg.innerHTML = message;
-    else msg.textContent = message;
+    msg.textContent = message;
   }
 
   function setStatusLoading(label) {
@@ -264,17 +283,17 @@
     const { status, message, url } = err;
     const code = err?.body?.error?.code || err?.body?.code;
     if ((status === 401 && code !== "invalid_admin_credentials") || code === "token_expired" || code === "admin_token_required" || code === "admin_token_invalid") {
-      setStatus("error", `Your admin session expired. Sign in again.${url ? ` · <code>${escapeHtml(url)}</code>` : ""}`, { html: true });
+      setStatus("error", `Your admin session expired. Sign in again.${url ? ` · ${url}` : ""}`);
       return;
     }
     if (status === 403 || code === "permission_denied" || code === "admin_scope_required") {
-      setStatus("error", `This token is not authorized for admin telemetry.${url ? ` · <code>${escapeHtml(url)}</code>` : ""}`, { html: true });
+      setStatus("error", `This token is not authorized for admin telemetry.${url ? ` · ${url}` : ""}`);
       return;
     }
     let body = message || "Request failed";
     if (status) body = `${status} · ${body}`;
-    if (url) body += ` · <code>${escapeHtml(url)}</code>`;
-    setStatus("error", body, { html: true });
+    if (url) body += ` · ${url}`;
+    setStatus("error", body);
   }
 
   function setStatusSuccess(message) {
@@ -295,14 +314,11 @@
   /* ========== HTTP ========== */
 
   function normalizeBase(raw) {
-    return (raw || "").trim().replace(/\/+$/, "");
+    return originPolicy.normalizeApiBase(raw);
   }
 
   function buildUrl(path) {
-    const base = normalizeBase(state.apiBase || DEFAULT_API_BASE);
-    if (!base) throw new Error("API base URL is not configured.");
-    if (path.startsWith("http")) return path;
-    return `${base}${path.startsWith("/") ? "" : "/"}${path}`;
+    return originPolicy.resolveApiUrl(state.apiBase || DEFAULT_API_BASE, path);
   }
 
   function abortInFlight() {
@@ -344,12 +360,16 @@
       if (serialized) url += (url.includes("?") ? "&" : "?") + serialized;
     }
 
-    const headers = { Accept: "application/json" };
-    if (state.apiToken) headers.Authorization = `Bearer ${state.apiToken}`;
+    const headers = originPolicy.createAuthorizedHeaders(
+      state.apiBase,
+      url,
+      state.apiToken,
+      { Accept: "application/json" },
+    );
 
     let response;
     try {
-      response = await fetch(url, { method: "GET", headers, signal: ctrl.signal });
+      response = await fetch(url, { method: "GET", headers, signal: ctrl.signal, redirect: "error" });
     } catch (err) {
       state.controllers.delete(ctrl);
       if (err && err.name === "AbortError") {
@@ -412,6 +432,7 @@
         headers: { Accept: "application/json", "Content-Type": "application/json" },
         body: JSON.stringify(body),
         signal: ctrl.signal,
+        redirect: "error",
       });
     } catch (err) {
       state.controllers.delete(ctrl);
@@ -523,7 +544,11 @@
     const normalizedUsername = data?.username || username;
     state.apiToken = token;
     state.adminUsername = normalizedUsername;
-    writeStoredConfig({ apiToken: token, adminUsername: normalizedUsername });
+    writeStoredConfig({
+      apiToken: token,
+      apiTokenOrigin: normalizeBase(state.apiBase),
+      adminUsername: normalizedUsername,
+    });
     renderAuthUi();
     return data;
   }
@@ -581,16 +606,6 @@
   }
 
   /* ========== Utilities ========== */
-
-  function escapeHtml(value) {
-    if (value == null) return "";
-    return String(value)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
-  }
 
   function formatNumber(value) {
     if (value == null || value === "") return "—";
@@ -2750,20 +2765,60 @@
     usernameInput.value = state.adminUsername || "";
     renderAuthUi();
 
+    function selectApiBase(raw) {
+      const nextBase = normalizeBase(raw);
+      const changed = Boolean(state.apiBase && state.apiBase !== nextBase);
+      const clearedSession = changed && isSignedIn();
+
+      if (changed) abortInFlight();
+      state.apiBase = nextBase;
+      baseInput.value = nextBase;
+      writeStoredConfig({ apiBase: nextBase });
+
+      if (clearedSession) {
+        clearSession();
+        state.apiToken = "";
+        state.adminUsername = "";
+        clearProtectedData();
+        renderAuthUi();
+      }
+      return { changed, clearedSession };
+    }
+
+    baseInput.addEventListener("change", () => {
+      try {
+        const selection = selectApiBase(baseInput.value);
+        if (selection.clearedSession) {
+          setStatus("locked", "API environment changed. Sign in again for this environment.");
+          usernameInput.focus();
+        } else if (selection.changed) {
+          setStatusSuccess(`Selected API environment · ${state.apiBase}`);
+        }
+      } catch (err) {
+        baseInput.value = state.apiBase;
+        setStatusError(err);
+      }
+    });
+
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
-      const base = normalizeBase(baseInput.value);
-      if (!base) {
-        setStatusError({ message: "API base URL is required." });
+      let selection;
+      try {
+        selection = selectApiBase(baseInput.value);
+      } catch (err) {
+        setStatusError(err);
         baseInput.focus();
         return;
       }
-      state.apiBase = base;
-      baseInput.value = base;
-      writeStoredConfig({ apiBase: state.apiBase });
+
+      if (selection.clearedSession) {
+        setStatus("locked", "API environment changed. Sign in again for this environment.");
+        usernameInput.focus();
+        return;
+      }
 
       if (state.apiToken) {
-        setStatusSuccess(`Saved API base · ${state.apiBase}`);
+        setStatusSuccess(`API environment unchanged · ${state.apiBase}`);
         return;
       }
 

@@ -12,6 +12,9 @@ on:
       - "apps/backend/Dockerfile"
       - "apps/mobile/android/app/build.gradle.kts"
       - "infra/deploy/**"
+      - "apps/admin/**"
+      - "apps/landing/index.html"
+      - "package.json"
       - "scripts/deploy/**"
       - "scripts/deploy-landing.sh"
       - "scripts/mobile/build-android.sh"
@@ -32,6 +35,9 @@ on:
       - "apps/backend/Dockerfile"
       - "apps/mobile/android/app/build.gradle.kts"
       - "infra/deploy/**"
+      - "apps/admin/**"
+      - "apps/landing/index.html"
+      - "package.json"
       - "scripts/deploy/**"
       - "scripts/deploy-landing.sh"
       - "scripts/mobile/build-android.sh"
@@ -82,3 +88,10 @@ jobs:
           scripts/deploy/test-apk-signing-policy.sh
           scripts/deploy/test-deployment-policy.sh
           scripts/deploy/test-supply-chain-policy.sh
+
+      - name: Test admin origin and web security policies
+        run: |
+          set -euo pipefail
+          node apps/admin/validate.mjs
+          node apps/admin/test-origin-policy.mjs
+          node scripts/deploy/test-web-security-policy.mjs

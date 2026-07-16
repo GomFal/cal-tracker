@@ -19,6 +19,7 @@ cp backup-postgres-schema.sh "$DEPLOY_DIR/backup-postgres-schema.sh"
 cp publish-landing.sh "$DEPLOY_DIR/publish-landing.sh"
 chmod 755 "$DEPLOY_DIR/deploy.sh" "$DEPLOY_DIR/backup-postgres-schema.sh" "$DEPLOY_DIR/publish-landing.sh"
 cp nginx/proxy-common.conf /etc/nginx/snippets/cal-tracker-proxy-common.conf
+cp nginx/security-headers.conf /etc/nginx/snippets/cal-tracker-security-headers.conf
 touch "$STATE_DIR/dev.active" "$STATE_DIR/pro.active"
 
 if [[ ! -f /etc/letsencrypt/live/api.bettercalories.app/fullchain.pem ]]; then

@@ -2,13 +2,16 @@ class ApiConfig {
   const ApiConfig({required this.baseUrl});
 
   const ApiConfig.fromEnvironment()
-    : baseUrl = const String.fromEnvironment('API_BASE_URL', defaultValue: '');
+      : baseUrl =
+            const String.fromEnvironment('API_BASE_URL', defaultValue: '');
 
   final String baseUrl;
 
   static const productionFlavor = 'prod';
   static const developmentFlavor = 'dev';
   static const localFlavor = 'local';
+  static const localParallelFlavorOne = 'local1';
+  static const localParallelFlavorTwo = 'local2';
 
   static const productionBaseUrl = 'https://api.bettercalories.app';
   static const developmentBaseUrl = 'https://dev-api.bettercalories.app';
@@ -69,6 +72,8 @@ class ApiConfig {
         }
         throw const ApiConfigException('unapproved_development_api_origin');
       case localFlavor:
+      case localParallelFlavorOne:
+      case localParallelFlavorTwo:
         if (isRelease) {
           throw const ApiConfigException('local_release_is_not_supported');
         }

@@ -22,8 +22,13 @@ void main() {
     expect(policy, isNot(contains('cleartextTrafficPermitted="true"')));
   });
 
-  test('only devDebug and localDebug declare scoped cleartext exceptions', () {
-    const debugSourceSets = ['devDebug', 'localDebug'];
+  test('only approved debug source sets declare cleartext exceptions', () {
+    const debugSourceSets = [
+      'devDebug',
+      'localDebug',
+      'local1Debug',
+      'local2Debug',
+    ];
     for (final sourceSet in debugSourceSets) {
       final manifest = File(
         '${androidApp.path}/src/$sourceSet/AndroidManifest.xml',

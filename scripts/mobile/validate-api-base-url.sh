@@ -57,7 +57,7 @@ if flavor in secure_origins:
     allowed = raw_url == secure_origins[flavor]
     if not allowed and flavor == "dev" and build_mode == "debug":
         allowed = raw_url in local_debug_origins
-elif flavor == "local" and build_mode == "debug":
+elif flavor in {"local", "local1", "local2"} and build_mode == "debug":
     allowed = raw_url in local_debug_origins
 
 if not allowed:

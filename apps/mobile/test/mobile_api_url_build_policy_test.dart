@@ -39,7 +39,7 @@ void main() {
   });
 
   test('debug validator limits HTTP to explicit local origins', () async {
-    for (final flavor in ['dev', 'local']) {
+    for (final flavor in ['dev', 'local', 'local1', 'local2']) {
       for (final baseUrl in [
         'http://10.0.2.2:3000',
         'http://localhost:3000',
@@ -62,6 +62,8 @@ void main() {
       ['local', 'https://example.com', 'debug'],
       ['prod', 'http://10.0.2.2:3000', 'debug'],
       ['local', 'http://user:secret@10.0.2.2:3000', 'debug'],
+      ['local1', 'http://10.0.2.2:3000', 'release'],
+      ['local2', 'http://10.0.2.2:3000', 'release'],
     ]) {
       await _expectValidation(validator, arguments, succeeds: false);
     }

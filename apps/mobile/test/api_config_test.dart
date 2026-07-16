@@ -47,17 +47,21 @@ void main() {
     test(
       'allows explicit local origins only in debug dev and local flavors',
       () {
-        for (final baseUrl in const [
-          'http://10.0.2.2:3000',
-          'http://localhost:3000',
-          'http://127.0.0.1:3000',
+        for (final flavor in const [
+          ApiConfig.developmentFlavor,
+          ApiConfig.localFlavor,
+          ApiConfig.localParallelFlavorOne,
+          ApiConfig.localParallelFlavorTwo,
         ]) {
-          ApiConfig(
-            baseUrl: baseUrl,
-          ).validate(flavor: ApiConfig.developmentFlavor, isRelease: false);
-          ApiConfig(
-            baseUrl: baseUrl,
-          ).validate(flavor: ApiConfig.localFlavor, isRelease: false);
+          for (final baseUrl in const [
+            'http://10.0.2.2:3000',
+            'http://localhost:3000',
+            'http://127.0.0.1:3000',
+          ]) {
+            ApiConfig(
+              baseUrl: baseUrl,
+            ).validate(flavor: flavor, isRelease: false);
+          }
         }
 
         expect(
@@ -82,6 +86,17 @@ void main() {
         ).validate(flavor: ApiConfig.localFlavor, isRelease: true),
         throwsA(_configError('local_release_is_not_supported')),
       );
+      for (final flavor in const [
+        ApiConfig.localParallelFlavorOne,
+        ApiConfig.localParallelFlavorTwo,
+      ]) {
+        expect(
+          () => const ApiConfig(
+            baseUrl: 'http://10.0.2.2:3000',
+          ).validate(flavor: flavor, isRelease: true),
+          throwsA(_configError('local_release_is_not_supported')),
+        );
+      }
       expect(
         () => const ApiConfig(
           baseUrl: '',

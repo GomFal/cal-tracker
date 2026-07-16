@@ -112,13 +112,20 @@ class CalTrackerApiClient {
         authenticated: false);
   }
 
-  Future<Map<String, Object?>> refresh(String refreshToken) {
-    return _post(
-        '/v1/auth/refresh',
-        {
-          'refreshToken': refreshToken,
-        },
-        authenticated: false);
+  Future<Map<String, Object?>> refresh(String refreshToken) async {
+    try {
+      return await _post(
+          '/v1/auth/refresh',
+          {
+            'refreshToken': refreshToken,
+          },
+          authenticated: false);
+    } on ApiException catch (error) {
+      if (error.statusCode == 401) {
+        await tokenStorage.clear();
+      }
+      rethrow;
+    }
   }
 
   Future<Map<String, Object?>> getMe() => _get('/v1/auth/me');

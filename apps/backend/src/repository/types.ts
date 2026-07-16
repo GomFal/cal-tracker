@@ -705,7 +705,7 @@ export interface AppRepository {
     sessionId: string,
     nextHash: string,
     expiresAt: string,
-  ): Promise<StoredSession>;
+  ): Promise<StoredSession | undefined>;
 
   createPasswordReset(input: {
     userId: string;

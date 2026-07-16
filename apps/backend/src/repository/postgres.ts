@@ -343,14 +343,14 @@ export class PostgresRepository implements AppRepository {
     sessionId: string,
     nextHash: string,
     expiresAt: string,
-  ): Promise<StoredSession> {
+  ): Promise<StoredSession | undefined> {
     const [row] = await this.execute(dbSql`
       UPDATE auth_sessions
       SET refresh_token_hash = ${nextHash}, expires_at = ${expiresAt}, rotated_at = now()
-      WHERE id = ${sessionId}
+      WHERE id = ${sessionId} AND revoked_at IS NULL AND expires_at > now()
       RETURNING *
     `);
-    return mapSession(row);
+    return row ? mapSession(row) : undefined;
   }
 
   async createPasswordReset(input: {
@@ -381,7 +381,32 @@ export class PostgresRepository implements AppRepository {
       if (!reset) return false;
       await executeRows(
         tx,
-        dbSql`UPDATE user_credentials SET password_hash = ${newPasswordHash}, updated_at = now() WHERE user_id = ${reset.user_id}`,
+        dbSql`
+          INSERT INTO user_credentials (user_id, password_hash)
+          VALUES (${reset.user_id}, ${newPasswordHash})
+          ON CONFLICT (user_id)
+          DO UPDATE SET password_hash = EXCLUDED.password_hash, updated_at = now()
+        `,
+      );
+      await executeRows(
+        tx,
+        dbSql`
+          UPDATE auth_sessions
+          SET revoked_at = now()
+          WHERE user_id = ${reset.user_id} AND revoked_at IS NULL
+        `,
+      );
+      await executeRows(
+        tx,
+        dbSql`
+          INSERT INTO audit_events (user_id, event_type, metadata_json, trace_id)
+          VALUES (
+            ${reset.user_id},
+            'auth.password_reset_completed',
+            ${jsonb({ sessionRevocation: "all" })},
+            'auth-reset-confirm'
+          )
+        `,
       );
       return true;
     });

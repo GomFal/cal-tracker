@@ -174,7 +174,14 @@ export class AuthService {
     if (!user) throw new AuthError("invalid_refresh_token", "Refresh token user no longer exists");
 
     const nextRefreshToken = createRefreshToken();
-    await this.repository.rotateSession(session.id, hashRefreshToken(this.config, nextRefreshToken), refreshExpiry());
+    const rotatedSession = await this.repository.rotateSession(
+      session.id,
+      hashRefreshToken(this.config, nextRefreshToken),
+      refreshExpiry(),
+    );
+    if (!rotatedSession) {
+      throw new AuthError("invalid_refresh_token", "Refresh token is invalid or expired");
+    }
     const access = await signAccessToken(this.config, { sub: user.id, scopes: user.scopes });
 
     return {

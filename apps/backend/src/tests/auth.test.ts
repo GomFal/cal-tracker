@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { GoogleTokenVerifier } from "../auth/google.js";
 import { buildTestApp, FakeAuthEmailSender, registerAndAuth } from "./testApp.js";
 
@@ -87,9 +87,22 @@ describe("auth routes", () => {
     expect(logout.status).toBe(200);
   });
 
-  it("stores reset token hashes and accepts the dev reset token once", async () => {
-    const { request } = buildTestApp();
-    await registerAndAuth(request);
+  it("resets the password, revokes every refresh session, and records the security audit", async () => {
+    const { request, repository } = buildTestApp();
+    const registered = await registerAndAuth(request);
+    const secondLogin = await request("http://localhost/v1/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: "test@example.com",
+        password: "password123",
+      }),
+    });
+    const secondSession = await secondLogin.json() as {
+      accessToken: string;
+      refreshToken: string;
+    };
+
     const resetRequest = await request("http://localhost/v1/auth/password-reset/request", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -106,6 +119,84 @@ describe("auth routes", () => {
     });
     expect(confirm.status).toBe(200);
     expect(await confirm.json()).toEqual({ ok: true });
+
+    const existingAccessToken = await request("http://localhost/v1/auth/me", {
+      headers: { authorization: `Bearer ${registered.accessToken}` },
+    });
+    expect(existingAccessToken.status).toBe(200);
+
+    for (const refreshToken of [registered.refreshToken, secondSession.refreshToken]) {
+      const refresh = await request("http://localhost/v1/auth/refresh", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ refreshToken }),
+      });
+      expect(refresh.status).toBe(401);
+      expect(await refresh.json()).toMatchObject({
+        error: { code: "invalid_refresh_token" },
+      });
+    }
+
+    const oldPasswordLogin = await request("http://localhost/v1/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: "test@example.com",
+        password: "password123",
+      }),
+    });
+    expect(oldPasswordLogin.status).toBe(401);
+
+    const newPasswordLogin = await request("http://localhost/v1/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: "test@example.com",
+        password: "newpassword123",
+      }),
+    });
+    expect(newPasswordLogin.status).toBe(200);
+
+    const reuse = await request("http://localhost/v1/auth/password-reset/confirm", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token: resetToken, newPassword: "anotherpassword123" }),
+    });
+    expect(reuse.status).toBe(200);
+    expect(await reuse.json()).toEqual({ ok: false });
+
+    const audits = await repository.listAuditEvents(registered.user.id);
+    const completedAudits = audits.filter(
+      (event) => event.eventType === "auth.password_reset_completed",
+    );
+    expect(completedAudits).toHaveLength(1);
+    expect(completedAudits[0]).toMatchObject({
+      userId: registered.user.id,
+      metadata: { sessionRevocation: "all" },
+      traceId: "auth-reset-confirm",
+    });
+    expect(JSON.stringify(completedAudits[0])).not.toContain(resetToken);
+    expect(JSON.stringify(completedAudits[0])).not.toContain("newpassword123");
+  });
+
+  it("returns session-ended semantics if a reset revokes the session during refresh", async () => {
+    const { request, repository } = buildTestApp();
+    const registered = await registerAndAuth(request);
+    vi.spyOn(repository, "rotateSession").mockResolvedValueOnce(undefined);
+
+    const refresh = await request("http://localhost/v1/auth/refresh", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ refreshToken: registered.refreshToken }),
+    });
+
+    expect(refresh.status).toBe(401);
+    expect(await refresh.json()).toMatchObject({
+      error: {
+        code: "invalid_refresh_token",
+        message: "Sign in to continue.",
+      },
+    });
   });
 
   it("rejects invalid registration email with a safe validation message", async () => {

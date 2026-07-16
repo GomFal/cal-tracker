@@ -307,9 +307,15 @@ export class InMemoryRepository implements AppRepository {
     sessionId: string,
     nextHash: string,
     expiresAt: string,
-  ): Promise<StoredSession> {
+  ): Promise<StoredSession | undefined> {
     const session = this.sessions.get(sessionId);
-    if (!session) throw new Error("session_not_found");
+    if (
+      !session ||
+      session.revokedAt ||
+      Date.parse(session.expiresAt) <= Date.now()
+    ) {
+      return undefined;
+    }
     session.refreshTokenHash = nextHash;
     session.expiresAt = expiresAt;
     session.rotatedAt = new Date().toISOString();
@@ -332,11 +338,26 @@ export class InMemoryRepository implements AppRepository {
     newPasswordHash: string,
   ): Promise<boolean> {
     const reset = this.passwordResetTokens.get(tokenHash);
-    if (!reset || reset.usedAt || Date.parse(reset.expiresAt) < Date.now())
+    if (!reset || reset.usedAt || Date.parse(reset.expiresAt) <= Date.now())
       return false;
     const user = this.requireUser(reset.userId);
+    const completedAt = new Date().toISOString();
+
     user.passwordHash = newPasswordHash;
-    reset.usedAt = new Date().toISOString();
+    reset.usedAt = completedAt;
+    for (const session of this.sessions.values()) {
+      if (session.userId === user.id && !session.revokedAt) {
+        session.revokedAt = completedAt;
+      }
+    }
+    this.auditEvents.push({
+      id: newId(),
+      userId: user.id,
+      eventType: "auth.password_reset_completed",
+      metadata: { sessionRevocation: "all" },
+      traceId: "auth-reset-confirm",
+      createdAt: completedAt,
+    });
     return true;
   }
 

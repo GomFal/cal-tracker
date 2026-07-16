@@ -77,7 +77,7 @@ MESSAGE
   echo "Building Android APK: $flavor ($api_base_url)"
   (
     cd "$MOBILE_DIR"
-    flutter pub get
+    flutter pub get --enforce-lockfile
     flutter build apk \
       --release \
       --flavor "$flavor" \

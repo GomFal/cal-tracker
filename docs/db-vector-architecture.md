@@ -28,7 +28,7 @@ The backend owns:
 Local development uses `docker-compose.yml`:
 
 ```text
-image: pgvector/pgvector:pg16
+image: pgvector/pgvector:0.8.1-pg16-bookworm
 database: cal_tracker
 user: cal_tracker
 password: cal_tracker

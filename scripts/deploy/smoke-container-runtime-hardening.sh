@@ -37,7 +37,7 @@ docker run -d \
   -e POSTGRES_DB=cal_tracker \
   -e POSTGRES_USER=cal_tracker \
   -e POSTGRES_PASSWORD=cal_tracker \
-  pgvector/pgvector:pg16 >/dev/null
+  pgvector/pgvector:0.8.1-pg16-bookworm >/dev/null
 
 for _ in {1..60}; do
   if docker exec "$POSTGRES" pg_isready -U cal_tracker -d cal_tracker >/dev/null 2>&1; then

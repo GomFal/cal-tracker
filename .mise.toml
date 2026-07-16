@@ -11,7 +11,7 @@ ANDROID_SDK_ROOT = "/home/javier/Android/Sdk"
 
 [tasks.install]
 description = "Install JavaScript workspace dependencies"
-run = "npm install"
+run = "bun install --frozen-lockfile"
 
 [tasks.backend-dev]
 description = "Run the backend API server"
@@ -39,7 +39,7 @@ run = "npm --workspace apps/backend run generate:flutter-client"
 
 [tasks.flutter-pub-get]
 description = "Resolve Flutter dependencies"
-run = "flutter pub get"
+run = "flutter pub get --enforce-lockfile"
 dir = "apps/mobile"
 
 [tasks.flutter-analyze]

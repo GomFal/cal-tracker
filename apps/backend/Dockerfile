@@ -1,4 +1,4 @@
-FROM oven/bun:1 AS build
+FROM oven/bun:1.3.13 AS build
 
 WORKDIR /app
 
@@ -18,7 +18,7 @@ RUN bun run typecheck
 RUN bun run build
 RUN bun install --frozen-lockfile --production
 
-FROM oven/bun:1 AS runtime
+FROM oven/bun:1.3.13 AS runtime
 
 ENV NODE_ENV=production
 ENV PORT=3000

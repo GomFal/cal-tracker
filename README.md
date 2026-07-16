@@ -2,6 +2,17 @@
 
 Aplicacion para registrar y consultar informacion nutricional.
 
+## Toolchain reproducible
+
+El toolchain revisado del repositorio usa Bun `1.3.13`, también declarado en
+`.mise.toml` y `package.json`. Instálalo con `mise install` o usa exactamente esa
+versión si gestionas Bun por otro medio. Las instalaciones de backend deben
+conservar `bun install --frozen-lockfile`; las builds móviles usan
+`flutter pub get --enforce-lockfile`.
+
+Las imágenes base y la política mínima de actualización están documentadas en
+[docs/software-supply-chain-controls.md](docs/software-supply-chain-controls.md).
+
 ## Landing y servidor
 
 Dominio: `https://bettercalories.app`

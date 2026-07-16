@@ -14,9 +14,18 @@ if (keystorePropertiesFile.exists()) {
     keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
 }
 
-fun signingProperty(name: String): String =
-    keystoreProperties.getProperty(name)
-        ?: throw GradleException("Missing Android signing property: $name")
+fun signingProperty(propertyName: String, environmentName: String): String? =
+    providers.environmentVariable(environmentName).orNull
+        ?.takeIf { it.isNotBlank() }
+        ?: keystoreProperties.getProperty(propertyName)?.takeIf { it.isNotBlank() }
+
+val releaseSigningValues = mapOf(
+    "keyAlias" to signingProperty("keyAlias", "ANDROID_RELEASE_KEY_ALIAS"),
+    "keyPassword" to signingProperty("keyPassword", "ANDROID_RELEASE_KEY_PASSWORD"),
+    "storeFile" to signingProperty("storeFile", "ANDROID_RELEASE_STORE_FILE"),
+    "storePassword" to signingProperty("storePassword", "ANDROID_RELEASE_STORE_PASSWORD"),
+)
+val hasCompleteReleaseSigning = releaseSigningValues.values.all { it != null }
 
 android {
     namespace = "com.example.cal_tracker_mobile"
@@ -48,17 +57,30 @@ android {
         execution = "ANDROIDX_TEST_ORCHESTRATOR"
     }
 
+    signingConfigs {
+        if (hasCompleteReleaseSigning) {
+            create("release") {
+                keyAlias = releaseSigningValues.getValue("keyAlias")
+                keyPassword = releaseSigningValues.getValue("keyPassword")
+                storeFile = file(releaseSigningValues.getValue("storeFile")!!)
+                storePassword = releaseSigningValues.getValue("storePassword")
+            }
+        }
+    }
+
     flavorDimensions += "env"
 
     productFlavors {
         create("prod") {
             dimension = "env"
             resValue("string", "app_name", "BetterCalories")
+            signingConfigs.findByName("release")?.let { signingConfig = it }
         }
         create("dev") {
             dimension = "env"
             applicationIdSuffix = ".dev"
             resValue("string", "app_name", "dev:BetterCalories")
+            signingConfig = signingConfigs.getByName("debug")
         }
         create("local") {
             dimension = "env"
@@ -67,21 +89,8 @@ android {
         }
     }
 
-    signingConfigs {
-        if (keystorePropertiesFile.exists()) {
-            create("release") {
-                keyAlias = signingProperty("keyAlias")
-                keyPassword = signingProperty("keyPassword")
-                storeFile = file(signingProperty("storeFile"))
-                storePassword = signingProperty("storePassword")
-            }
-        }
-    }
-
     buildTypes {
         release {
-            signingConfig = signingConfigs.findByName("release")
-                ?: signingConfigs.getByName("debug")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -89,6 +98,20 @@ android {
                 "proguard-rules.pro",
             )
         }
+    }
+}
+
+// Keep dev/local builds usable without production material, but make a direct
+// Gradle/Flutter prod release invocation fail before packaging when it is absent.
+gradle.taskGraph.whenReady {
+    val buildsProdRelease = allTasks.any { task ->
+        task.name.contains("ProdRelease", ignoreCase = true)
+    }
+    if (buildsProdRelease && !hasCompleteReleaseSigning) {
+        throw GradleException(
+            "Production release signing is incomplete. Configure key.properties " +
+                "or the ANDROID_RELEASE_* environment variables.",
+        )
     }
 }
 

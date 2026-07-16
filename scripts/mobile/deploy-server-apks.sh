@@ -127,13 +127,19 @@ publish_flavor() {
   if [[ "$SKIP_ANDROID_BUILD" == "1" ]]; then
     echo "Using prebuilt Android APKs from $DIST_DIR"
   else
-    ALLOW_DEBUG_SIGNING=1 "$ROOT_DIR/scripts/mobile/build-android.sh" "$flavor"
+    "$ROOT_DIR/scripts/mobile/build-android.sh" "$flavor"
   fi
 
   source_apk="$(find "$DIST_DIR" -maxdepth 1 -type f -name "bettercalories-$flavor-${version_name}-${version_code}-*.apk" | sort | tail -n 1)"
   if [[ -z "$source_apk" || ! -f "$source_apk" ]]; then
     echo "Could not find built APK for $flavor in $DIST_DIR." >&2
     exit 1
+  fi
+
+  if [[ "$flavor" == "prod" ]]; then
+    "$ROOT_DIR/scripts/mobile/verify-apk-signing.sh" \
+      "$source_apk" \
+      "${ANDROID_RELEASE_CERT_SHA256:-}"
   fi
 
   apk_name="$(basename "$source_apk")"

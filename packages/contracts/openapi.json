@@ -47,6 +47,50 @@
         ],
         "additionalProperties": false
       },
+      "RateLimitErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "rate_limit_exceeded"
+              },
+              "message": {
+                "type": "string"
+              },
+              "traceId": {
+                "type": "string"
+              },
+              "details": {
+                "type": "object",
+                "properties": {
+                  "retryAfterSeconds": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0
+                  }
+                },
+                "required": [
+                  "retryAfterSeconds"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "code",
+              "message",
+              "traceId",
+              "details"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "additionalProperties": false
+      },
       "RegisterRequest": {
         "type": "object",
         "properties": {
@@ -3584,6 +3628,36 @@
         },
         "required": [
           "text"
+        ],
+        "additionalProperties": false
+      },
+      "AgentChatRequest": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "flutter",
+              "ios_appintents",
+              "android_appfunctions"
+            ],
+            "default": "flutter"
+          },
+          "conversationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "activeProposalId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "message"
         ],
         "additionalProperties": false
       },
@@ -19254,6 +19328,25 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Request rate or concurrency limit exceeded",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the client should retry",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RateLimitErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -19278,6 +19371,25 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TokenPair"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Request rate or concurrency limit exceeded",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the client should retry",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RateLimitErrorResponse"
                 }
               }
             }
@@ -19308,6 +19420,25 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Request rate or concurrency limit exceeded",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the client should retry",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RateLimitErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -19335,6 +19466,25 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Request rate or concurrency limit exceeded",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the client should retry",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RateLimitErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -19355,6 +19505,25 @@
         "responses": {
           "200": {
             "description": "Password reset result"
+          },
+          "429": {
+            "description": "Request rate or concurrency limit exceeded",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the client should retry",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RateLimitErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -19382,6 +19551,25 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Request rate or concurrency limit exceeded",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the client should retry",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RateLimitErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -19406,6 +19594,25 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TokenPair"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Request rate or concurrency limit exceeded",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the client should retry",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RateLimitErrorResponse"
                 }
               }
             }
@@ -19597,6 +19804,25 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Request rate or concurrency limit exceeded",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the client should retry",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RateLimitErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -19713,6 +19939,25 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Request rate or concurrency limit exceeded",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the client should retry",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RateLimitErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -19816,6 +20061,147 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AgentRunResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Request rate or concurrency limit exceeded",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the client should retry",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RateLimitErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/agent/chat": {
+      "post": {
+        "operationId": "chatWithAgent",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentChatRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Agent chat event stream",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Request rate or concurrency limit exceeded",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the client should retry",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RateLimitErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/agent/chat/audio": {
+      "post": {
+        "operationId": "chatWithAgentAudio",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "audio": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "conversationId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "activeProposalId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "audio"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Transcription and agent chat event stream",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Request rate or concurrency limit exceeded",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the client should retry",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RateLimitErrorResponse"
                 }
               }
             }
@@ -19949,6 +20335,25 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Request rate or concurrency limit exceeded",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the client should retry",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RateLimitErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -19990,6 +20395,25 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/VoiceMealRunResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Request rate or concurrency limit exceeded",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the client should retry",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RateLimitErrorResponse"
                 }
               }
             }
@@ -21489,6 +21913,25 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UsualMealDraftResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Request rate or concurrency limit exceeded",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the client should retry",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RateLimitErrorResponse"
                 }
               }
             }

@@ -6,7 +6,7 @@ import type {
 } from "../auth/email.js";
 import type { GoogleTokenVerifier } from "../auth/google.js";
 import { AuthService } from "../auth/service.js";
-import { loadConfig } from "../config/env.js";
+import { loadConfig, type AppConfig } from "../config/env.js";
 import { createApp } from "../http/app.js";
 import type { MealItem } from "@cal-tracker/contracts";
 import {
@@ -26,6 +26,10 @@ import type { UsualMealDraftProvider } from "../agent/usualMealDraftProvider.js"
 import type { LocalRunLogger } from "../observability/localRunLogger.js";
 import { TelemetryService as DbTelemetryService } from "../telemetry/service.js";
 import type { TelemetryService } from "../telemetry/telemetryService.js";
+import {
+  InMemoryAbuseProtection,
+  type AbuseProtectionLogger,
+} from "../security/abuseProtection.js";
 import { seedTestFoods } from "./foodFixtures.js";
 
 export class FakeSpeechToTextProvider implements SpeechToTextProvider {
@@ -100,8 +104,14 @@ export function buildTestApp(options?: {
   usualMealDraftProvider?: UsualMealDraftProvider;
   telemetryService?: TelemetryService;
   authEmailSender?: AuthEmailSender;
+  configOverrides?: Partial<AppConfig>;
+  rateLimitNow?: () => number;
+  abuseProtectionLogger?: AbuseProtectionLogger;
 }) {
-  const config = loadConfig({ NODE_ENV: "test" } as NodeJS.ProcessEnv);
+  const config = {
+    ...loadConfig({ NODE_ENV: "test" } as NodeJS.ProcessEnv),
+    ...options?.configOverrides,
+  };
   const repository = InMemoryRepository.seeded();
   seedTestFoods(repository);
   const authEmailSender = options?.authEmailSender ?? new FakeAuthEmailSender();
@@ -154,7 +164,12 @@ export function buildTestApp(options?: {
     rawResponse: {},
   });
   const agentProvider = options?.agentProvider ?? defaultAgentProvider;
-  const app = createApp({ config, repository, authService, actionExecutor, sttProvider, agentProvider, runLogger: options?.runLogger, telemetryService: options?.telemetryService });
+  const abuseProtection = new InMemoryAbuseProtection(
+    config,
+    options?.rateLimitNow,
+    options?.abuseProtectionLogger,
+  );
+  const app = createApp({ config, repository, authService, actionExecutor, sttProvider, agentProvider, runLogger: options?.runLogger, telemetryService: options?.telemetryService, abuseProtection });
   const request = (input: string, init?: RequestInit) => Promise.resolve(app.request(input, init));
   if (authEmailSender instanceof FakeAuthEmailSender) {
     authEmailSendersByRequest.set(request, authEmailSender);

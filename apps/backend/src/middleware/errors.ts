@@ -6,6 +6,7 @@ import { ActionExecutionError } from "../actions/executor.js";
 import { AgentProviderUnavailableError } from "../agent/agentService.js";
 import { AdminAuthError } from "../auth/adminService.js";
 import { AuthError } from "../auth/service.js";
+import { AbuseLimitExceededError } from "../security/abuseProtection.js";
 import { getTraceId } from "./requestContext.js";
 
 export function formatErrorResponse(c: Context, error: unknown) {
@@ -18,6 +19,17 @@ export function formatErrorResponse(c: Context, error: unknown) {
   }
   if (error instanceof AdminAuthError) {
     return c.json({ error: { code: error.code, message: adminAuthErrorMessage(error.code), traceId } }, error.status);
+  }
+  if (error instanceof AbuseLimitExceededError) {
+    c.header("Retry-After", String(error.retryAfterSeconds));
+    return c.json({
+      error: {
+        code: error.code,
+        message: "Too many requests. Try again later.",
+        traceId,
+        details: { retryAfterSeconds: error.retryAfterSeconds },
+      },
+    }, 429);
   }
   if (error instanceof errors.JWTExpired || error instanceof errors.JWTClaimValidationFailed) {
     return c.json({ error: { code: "token_expired", message: "Token expired or invalid", traceId } }, 401);

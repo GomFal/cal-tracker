@@ -11,11 +11,6 @@ on:
         options:
           - dev
           - prod
-      allow_non_incremental_version:
-        description: Allow republishing the same or lower mobile versionCode
-        required: true
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -88,6 +83,8 @@ jobs:
             echo "Missing one or more MOBILE_${flavor^^}_* GitHub secrets." >&2
             exit 1
           fi
+
+          scripts/mobile/validate-api-base-url.sh "$flavor" "$api_base_url" release
 
           CONFIG_PATH="$config_dir/$flavor.json" \
           API_BASE_URL="$api_base_url" \
@@ -209,13 +206,10 @@ jobs:
 
       - name: Publish APK to server
         env:
-          ALLOW_NON_INCREMENTAL_APK_VERSION: ${{ inputs.allow_non_incremental_version && '1' || '0' }}
           BETTERCALORIES_APK_SSH_HOST: ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}
           BETTERCALORIES_DEPLOY_SOURCE_COMMIT: ${{ github.sha }}
           BETTERCALORIES_DEPLOY_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
           BETTERCALORIES_DEPLOY_ACTOR: ${{ github.actor }}
-          DEV_PUBLIC_BASE_URL: ${{ secrets.MOBILE_DEV_API_BASE_URL }}
-          PROD_PUBLIC_BASE_URL: ${{ secrets.MOBILE_PROD_API_BASE_URL }}
           ANDROID_RELEASE_CERT_SHA256: ${{ inputs.environment == 'prod' && secrets.ANDROID_RELEASE_CERT_SHA256 || '' }}
         run: |
           set -euo pipefail

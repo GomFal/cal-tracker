@@ -1,3 +1,4 @@
+import java.util.Base64
 import java.util.Properties
 
 plugins {
@@ -128,4 +129,70 @@ flutter {
 dependencies {
     androidTestUtil("androidx.test:orchestrator:1.5.1")
     androidTestUtil("androidx.test.services:test-services:1.5.0")
+}
+
+fun decodedDartDefine(name: String): String? {
+    val encodedDefines = project.findProperty("dart-defines") as? String
+        ?: return null
+    return encodedDefines
+        .split(',')
+        .mapNotNull { encoded ->
+            runCatching {
+                String(Base64.getDecoder().decode(encoded), Charsets.UTF_8)
+            }.getOrNull()
+        }
+        .mapNotNull { define ->
+            val separator = define.indexOf('=')
+            if (separator <= 0) null
+            else define.substring(0, separator) to define.substring(separator + 1)
+        }
+        .lastOrNull { (key, _) -> key == name }
+        ?.second
+}
+
+fun registerReleaseApiValidationTask(
+    taskName: String,
+    releaseFlavor: String,
+) = tasks.register(taskName) {
+    group = "verification"
+    description = "Validates API_BASE_URL for the $releaseFlavor release."
+    doLast {
+        val validator = rootProject.file(
+            "../../../scripts/mobile/validate-api-base-url.sh",
+        )
+        val apiBaseUrl = decodedDartDefine("API_BASE_URL").orEmpty()
+        val process = ProcessBuilder(
+            "bash",
+            validator.absolutePath,
+            releaseFlavor,
+            apiBaseUrl,
+            "release",
+        )
+            .inheritIO()
+            .start()
+        if (process.waitFor() != 0) {
+            throw GradleException(
+                "Invalid API_BASE_URL for $releaseFlavor release build.",
+            )
+        }
+    }
+}
+
+// Defense in depth for direct Flutter/Gradle release builds that bypass the
+// repository build script. These tasks have no outputs, so validation also
+// runs when Flutter's compile task is otherwise up-to-date.
+val validateDevReleaseApiBaseUrl = registerReleaseApiValidationTask(
+    "validateDevReleaseApiBaseUrl",
+    "dev",
+)
+val validateProdReleaseApiBaseUrl = registerReleaseApiValidationTask(
+    "validateProdReleaseApiBaseUrl",
+    "prod",
+)
+
+tasks.configureEach {
+    when (name) {
+        "compileFlutterBuildDevRelease" -> dependsOn(validateDevReleaseApiBaseUrl)
+        "compileFlutterBuildProdRelease" -> dependsOn(validateProdReleaseApiBaseUrl)
+    }
 }

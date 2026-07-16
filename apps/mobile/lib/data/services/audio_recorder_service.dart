@@ -5,7 +5,12 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
-enum RecorderState { idle, recording, stopping, error }
+enum RecorderState {
+  idle,
+  recording,
+  stopping,
+  error,
+}
 
 class RecorderException implements Exception {
   const RecorderException(this.code, [this.message]);

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:marionette_flutter/marionette_flutter.dart';
 
 import 'app/app.dart';
+import 'data/services/api_config.dart';
 
 Future<void> main() async {
   if (kDebugMode) {
@@ -13,5 +14,9 @@ Future<void> main() async {
   }
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
-  runApp(const CalTrackerBootstrap());
+  final apiConfig = ApiConfig.validatedFromEnvironment(
+    flavor: appFlavor,
+    isRelease: kReleaseMode,
+  );
+  runApp(CalTrackerBootstrap(apiConfig: apiConfig));
 }

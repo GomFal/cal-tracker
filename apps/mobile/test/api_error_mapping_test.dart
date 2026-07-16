@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:cal_tracker_mobile/data/services/api_config.dart';
+import 'package:cal_tracker_mobile/data/services/audio_recorder_service.dart';
 import 'package:cal_tracker_mobile/data/services/secure_token_storage.dart';
 import 'package:cal_tracker_mobile/generated/api/cal_tracker_api.dart';
 import 'package:cal_tracker_mobile/ui/core/user_visible_error.dart';
@@ -9,6 +10,23 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 void main() {
+  test('microphone denial explains settings recovery and manual fallback', () {
+    expect(
+      userVisibleErrorMessage(
+        const RecorderException('permission_denied'),
+        context: UserErrorContext.voiceRecording,
+      ),
+      contains('Enable it in your device settings'),
+    );
+    expect(
+      userVisibleErrorMessage(
+        const RecorderException('permission_denied'),
+        context: UserErrorContext.voiceMeal,
+      ),
+      contains('log your meal manually'),
+    );
+  });
+
   test(
     'ApiException keeps API metadata but stringifies as safe copy',
     () async {

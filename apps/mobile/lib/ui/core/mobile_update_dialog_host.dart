@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../app/mobile_update_view_model.dart';
+import '../../data/services/mobile_update_service.dart';
 import '../../l10n/app_localizations_context.dart';
 
 class MobileUpdateDialogHost extends StatefulWidget {
@@ -21,6 +22,7 @@ class MobileUpdateDialogHost extends StatefulWidget {
 
 class _MobileUpdateDialogHostState extends State<MobileUpdateDialogHost> {
   bool _dialogOpen = false;
+  bool _errorSnackScheduled = false;
 
   @override
   void didChangeDependencies() {
@@ -40,6 +42,9 @@ class _MobileUpdateDialogHostState extends State<MobileUpdateDialogHost> {
     if (viewModel.shouldShowDialog) {
       _scheduleDialogIfNeeded();
     }
+    if (viewModel.error?.isUserVisible ?? false) {
+      _scheduleErrorIfNeeded();
+    }
     return widget.child;
   }
 
@@ -48,6 +53,44 @@ class _MobileUpdateDialogHostState extends State<MobileUpdateDialogHost> {
     final viewModel = context.read<MobileUpdateViewModel>();
     if (!viewModel.shouldShowDialog) return;
     WidgetsBinding.instance.addPostFrameCallback((_) => _showDialog());
+  }
+
+  void _scheduleErrorIfNeeded() {
+    if (_errorSnackScheduled) return;
+    final error = context.read<MobileUpdateViewModel>().error;
+    if (error == null || !error.isUserVisible) return;
+    _errorSnackScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _showError(error));
+  }
+
+  void _showError(MobileUpdateFailureCode error) {
+    _errorSnackScheduled = false;
+    if (!mounted) return;
+    final viewModel = context.read<MobileUpdateViewModel>();
+    if (viewModel.error != error) return;
+    final messengerContext = widget.navigatorKey.currentContext;
+    if (messengerContext == null) {
+      _scheduleErrorIfNeeded();
+      return;
+    }
+    final l10n = messengerContext.l10n;
+    final message = switch (error) {
+      MobileUpdateFailureCode.downloadOpenFailed => l10n.mobileUpdateOpenFailed,
+      MobileUpdateFailureCode.manifestRejected ||
+      MobileUpdateFailureCode.downloadRejected =>
+        l10n.mobileUpdateVerificationFailed,
+      MobileUpdateFailureCode.checkUnavailable => null,
+    };
+    viewModel.clearError(error);
+    if (message == null) return;
+    ScaffoldMessenger.of(messengerContext)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          key: const ValueKey('mobile_update_error_snack_bar'),
+          content: Text(message),
+        ),
+      );
   }
 
   Future<void> _showDialog() async {

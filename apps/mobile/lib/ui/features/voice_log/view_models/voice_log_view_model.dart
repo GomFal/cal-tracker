@@ -27,7 +27,6 @@ enum VoiceLogState {
   clarificationRequired,
   error,
 }
-
 class VoiceLogUiState {
   const VoiceLogUiState({
     this.phase = VoiceLogState.idle,
@@ -374,7 +373,9 @@ class VoiceLogViewModel extends ChangeNotifier {
         extra: <String, Object?>{'stage': 'start'},
       );
       if (e.code == 'permission_denied') {
-        _setError('Microphone permission is required to record voice logs.');
+        _setError(
+          e.message ?? AudioRecorderService.microphonePermissionDeniedMessage,
+        );
       } else {
         _setError(
           e.message ??
@@ -867,6 +868,29 @@ class VoiceLogViewModel extends ChangeNotifier {
   void clearResult() {
     _timers.clearProposalChangeSuccess();
     _setUiState(const VoiceLogUiState());
+  }
+
+  void resetForLogout() {
+    final shouldCancelRecording = {
+      VoiceLogState.requestingPermission,
+      VoiceLogState.ready,
+      VoiceLogState.recording,
+      VoiceLogState.stopping,
+    }.contains(state);
+    _timers.clearProposalChangeSuccess();
+    _timers.stopRecordingDuration();
+    _setUiState(const VoiceLogUiState());
+    if (shouldCancelRecording) {
+      unawaited(_cancelRecordingForLogout());
+    }
+  }
+
+  Future<void> _cancelRecordingForLogout() async {
+    try {
+      await _audioRecorderService.cancel();
+    } on Object {
+      // Recorder cleanup is independent from authentication state teardown.
+    }
   }
 
   void retry() {

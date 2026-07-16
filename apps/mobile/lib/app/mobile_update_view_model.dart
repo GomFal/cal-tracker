@@ -5,20 +5,20 @@ import '../domain/models/mobile_update_models.dart';
 
 class MobileUpdateViewModel extends ChangeNotifier {
   MobileUpdateViewModel({required MobileUpdateService updateService})
-      : _updateService = updateService;
+    : _updateService = updateService;
 
   final MobileUpdateService _updateService;
 
   bool _checking = false;
   bool _opening = false;
   bool _dialogHandled = false;
-  String? _error;
+  MobileUpdateFailureCode? _error;
   MobileUpdateCheck? _update;
   bool _disposed = false;
 
   bool get checking => _checking;
   bool get opening => _opening;
-  String? get error => _error;
+  MobileUpdateFailureCode? get error => _error;
   MobileUpdateCheck? get update => _update;
   bool get shouldShowDialog =>
       !_dialogHandled && (_update?.updateAvailable ?? false);
@@ -34,10 +34,10 @@ class MobileUpdateViewModel extends ChangeNotifier {
       _update = update;
     } on MobileUpdateException catch (caught) {
       if (_disposed) return;
-      _error = caught.message;
-    } on Object catch (caught) {
+      _error = caught.code;
+    } on Object {
       if (_disposed) return;
-      _error = '$caught';
+      _error = MobileUpdateFailureCode.checkUnavailable;
     } finally {
       if (!_disposed) {
         _checking = false;
@@ -61,15 +61,21 @@ class MobileUpdateViewModel extends ChangeNotifier {
     try {
       await _updateService.openDownload(manifest);
     } on MobileUpdateException catch (caught) {
-      _error = caught.message;
-    } on Object catch (caught) {
-      _error = '$caught';
+      _error = caught.code;
+    } on Object {
+      _error = MobileUpdateFailureCode.downloadOpenFailed;
     } finally {
       if (!_disposed) {
         _opening = false;
         _notifyListenersIfActive();
       }
     }
+  }
+
+  void clearError(MobileUpdateFailureCode error) {
+    if (_error != error) return;
+    _error = null;
+    _notifyListenersIfActive();
   }
 
   @override

@@ -11,7 +11,29 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
+const _testEmail = 'new-user@example.com';
+const _testPassword = 'correct-horse-battery';
+const _testDisplayName = 'New User';
+
 void main() {
+  testWidgets('authentication fields start empty in login and register modes', (
+    tester,
+  ) async {
+    final repository = _FakeAuthRepository();
+    await tester.pumpWidget(_AuthTestApp(repository: repository));
+    await tester.pump();
+
+    expect(_fieldText(tester, 'email_field'), isEmpty);
+    expect(_fieldText(tester, 'password_field'), isEmpty);
+
+    await _tapVisible(tester, const ValueKey('auth_toggle_mode_button'));
+    await tester.pump();
+
+    expect(_fieldText(tester, 'display_name_field'), isEmpty);
+    expect(_fieldText(tester, 'email_field'), isEmpty);
+    expect(_fieldText(tester, 'password_field'), isEmpty);
+  });
+
   testWidgets(
     'registration validates malformed emails before calling the API',
     (tester) async {
@@ -24,6 +46,14 @@ void main() {
       await tester.enterText(
         find.byKey(const ValueKey('email_field')),
         'demo444422iii§@example.com',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('password_field')),
+        _testPassword,
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('display_name_field')),
+        _testDisplayName,
       );
       await _tapVisible(tester, const ValueKey('auth_submit_button'));
       await tester.pump();
@@ -53,6 +83,7 @@ void main() {
 
     await _tapVisible(tester, const ValueKey('auth_toggle_mode_button'));
     await tester.pump();
+    await _enterRegistrationCredentials(tester);
     await _tapVisible(tester, const ValueKey('auth_submit_button'));
     await tester.pump();
 
@@ -76,6 +107,7 @@ void main() {
 
     await _tapVisible(tester, const ValueKey('auth_toggle_mode_button'));
     await tester.pump();
+    await _enterRegistrationCredentials(tester);
     await _tapVisible(tester, const ValueKey('auth_submit_button'));
     await tester.pump();
 
@@ -104,6 +136,7 @@ void main() {
     await tester.pumpWidget(_AuthTestApp(repository: repository));
     await tester.pump();
 
+    await _enterLoginCredentials(tester);
     await _tapVisible(tester, const ValueKey('auth_submit_button'));
     await tester.pump();
 
@@ -126,6 +159,7 @@ void main() {
     await tester.pumpWidget(_AuthTestApp(repository: repository));
     await tester.pump();
 
+    await _enterLoginCredentials(tester);
     await _tapVisible(tester, const ValueKey('auth_submit_button'));
     await tester.pump();
 
@@ -135,6 +169,29 @@ void main() {
       findsOneWidget,
     );
   });
+}
+
+String _fieldText(WidgetTester tester, String key) {
+  return tester.widget<TextField>(find.byKey(ValueKey(key))).controller!.text;
+}
+
+Future<void> _enterLoginCredentials(WidgetTester tester) async {
+  await tester.enterText(
+    find.byKey(const ValueKey('email_field')),
+    _testEmail,
+  );
+  await tester.enterText(
+    find.byKey(const ValueKey('password_field')),
+    _testPassword,
+  );
+}
+
+Future<void> _enterRegistrationCredentials(WidgetTester tester) async {
+  await _enterLoginCredentials(tester);
+  await tester.enterText(
+    find.byKey(const ValueKey('display_name_field')),
+    _testDisplayName,
+  );
 }
 
 Future<void> _tapVisible(WidgetTester tester, ValueKey<String> key) async {

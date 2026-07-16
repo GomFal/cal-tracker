@@ -24,6 +24,7 @@ Current authoritative files:
 | `software-supply-chain-controls.md` | Bun and production base-image versions, frozen lockfile policy and the MVP update procedure. | SBOM, attestations, container signing, new scanners or commit-pinned Actions. |
 | `runtime-dependency-remediation.md` | Runtime dependency security updates, audit evidence and temporary non-applicable development-tool findings. | A general vulnerability-management SLA or automatic dependency updates. |
 | `trusted-production-apk-signing.md` | Android production signing identity, protected CI secrets, certificate verification, offline custody and recovery/rotation procedure. | Play Store migration or in-app updater redesign. |
+| `trusted-mobile-update-delivery.md` | Temporary direct-APK update trust contract, exact dev/prod origins, manifest validation and browser handoff. | Production key custody, Play Store migration or an internal APK downloader. |
 
 This split is intentional:
 

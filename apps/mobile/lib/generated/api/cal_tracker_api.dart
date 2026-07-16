@@ -174,6 +174,15 @@ class CalTrackerApiClient {
     }
   }
 
+  Future<Map<String, Object?>> logout({required String refreshToken}) {
+    return _post(
+        '/v1/auth/logout',
+        {
+          'refreshToken': refreshToken,
+        },
+        authenticated: false);
+  }
+
   Future<Map<String, Object?>> getMe() => _get('/v1/auth/me');
 
   Future<Map<String, Object?>> updateSettings({

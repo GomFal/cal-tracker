@@ -5,17 +5,17 @@ import 'app_preferences_storage.dart';
 
 class AgentChatCacheStore {
   AgentChatCacheStore({
-    required AppPreferencesStorage storage,
+    required StringKeyValueStorage storage,
     DateTime Function()? now,
     Duration maxEntryAge = const Duration(days: 7),
-  })  : _storage = storage,
-        _now = now ?? DateTime.now,
-        _maxEntryAge = maxEntryAge;
+  }) : _storage = storage,
+       _now = now ?? DateTime.now,
+       _maxEntryAge = maxEntryAge;
 
   static const _schemaVersion = 1;
   static const _keyPrefix = 'agent_chat_cache:v1';
 
-  final AppPreferencesStorage _storage;
+  final StringKeyValueStorage _storage;
   final DateTime Function() _now;
   final Duration _maxEntryAge;
   String? _activeUserKey;
@@ -168,6 +168,8 @@ class AgentChatCacheStore {
   Future<void> clearActiveUserData() async {
     final context = _context();
     if (context == null) return;
+    _activeUserKey = null;
+    _generation++;
     await _storage.removeWhere(
       (key) => key.startsWith('$_keyPrefix:${context.userKey}:'),
     );

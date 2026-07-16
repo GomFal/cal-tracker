@@ -6,10 +6,12 @@ import 'package:cal_tracker_mobile/data/repositories/nutrition_repository.dart';
 import 'package:cal_tracker_mobile/data/services/app_preferences_repository.dart';
 import 'package:cal_tracker_mobile/domain/models/auth_models.dart';
 import 'package:cal_tracker_mobile/domain/models/nutrition_models.dart';
+import 'package:cal_tracker_mobile/ui/features/auth/view_models/auth_view_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:provider/provider.dart';
 
 class _MockAuthRepository extends Mock implements AuthRepository {}
 
@@ -127,6 +129,46 @@ void main() {
     expect(find.byKey(const ValueKey('auth_submit_button')), findsNothing);
     expect(
         find.byKey(const ValueKey('dashboard_progress_card')), findsOneWidget);
+  });
+
+  testWidgets(
+      'logout redirects and starts cache cleanup before the backend finishes',
+      (tester) async {
+    final logoutCompleter = Completer<void>();
+    final authRepository = _MockAuthRepository();
+    final nutritionRepository = _MockNutritionRepository();
+    _stubNutritionRepository(nutritionRepository);
+    when(() => authRepository.restoreSession()).thenAnswer((_) async => _user);
+    when(() => authRepository.logout())
+        .thenAnswer((_) => logoutCompleter.future);
+    when(() => nutritionRepository.clearActiveUserCache())
+        .thenAnswer((_) async {});
+
+    await tester.pumpWidget(
+      CalTrackerBootstrap(
+        preferencesRepository: _FakePreferencesRepository(),
+        authRepository: authRepository,
+        nutritionRepository: nutritionRepository,
+        checkForUpdates: false,
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    await tester.pump();
+
+    final dashboardContext = tester.element(
+      find.byKey(const ValueKey('dashboard_progress_card')),
+    );
+    final logout = dashboardContext.read<AuthViewModel>().logout();
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('auth_submit_button')), findsOneWidget);
+    verify(() => nutritionRepository.clearActiveUserCache()).called(1);
+    verify(() => nutritionRepository.deactivateCache()).called(1);
+
+    logoutCompleter.complete();
+    await logout;
   });
 }
 

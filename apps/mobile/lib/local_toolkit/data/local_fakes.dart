@@ -34,7 +34,6 @@ class LocalTokenStorage implements TokenStorage {
     _tokens = null;
   }
 }
-
 class LocalAuthRepository extends AuthRepository {
   factory LocalAuthRepository(
     LocalFixtureStore store, {
@@ -472,6 +471,8 @@ class LocalMobileUpdateService extends MobileUpdateService {
       installedVersionName: 'local',
       installedVersionCode: 1,
       manifest: MobileUpdateManifest(
+        channel: 'local',
+        packageName: 'app.bettercalories.dev.local',
         versionName: 'local',
         versionCode: 1,
         apkUrl: 'http://localhost/local.apk',
@@ -505,7 +506,10 @@ class LocalAudioRecorderService extends AudioRecorderService {
   @override
   Future<void> start() async {
     if (!await hasPermission()) {
-      throw const RecorderException('permission_denied');
+      throw const RecorderException(
+        'permission_denied',
+        AudioRecorderService.microphonePermissionDeniedMessage,
+      );
     }
     _currentPath =
         '${Directory.systemTemp.path}/bettercalories_local_audio.wav';

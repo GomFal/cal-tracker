@@ -60,6 +60,65 @@ void main() {
       store.activateUser('user-b');
       expect(await store.readActiveSession(), isNull);
     });
+
+    test('expires stale sessions and removes them from storage', () async {
+      var now = DateTime.utc(2026, 6, 19, 12);
+      final storage = _MemoryPreferencesStorage();
+      final store = AgentChatSessionStore(
+        storage: storage,
+        now: () => now,
+        maxEntryAge: const Duration(days: 1),
+      );
+      store.activateUser('user-a');
+      await store.writeActiveSession(_session('conversation-a'));
+
+      now = now.add(const Duration(days: 2));
+
+      expect(await store.readActiveSession(), isNull);
+      expect(storage.values, isEmpty);
+    });
+
+    test('migrates legacy sessions idempotently', () async {
+      final now = DateTime.utc(2026, 6, 19, 12);
+      final storage = _MemoryPreferencesStorage();
+      final store = AgentChatSessionStore(storage: storage, now: () => now);
+      store.activateUser('user-a');
+      final key = storageKeyForTest(
+        'agent_chat_session:v1',
+        'user-a',
+        'active',
+      );
+      await storage.writeString(
+        key,
+        jsonEncode(
+            {'schemaVersion': 1, 'payload': _session('legacy').toJson()}),
+      );
+
+      expect((await store.readActiveSession())?.conversationId, 'legacy');
+      expect(jsonDecode(storage.values[key]!)['schemaVersion'], 2);
+      expect((await store.readActiveSession())?.conversationId, 'legacy');
+      expect(storage.values, hasLength(1));
+    });
+
+    test(
+      'logout removes the active session and blocks stale repopulation',
+      () async {
+        final storage = _MemoryPreferencesStorage();
+        final store = AgentChatSessionStore(storage: storage);
+        store.activateUser('user-a');
+        await store.writeActiveSession(_session('conversation-a'));
+
+        final cleanup = store.clearActiveUserData();
+        await store.writeActiveSession(_session('stale'));
+        await cleanup;
+        await store.clearActiveUserData();
+
+        store.activateUser('user-b');
+        expect(await store.readActiveSession(), isNull);
+        store.activateUser('user-a');
+        expect(await store.readActiveSession(), isNull);
+      },
+    );
   });
 }
 

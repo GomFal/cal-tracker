@@ -232,6 +232,8 @@
   "mobileUpdateMessage": "A new BetterCalories version is available. Download the APK from your browser to update.",
   "mobileUpdateNow": "Update now",
   "mobileUpdateLater": "Later",
+  "mobileUpdateVerificationFailed": "This update could not be verified, so the download was blocked.",
+  "mobileUpdateOpenFailed": "The verified update could not be opened. Please try again later.",
   "settingsMacroRequiresCaloriesTitle": "Set calories first",
   "settingsMacroRequiresCaloriesMessage": "Configure your daily calories before setting a macro distribution.",
   "settingsMacroRequiresCaloriesSetNow": "Set your calories now",

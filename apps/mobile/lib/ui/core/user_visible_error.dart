@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
+import '../../data/services/audio_recorder_service.dart';
 import '../../generated/api/cal_tracker_api.dart';
 import '../../l10n/generated/app_localizations.dart';
 
@@ -72,6 +73,11 @@ String userVisibleErrorMessage(
   Object error, {
   UserErrorContext context = UserErrorContext.generic,
 }) {
+  if (error is RecorderException && error.code == 'permission_denied') {
+    return error.message ??
+        AudioRecorderService.microphonePermissionDeniedMessage;
+  }
+
   if (_isNetworkError(error)) {
     return 'We could not reach Better Calories. Check your connection and try again.';
   }

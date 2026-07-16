@@ -65,6 +65,8 @@ build_flavor() {
   local flavor="$1"
   local api_base_url="$2"
 
+  "$ROOT_DIR/scripts/mobile/validate-api-base-url.sh" \
+    "$flavor" "$api_base_url" "$BUILD_MODE"
   local define_file="$MOBILE_CONFIG_DIR/$flavor.json"
   if [[ ! -f "$define_file" ]]; then
     echo "Missing Flutter dart-define file: $define_file" >&2

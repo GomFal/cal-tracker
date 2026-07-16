@@ -18,6 +18,7 @@ import '../data/services/client_metadata_provider.dart';
 import '../data/services/client_telemetry_service.dart';
 import '../data/services/mobile_update_service.dart';
 import '../data/services/nutrition_cache_store.dart';
+import '../data/services/private_cache_storage.dart';
 import '../data/services/secure_token_storage.dart';
 import '../generated/api/cal_tracker_api.dart';
 import '../l10n/generated/app_localizations.dart';
@@ -260,18 +261,21 @@ class _CalTrackerComposition {
     final authRepository =
         widget.authRepository ??
         AuthRepository(apiClient: apiClient, tokenStorage: tokenStorage);
+    final privateCacheStorage = PrivateCacheStorage(
+      legacyStorage: AppPreferencesStorage(),
+    );
     final nutritionRepository =
         widget.nutritionRepository ??
         NutritionRepository(
           apiClient: apiClient,
-          cacheStore: NutritionCacheStore(storage: AppPreferencesStorage()),
+          cacheStore: NutritionCacheStore(storage: privateCacheStorage),
           telemetryService: telemetryService,
         );
     final agentChatSessionStore = AgentChatSessionStore(
-      storage: AppPreferencesStorage(),
+      storage: privateCacheStorage,
     );
     final agentChatCacheStore = AgentChatCacheStore(
-      storage: AppPreferencesStorage(),
+      storage: privateCacheStorage,
     );
     final ownsAudioRecorderService = widget.audioRecorderService == null;
 
@@ -474,9 +478,24 @@ class _AuthenticatedDataPreloaderState
     context.read<MealHistoryViewModel>().reset();
     context.read<MealTemplatesViewModel>().reset();
     context.read<SettingsViewModel>().reset();
-    context.read<AgentChatSessionStore>().deactivateUser();
-    context.read<AgentChatCacheStore>().deactivateUser();
-    unawaited(repository.clearActiveUserCache());
+    context.read<AgentChatViewModel>().reset();
+    context.read<VoiceLogViewModel>().resetForLogout();
+
+    final sessionStore = context.read<AgentChatSessionStore>();
+    final chatCacheStore = context.read<AgentChatCacheStore>();
+    final cacheCleanup = Future.wait([
+      _ignoreLogoutCleanupError(repository.clearActiveUserCache()),
+      _ignoreLogoutCleanupError(sessionStore.clearActiveUserData()),
+      _ignoreLogoutCleanupError(chatCacheStore.clearActiveUserData()),
+    ]);
+
+    // Each store captures its active user key when cleanup starts. Deactivate
+    // immediately afterwards so stale in-flight work cannot write more data
+    // under the signed-out user while deletion completes in the background.
+    repository.deactivateCache();
+    sessionStore.deactivateUser();
+    chatCacheStore.deactivateUser();
+    unawaited(cacheCleanup);
   }
 
   void _schedulePreload() {
@@ -509,5 +528,13 @@ class _AuthenticatedDataPreloaderState
     } on Object {
       // Preloading is opportunistic; screens still handle their own load state.
     }
+  }
+}
+
+Future<void> _ignoreLogoutCleanupError(Future<void> operation) async {
+  try {
+    await operation;
+  } on Object {
+    // Independent cleanup failures must not restore or delay the signed-out UI.
   }
 }

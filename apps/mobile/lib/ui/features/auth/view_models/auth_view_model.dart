@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../../../data/repositories/auth_repository.dart';
@@ -24,6 +26,7 @@ class AuthViewModel extends ChangeNotifier {
   String? _error;
   AuthErrorSource? _errorSource;
   String? _pendingRegistrationEmail;
+  Future<void>? _logoutInFlight;
 
   AuthUser? get user => _user;
   AuthStatus get status => _status;
@@ -38,6 +41,7 @@ class AuthViewModel extends ChangeNotifier {
     _status = AuthStatus.restoring;
     _setLoading(true);
     try {
+      await _waitForLogoutTeardown();
       _user = await _authRepository.restoreSession();
       _status =
           _user == null ? AuthStatus.unauthenticated : AuthStatus.authenticated;
@@ -56,6 +60,7 @@ class AuthViewModel extends ChangeNotifier {
   Future<void> login(String email, String password) async {
     _setLoading(true);
     try {
+      await _waitForLogoutTeardown();
       _user =
           (await _authRepository.login(email: email, password: password)).user;
       _status = AuthStatus.authenticated;
@@ -74,6 +79,7 @@ class AuthViewModel extends ChangeNotifier {
   Future<void> loginWithGoogle() async {
     _setLoading(true);
     try {
+      await _waitForLogoutTeardown();
       final session = await _authRepository.loginWithGoogle();
       if (session != null) {
         _user = session.user;
@@ -101,6 +107,7 @@ class AuthViewModel extends ChangeNotifier {
   ) async {
     _setLoading(true);
     try {
+      await _waitForLogoutTeardown();
       await _authRepository.register(
         email: email,
         password: password,
@@ -123,6 +130,7 @@ class AuthViewModel extends ChangeNotifier {
   Future<void> confirmEmail(String token) async {
     _setLoading(true);
     try {
+      await _waitForLogoutTeardown();
       _user = (await _authRepository.confirmEmail(token)).user;
       _status = AuthStatus.authenticated;
       _error = null;
@@ -137,12 +145,46 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> logout() async {
-    await _authRepository.logout();
+  Future<void> logout() {
+    final inFlight = _logoutInFlight;
+    if (inFlight != null) return inFlight;
+
     _user = null;
     _status = AuthStatus.unauthenticated;
+    _error = null;
+    _errorSource = null;
     _pendingRegistrationEmail = null;
     notifyListeners();
+
+    final operation = _finishLogout();
+    _logoutInFlight = operation;
+    unawaited(
+      operation.then<void>(
+        (_) => _clearLogoutInFlight(operation),
+        onError: (_) => _clearLogoutInFlight(operation),
+      ),
+    );
+    return operation;
+  }
+
+  Future<void> _finishLogout() async {
+    try {
+      await _authRepository.logout();
+    } on Object {
+      // Authentication state remains destroyed even after unexpected adapter
+      // failures; logout never restores a local session or surfaces an error.
+    }
+  }
+
+  void _clearLogoutInFlight(Future<void> operation) {
+    if (identical(_logoutInFlight, operation)) {
+      _logoutInFlight = null;
+    }
+  }
+
+  Future<void> _waitForLogoutTeardown() async {
+    final logout = _logoutInFlight;
+    if (logout != null) await logout;
   }
 
   void setUser(AuthUser user) {

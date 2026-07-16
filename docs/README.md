@@ -19,6 +19,7 @@ Current authoritative files:
 | `food-search-benchmark-acceptance-plan.md` | Reusable food search benchmark and primary-position validation commands, metrics, acceptance gates, and profiling workflow. | Data normalization rules and production rollout sequencing. |
 | `production-host-access-hardening.md` | Fail-safe migration from direct root/password SSH to a nominal key-only operator, fail2ban, explicit UFW policy, validation and basic console recovery. | GitHub Actions deployment-user migration, VPN access, or long-term emergency-key custody. |
 | `trusted-production-deployments.md` | Pinned SSH host identity, dedicated deployment account, immutable backend image references and release traceability. | GitHub environment approvals, signed tags, or deployment execution. |
+| `container-runtime-hardening.md` | Backend container privilege, capability and resource policy; isolated runtime smoke and operational tuning. | Read-only filesystems or additional PostgreSQL hardening. |
 
 This split is intentional:
 

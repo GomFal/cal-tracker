@@ -3,6 +3,12 @@ name: cal-tracker
 x-backend-common: &backend-common
   image: ${BACKEND_IMAGE:?BACKEND_IMAGE is required}
   restart: unless-stopped
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  cpus: ${BACKEND_CPU_LIMIT:-1.0}
+  mem_limit: ${BACKEND_MEMORY_LIMIT:-768m}
   depends_on:
     postgres:
       condition: service_healthy

@@ -37,6 +37,8 @@ jobs:
           set -euo pipefail
           bash -n \
             scripts/deploy/configure-ssh.sh \
+            scripts/deploy/smoke-container-runtime-hardening.sh \
+            scripts/deploy/test-container-runtime-policy.sh \
             scripts/deploy/test-configure-ssh.sh \
             scripts/deploy/test-deployment-policy.sh \
             scripts/deploy/test-provision-deploy-user.sh \
@@ -52,5 +54,6 @@ jobs:
         run: |
           set -euo pipefail
           scripts/deploy/test-configure-ssh.sh
+          scripts/deploy/test-container-runtime-policy.sh
           scripts/deploy/test-provision-deploy-user.sh
           scripts/deploy/test-deployment-policy.sh

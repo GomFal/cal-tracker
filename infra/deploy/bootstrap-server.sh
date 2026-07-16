@@ -88,6 +88,8 @@ if [[ ! -f "$ENV_DIR/deploy.env" ]]; then
   cat > "$ENV_DIR/deploy.env" <<'EOF'
 POSTGRES_PASSWORD=replace-with-strong-postgres-password
 BACKEND_IMAGE=ghcr.io/autofactu/cal-tracker-backend:bootstrap
+BACKEND_CPU_LIMIT=1.0
+BACKEND_MEMORY_LIMIT=768m
 EOF
   chmod 600 "$ENV_DIR/deploy.env"
 fi

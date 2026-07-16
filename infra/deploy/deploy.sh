@@ -62,6 +62,18 @@ POSTGRES_PASSWORD="$(read_env_value POSTGRES_PASSWORD)" \
   || { echo "POSTGRES_PASSWORD is missing from deploy.env" >&2; exit 2; }
 DEV_DATABASE_NAME="$(read_env_value DEV_DATABASE_NAME 2>/dev/null || true)"
 PRO_DATABASE_NAME="$(read_env_value PRO_DATABASE_NAME 2>/dev/null || true)"
+BACKEND_CPU_LIMIT="$(read_env_value BACKEND_CPU_LIMIT 2>/dev/null || printf '1.0\n')"
+BACKEND_MEMORY_LIMIT="$(read_env_value BACKEND_MEMORY_LIMIT 2>/dev/null || printf '768m\n')"
+
+if [[ ! "$BACKEND_CPU_LIMIT" =~ ^([1-9][0-9]*([.][0-9]+)?|0[.][0-9]*[1-9][0-9]*)$ ]]; then
+  echo "Invalid BACKEND_CPU_LIMIT: expected a positive CPU count" >&2
+  exit 2
+fi
+
+if [[ ! "$BACKEND_MEMORY_LIMIT" =~ ^[1-9][0-9]*(b|k|kb|m|mb|g|gb)$ ]]; then
+  echo "Invalid BACKEND_MEMORY_LIMIT: expected a positive Docker memory value such as 768m" >&2
+  exit 2
+fi
 
 case "$ENVIRONMENT" in
   dev) DATABASE_NAME="${DEV_DATABASE_NAME:-cal_tracker}" ;;
@@ -74,6 +86,8 @@ if [[ ! "$DATABASE_NAME" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
 fi
 
 export BACKEND_IMAGE="$REQUESTED_BACKEND_IMAGE"
+export BACKEND_CPU_LIMIT
+export BACKEND_MEMORY_LIMIT
 
 docker compose --env-file "$SECRETS_FILE" -f "$COMPOSE_FILE" pull postgres "$NEXT_SERVICE"
 docker compose --env-file "$SECRETS_FILE" -f "$COMPOSE_FILE" up -d postgres
@@ -88,6 +102,10 @@ done
 docker exec cal-tracker-postgres pg_isready -U cal_tracker -d "$DATABASE_NAME"
 
 docker run --rm \
+  --security-opt no-new-privileges:true \
+  --cap-drop ALL \
+  --cpus "$BACKEND_CPU_LIMIT" \
+  --memory "$BACKEND_MEMORY_LIMIT" \
   --network cal-tracker-internal \
   --env-file "$ENV_DIR/${ENVIRONMENT}.env" \
   -e "DATABASE_SCHEMA=$SCHEMA" \

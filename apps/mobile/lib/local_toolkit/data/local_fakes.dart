@@ -34,6 +34,7 @@ class LocalTokenStorage implements TokenStorage {
     _tokens = null;
   }
 }
+
 class LocalAuthRepository extends AuthRepository {
   factory LocalAuthRepository(
     LocalFixtureStore store, {
@@ -506,10 +507,7 @@ class LocalAudioRecorderService extends AudioRecorderService {
   @override
   Future<void> start() async {
     if (!await hasPermission()) {
-      throw const RecorderException(
-        'permission_denied',
-        AudioRecorderService.microphonePermissionDeniedMessage,
-      );
+      throw const RecorderException('permission_denied');
     }
     _currentPath =
         '${Directory.systemTemp.path}/bettercalories_local_audio.wav';

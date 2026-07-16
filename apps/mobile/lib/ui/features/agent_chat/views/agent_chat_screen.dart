@@ -57,6 +57,9 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
   Widget build(BuildContext context) {
     final viewModel = context.watch<AgentChatViewModel>();
     final palette = context.freshPalette;
+    final errorMessage = viewModel.errorCode == 'microphone_permission_denied'
+        ? context.l10n.voiceMicrophonePermissionDenied
+        : viewModel.errorMessage;
     _scheduleScrollToBottom(viewModel);
     return Scaffold(
       backgroundColor: palette.screen,
@@ -89,8 +92,8 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
                             onPressed: viewModel.isBusy || viewModel.isRecording
                                 ? null
                                 : () => unawaited(
-                                      viewModel.startNewConversation(),
-                                    ),
+                                    viewModel.startNewConversation(),
+                                  ),
                           ),
                           FreshIconButton(
                             key: const ValueKey('agent_chat_history_button'),
@@ -108,7 +111,7 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
                         controller: _scrollController,
                         padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
                         children: [
-                          if (viewModel.errorMessage != null) ...[
+                          if (errorMessage != null) ...[
                             FreshFadeSlide(
                               child: FreshStatusBanner(
                                 icon: Icons.error_outline_rounded,
@@ -116,7 +119,7 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
                                 message: localizedPublicAiErrorMessage(
                                   context.l10n,
                                   viewModel.errorCode,
-                                  fallback: viewModel.errorMessage!,
+                                  fallback: errorMessage,
                                 ),
                                 color: palette.coral,
                               ),
@@ -179,6 +182,7 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
         '${entry.id}:${entry.text.length}:${entry.toolStatus}:${entry.result?.kind}:${entry.error ?? ''}',
       viewModel.statusMessage ?? '',
       viewModel.errorMessage ?? '',
+      viewModel.errorCode ?? '',
     ].join('|');
     if (signature == _lastScrollSignature) return;
     _lastScrollSignature = signature;
@@ -271,9 +275,7 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
                         Expanded(
                           child: Text(
                             context.l10n.agentChatHistoryTitle,
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleLarge
+                            style: Theme.of(context).textTheme.titleLarge
                                 ?.copyWith(fontWeight: FontWeight.w700),
                           ),
                         ),
@@ -488,9 +490,9 @@ class _UserBubble extends StatelessWidget {
             text,
             textAlign: TextAlign.right,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: palette.ink,
-                  fontWeight: FontWeight.w600,
-                ),
+              color: palette.ink,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       ),
@@ -688,9 +690,7 @@ class _ToolCallCard extends StatelessWidget {
                     children: [
                       Text(
                         toolCall?.label ?? context.l10n.agentChatToolFallback,
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
+                        style: Theme.of(context).textTheme.titleMedium
                             ?.copyWith(fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(height: FreshSpacing.xs),
@@ -701,8 +701,8 @@ class _ToolCallCard extends StatelessWidget {
                           fallback: entry.error ?? toolCall?.summary ?? '',
                         ),
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: palette.inkSoft,
-                            ),
+                          color: palette.inkSoft,
+                        ),
                       ),
                     ],
                   ),
@@ -836,9 +836,9 @@ class _UsualFoodDraftReview extends StatelessWidget {
           Text(
             l10n.agentChatDraftMissingFields(missing),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: palette.orange,
-                  fontWeight: FontWeight.w600,
-                ),
+              color: palette.orange,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
         const SizedBox(height: FreshSpacing.md),
@@ -899,8 +899,9 @@ class _UsualMealDraftReview extends StatelessWidget {
     final missing = missingFields
         .map((field) => _usualMealDraftFieldLabel(context, field))
         .join(', ');
-    final nutrition =
-        draft.items.isEmpty ? null : _sumMealItemNutrition(draft.items);
+    final nutrition = draft.items.isEmpty
+        ? null
+        : _sumMealItemNutrition(draft.items);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -928,9 +929,9 @@ class _UsualMealDraftReview extends StatelessWidget {
           Text(
             l10n.agentChatDraftMissingFields(missing),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: palette.orange,
-                  fontWeight: FontWeight.w600,
-                ),
+              color: palette.orange,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
         const SizedBox(height: FreshSpacing.md),
@@ -1189,9 +1190,9 @@ class _MetricPill extends StatelessWidget {
       child: Text(
         '$value $label',
         style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w700,
-            ),
+          color: color,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
@@ -1231,7 +1232,8 @@ class _MealList extends StatelessWidget {
         for (final meal in meals.take(6))
           _CompactRow(
             title: meal.title,
-            subtitle: meal.mealLabel?.label ??
+            subtitle:
+                meal.mealLabel?.label ??
                 meal.occurredAt.toLocal().toString().substring(0, 16),
             trailing: '${meal.nutrition.calories} ${context.l10n.commonKcal}',
           ),
@@ -1253,7 +1255,8 @@ class _UsualFoodList extends StatelessWidget {
         for (final food in foods.take(6))
           _CompactRow(
             title: food.name,
-            subtitle: food.brand ??
+            subtitle:
+                food.brand ??
                 context.l10n.usualFoodsPerServing(_grams(food.servingGrams)),
             trailing: '${food.nutrition.calories} ${context.l10n.commonKcal}',
           ),

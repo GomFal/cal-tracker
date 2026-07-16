@@ -90,11 +90,7 @@ void main() {
         () => service.start(),
         throwsA(isA<RecorderException>()
             .having((e) => e.code, 'code', 'permission_denied')
-            .having(
-              (e) => e.message,
-              'message',
-              contains('device settings'),
-            )),
+            .having((e) => e.message, 'message', isNull)),
       );
       verifyNever(
         () => mockRecorder.start(any(), path: any(named: 'path')),

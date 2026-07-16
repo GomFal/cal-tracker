@@ -30,24 +30,24 @@ class MockAudioRecorderService extends Mock implements AudioRecorderService {}
 
 class _FakeAgentOcrScanViewModel extends UsualFoodScanViewModel {
   _FakeAgentOcrScanViewModel(this.context)
-      : super(
-          nutritionRepository: MockNutritionRepository(),
-          initializeCamera: () async {},
-          takePicture: () async => '/tmp/label.jpg',
-          pausePreview: () async {},
-          resumePreview: () async {},
-          recognizeText: (_) async => '',
-          deleteCapturedFile: (_) async {},
-          draftFromRecognizedText: false,
-        );
+    : super(
+        nutritionRepository: MockNutritionRepository(),
+        initializeCamera: () async {},
+        takePicture: () async => '/tmp/label.jpg',
+        pausePreview: () async {},
+        resumePreview: () async {},
+        recognizeText: (_) async => '',
+        deleteCapturedFile: (_) async {},
+        draftFromRecognizedText: false,
+      );
 
   final BuildContext context;
 
   @override
   Future<void> init() async {
-    setUiStateForTest(const UsualFoodScanUiState(
-      phase: UsualFoodScanPhase.ready,
-    ));
+    setUiStateForTest(
+      const UsualFoodScanUiState(phase: UsualFoodScanPhase.ready),
+    );
   }
 
   @override
@@ -108,8 +108,7 @@ void main() {
     expect(events[2]['type'], 'done');
   });
 
-  test('CalTrackerApiClient keeps typed safe SSE errors and trace ids',
-      () async {
+  test('CalTrackerApiClient keeps typed safe SSE errors and trace ids', () async {
     final client = CalTrackerApiClient(
       config: const ApiConfig(baseUrl: 'http://localhost'),
       tokenStorage: _MemoryTokenStorage(),
@@ -128,24 +127,29 @@ void main() {
     expect(error.message, isNot(contains('http')));
   });
 
-  test('CalTrackerApiClient classifies a prematurely closed SSE stream',
-      () async {
-    final client = CalTrackerApiClient(
-      config: const ApiConfig(baseUrl: 'http://localhost'),
-      tokenStorage: _MemoryTokenStorage(),
-      httpClient: _StreamingClient([
-        'data: {"type":"assistant_delta","delta":"Partial"}\n\n',
-      ]),
-    );
+  test(
+    'CalTrackerApiClient classifies a prematurely closed SSE stream',
+    () async {
+      final client = CalTrackerApiClient(
+        config: const ApiConfig(baseUrl: 'http://localhost'),
+        tokenStorage: _MemoryTokenStorage(),
+        httpClient: _StreamingClient([
+          'data: {"type":"assistant_delta","delta":"Partial"}\n\n',
+        ]),
+      );
 
-    await expectLater(
-      client.streamAgentChat('hello').toList(),
-      throwsA(
-        isA<ApiException>()
-            .having((error) => error.code, 'code', 'internal_error'),
-      ),
-    );
-  });
+      await expectLater(
+        client.streamAgentChat('hello').toList(),
+        throwsA(
+          isA<ApiException>().having(
+            (error) => error.code,
+            'code',
+            'internal_error',
+          ),
+        ),
+      );
+    },
+  );
 
   test('ApiErrorDetails rejects unknown server categories', () {
     final error = ApiErrorDetails.fromJson({
@@ -158,111 +162,173 @@ void main() {
     expect(error.traceId, 'trace-unknown');
   });
 
-  test('AgentChatViewModel classifies SSE errors by code, not message',
-      () async {
-    final repository = MockNutritionRepository();
-    final recorder = MockAudioRecorderService();
-    when(
-      () => repository.streamAgentChat(
-        any(),
-        conversationId: any(named: 'conversationId'),
-        activeProposalId: any(named: 'activeProposalId'),
-      ),
-    ).thenAnswer(
-      (_) => Stream.value(
-        const AgentChatStreamEvent(
-          type: 'error',
-          error: ApiErrorDetails(
-            code: 'rate_limit_exceeded',
-            message: 'Server copy that the UI must not inspect.',
-            traceId: 'trace-rate',
+  test(
+    'AgentChatViewModel classifies SSE errors by code, not message',
+    () async {
+      final repository = MockNutritionRepository();
+      final recorder = MockAudioRecorderService();
+      when(
+        () => repository.streamAgentChat(
+          any(),
+          conversationId: any(named: 'conversationId'),
+          activeProposalId: any(named: 'activeProposalId'),
+        ),
+      ).thenAnswer(
+        (_) => Stream.value(
+          const AgentChatStreamEvent(
+            type: 'error',
+            error: ApiErrorDetails(
+              code: 'rate_limit_exceeded',
+              message: 'Server copy that the UI must not inspect.',
+              traceId: 'trace-rate',
+            ),
           ),
         ),
-      ),
-    );
-    final viewModel = AgentChatViewModel(
-      nutritionRepository: repository,
-      audioRecorderService: recorder,
-    );
+      );
+      final viewModel = AgentChatViewModel(
+        nutritionRepository: repository,
+        audioRecorderService: recorder,
+      );
 
-    await viewModel.sendText('hello');
+      await viewModel.sendText('hello');
 
-    expect(viewModel.errorCode, 'rate_limit_exceeded');
-    expect(viewModel.errorMessage, 'Server copy that the UI must not inspect.');
-  });
+      expect(viewModel.errorCode, 'rate_limit_exceeded');
+      expect(
+        viewModel.errorMessage,
+        'Server copy that the UI must not inspect.',
+      );
+    },
+  );
 
-  test('AgentChatViewModel turns tool events into visible timeline entries',
-      () async {
-    final repository = MockNutritionRepository();
-    final recorder = MockAudioRecorderService();
-    final summary = _summary();
-    when(
-      () => repository.streamAgentChat(
-        any(),
-        conversationId: any(named: 'conversationId'),
-        activeProposalId: any(named: 'activeProposalId'),
-      ),
-    ).thenAnswer(
-      (_) => Stream.fromIterable([
-        const AgentChatStreamEvent(
-          type: 'conversation_started',
-          conversationId: '11111111-1111-1111-1111-111111111111',
-        ),
-        const AgentChatStreamEvent(
-          type: 'tool_call_started',
-          conversationId: '11111111-1111-1111-1111-111111111111',
-          toolCall: AgentToolCallFeedback(
-            id: 'call_summary',
-            actionId: 'get_daily_summary',
-            label: 'Get Daily Summary',
-            summary: 'Reading daily summary',
+  for (final testCase in <(Locale, String)>[
+    (
+      const Locale('en'),
+      'Microphone access is off. Enable it in your device settings to record, or log your meal manually.',
+    ),
+    (
+      const Locale('es'),
+      'El acceso al micrófono está desactivado. Actívalo en los ajustes del dispositivo para grabar o registra tu comida manualmente.',
+    ),
+  ]) {
+    testWidgets(
+      'AgentChatScreen localizes microphone denial recovery in ${testCase.$1.languageCode}',
+      (tester) async {
+        final repository = MockNutritionRepository();
+        final recorder = MockAudioRecorderService();
+        when(
+          () => recorder.start(),
+        ).thenThrow(const RecorderException('permission_denied'));
+        final viewModel = AgentChatViewModel(
+          nutritionRepository: repository,
+          audioRecorderService: recorder,
+        );
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider<AgentChatViewModel>.value(
+            value: viewModel,
+            child: MaterialApp(
+              locale: testCase.$1,
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              theme: buildLightTheme(),
+              home: const AgentChatScreen(),
+            ),
           ),
-        ),
-        AgentChatStreamEvent(
-          type: 'tool_call_completed',
-          conversationId: '11111111-1111-1111-1111-111111111111',
-          toolCall: const AgentToolCallFeedback(
-            id: 'call_summary',
-            actionId: 'get_daily_summary',
-            label: 'Get Daily Summary',
-            summary: 'Reading daily summary',
-          ),
-          result: AgentRunResult(
-            kind: 'summary',
-            message: 'Here is your daily summary.',
-            summary: summary,
-          ),
-        ),
-        const AgentChatStreamEvent(
-          type: 'assistant_delta',
-          conversationId: '11111111-1111-1111-1111-111111111111',
-          delta: 'You ate breakfast.',
-        ),
-        const AgentChatStreamEvent(
-          type: 'done',
-          conversationId: '11111111-1111-1111-1111-111111111111',
-        ),
-      ]),
+        );
+        await tester.pump();
+        await tester.tap(find.byKey(const ValueKey('agent_chat_mic_button')));
+        await tester.pump();
+
+        expect(viewModel.errorCode, 'microphone_permission_denied');
+        expect(viewModel.errorMessage, isNull);
+        expect(find.text(testCase.$2), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('agent_chat_message_field')),
+          findsOneWidget,
+        );
+
+        await tester.pump(const Duration(milliseconds: 250));
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump(const Duration(milliseconds: 250));
+        viewModel.dispose();
+      },
     );
+  }
 
-    final viewModel = AgentChatViewModel(
-      nutritionRepository: repository,
-      audioRecorderService: recorder,
-    );
+  test(
+    'AgentChatViewModel turns tool events into visible timeline entries',
+    () async {
+      final repository = MockNutritionRepository();
+      final recorder = MockAudioRecorderService();
+      final summary = _summary();
+      when(
+        () => repository.streamAgentChat(
+          any(),
+          conversationId: any(named: 'conversationId'),
+          activeProposalId: any(named: 'activeProposalId'),
+        ),
+      ).thenAnswer(
+        (_) => Stream.fromIterable([
+          const AgentChatStreamEvent(
+            type: 'conversation_started',
+            conversationId: '11111111-1111-1111-1111-111111111111',
+          ),
+          const AgentChatStreamEvent(
+            type: 'tool_call_started',
+            conversationId: '11111111-1111-1111-1111-111111111111',
+            toolCall: AgentToolCallFeedback(
+              id: 'call_summary',
+              actionId: 'get_daily_summary',
+              label: 'Get Daily Summary',
+              summary: 'Reading daily summary',
+            ),
+          ),
+          AgentChatStreamEvent(
+            type: 'tool_call_completed',
+            conversationId: '11111111-1111-1111-1111-111111111111',
+            toolCall: const AgentToolCallFeedback(
+              id: 'call_summary',
+              actionId: 'get_daily_summary',
+              label: 'Get Daily Summary',
+              summary: 'Reading daily summary',
+            ),
+            result: AgentRunResult(
+              kind: 'summary',
+              message: 'Here is your daily summary.',
+              summary: summary,
+            ),
+          ),
+          const AgentChatStreamEvent(
+            type: 'assistant_delta',
+            conversationId: '11111111-1111-1111-1111-111111111111',
+            delta: 'You ate breakfast.',
+          ),
+          const AgentChatStreamEvent(
+            type: 'done',
+            conversationId: '11111111-1111-1111-1111-111111111111',
+          ),
+        ]),
+      );
 
-    await viewModel.sendText('what did I eat today?');
+      final viewModel = AgentChatViewModel(
+        nutritionRepository: repository,
+        audioRecorderService: recorder,
+      );
 
-    expect(viewModel.conversationId, '11111111-1111-1111-1111-111111111111');
-    expect(viewModel.entries.map((entry) => entry.kind), [
-      AgentChatEntryKind.user,
-      AgentChatEntryKind.tool,
-      AgentChatEntryKind.assistant,
-    ]);
-    final toolEntry = viewModel.entries[1];
-    expect(toolEntry.toolStatus, AgentChatToolStatus.completed);
-    expect(toolEntry.result?.summary?.consumed.calories, 420);
-    expect(viewModel.entries[2].text, 'You ate breakfast.');
-  });
+      await viewModel.sendText('what did I eat today?');
+
+      expect(viewModel.conversationId, '11111111-1111-1111-1111-111111111111');
+      expect(viewModel.entries.map((entry) => entry.kind), [
+        AgentChatEntryKind.user,
+        AgentChatEntryKind.tool,
+        AgentChatEntryKind.assistant,
+      ]);
+      final toolEntry = viewModel.entries[1];
+      expect(toolEntry.toolStatus, AgentChatToolStatus.completed);
+      expect(toolEntry.result?.summary?.consumed.calories, 420);
+      expect(viewModel.entries[2].text, 'You ate breakfast.');
+    },
+  );
 
   test('AgentChatViewModel clears active proposal after meal commit', () async {
     final repository = MockNutritionRepository();
@@ -350,40 +416,43 @@ void main() {
     expect(viewModel.activeProposalId, isNull);
   });
 
-  test('AgentChatViewModel starts blank after stale completed session',
-      () async {
-    final repository = MockNutritionRepository();
-    final recorder = MockAudioRecorderService();
-    final storage = _MemoryPreferencesStorage();
-    final sessionStore = AgentChatSessionStore(storage: storage);
-    final cacheStore = AgentChatCacheStore(storage: storage);
-    sessionStore.activateUser('user-a');
-    cacheStore.activateUser('user-a');
-    await sessionStore.writeActiveSession(
-      AgentChatSession(
-        conversationId: '11111111-1111-1111-1111-111111111111',
-        lastInteractionAt: DateTime.utc(2026, 6, 19, 12),
-        lastCompletedAt: DateTime.utc(2026, 6, 19, 12),
-        unfinished: false,
-      ),
-    );
-    when(() => repository.listAgentConversations())
-        .thenAnswer((_) async => const []);
-    final viewModel = AgentChatViewModel(
-      nutritionRepository: repository,
-      audioRecorderService: recorder,
-      sessionStore: sessionStore,
-      cacheStore: cacheStore,
-      now: () => DateTime.utc(2026, 6, 19, 12, 3),
-    )..conversationId = '11111111-1111-1111-1111-111111111111';
+  test(
+    'AgentChatViewModel starts blank after stale completed session',
+    () async {
+      final repository = MockNutritionRepository();
+      final recorder = MockAudioRecorderService();
+      final storage = _MemoryPreferencesStorage();
+      final sessionStore = AgentChatSessionStore(storage: storage);
+      final cacheStore = AgentChatCacheStore(storage: storage);
+      sessionStore.activateUser('user-a');
+      cacheStore.activateUser('user-a');
+      await sessionStore.writeActiveSession(
+        AgentChatSession(
+          conversationId: '11111111-1111-1111-1111-111111111111',
+          lastInteractionAt: DateTime.utc(2026, 6, 19, 12),
+          lastCompletedAt: DateTime.utc(2026, 6, 19, 12),
+          unfinished: false,
+        ),
+      );
+      when(
+        () => repository.listAgentConversations(),
+      ).thenAnswer((_) async => const []);
+      final viewModel = AgentChatViewModel(
+        nutritionRepository: repository,
+        audioRecorderService: recorder,
+        sessionStore: sessionStore,
+        cacheStore: cacheStore,
+        now: () => DateTime.utc(2026, 6, 19, 12, 3),
+      )..conversationId = '11111111-1111-1111-1111-111111111111';
 
-    await viewModel.prepareForEntry();
+      await viewModel.prepareForEntry();
 
-    expect(viewModel.conversationId, isNull);
-    expect(viewModel.entries, isEmpty);
-    expect(await sessionStore.readActiveSession(), isNull);
-    verifyNever(() => repository.getAgentConversation(any()));
-  });
+      expect(viewModel.conversationId, isNull);
+      expect(viewModel.entries, isEmpty);
+      expect(await sessionStore.readActiveSession(), isNull);
+      verifyNever(() => repository.getAgentConversation(any()));
+    },
+  );
 
   test('AgentChatViewModel resumes stale unfinished session', () async {
     final repository = MockNutritionRepository();
@@ -401,8 +470,9 @@ void main() {
         unfinished: true,
       ),
     );
-    when(() => repository.listAgentConversations())
-        .thenAnswer((_) async => const []);
+    when(
+      () => repository.listAgentConversations(),
+    ).thenAnswer((_) async => const []);
     when(() => repository.getAgentConversation(conversationId)).thenAnswer(
       (_) async => AgentConversationDetail(
         conversation: _conversationSummary(conversationId),
@@ -431,48 +501,51 @@ void main() {
     expect(viewModel.entries.single.text, 'finish this meal');
   });
 
-  test('AgentChatViewModel manual new chat omits conversation id on next send',
-      () async {
-    final repository = MockNutritionRepository();
-    final recorder = MockAudioRecorderService();
-    when(
-      () => repository.streamAgentChat(
-        any(),
-        conversationId: any(named: 'conversationId'),
-        activeProposalId: any(named: 'activeProposalId'),
-      ),
-    ).thenAnswer(
-      (_) => Stream.fromIterable([
-        const AgentChatStreamEvent(
-          type: 'conversation_started',
-          conversationId: '22222222-2222-2222-2222-222222222222',
+  test(
+    'AgentChatViewModel manual new chat omits conversation id on next send',
+    () async {
+      final repository = MockNutritionRepository();
+      final recorder = MockAudioRecorderService();
+      when(
+        () => repository.streamAgentChat(
+          any(),
+          conversationId: any(named: 'conversationId'),
+          activeProposalId: any(named: 'activeProposalId'),
         ),
-        const AgentChatStreamEvent(
-          type: 'done',
-          conversationId: '22222222-2222-2222-2222-222222222222',
+      ).thenAnswer(
+        (_) => Stream.fromIterable([
+          const AgentChatStreamEvent(
+            type: 'conversation_started',
+            conversationId: '22222222-2222-2222-2222-222222222222',
+          ),
+          const AgentChatStreamEvent(
+            type: 'done',
+            conversationId: '22222222-2222-2222-2222-222222222222',
+          ),
+        ]),
+      );
+      final viewModel = AgentChatViewModel(
+        nutritionRepository: repository,
+        audioRecorderService: recorder,
+      )..conversationId = '11111111-1111-1111-1111-111111111111';
+
+      await viewModel.startNewConversation();
+      await viewModel.sendText('fresh start');
+
+      verify(
+        () => repository.streamAgentChat(
+          'fresh start',
+          conversationId: null,
+          activeProposalId: any(named: 'activeProposalId'),
         ),
-      ]),
-    );
-    final viewModel = AgentChatViewModel(
-      nutritionRepository: repository,
-      audioRecorderService: recorder,
-    )..conversationId = '11111111-1111-1111-1111-111111111111';
+      ).called(1);
+      expect(viewModel.conversationId, '22222222-2222-2222-2222-222222222222');
+    },
+  );
 
-    await viewModel.startNewConversation();
-    await viewModel.sendText('fresh start');
-
-    verify(
-      () => repository.streamAgentChat(
-        'fresh start',
-        conversationId: null,
-        activeProposalId: any(named: 'activeProposalId'),
-      ),
-    ).called(1);
-    expect(viewModel.conversationId, '22222222-2222-2222-2222-222222222222');
-  });
-
-  testWidgets('AgentChatScreen renders a completed tool widget',
-      (tester) async {
+  testWidgets('AgentChatScreen renders a completed tool widget', (
+    tester,
+  ) async {
     final repository = MockNutritionRepository();
     final recorder = MockAudioRecorderService();
     when(
@@ -551,8 +624,9 @@ void main() {
     expect(find.textContaining('780'), findsOneWidget);
   });
 
-  testWidgets('AgentChatScreen renders quick reply buttons that send text',
-      (tester) async {
+  testWidgets('AgentChatScreen renders quick reply buttons that send text', (
+    tester,
+  ) async {
     final repository = MockNutritionRepository();
     final recorder = MockAudioRecorderService();
     when(
@@ -640,8 +714,9 @@ void main() {
     expect(find.textContaining('Perfecto'), findsOneWidget);
   });
 
-  testWidgets('AgentChatScreen scans a label and submits OCR text to agent',
-      (tester) async {
+  testWidgets('AgentChatScreen scans a label and submits OCR text to agent', (
+    tester,
+  ) async {
     final repository = MockNutritionRepository();
     final recorder = MockAudioRecorderService();
     String? submittedText;
@@ -683,14 +758,18 @@ void main() {
       ),
     );
 
-    await tester
-        .tap(find.byKey(const ValueKey('agent_chat_scan_label_button')));
+    await tester.tap(
+      find.byKey(const ValueKey('agent_chat_scan_label_button')),
+    );
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('usual_food_scan_capture_button')),
-        findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('usual_food_scan_capture_button')),
+      findsOneWidget,
+    );
 
-    await tester
-        .tap(find.byKey(const ValueKey('usual_food_scan_capture_button')));
+    await tester.tap(
+      find.byKey(const ValueKey('usual_food_scan_capture_button')),
+    );
     await tester.pumpAndSettle();
 
     expect(submittedText, contains('Nutrition per 100 g'));
@@ -698,164 +777,174 @@ void main() {
     expect(find.byType(AgentChatScreen), findsOneWidget);
   });
 
-  testWidgets('AgentChatScreen marks usual food draft saved after editor save',
-      (tester) async {
-    final repository = MockNutritionRepository();
-    final recorder = MockAudioRecorderService();
-    const draft = UsualFoodDraft(
-      name: 'Arroz Hacendado',
-      servingGrams: 100,
-      calories: 360,
-      proteinGrams: 7,
-      carbsGrams: 79,
-      fatGrams: 1,
-    );
-    when(
-      () => repository.streamAgentChat(
-        any(),
-        conversationId: any(named: 'conversationId'),
-        activeProposalId: any(named: 'activeProposalId'),
-      ),
-    ).thenAnswer(
-      (_) => Stream.fromIterable([
-        const AgentChatStreamEvent(
-          type: 'conversation_started',
-          conversationId: '11111111-1111-1111-1111-111111111111',
-        ),
-        const AgentChatStreamEvent(
-          type: 'tool_call_started',
-          conversationId: '11111111-1111-1111-1111-111111111111',
-          toolCall: AgentToolCallFeedback(
-            id: 'call_draft',
-            actionId: 'draft_usual_food',
-            label: 'Draft Usual Ingredient',
-            summary: 'Preparing a reviewed usual ingredient draft',
-          ),
-        ),
-        const AgentChatStreamEvent(
-          type: 'tool_call_completed',
-          conversationId: '11111111-1111-1111-1111-111111111111',
-          toolCall: AgentToolCallFeedback(
-            id: 'call_draft',
-            actionId: 'draft_usual_food',
-            label: 'Draft Usual Ingredient',
-            summary: 'Preparing a reviewed usual ingredient draft',
-          ),
-          result: AgentRunResult(
-            kind: 'usual_food_draft',
-            message: 'Review this ingredient before saving.',
-            usualFoodDraft: draft,
-          ),
-        ),
-        const AgentChatStreamEvent(
-          type: 'done',
-          conversationId: '11111111-1111-1111-1111-111111111111',
-        ),
-      ]),
-    );
-    when(() => repository.cachedTemplates()).thenAnswer((_) async => null);
-    when(() => repository.cachedUsualFoods()).thenAnswer((_) async => null);
-    when(
-      () => repository.refreshTemplates(force: any(named: 'force')),
-    ).thenAnswer((_) async => const <MealTemplate>[]);
-    when(
-      () => repository.refreshUsualFoods(force: any(named: 'force')),
-    ).thenAnswer((_) async => const <UsualFood>[]);
-    when(() => repository.putCachedUsualFoods(any())).thenAnswer((_) async {});
-    when(() => repository.createUsualFood(any()))
-        .thenAnswer((invocation) async {
-      final input = invocation.positionalArguments.first as UsualFoodInput;
-      return UsualFood(
-        id: 'usual_food_rice',
-        name: input.name,
-        canonicalName: input.canonicalName,
-        brand: input.brand,
-        barcode: input.barcode,
-        servingGrams: input.servingGrams,
-        nutrition: input.nutrition,
-        aliases: input.aliases,
-        nutrients: input.nutrients,
+  testWidgets(
+    'AgentChatScreen marks usual food draft saved after editor save',
+    (tester) async {
+      final repository = MockNutritionRepository();
+      final recorder = MockAudioRecorderService();
+      const draft = UsualFoodDraft(
+        name: 'Arroz Hacendado',
+        servingGrams: 100,
+        calories: 360,
+        proteinGrams: 7,
+        carbsGrams: 79,
+        fatGrams: 1,
       );
-    });
-    final viewModel = AgentChatViewModel(
-      nutritionRepository: repository,
-      audioRecorderService: recorder,
-    );
-    final templatesViewModel = MealTemplatesViewModel(
-      nutritionRepository: repository,
-    );
-    final router = GoRouter(
-      initialLocation: '/agent',
-      routes: [
-        GoRoute(
-          path: '/agent',
-          builder: (context, state) => const AgentChatScreen(),
+      when(
+        () => repository.streamAgentChat(
+          any(),
+          conversationId: any(named: 'conversationId'),
+          activeProposalId: any(named: 'activeProposalId'),
         ),
-      ],
-    );
-
-    await tester.pumpWidget(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider.value(value: viewModel),
-          ChangeNotifierProvider.value(value: templatesViewModel),
+      ).thenAnswer(
+        (_) => Stream.fromIterable([
+          const AgentChatStreamEvent(
+            type: 'conversation_started',
+            conversationId: '11111111-1111-1111-1111-111111111111',
+          ),
+          const AgentChatStreamEvent(
+            type: 'tool_call_started',
+            conversationId: '11111111-1111-1111-1111-111111111111',
+            toolCall: AgentToolCallFeedback(
+              id: 'call_draft',
+              actionId: 'draft_usual_food',
+              label: 'Draft Usual Ingredient',
+              summary: 'Preparing a reviewed usual ingredient draft',
+            ),
+          ),
+          const AgentChatStreamEvent(
+            type: 'tool_call_completed',
+            conversationId: '11111111-1111-1111-1111-111111111111',
+            toolCall: AgentToolCallFeedback(
+              id: 'call_draft',
+              actionId: 'draft_usual_food',
+              label: 'Draft Usual Ingredient',
+              summary: 'Preparing a reviewed usual ingredient draft',
+            ),
+            result: AgentRunResult(
+              kind: 'usual_food_draft',
+              message: 'Review this ingredient before saving.',
+              usualFoodDraft: draft,
+            ),
+          ),
+          const AgentChatStreamEvent(
+            type: 'done',
+            conversationId: '11111111-1111-1111-1111-111111111111',
+          ),
+        ]),
+      );
+      when(() => repository.cachedTemplates()).thenAnswer((_) async => null);
+      when(() => repository.cachedUsualFoods()).thenAnswer((_) async => null);
+      when(
+        () => repository.refreshTemplates(force: any(named: 'force')),
+      ).thenAnswer((_) async => const <MealTemplate>[]);
+      when(
+        () => repository.refreshUsualFoods(force: any(named: 'force')),
+      ).thenAnswer((_) async => const <UsualFood>[]);
+      when(
+        () => repository.putCachedUsualFoods(any()),
+      ).thenAnswer((_) async {});
+      when(() => repository.createUsualFood(any())).thenAnswer((
+        invocation,
+      ) async {
+        final input = invocation.positionalArguments.first as UsualFoodInput;
+        return UsualFood(
+          id: 'usual_food_rice',
+          name: input.name,
+          canonicalName: input.canonicalName,
+          brand: input.brand,
+          barcode: input.barcode,
+          servingGrams: input.servingGrams,
+          nutrition: input.nutrition,
+          aliases: input.aliases,
+          nutrients: input.nutrients,
+        );
+      });
+      final viewModel = AgentChatViewModel(
+        nutritionRepository: repository,
+        audioRecorderService: recorder,
+      );
+      final templatesViewModel = MealTemplatesViewModel(
+        nutritionRepository: repository,
+      );
+      final router = GoRouter(
+        initialLocation: '/agent',
+        routes: [
+          GoRoute(
+            path: '/agent',
+            builder: (context, state) => const AgentChatScreen(),
+          ),
         ],
-        child: MaterialApp.router(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          theme: buildLightTheme(),
-          routerConfig: router,
+      );
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: viewModel),
+            ChangeNotifierProvider.value(value: templatesViewModel),
+          ],
+          child: MaterialApp.router(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            theme: buildLightTheme(),
+            routerConfig: router,
+          ),
         ),
-      ),
-    );
+      );
 
-    await tester.enterText(
-      find.byKey(const ValueKey('agent_chat_message_field')),
-      'save rice as a usual ingredient',
-    );
-    await tester.tap(find.byKey(const ValueKey('agent_chat_send_button')));
-    await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('agent_chat_message_field')),
+        'save rice as a usual ingredient',
+      );
+      await tester.tap(find.byKey(const ValueKey('agent_chat_send_button')));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Usual ingredient draft'), findsOneWidget);
-    expect(find.text('Arroz Hacendado'), findsOneWidget);
+      expect(find.text('Usual ingredient draft'), findsOneWidget);
+      expect(find.text('Arroz Hacendado'), findsOneWidget);
 
-    await tester.tap(
-      find.byKey(const ValueKey('agent_chat_review_usual_food_draft_button')),
-    );
-    await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('agent_chat_review_usual_food_draft_button')),
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.text('New saved ingredient'), findsOneWidget);
-    expect(find.text('Arroz Hacendado'), findsOneWidget);
-    expect(
-        find.byKey(const ValueKey('usual_food_save_button')), findsOneWidget);
+      expect(find.text('New saved ingredient'), findsOneWidget);
+      expect(find.text('Arroz Hacendado'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('usual_food_save_button')),
+        findsOneWidget,
+      );
 
-    await tester
-        .ensureVisible(find.byKey(const ValueKey('usual_food_save_button')));
-    await tester.tap(find.byKey(const ValueKey('usual_food_save_button')));
-    await tester.pumpAndSettle();
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('usual_food_save_button')),
+      );
+      await tester.tap(find.byKey(const ValueKey('usual_food_save_button')));
+      await tester.pumpAndSettle();
 
-    expect(find.byType(AgentChatScreen), findsOneWidget);
-    expect(find.text('Usual ingredient draft'), findsOneWidget);
-    expect(
-      find.text('Saved Arroz Hacendado to your usual ingredients.'),
-      findsWidgets,
-    );
-    expect(
-      find.byKey(const ValueKey('agent_chat_review_usual_food_draft_button')),
-      findsNothing,
-    );
-    verify(() => repository.createUsualFood(any())).called(1);
-  });
-  testWidgets('chat deletion explains scope and removes the row immediately',
-      (tester) async {
+      expect(find.byType(AgentChatScreen), findsOneWidget);
+      expect(find.text('Usual ingredient draft'), findsOneWidget);
+      expect(
+        find.text('Saved Arroz Hacendado to your usual ingredients.'),
+        findsWidgets,
+      );
+      expect(
+        find.byKey(const ValueKey('agent_chat_review_usual_food_draft_button')),
+        findsNothing,
+      );
+      verify(() => repository.createUsualFood(any())).called(1);
+    },
+  );
+  testWidgets('chat deletion explains scope and removes the row immediately', (
+    tester,
+  ) async {
     final repository = MockNutritionRepository();
     final recorder = MockAudioRecorderService();
     const conversationId = '11111111-1111-1111-1111-111111111111';
-    when(() => repository.listAgentConversations()).thenAnswer(
-      (_) async => [_conversationSummary(conversationId)],
-    );
-    when(() => repository.deleteAgentConversation(conversationId))
-        .thenAnswer((_) async {});
+    when(
+      () => repository.listAgentConversations(),
+    ).thenAnswer((_) async => [_conversationSummary(conversationId)]);
+    when(
+      () => repository.deleteAgentConversation(conversationId),
+    ).thenAnswer((_) async {});
     final viewModel = AgentChatViewModel(
       nutritionRepository: repository,
       audioRecorderService: recorder,
@@ -885,7 +974,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       find.textContaining(
-          'permanently removed from active systems within 24 hours'),
+        'permanently removed from active systems within 24 hours',
+      ),
       findsOneWidget,
     );
     await tester.tap(
@@ -904,10 +994,12 @@ void main() {
     final cache = AgentChatCacheStore(storage: storage)..activateUser('user-a');
     const conversationId = '11111111-1111-1111-1111-111111111111';
     final response = Completer<List<AgentConversationSummary>>();
-    when(() => repository.listAgentConversations())
-        .thenAnswer((_) => response.future);
-    when(() => repository.deleteAgentConversation(conversationId))
-        .thenAnswer((_) async {});
+    when(
+      () => repository.listAgentConversations(),
+    ).thenAnswer((_) => response.future);
+    when(
+      () => repository.deleteAgentConversation(conversationId),
+    ).thenAnswer((_) async {});
     final viewModel = AgentChatViewModel(
       nutritionRepository: repository,
       audioRecorderService: recorder,
@@ -925,87 +1017,102 @@ void main() {
     expect(await cache.isConversationDeleted(conversationId), isTrue);
   });
 
-  test('a failed backend deletion rolls back the tombstone and can be retried',
-      () async {
-    final repository = MockNutritionRepository();
-    final recorder = MockAudioRecorderService();
-    final storage = _MemoryPreferencesStorage();
-    final cache = AgentChatCacheStore(storage: storage)..activateUser('user-a');
-    const conversationId = '11111111-1111-1111-1111-111111111111';
-    var attempts = 0;
-    when(() => repository.listAgentConversations()).thenAnswer(
-      (_) async => [_conversationSummary(conversationId)],
-    );
-    when(() => repository.deleteAgentConversation(conversationId))
-        .thenAnswer((_) async {
-      attempts++;
-      if (attempts == 1) throw Exception('offline');
-    });
-    final viewModel = AgentChatViewModel(
-      nutritionRepository: repository,
-      audioRecorderService: recorder,
-      cacheStore: cache,
-    );
-    await viewModel.refreshConversationHistory();
+  test(
+    'a failed backend deletion rolls back the tombstone and can be retried',
+    () async {
+      final repository = MockNutritionRepository();
+      final recorder = MockAudioRecorderService();
+      final storage = _MemoryPreferencesStorage();
+      final cache = AgentChatCacheStore(storage: storage)
+        ..activateUser('user-a');
+      const conversationId = '11111111-1111-1111-1111-111111111111';
+      var attempts = 0;
+      when(
+        () => repository.listAgentConversations(),
+      ).thenAnswer((_) async => [_conversationSummary(conversationId)]);
+      when(() => repository.deleteAgentConversation(conversationId)).thenAnswer(
+        (_) async {
+          attempts++;
+          if (attempts == 1) throw Exception('offline');
+        },
+      );
+      final viewModel = AgentChatViewModel(
+        nutritionRepository: repository,
+        audioRecorderService: recorder,
+        cacheStore: cache,
+      );
+      await viewModel.refreshConversationHistory();
 
-    await viewModel.deleteConversation(conversationId);
-    expect(viewModel.errorMessage, isNotNull);
-    expect(viewModel.conversations.map((item) => item.id), [conversationId]);
-    expect(await cache.isConversationDeleted(conversationId), isFalse);
+      await viewModel.deleteConversation(conversationId);
+      expect(viewModel.errorMessage, isNotNull);
+      expect(viewModel.conversations.map((item) => item.id), [conversationId]);
+      expect(await cache.isConversationDeleted(conversationId), isFalse);
 
-    await viewModel.deleteConversation(conversationId);
-    expect(viewModel.errorMessage, isNull);
-    expect(viewModel.conversations, isEmpty);
-    expect(await cache.isConversationDeleted(conversationId), isTrue);
-    expect(attempts, 2);
-  });
+      await viewModel.deleteConversation(conversationId);
+      expect(viewModel.errorMessage, isNull);
+      expect(viewModel.conversations, isEmpty);
+      expect(await cache.isConversationDeleted(conversationId), isTrue);
+      expect(attempts, 2);
+    },
+  );
 
-  test('deleting an active conversation abandons later stream events',
-      () async {
-    final repository = MockNutritionRepository();
-    final recorder = MockAudioRecorderService();
-    final events = StreamController<AgentChatStreamEvent>();
-    const conversationId = '11111111-1111-1111-1111-111111111111';
-    when(
-      () => repository.streamAgentChat(
-        any(),
-        conversationId: any(named: 'conversationId'),
-        activeProposalId: any(named: 'activeProposalId'),
-      ),
-    ).thenAnswer((_) => events.stream);
-    when(() => repository.deleteAgentConversation(conversationId))
-        .thenAnswer((_) async {});
-    final viewModel = AgentChatViewModel(
-      nutritionRepository: repository,
-      audioRecorderService: recorder,
-    );
+  test(
+    'deleting an active conversation abandons later stream events',
+    () async {
+      final repository = MockNutritionRepository();
+      final recorder = MockAudioRecorderService();
+      final events = StreamController<AgentChatStreamEvent>();
+      const conversationId = '11111111-1111-1111-1111-111111111111';
+      when(
+        () => repository.streamAgentChat(
+          any(),
+          conversationId: any(named: 'conversationId'),
+          activeProposalId: any(named: 'activeProposalId'),
+        ),
+      ).thenAnswer((_) => events.stream);
+      when(
+        () => repository.deleteAgentConversation(conversationId),
+      ).thenAnswer((_) async {});
+      final viewModel = AgentChatViewModel(
+        nutritionRepository: repository,
+        audioRecorderService: recorder,
+      );
 
-    final send = viewModel.sendText('private message');
-    events.add(const AgentChatStreamEvent(
-      type: 'conversation_started',
-      conversationId: conversationId,
-    ));
-    await Future<void>.delayed(Duration.zero);
-    expect(viewModel.isSending, isTrue);
-    expect(viewModel.conversationId, conversationId);
+      final send = viewModel.sendText('private message');
+      events.add(
+        const AgentChatStreamEvent(
+          type: 'conversation_started',
+          conversationId: conversationId,
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(viewModel.isSending, isTrue);
+      expect(viewModel.conversationId, conversationId);
 
-    await viewModel.deleteConversation(conversationId);
-    events.add(const AgentChatStreamEvent(
-      type: 'assistant_delta',
-      conversationId: conversationId,
-      delta: 'must not reappear',
-    ));
-    events.add(const AgentChatStreamEvent(
-      type: 'done',
-      conversationId: conversationId,
-    ));
-    await events.close();
-    await send;
+      await viewModel.deleteConversation(conversationId);
+      events.add(
+        const AgentChatStreamEvent(
+          type: 'assistant_delta',
+          conversationId: conversationId,
+          delta: 'must not reappear',
+        ),
+      );
+      events.add(
+        const AgentChatStreamEvent(
+          type: 'done',
+          conversationId: conversationId,
+        ),
+      );
+      await events.close();
+      await send;
 
-    expect(viewModel.conversationId, isNull);
-    expect(viewModel.entries.where((entry) => entry.text.contains('reappear')),
-        isEmpty);
-  });
+      expect(viewModel.conversationId, isNull);
+      expect(
+        viewModel.entries.where((entry) => entry.text.contains('reappear')),
+        isEmpty,
+      );
+    },
+  );
 }
 
 DailySummary _summary() {

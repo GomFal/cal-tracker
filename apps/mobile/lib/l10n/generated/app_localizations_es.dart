@@ -1401,6 +1401,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get voiceErrorTitle => 'Algo salió mal';
 
   @override
+  String get voiceMicrophonePermissionDenied =>
+      'El acceso al micrófono está desactivado. Actívalo en los ajustes del dispositivo para grabar o registra tu comida manualmente.';
+
+  @override
   String get voiceLoggedMessage =>
       'Registrado. Puedes corregirlo desde el historial.';
 

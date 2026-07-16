@@ -27,6 +27,7 @@ enum VoiceLogState {
   clarificationRequired,
   error,
 }
+
 class VoiceLogUiState {
   const VoiceLogUiState({
     this.phase = VoiceLogState.idle,
@@ -122,8 +123,9 @@ class VoiceLogUiState {
       errorCode: identical(errorCode, _unchanged)
           ? this.errorCode
           : errorCode as String?,
-      message:
-          identical(message, _unchanged) ? this.message : message as String?,
+      message: identical(message, _unchanged)
+          ? this.message
+          : message as String?,
       transcript: transcript ?? this.transcript,
       transcriptFromVoice: transcriptFromVoice ?? this.transcriptFromVoice,
       recordingDuration: recordingDuration ?? this.recordingDuration,
@@ -140,8 +142,9 @@ class VoiceLogUiState {
           ? this.remaining
           : remaining as NutritionSnapshot?,
       meals: identical(meals, _unchanged) ? this.meals : meals as List<Meal>?,
-      items:
-          identical(items, _unchanged) ? this.items : items as List<MealItem>?,
+      items: identical(items, _unchanged)
+          ? this.items
+          : items as List<MealItem>?,
       resolvedItems: identical(resolvedItems, _unchanged)
           ? this.resolvedItems
           : resolvedItems as List<MealItem>?,
@@ -187,12 +190,12 @@ class VoiceLogViewModel extends ChangeNotifier {
     bool ownsAudioRecorderService = true,
     ClientTelemetryService? telemetryService,
     DateTime Function()? now,
-  })  : _nutritionRepository = nutritionRepository,
-        _audioRecorderService = audioRecorderService ?? AudioRecorderService(),
-        _ownsAudioRecorderService =
-            audioRecorderService == null || ownsAudioRecorderService,
-        _telemetryService = telemetryService,
-        _now = now ?? DateTime.now {
+  }) : _nutritionRepository = nutritionRepository,
+       _audioRecorderService = audioRecorderService ?? AudioRecorderService(),
+       _ownsAudioRecorderService =
+           audioRecorderService == null || ownsAudioRecorderService,
+       _telemetryService = telemetryService,
+       _now = now ?? DateTime.now {
     _timers = VoiceLogTimers(
       onRecordingDurationTick: _onRecordingDurationTick,
       onProposalChangeSuccessExpired: _onProposalChangeSuccessExpired,
@@ -329,6 +332,7 @@ class VoiceLogViewModel extends ChangeNotifier {
     _setUiState(
       _uiState.copyWith(
         phase: VoiceLogState.requestingPermission,
+        errorCode: null,
         transcript: '',
         transcriptFromVoice: false,
         errorMessage: null,
@@ -348,10 +352,12 @@ class VoiceLogViewModel extends ChangeNotifier {
         confirmationActionId: null,
         confirmationInput: null,
         clarificationOptions: null,
-        candidateGroups:
-            activeProposal == null ? null : _uiState.candidateGroups,
-        selectedCandidateItems:
-            activeProposal == null ? const {} : _uiState.selectedCandidateItems,
+        candidateGroups: activeProposal == null
+            ? null
+            : _uiState.candidateGroups,
+        selectedCandidateItems: activeProposal == null
+            ? const {}
+            : _uiState.selectedCandidateItems,
         showProposalChangeSuccess: false,
       ),
     );
@@ -373,9 +379,7 @@ class VoiceLogViewModel extends ChangeNotifier {
         extra: <String, Object?>{'stage': 'start'},
       );
       if (e.code == 'permission_denied') {
-        _setError(
-          e.message ?? AudioRecorderService.microphonePermissionDeniedMessage,
-        );
+        _setError(null, code: 'microphone_permission_denied');
       } else {
         _setError(
           e.message ??
@@ -525,7 +529,8 @@ class VoiceLogViewModel extends ChangeNotifier {
     final text = (overrideText ?? _uiState.transcript).trim();
     if (text.isEmpty) return;
     final activeProposal = _uiState.proposal;
-    final keepVoiceTranscript = overrideText == null &&
+    final keepVoiceTranscript =
+        overrideText == null &&
         _uiState.transcriptFromVoice &&
         text == _uiState.transcript.trim();
     _setUiState(
@@ -550,10 +555,12 @@ class VoiceLogViewModel extends ChangeNotifier {
         confirmationActionId: null,
         confirmationInput: null,
         clarificationOptions: null,
-        candidateGroups:
-            activeProposal == null ? null : _uiState.candidateGroups,
-        selectedCandidateItems:
-            activeProposal == null ? const {} : _uiState.selectedCandidateItems,
+        candidateGroups: activeProposal == null
+            ? null
+            : _uiState.candidateGroups,
+        selectedCandidateItems: activeProposal == null
+            ? const {}
+            : _uiState.selectedCandidateItems,
         showProposalChangeSuccess: false,
       ),
     );
@@ -607,12 +614,14 @@ class VoiceLogViewModel extends ChangeNotifier {
       default:
         nextState = VoiceLogState.clarificationRequired;
     }
-    final visibleOptions = result.clarificationOptions ??
+    final visibleOptions =
+        result.clarificationOptions ??
         (result.kind == 'clarification_required'
             ? result.candidateGroups
             : null);
     final incomingCandidateGroups = result.candidateGroups ?? visibleOptions;
-    final shouldPreserveCandidateGroups = _uiState.proposal != null ||
+    final shouldPreserveCandidateGroups =
+        _uiState.proposal != null ||
         fallbackProposal != null ||
         result.proposal != null;
     final candidateGroups = shouldPreserveCandidateGroups
@@ -630,9 +639,11 @@ class VoiceLogViewModel extends ChangeNotifier {
         resolvedItems: resolvedItemsForSelection,
       ),
     };
-    final proposal = result.proposal ??
+    final proposal =
+        result.proposal ??
         (result.kind == 'clarification_required' ? fallbackProposal : null);
-    final showProposalChangeSuccess = result.kind == 'proposal' &&
+    final showProposalChangeSuccess =
+        result.kind == 'proposal' &&
         activeProposalBeforeResult != null &&
         result.proposal != null;
     _setUiState(
@@ -808,7 +819,9 @@ class VoiceLogViewModel extends ChangeNotifier {
     final requiredGroups = visibleGroups
         .where(
           (group) => needsCandidateSelection(
-              group, resolvedItemsForCandidateSelection),
+            group,
+            resolvedItemsForCandidateSelection,
+          ),
         )
         .toList();
     if (!requiredGroups.every(
@@ -897,6 +910,7 @@ class VoiceLogViewModel extends ChangeNotifier {
     _setUiState(
       _uiState.copyWith(
         phase: VoiceLogState.idle,
+        errorCode: null,
         errorMessage: null,
         showProposalChangeSuccess: false,
       ),
@@ -907,7 +921,7 @@ class VoiceLogViewModel extends ChangeNotifier {
     _setUiState(_uiState.copyWith(phase: value));
   }
 
-  void _setError(String message, {String? code}) {
+  void _setError(String? message, {String? code}) {
     _timers.clearProposalChangeSuccess();
     _setUiState(
       _uiState.copyWith(

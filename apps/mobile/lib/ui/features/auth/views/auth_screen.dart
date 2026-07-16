@@ -26,9 +26,9 @@ class AuthScreen extends StatefulWidget {
 }
 
 class _AuthScreenState extends State<AuthScreen> {
-  final _emailController = TextEditingController(text: 'demo@example.com');
-  final _passwordController = TextEditingController(text: 'password123');
-  final _nameController = TextEditingController(text: 'Test User');
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _nameController = TextEditingController();
   bool _registerMode = false;
   bool _preloadedAuthAssets = false;
   String? _nameError;

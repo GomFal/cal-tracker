@@ -32,6 +32,22 @@ void main() {
     expect(updatedSummary.meals, hasLength(1));
   });
 
+  test('local authentication uses fixture data without a backend', () async {
+    final dependencies = createLocalToolkitDependencies();
+
+    await dependencies.authRepository.logout();
+    expect(dependencies.store.sessionActive, isFalse);
+
+    final session = await dependencies.authRepository.login(
+      email: 'fixture-user@bettercalories.test',
+      password: 'fixture-password',
+    );
+
+    expect(session.user.email, 'fixture-user@bettercalories.test');
+    expect(dependencies.store.sessionActive, isTrue);
+    expect(await dependencies.tokenStorage.read(), isNotNull);
+  });
+
   test('local agent scenarios return explicit fixture results', () async {
     final dependencies = createLocalToolkitDependencies();
 

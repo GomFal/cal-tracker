@@ -36,13 +36,21 @@ class AgentChatSession {
 }
 
 class AgentChatSessionStore {
-  AgentChatSessionStore({required AppPreferencesStorage storage})
-      : _storage = storage;
+  AgentChatSessionStore({
+    required StringKeyValueStorage storage,
+    DateTime Function()? now,
+    Duration maxEntryAge = const Duration(days: 7),
+  })  : _storage = storage,
+        _now = now ?? DateTime.now,
+        _maxEntryAge = maxEntryAge;
 
-  static const _schemaVersion = 1;
+  static const _schemaVersion = 2;
+  static const _legacySchemaVersion = 1;
   static const _keyPrefix = 'agent_chat_session:v1';
 
-  final AppPreferencesStorage _storage;
+  final StringKeyValueStorage _storage;
+  final DateTime Function() _now;
+  final Duration _maxEntryAge;
   String? _activeUserKey;
 
   void activateUser(String userId) {
@@ -61,11 +69,27 @@ class AgentChatSessionStore {
 
     try {
       final envelope = _objectMap(jsonDecode(raw));
-      if (envelope['schemaVersion'] != _schemaVersion) {
+      final schemaVersion = envelope['schemaVersion'];
+      if (schemaVersion != _schemaVersion &&
+          schemaVersion != _legacySchemaVersion) {
         await _storage.remove(storageKey);
         return null;
       }
-      return AgentChatSession.fromJson(_objectMap(envelope['payload']));
+      final session = AgentChatSession.fromJson(
+        _objectMap(envelope['payload']),
+      );
+      if (schemaVersion == _legacySchemaVersion) {
+        await _writeSession(storageKey, session);
+        return session;
+      }
+      final cachedAtRaw = envelope['cachedAt'];
+      final cachedAt =
+          cachedAtRaw is String ? DateTime.tryParse(cachedAtRaw) : null;
+      if (cachedAt == null || _now().difference(cachedAt) > _maxEntryAge) {
+        await _storage.remove(storageKey);
+        return null;
+      }
+      return session;
     } on Object {
       await _storage.remove(storageKey);
       return null;
@@ -75,8 +99,16 @@ class AgentChatSessionStore {
   Future<void> writeActiveSession(AgentChatSession session) async {
     final storageKey = _storageKey('active');
     if (storageKey == null) return;
+    await _writeSession(storageKey, session);
+  }
+
+  Future<void> _writeSession(
+    String storageKey,
+    AgentChatSession session,
+  ) async {
     final envelope = {
       'schemaVersion': _schemaVersion,
+      'cachedAt': _now().toUtc().toIso8601String(),
       'payload': session.toJson(),
     };
     await _storage.writeString(storageKey, jsonEncode(envelope));
@@ -91,6 +123,7 @@ class AgentChatSessionStore {
   Future<void> clearActiveUserData() async {
     final userKey = _activeUserKey;
     if (userKey == null) return;
+    _activeUserKey = null;
     await _storage.removeWhere(
       (key) => key.startsWith('$_keyPrefix:$userKey:'),
     );

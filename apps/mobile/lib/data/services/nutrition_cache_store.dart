@@ -16,7 +16,7 @@ class CachedNutritionValue<T> {
 
 class NutritionCacheStore {
   NutritionCacheStore({
-    required AppPreferencesStorage storage,
+    required StringKeyValueStorage storage,
     DateTime Function()? now,
     Duration maxEntryAge = const Duration(days: 7),
   }) : _storage = storage,
@@ -26,7 +26,7 @@ class NutritionCacheStore {
   static const _schemaVersion = 1;
   static const _keyPrefix = 'nutrition_cache:v1';
 
-  final AppPreferencesStorage _storage;
+  final StringKeyValueStorage _storage;
   final DateTime Function() _now;
   final Duration _maxEntryAge;
   String? _activeUserKey;
@@ -44,10 +44,10 @@ class NutritionCacheStore {
   Future<void> clearActiveUserCache() async {
     final userKey = _activeUserKey;
     if (userKey == null) return;
+    _activeUserKey = null;
     await _storage.removeWhere(
       (key) => key.startsWith('$_keyPrefix:$userKey:'),
     );
-    _activeUserKey = null;
   }
 
   Future<CachedNutritionValue<DailySummary>?> readDailySummary(String date) {

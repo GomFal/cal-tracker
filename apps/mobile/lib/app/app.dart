@@ -18,6 +18,7 @@ import '../data/services/client_metadata_provider.dart';
 import '../data/services/client_telemetry_service.dart';
 import '../data/services/mobile_update_service.dart';
 import '../data/services/nutrition_cache_store.dart';
+import '../data/services/private_cache_storage.dart';
 import '../data/services/secure_token_storage.dart';
 import '../generated/api/cal_tracker_api.dart';
 import '../l10n/generated/app_localizations.dart';
@@ -260,18 +261,21 @@ class _CalTrackerComposition {
     final authRepository =
         widget.authRepository ??
         AuthRepository(apiClient: apiClient, tokenStorage: tokenStorage);
+    final privateCacheStorage = PrivateCacheStorage(
+      legacyStorage: AppPreferencesStorage(),
+    );
     final nutritionRepository =
         widget.nutritionRepository ??
         NutritionRepository(
           apiClient: apiClient,
-          cacheStore: NutritionCacheStore(storage: AppPreferencesStorage()),
+          cacheStore: NutritionCacheStore(storage: privateCacheStorage),
           telemetryService: telemetryService,
         );
     final agentChatSessionStore = AgentChatSessionStore(
-      storage: AppPreferencesStorage(),
+      storage: privateCacheStorage,
     );
     final agentChatCacheStore = AgentChatCacheStore(
-      storage: AppPreferencesStorage(),
+      storage: privateCacheStorage,
     );
     final ownsAudioRecorderService = widget.audioRecorderService == null;
 

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:cal_tracker_mobile/data/repositories/nutrition_repository.dart';
 import 'package:cal_tracker_mobile/data/services/agent_chat_cache_store.dart';
 import 'package:cal_tracker_mobile/data/services/app_preferences_storage.dart';
@@ -32,20 +34,18 @@ void main() {
       await store.writeConversationDetail(_detail('conversation-a'));
 
       expect(
-        (await store.readConversationDetail('conversation-a'))
-            ?.messages
-            .single
-            .content,
+        (await store.readConversationDetail(
+          'conversation-a',
+        ))?.messages.single.content,
         'hello',
       );
 
       await store.removeConversation('conversation-a');
 
       expect(await store.readConversationDetail('conversation-a'), isNull);
-      expect(
-        (await store.readConversationSummaries()).map((item) => item.id),
-        ['conversation-b'],
-      );
+      expect((await store.readConversationSummaries()).map((item) => item.id), [
+        'conversation-b',
+      ]);
     });
 
     test('expires stale cache entries', () async {
@@ -65,7 +65,49 @@ void main() {
       expect(await store.readConversationDetail('conversation-a'), isNull);
       expect(storage.values, isEmpty);
     });
+
+    test(
+      'logout removes summaries and details without stale repopulation',
+      () async {
+        final storage = _MemoryPreferencesStorage();
+        final store = AgentChatCacheStore(storage: storage);
+        store.activateUser('user-a');
+        await store.writeConversationSummaries([_summary('conversation-a')]);
+        await store.writeConversationDetail(_detail('conversation-a'));
+
+        final cleanup = store.clearActiveUserData();
+        await store.writeConversationSummaries([_summary('stale')]);
+        await store.writeConversationDetail(_detail('stale'));
+        await cleanup;
+        await store.clearActiveUserData();
+
+        store.activateUser('user-b');
+        expect(await store.readConversationSummaries(), isEmpty);
+        expect(await store.readConversationDetail('conversation-a'), isNull);
+        store.activateUser('user-a');
+        expect(await store.readConversationSummaries(), isEmpty);
+        expect(await store.readConversationDetail('conversation-a'), isNull);
+        expect(await store.readConversationDetail('stale'), isNull);
+      },
+    );
+
+    test('removes corrupt conversation cache', () async {
+      final storage = _MemoryPreferencesStorage();
+      final store = AgentChatCacheStore(storage: storage);
+      store.activateUser('user-a');
+      await storage.writeString(
+        'agent_chat_cache:v1:${base64UserForTest('user-a')}:summaries',
+        '{bad json',
+      );
+
+      expect(await store.readConversationSummaries(), isEmpty);
+      expect(storage.values, isEmpty);
+    });
   });
+}
+
+String base64UserForTest(String userId) {
+  return base64Url.encode(utf8.encode(userId));
 }
 
 AgentConversationSummary _summary(String id) {

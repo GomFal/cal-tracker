@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:cal_tracker_mobile/data/services/app_preferences_storage.dart';
 import 'package:cal_tracker_mobile/data/services/nutrition_cache_store.dart';
 import 'package:cal_tracker_mobile/domain/models/nutrition_models.dart';
@@ -80,7 +82,65 @@ void main() {
       store.activateUser('user-b');
       expect(await store.readDailySummary('2026-05-11'), isNull);
     });
+
+    test('logout cleanup prevents stale writes and is idempotent', () async {
+      final storage = _MemoryPreferencesStorage();
+      final store = NutritionCacheStore(storage: storage);
+      store.activateUser('user-a');
+      await store.writeDailySummary(_summary('2026-05-10'));
+
+      final cleanup = store.clearActiveUserCache();
+      await store.writeDailySummary(_summary('2026-05-11'));
+      await cleanup;
+      await store.clearActiveUserCache();
+
+      store.activateUser('user-b');
+      expect(await store.readDailySummary('2026-05-10'), isNull);
+      expect(await store.readDailySummary('2026-05-11'), isNull);
+      store.activateUser('user-a');
+      expect(await store.readDailySummary('2026-05-10'), isNull);
+      expect(await store.readDailySummary('2026-05-11'), isNull);
+    });
+
+    test(
+      'removes corrupt entries without exposing them to another account',
+      () async {
+        final storage = _MemoryPreferencesStorage();
+        final store = NutritionCacheStore(storage: storage);
+        store.activateUser('user-a');
+        await storage.writeString(
+          'nutrition_cache:v1:${base64UserForTest('user-a')}:daily_summary:2026-05-10',
+          '{bad json',
+        );
+
+        expect(await store.readDailySummary('2026-05-10'), isNull);
+        store.activateUser('user-b');
+        expect(await store.readDailySummary('2026-05-10'), isNull);
+        expect(storage.values, isEmpty);
+      },
+    );
+
+    test('failed logout cleanup still isolates the next account', () async {
+      final storage = _FailingCleanupStorage();
+      final store = NutritionCacheStore(storage: storage);
+      store.activateUser('user-a');
+      await store.writeDailySummary(_summary('2026-05-10'));
+
+      await expectLater(store.clearActiveUserCache(), throwsStateError);
+      store.activateUser('user-b');
+
+      expect(await store.readDailySummary('2026-05-10'), isNull);
+      await store.writeDailySummary(_summary('2026-05-11'));
+      expect(
+        (await store.readDailySummary('2026-05-11'))?.value.date,
+        '2026-05-11',
+      );
+    });
   });
+}
+
+String base64UserForTest(String userId) {
+  return base64Url.encode(utf8.encode(userId));
 }
 
 class _MemoryPreferencesStorage implements AppPreferencesStorage {
@@ -105,6 +165,13 @@ class _MemoryPreferencesStorage implements AppPreferencesStorage {
   @override
   Future<void> removeWhere(bool Function(String key) test) async {
     values.removeWhere((key, value) => test(key));
+  }
+}
+
+class _FailingCleanupStorage extends _MemoryPreferencesStorage {
+  @override
+  Future<void> removeWhere(bool Function(String key) test) async {
+    throw StateError('simulated cleanup failure');
   }
 }
 

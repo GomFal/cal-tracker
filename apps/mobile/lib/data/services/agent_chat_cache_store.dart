@@ -5,17 +5,17 @@ import 'app_preferences_storage.dart';
 
 class AgentChatCacheStore {
   AgentChatCacheStore({
-    required AppPreferencesStorage storage,
+    required StringKeyValueStorage storage,
     DateTime Function()? now,
     Duration maxEntryAge = const Duration(days: 7),
-  })  : _storage = storage,
-        _now = now ?? DateTime.now,
-        _maxEntryAge = maxEntryAge;
+  }) : _storage = storage,
+       _now = now ?? DateTime.now,
+       _maxEntryAge = maxEntryAge;
 
   static const _schemaVersion = 1;
   static const _keyPrefix = 'agent_chat_cache:v1';
 
-  final AppPreferencesStorage _storage;
+  final StringKeyValueStorage _storage;
   final DateTime Function() _now;
   final Duration _maxEntryAge;
   String? _activeUserKey;
@@ -55,9 +55,9 @@ class AgentChatCacheStore {
         conversation: AgentConversationSummary.fromJson(
           _objectMap(object['conversation']),
         ),
-        messages: _objectList(object['messages'])
-            .map(AgentConversationMessage.fromJson)
-            .toList(),
+        messages: _objectList(
+          object['messages'],
+        ).map(AgentConversationMessage.fromJson).toList(),
       );
     });
   }
@@ -80,13 +80,16 @@ class AgentChatCacheStore {
   Future<void> clearActiveUserData() async {
     final userKey = _activeUserKey;
     if (userKey == null) return;
+    _activeUserKey = null;
     await _storage.removeWhere(
       (key) => key.startsWith('$_keyPrefix:$userKey:'),
     );
   }
 
   Future<T?> _read<T>(
-      String cacheKey, T Function(Object? payload) decode) async {
+    String cacheKey,
+    T Function(Object? payload) decode,
+  ) async {
     final storageKey = _storageKey(cacheKey);
     if (storageKey == null) return null;
     final raw = await _storage.readString(storageKey);

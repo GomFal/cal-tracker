@@ -8,13 +8,7 @@ Dominio: `https://bettercalories.app`
 
 IP del servidor: `82.223.104.126`
 
-Usuario: `root`
-
-Comando SSH:
-
-```bash
-ssh root@82.223.104.126
-```
+El acceso administrativo objetivo usa una cuenta nominal, clave pública y elevación mediante `sudo`; no se deben documentar usuarios o claves privadas compartidos. La migración segura y sus comprobaciones están descritas en [docs/production-host-access-hardening.md](docs/production-host-access-hardening.md). Hasta aplicar ese procedimiento, comprueba el estado real del host y no cierres la vía existente.
 
 El servidor esta preparado con Docker, NGINX y HTTPS mediante Let's Encrypt.
 La landing estatica del producto vive en `apps/landing` y esta preparada para
@@ -39,7 +33,7 @@ A dev-api.bettercalories.app -> 82.223.104.126
 Secrets de GitHub necesarios:
 
 - `VPS_HOST`: `82.223.104.126`
-- `VPS_USER`: `root`
+- `VPS_USER`: usuario remoto definido por el flujo de despliegue vigente
 - `VPS_SSH_PRIVATE_KEY`
 - `GHCR_USERNAME`
 - `GHCR_READ_TOKEN`

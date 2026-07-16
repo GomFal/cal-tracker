@@ -31,16 +31,16 @@
 
       <form class="config" id="config-form" autocomplete="off" novalidate>
         <label class="field">
-          <span>API base URL</span>
-          <input
+          <span>API environment</span>
+          <select
             id="api-base"
             name="apiBase"
-            type="url"
-            inputmode="url"
-            spellcheck="false"
-            placeholder="http://localhost:3000"
             required
           >
+            <option value="http://localhost:3000">Local · localhost:3000</option>
+            <option value="https://dev-api.bettercalories.app">Development · dev-api.bettercalories.app</option>
+            <option value="https://api.bettercalories.app">Production · api.bettercalories.app</option>
+          </select>
         </label>
         <label class="field field-admin-auth" id="admin-username-field">
           <span>Admin username</span>
@@ -1238,6 +1238,7 @@
       </small>
     </footer>
 
+    <script src="origin-policy.js"></script>
     <script src="config.js"></script>
     <script src="app.js"></script>
   </body>

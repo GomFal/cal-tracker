@@ -79,3 +79,20 @@ Para rotar una clave de host sin TOFU:
 6. elimina sus líneas y fingerprints de los secretos y vuelve a validar.
 
 Una clave inesperada siempre bloquea el job. No la reemplaces basándote únicamente en el error del workflow.
+
+## Verificación de cabeceras web
+
+El aprovisionamiento instala `infra/deploy/nginx/security-headers.conf` como
+snippet compartido por los hosts HTTPS. Antes de recargar Nginx valida la
+configuración con `nginx -t`. La política incluye HSTS sin `preload` ni
+`includeSubDomains`, CSP sin `unsafe-eval`, `nosniff`, anti-framing, referrer y
+permisos mínimos. Los `add_header` usan `always`, y las locations que declaran
+su propio `add_header` vuelven a incluir el snippet para no perderlos en 4xx o
+5xx por las reglas de herencia de Nginx.
+
+La validación reproducible del repositorio cubre los hosts dev/prod, rutas de
+error, CSP y el hash del JSON-LD de la landing:
+
+```bash
+bun run security:web
+```

@@ -1,7 +1,7 @@
 # BetterCalories Admin · Telemetry
 
-Static, dependency-free admin panel for inspecting the local/dev telemetry
-emitted by the BetterCalories backend.
+Static, dependency-free admin panel for inspecting telemetry in the local,
+development and production BetterCalories environments.
 
 This panel is the first slice of the telemetry work described in
 [`specs/admin-telemetry-panel-plan.md`](../../specs/admin-telemetry-panel-plan.md).
@@ -9,8 +9,9 @@ It ships the static UI for the backend admin telemetry endpoints.
 
 ## Features
 
-- Configurable **API base URL** persisted in `localStorage`
-  (`bc.admin.apiBase`).
+- Restricted **API environment selector** persisted in `localStorage`
+  (`bc.admin.apiBase`). It accepts only the local backend and the official
+  development and production API origins.
 - **Admin sign in** with username + deployment password against
   `POST /v1/admin/auth/login`. The returned admin access token is kept
   in `sessionStorage` (`bc.admin.apiToken`) and is cleared on sign out
@@ -42,8 +43,9 @@ GET  /v1/admin/telemetry/traces/:traceId
 ```
 
 Telemetry requests use `Authorization: Bearer <admin-token>` after a
-successful admin login. The token is only sent to the configured API
-base URL and never leaves the browser.
+successful admin login. The token is bound to the selected origin and the
+request helper refuses to attach it anywhere else. Changing environments
+clears the session and requires a new sign-in.
 
 ## Backend admin auth configuration
 
@@ -91,20 +93,20 @@ caddy file-server --listen :4174 --root apps/admin
 
 Then open <http://localhost:4174>.
 
-### Pointing at the local backend
+### Selecting an API environment
 
 The default API base URL is `http://localhost:3000`, which matches the
-local backend on the host. If you are running the panel from a phone or
-emulator, set the API base URL to the address that the backend is
-reachable at, for example:
+local backend on the host. The selector is deliberately limited to:
 
-- Android emulator → `http://10.0.2.2:3000`
+- Local host → `http://localhost:3000`
 - Dev environment → `https://dev-api.bettercalories.app`
 - Production → `https://api.bettercalories.app`
 
 Enter the admin username and deployment password, then click **Sign in**.
-The API base URL is saved in `localStorage`; the admin token is saved only
-in `sessionStorage` for the current tab. Use **Sign out** to clear it.
+The API environment is saved in `localStorage`; the admin token is saved
+only in `sessionStorage` for the current tab and tagged with its API
+origin. Selecting another environment signs out immediately; authenticate
+again before telemetry requests can resume.
 
 ## Validating the panel
 
@@ -142,8 +144,10 @@ After starting the backend and a local Postgres with telemetry data:
 apps/admin/
 ├── index.html       # Static entry point
 ├── styles.css       # Styles (no external assets)
-├── config.js        # Defaults: API base URL, storage keys, endpoints
+├── origin-policy.js # Exact origin allowlist and authorization guard
+├── config.js        # Defaults: API environment, storage keys, endpoints
 ├── app.js           # Vanilla JS application logic
+├── test-origin-policy.mjs # Origin and credential-boundary tests
 ├── validate.mjs     # Static file validator
 └── README.md        # This file
 ```
@@ -151,7 +155,12 @@ apps/admin/
 ## Security & privacy notes
 
 - The admin access token is stored in `sessionStorage`, scoped to one
-  browser tab. It is only sent to the configured API base URL.
+  browser tab and one approved API origin. Local HTTP is an explicit
+  loopback-only development exception; deployed origins require HTTPS.
+- Requests reject redirects so credentials cannot silently follow an API
+  response to another origin.
+- Nginx serves the panel with HSTS, a no-eval CSP, anti-framing,
+  `nosniff`, referrer and unused-browser-capability policies.
 - The deployment password is never stored by the panel.
 - Use **Sign out** to remove the token when you are done.
 - The panel never sends telemetry of its own to any third party.

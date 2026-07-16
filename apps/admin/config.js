@@ -3,23 +3,22 @@
  *
  * This file is loaded before app.js. It exposes a small global
  * namespace with default values for the local admin panel. The actual
- * configured API base URL is read from localStorage. The admin token is
+ * selected API environment is read from localStorage. The admin token is
  * read from sessionStorage at runtime in app.js, never hardcoded here.
  */
 window.AdminTelemetry = window.AdminTelemetry || {};
 
 Object.assign(window.AdminTelemetry, {
-  // Default API base URL used the first time the panel is opened.
-  // Operators can override it from the form; the value is stored in
-  // localStorage under the keys below.
-  defaultApiBase: window.location.hostname === "localhost"
-    ? "http://localhost:3000"
-    : window.location.origin,
+  // The policy script owns the exact allowlist. Unknown hosting origins fall
+  // back to the loopback backend and can only select a listed environment.
+  defaultApiBase: window.AdminOriginPolicy.defaultApiBaseFor(window.location),
+  approvedApiOrigins: window.AdminOriginPolicy.approvedApiOrigins,
 
   // apiBase uses localStorage. apiToken and username use sessionStorage.
   storageKeys: {
     apiBase: "bc.admin.apiBase",
     apiToken: "bc.admin.apiToken",
+    apiTokenOrigin: "bc.admin.apiTokenOrigin",
     adminUsername: "bc.admin.username",
   },
 

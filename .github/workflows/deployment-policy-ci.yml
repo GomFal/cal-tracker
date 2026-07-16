@@ -7,6 +7,9 @@ on:
       - ".github/workflows/mobile-apk-deploy.yml"
       - ".github/workflows/deployment-policy-ci.yml"
       - "infra/deploy/**"
+      - "apps/admin/**"
+      - "apps/landing/index.html"
+      - "package.json"
       - "scripts/deploy/**"
       - "scripts/deploy-landing.sh"
       - "scripts/mobile/deploy-server-apks.sh"
@@ -19,6 +22,9 @@ on:
       - ".github/workflows/mobile-apk-deploy.yml"
       - ".github/workflows/deployment-policy-ci.yml"
       - "infra/deploy/**"
+      - "apps/admin/**"
+      - "apps/landing/index.html"
+      - "package.json"
       - "scripts/deploy/**"
       - "scripts/deploy-landing.sh"
       - "scripts/mobile/deploy-server-apks.sh"
@@ -52,3 +58,10 @@ jobs:
           set -euo pipefail
           scripts/deploy/test-configure-ssh.sh
           scripts/deploy/test-deployment-policy.sh
+
+      - name: Test admin origin and web security policies
+        run: |
+          set -euo pipefail
+          node apps/admin/validate.mjs
+          node apps/admin/test-origin-policy.mjs
+          node scripts/deploy/test-web-security-policy.mjs

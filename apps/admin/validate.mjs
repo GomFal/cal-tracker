@@ -16,6 +16,7 @@ const requiredFiles = [
   "styles.css",
   "app.js",
   "config.js",
+  "origin-policy.js",
   "README.md",
 ];
 
@@ -39,15 +40,17 @@ const read = (file) => {
 const index = read("index.html");
 const app = read("app.js");
 const config = read("config.js");
+const originPolicy = read("origin-policy.js");
 const styles = read("styles.css");
 
 const requiredHtmlSnippets = [
   ['<title>BetterCalories Admin · Telemetry</title>', "title"],
   ['href="styles.css"', "stylesheet link"],
+  ['src="origin-policy.js"', "origin policy script"],
   ['src="config.js"', "config.js script"],
   ['src="app.js"', "app.js script"],
   ['id="config-form"', "config form"],
-  ['id="api-base"', "API base URL input"],
+  ['id="api-base"', "API environment selector"],
   ['id="admin-username"', "admin username input"],
   ['id="admin-password"', "admin password input"],
   ['id="admin-login-submit"', "admin login button"],
@@ -129,6 +132,24 @@ for (const key of requiredConfigKeys) {
   }
 }
 
+for (const approvedOrigin of [
+  "http://localhost:3000",
+  "https://dev-api.bettercalories.app",
+  "https://api.bettercalories.app",
+]) {
+  if (!originPolicy.includes(approvedOrigin) || !index.includes(`value="${approvedOrigin}"`)) {
+    fail(`Approved API origin is not enforced by policy and selector: ${approvedOrigin}`);
+  } else {
+    console.log(`✓ approved API origin · ${approvedOrigin}`);
+  }
+}
+
+if (!originPolicy.includes("Bearer ") || !originPolicy.includes("createAuthorizedHeaders")) {
+  fail("origin-policy.js does not own Authorization header construction");
+} else {
+  console.log("✓ origin-policy.js · owns origin-checked Authorization headers");
+}
+
 const requiredAppFeatures = [
   ["localStorage", "uses localStorage for API base URL"],
   ["sessionStorage", "uses sessionStorage for admin token"],
@@ -192,7 +213,9 @@ const requiredAppFeatures = [
   ["admin/telemetry/transcriptions", "transcriptions endpoint"],
   ["admin/telemetry/food-search", "food-search endpoint"],
   ["admin/telemetry/traces/", "traces endpoint"],
-  ["Bearer ", "Authorization header construction"],
+  ["createAuthorizedHeaders", "origin-bound authorization headers"],
+  ["apiTokenOrigin", "session token origin binding"],
+  ['redirect: "error"', "cross-origin redirect rejection"],
   ["invalid_admin_credentials", "handles invalid admin credentials"],
   ["admin_panel_disabled", "handles disabled admin auth"],
 ];
@@ -203,6 +226,13 @@ for (const [snippet, label] of requiredAppFeatures) {
   } else {
     console.log(`✓ app.js · ${label}`);
   }
+}
+
+
+if (/\binnerHTML\b|\binsertAdjacentHTML\b|\bdocument\.write\b/.test(app)) {
+  fail("app.js contains an unencapsulated HTML injection sink");
+} else {
+  console.log("✓ app.js · renders status and data as text/DOM nodes");
 }
 
 const requiredCssSnippets = [

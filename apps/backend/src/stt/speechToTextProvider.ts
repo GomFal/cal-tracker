@@ -1,3 +1,5 @@
+import { safeErrorDiagnostic } from "../observability/sensitiveDataRedaction.js";
+
 export type TranscriptionResult = {
   text: string;
   language?: string;
@@ -16,6 +18,15 @@ export type SpeechToTextInput = {
 
 export interface SpeechToTextProvider {
   transcribe(input: SpeechToTextInput): Promise<TranscriptionResult>;
+}
+
+export class SpeechToTextProviderUnavailableError extends Error {
+  readonly code = "stt_provider_unavailable";
+
+  constructor(cause?: unknown) {
+    super("stt_provider_unavailable", { cause });
+    this.name = "SpeechToTextProviderUnavailableError";
+  }
 }
 
 export class RemoteSpeechToTextProvider implements SpeechToTextProvider {
@@ -54,9 +65,11 @@ export class RemoteSpeechToTextProvider implements SpeechToTextProvider {
         model: this.model,
         status: res.status,
         durationMs: Date.now() - startedAt,
-        response: err.slice(0, 500),
+        response: safeErrorDiagnostic(err),
       });
-      throw new Error(`STT failed: ${res.status} ${err}`);
+      throw new SpeechToTextProviderUnavailableError(
+        new Error(`STT failed with status ${res.status}`),
+      );
     }
 
     const json = (await res.json()) as { text: string };

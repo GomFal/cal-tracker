@@ -31,7 +31,13 @@ DEPLOY_DIR="/srv/cal-tracker/deploy"
 ENV_DIR="/srv/cal-tracker/env"
 COMPOSE_FILE="$DEPLOY_DIR/compose.yml"
 SECRETS_FILE="$ENV_DIR/deploy.env"
+RESTORE_PENDING="/srv/cal-tracker/state/${ENVIRONMENT}.privacy-restore-pending"
 ACTIVE_SLOT="$(cat "$STATE_FILE" 2>/dev/null || true)"
+
+if [[ -e "$RESTORE_PENDING" ]]; then
+  echo "Refusing deploy: privacy restore verification is still pending for $ENVIRONMENT" >&2
+  exit 1
+fi
 
 if [[ "$ACTIVE_SLOT" == "blue" ]]; then
   NEXT_SLOT="green"
@@ -112,6 +118,16 @@ docker run --rm \
   -e "DATABASE_URL=postgres://cal_tracker:${POSTGRES_PASSWORD}@cal-tracker-postgres:5432/${DATABASE_NAME}" \
   "$BACKEND_IMAGE" \
   bun dist/scripts/migrate.js
+
+# Reapply every durable suppression before a restored row can be served. This
+# command is idempotent and fails the deploy if any purge needs operator action.
+docker run --rm \
+  --network cal-tracker-internal \
+  --env-file "$ENV_DIR/${ENVIRONMENT}.env" \
+  -e "DATABASE_SCHEMA=$SCHEMA" \
+  -e "DATABASE_URL=postgres://cal_tracker:${POSTGRES_PASSWORD}@cal-tracker-postgres:5432/${DATABASE_NAME}" \
+  "$BACKEND_IMAGE" \
+  bun dist/scripts/apply-privacy-suppressions.js
 
 docker compose --env-file "$SECRETS_FILE" -f "$COMPOSE_FILE" up -d --no-deps --force-recreate "$NEXT_SERVICE"
 

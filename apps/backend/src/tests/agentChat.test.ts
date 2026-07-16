@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type {
   AgentMessage,
   AgentToolDecision,
@@ -452,13 +452,13 @@ describe("agent chat streaming", () => {
       surface: "agent_chat_audio",
       provider: "test",
       model: "test-model",
-      transcriptText: "voice message",
+      transcriptText: "[redacted]",
       transcriptLength: 13,
       status: "completed",
     });
   });
 
-  it("hides deleted conversations from users while retaining stored messages", async () => {
+  it("hides immediately and permanently purges a deleted conversation", async () => {
     const agentProvider = new QueueChatAgentProvider([
       {
         toolCalls: [],
@@ -491,11 +491,12 @@ describe("agent chat streaming", () => {
       `http://localhost/v1/agent/conversations/${conversationId}`,
       { method: "DELETE", headers: authHeader },
     );
-    expect(deleteResponse.status).toBe(200);
-    await expect(deleteResponse.json()).resolves.toEqual({
+    expect(deleteResponse.status).toBe(202);
+    await expect(deleteResponse.json()).resolves.toMatchObject({
       ok: true,
       deleted: true,
       hidden: true,
+      status: "pending",
     });
 
     const listResponse = await request("http://localhost/v1/agent/conversations", {
@@ -522,6 +523,154 @@ describe("agent chat streaming", () => {
       user.id,
       user.id,
     ]);
+
+    await repository.runPrivacyLifecycle();
+    const purged = (
+      repository as unknown as {
+        agentConversationMessages: Map<string, unknown[]>;
+      }
+    ).agentConversationMessages.get(conversationId);
+    expect(purged).toBeUndefined();
+  });
+
+  it("uses the same safe envelope for provider failures without leaking reflected input", async () => {
+    const leaked =
+      "Antonio comió pizza at https://provider.invalid/debug?token=secret-value sk_reflectedsecret123";
+    const localEvents: Record<string, unknown>[] = [];
+    const agentProvider: ChatAgentProvider = {
+      async runWithTools(): Promise<never> {
+        throw new Error(leaked);
+      },
+    };
+    const { request } = buildTestApp({
+      agentProvider,
+      runLogger: {
+        enabled: true,
+        async log(event) {
+          localEvents.push(event);
+        },
+      },
+    });
+    const { authHeader } = await registerAndAuth(request);
+
+    const response = await request("http://localhost/v1/agent/chat", {
+      method: "POST",
+      headers: authHeader,
+      body: JSON.stringify({ message: "Help me", source: "flutter" }),
+    });
+    const traceId = response.headers.get("x-request-id");
+    const raw = await response.text();
+    const error = parseSse(raw).find((event) => event.type === "error")?.error;
+
+    expect(error).toEqual({
+      code: "provider_unavailable",
+      message:
+        "The nutrition assistant is temporarily unavailable. Try again shortly.",
+      traceId,
+    });
+    expect(raw).not.toContain("Antonio");
+    expect(raw).not.toContain("provider.invalid");
+    expect(raw).not.toContain("reflectedsecret");
+    expect(JSON.stringify(localEvents)).not.toContain("Antonio");
+    expect(JSON.stringify(localEvents)).not.toContain("provider.invalid");
+    expect(JSON.stringify(localEvents)).not.toContain("reflectedsecret");
+    expect(localEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ traceId }),
+      ]),
+    );
+  });
+
+  it("sanitizes unexpected tool failures in SSE and stored conversation data", async () => {
+    const leaked =
+      "Antonio comió pasta at https://tools.invalid/run?key=secret-value sk_toolsecret123";
+    const agentProvider = new QueueChatAgentProvider([
+      {
+        toolCalls: [
+          {
+            id: "call_summary_failure",
+            type: "function",
+            function: { name: "get_daily_summary", arguments: "{}" },
+          },
+        ],
+        rawResponse: {},
+      },
+      {
+        toolCalls: [],
+        rawResponse: {},
+        interaction: {
+          messages: [],
+          assistantContent: "Please try again.",
+          streamEvents: [],
+        },
+      },
+    ]);
+    const { request, actionExecutor } = buildTestApp({ agentProvider });
+    vi.spyOn(actionExecutor, "execute").mockRejectedValue(new Error(leaked));
+    const { authHeader } = await registerAndAuth(request);
+
+    const response = await request("http://localhost/v1/agent/chat", {
+      method: "POST",
+      headers: authHeader,
+      body: JSON.stringify({ message: "Show today", source: "flutter" }),
+    });
+    const raw = await response.text();
+    const events = parseSse(raw);
+    const failed = events.find((event) => event.type === "tool_call_failed");
+    const conversationId = events.find(
+      (event) => event.type === "conversation_started",
+    )?.conversationId as string;
+
+    expect(failed?.error).toEqual(
+      expect.objectContaining({
+        code: "internal_error",
+        traceId: response.headers.get("x-request-id"),
+      }),
+    );
+    expect(raw).not.toContain("Antonio");
+    expect(raw).not.toContain("tools.invalid");
+    expect(raw).not.toContain("toolsecret");
+
+    const stored = await request(
+      `http://localhost/v1/agent/conversations/${conversationId}`,
+      { headers: authHeader },
+    );
+    const storedRaw = await stored.text();
+    expect(storedRaw).not.toContain("Antonio");
+    expect(storedRaw).not.toContain("tools.invalid");
+    expect(storedRaw).not.toContain("toolsecret");
+  });
+
+  it("returns catalogued JSON errors before opening an SSE stream", async () => {
+    const { request } = buildTestApp();
+    const unauthenticated = await request("http://localhost/v1/agent/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ message: "hello", source: "flutter" }),
+    });
+    expect(unauthenticated.status).toBe(401);
+    await expect(unauthenticated.json()).resolves.toEqual({
+      error: {
+        code: "authentication_required",
+        message: "Sign in to continue.",
+        traceId: unauthenticated.headers.get("x-request-id"),
+      },
+    });
+
+    const { authHeader } = await registerAndAuth(request);
+    const invalid = await request("http://localhost/v1/agent/chat", {
+      method: "POST",
+      headers: authHeader,
+      body: JSON.stringify({ message: "", source: "flutter" }),
+    });
+    expect(invalid.status).toBe(400);
+    await expect(invalid.json()).resolves.toEqual({
+      error: {
+        code: "validation_error",
+        message: "Check the request and try again.",
+        traceId: invalid.headers.get("x-request-id"),
+      },
+    });
   });
 });
 

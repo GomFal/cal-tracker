@@ -223,9 +223,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authCheckEmailTitle => 'Check your email';
 
   @override
-  String authCheckEmailMessage(String email) {
-    return 'We sent a confirmation link to $email. Open it to finish creating your account.';
-  }
+  String get authCheckEmailMessage =>
+      'If this address can be used, you’ll receive an email with the next step. Check your spam folder too.';
 
   @override
   String get authEmailInvalidError =>
@@ -1801,6 +1800,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get agentChatHistoryDeleteTooltip => 'Delete chat';
 
   @override
+  String get agentChatDeleteDialogTitle => 'Delete this chat?';
+
+  @override
+  String get agentChatDeleteDialogBody =>
+      'It disappears now. Its messages, transcripts, and linked diagnostics are permanently removed from active systems within 24 hours. There is no trash.';
+
+  @override
+  String get agentChatDeleteConfirm => 'Delete permanently';
+
+  @override
+  String get agentChatDeletionAccepted =>
+      'Chat hidden now. Permanent deletion is in progress.';
+
+  @override
   String get agentChatHistoryLoadError => 'Could not load this chat.';
 
   @override
@@ -1813,4 +1826,21 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get agentChatOpenAction => 'Open agent chat. Hold to speak';
+
+  @override
+  String get aiErrorValidation => 'Check the request and try again.';
+
+  @override
+  String get aiErrorAuthentication => 'Your session expired. Sign in again.';
+
+  @override
+  String get aiErrorRateLimit =>
+      'You\'ve reached the current limit. Wait before trying again.';
+
+  @override
+  String get aiErrorProviderUnavailable =>
+      'The nutrition assistant is temporarily unavailable. Try again shortly.';
+
+  @override
+  String get aiErrorInternal => 'Something went wrong on our side. Try again.';
 }

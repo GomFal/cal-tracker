@@ -54,6 +54,8 @@ import type {
   LlmProviderCallRecord,
   MemoryMatch,
   PendingRegistrationRecord,
+  PrivacyDeletionRequest,
+  PrivacyLifecycleResult,
   StoredSession,
   StoredUser,
   TelemetryEventFilter,
@@ -343,14 +345,14 @@ export class PostgresRepository implements AppRepository {
     sessionId: string,
     nextHash: string,
     expiresAt: string,
-  ): Promise<StoredSession> {
+  ): Promise<StoredSession | undefined> {
     const [row] = await this.execute(dbSql`
       UPDATE auth_sessions
       SET refresh_token_hash = ${nextHash}, expires_at = ${expiresAt}, rotated_at = now()
-      WHERE id = ${sessionId}
+      WHERE id = ${sessionId} AND revoked_at IS NULL AND expires_at > now()
       RETURNING *
     `);
-    return mapSession(row);
+    return row ? mapSession(row) : undefined;
   }
 
   async createPasswordReset(input: {
@@ -381,7 +383,32 @@ export class PostgresRepository implements AppRepository {
       if (!reset) return false;
       await executeRows(
         tx,
-        dbSql`UPDATE user_credentials SET password_hash = ${newPasswordHash}, updated_at = now() WHERE user_id = ${reset.user_id}`,
+        dbSql`
+          INSERT INTO user_credentials (user_id, password_hash)
+          VALUES (${reset.user_id}, ${newPasswordHash})
+          ON CONFLICT (user_id)
+          DO UPDATE SET password_hash = EXCLUDED.password_hash, updated_at = now()
+        `,
+      );
+      await executeRows(
+        tx,
+        dbSql`
+          UPDATE auth_sessions
+          SET revoked_at = now()
+          WHERE user_id = ${reset.user_id} AND revoked_at IS NULL
+        `,
+      );
+      await executeRows(
+        tx,
+        dbSql`
+          INSERT INTO audit_events (user_id, event_type, metadata_json, trace_id)
+          VALUES (
+            ${reset.user_id},
+            'auth.password_reset_completed',
+            ${jsonb({ sessionRevocation: "all" })},
+            'auth-reset-confirm'
+          )
+        `,
       );
       return true;
     });
@@ -2229,6 +2256,10 @@ export class PostgresRepository implements AppRepository {
           LEFT JOIN agent_messages message
             ON message.conversation_id = conversation.id
           WHERE (${filter.includeHidden ?? false}::boolean OR conversation.hidden_from_user_at IS NULL)
+            AND NOT EXISTS (
+              SELECT 1 FROM privacy_deletion_requests suppression
+              WHERE suppression.conversation_id = conversation.id
+            )
             AND (${filter.userId ?? null}::uuid IS NULL OR conversation.user_id = ${filter.userId ?? null})
             AND (${filter.conversationId ?? null}::uuid IS NULL OR conversation.id = ${filter.conversationId ?? null})
             AND (${filter.traceId ?? null}::text IS NULL OR message.trace_id = ${filter.traceId ?? null})
@@ -2253,6 +2284,10 @@ export class PostgresRepository implements AppRepository {
         ON conversation.id = message.conversation_id
       WHERE message.conversation_id = ${conversationId}
         AND (${includeHidden}::boolean OR conversation.hidden_from_user_at IS NULL)
+        AND NOT EXISTS (
+          SELECT 1 FROM privacy_deletion_requests suppression
+          WHERE suppression.conversation_id = conversation.id
+        )
       ORDER BY message.created_at, message.id
     `);
     return rows.map(mapAgentConversationMessage);
@@ -2269,6 +2304,10 @@ export class PostgresRepository implements AppRepository {
         ON conversation.id = message.conversation_id
       WHERE message.trace_id = ${traceId}
         AND (${includeHidden}::boolean OR conversation.hidden_from_user_at IS NULL)
+        AND NOT EXISTS (
+          SELECT 1 FROM privacy_deletion_requests suppression
+          WHERE suppression.conversation_id = conversation.id
+        )
       ORDER BY message.created_at, message.id
       LIMIT 500
     `);
@@ -2295,6 +2334,154 @@ export class PostgresRepository implements AppRepository {
       RETURNING id
     `);
     return rows.length > 0;
+  }
+
+  async requestAgentConversationDeletion(
+    userId: string,
+    conversationId: string,
+  ): Promise<PrivacyDeletionRequest | undefined> {
+    return this.db.transaction(async (tx) => {
+      await executeRows(tx, dbSql`
+        SELECT pg_advisory_xact_lock(hashtext(${conversationId}))
+      `);
+      const existing = await executeRows(tx, dbSql`
+        SELECT * FROM privacy_deletion_requests
+        WHERE conversation_id = ${conversationId}
+          AND subject_user_id = ${userId}
+        LIMIT 1
+      `);
+      if (existing[0]) return mapPrivacyDeletionRequest(existing[0]);
+
+      const owned = await executeRows(tx, dbSql`
+        SELECT id FROM agent_conversations
+        WHERE id = ${conversationId} AND user_id = ${userId}
+        FOR UPDATE
+      `);
+      if (!owned[0]) return undefined;
+
+      const rows = await executeRows(tx, dbSql`
+        INSERT INTO privacy_deletion_requests (
+          subject_user_id, conversation_id, purge_due_at
+        ) VALUES (
+          ${userId}, ${conversationId}, now() + interval '24 hours'
+        )
+        ON CONFLICT (conversation_id) DO NOTHING
+        RETURNING *
+      `);
+      const request = rows[0] ?? (await executeRows(tx, dbSql`
+        SELECT * FROM privacy_deletion_requests
+        WHERE conversation_id = ${conversationId}
+          AND subject_user_id = ${userId}
+        LIMIT 1
+      `))[0];
+      if (!request) return undefined;
+      await executeRows(tx, dbSql`
+        UPDATE agent_conversations
+        SET hidden_from_user_at = COALESCE(hidden_from_user_at, now()),
+            updated_at = now()
+        WHERE id = ${conversationId} AND user_id = ${userId}
+      `);
+      return mapPrivacyDeletionRequest(request);
+    });
+  }
+
+  async getAgentConversationDeletion(
+    userId: string,
+    conversationId: string,
+  ): Promise<PrivacyDeletionRequest | undefined> {
+    const [row] = await this.execute(dbSql`
+      SELECT * FROM privacy_deletion_requests
+      WHERE conversation_id = ${conversationId}
+        AND subject_user_id = ${userId}
+      LIMIT 1
+    `);
+    return row ? mapPrivacyDeletionRequest(row) : undefined;
+  }
+
+  async isAgentConversationSuppressed(conversationId: string): Promise<boolean> {
+    const [row] = await this.execute(dbSql`
+      SELECT 1 AS suppressed FROM privacy_deletion_requests
+      WHERE conversation_id = ${conversationId}
+      LIMIT 1
+    `);
+    return Boolean(row);
+  }
+
+  async runPrivacyLifecycle(input: {
+    now?: string;
+    batchSize?: number;
+    reapplyBefore?: string;
+  } = {}): Promise<PrivacyLifecycleResult> {
+    const batchSize = Math.max(1, Math.min(100, Math.floor(input.batchSize ?? 25)));
+    const effectiveNow = input.now ?? new Date().toISOString();
+    return this.db.transaction(async (tx) => {
+      const [lock] = await executeRows(tx, dbSql`
+        SELECT pg_try_advisory_xact_lock(hashtext('bettercalories-privacy-lifecycle-v1')) AS acquired
+      `);
+      if (!lock?.acquired) {
+        return { lockAcquired: false, processed: 0, purged: 0, failed: 0, rawTelemetryExpired: 0 };
+      }
+      const requests = await executeRows(tx, dbSql`
+        SELECT * FROM privacy_deletion_requests
+        WHERE status IN ('pending', 'failed')
+          OR (
+            ${input.reapplyBefore ?? null}::timestamptz IS NOT NULL
+            AND status = 'purged'
+            AND (last_attempt_at IS NULL OR last_attempt_at < ${input.reapplyBefore ?? null})
+          )
+        ORDER BY requested_at
+        LIMIT ${batchSize}
+        FOR UPDATE SKIP LOCKED
+      `);
+      let purged = 0;
+      let failed = 0;
+      for (const row of requests) {
+        try {
+          await tx.transaction(async (savepoint) => {
+            await purgeConversationContent(savepoint, row.conversation_id as string);
+            await executeRows(savepoint, dbSql`
+              UPDATE privacy_deletion_requests
+              SET status = 'purged', purged_at = COALESCE(purged_at, ${effectiveNow}),
+                  last_attempt_at = ${effectiveNow}, attempt_count = attempt_count + 1,
+                  result_code = 'active_content_purged'
+              WHERE id = ${row.id as string}
+            `);
+          });
+          purged++;
+        } catch {
+          await executeRows(tx, dbSql`
+            UPDATE privacy_deletion_requests
+            SET status = 'failed', last_attempt_at = ${effectiveNow},
+                attempt_count = attempt_count + 1,
+                result_code = 'purge_retry_required'
+            WHERE id = ${row.id as string}
+          `);
+          failed++;
+        }
+      }
+
+      const cutoff = new Date(Date.parse(effectiveNow) - 30 * 24 * 60 * 60 * 1000).toISOString();
+      let rawTelemetryExpired = 0;
+      const scrubQueries = [
+        dbSql`UPDATE telemetry_events SET error_message = NULL, metadata_json = '{}'::jsonb WHERE created_at < ${cutoff} AND (error_message IS NOT NULL OR metadata_json <> '{}'::jsonb) RETURNING id`,
+        dbSql`UPDATE llm_runs SET metadata_json = '{}'::jsonb WHERE created_at < ${cutoff} AND metadata_json <> '{}'::jsonb RETURNING id`,
+        dbSql`UPDATE food_search_events SET query_text = NULL, metadata_json = '{}'::jsonb WHERE created_at < ${cutoff} AND (query_text IS NOT NULL OR metadata_json <> '{}'::jsonb) RETURNING id`,
+        dbSql`UPDATE agent_turn_telemetry SET input_text = NULL, assistant_text = NULL, error_message = NULL, metadata_json = '{}'::jsonb WHERE created_at < ${cutoff} AND (input_text IS NOT NULL OR assistant_text IS NOT NULL OR error_message IS NOT NULL OR metadata_json <> '{}'::jsonb) RETURNING id`,
+        dbSql`UPDATE agent_tool_call_telemetry SET arguments_json = NULL, result_summary_json = NULL, error_message = NULL, metadata_json = '{}'::jsonb WHERE created_at < ${cutoff} AND (arguments_json IS NOT NULL OR result_summary_json IS NOT NULL OR error_message IS NOT NULL OR metadata_json <> '{}'::jsonb) RETURNING id`,
+        dbSql`UPDATE llm_provider_calls SET error_message = NULL, metadata_json = '{}'::jsonb WHERE created_at < ${cutoff} AND (error_message IS NOT NULL OR metadata_json <> '{}'::jsonb) RETURNING id`,
+        dbSql`UPDATE transcription_records SET transcript_text = NULL, error_message = NULL, metadata_json = '{}'::jsonb WHERE created_at < ${cutoff} AND (transcript_text IS NOT NULL OR error_message IS NOT NULL OR metadata_json <> '{}'::jsonb) RETURNING id`,
+      ];
+      for (const query of scrubQueries) {
+        rawTelemetryExpired += (await executeRows(tx, query)).length;
+      }
+      return {
+        lockAcquired: true,
+        processed: requests.length,
+        purged,
+        failed,
+        rawTelemetryExpired,
+      };
+    });
   }
 
   async recordActionCall(
@@ -3155,6 +3342,91 @@ function mapPendingRegistration(
     createdAt: toIso(row.created_at),
     updatedAt: toIso(row.updated_at),
   };
+}
+
+function mapPrivacyDeletionRequest(
+  row: Record<string, unknown>,
+): PrivacyDeletionRequest {
+  return {
+    id: row.id as string,
+    subjectUserId: row.subject_user_id as string,
+    conversationId: row.conversation_id as string,
+    requestedAt: toIso(row.requested_at),
+    purgeDueAt: toIso(row.purge_due_at),
+    status: row.status as PrivacyDeletionRequest["status"],
+    ...(row.purged_at ? { purgedAt: toIso(row.purged_at) } : {}),
+    ...(row.last_attempt_at ? { lastAttemptAt: toIso(row.last_attempt_at) } : {}),
+    attemptCount: Number(row.attempt_count ?? 0),
+    ...(row.result_code ? { resultCode: row.result_code as string } : {}),
+  };
+}
+
+async function purgeConversationContent(
+  dbClient: DbExecutor,
+  conversationId: string,
+): Promise<void> {
+  // Capture correlation keys before deleting messages. These keys propagate
+  // deletion to telemetry and derived operational rows without retaining text.
+  const traceRows = await executeRows(dbClient, dbSql`
+    SELECT DISTINCT trace_id FROM (
+      SELECT trace_id FROM agent_messages WHERE conversation_id = ${conversationId}
+      UNION ALL SELECT trace_id FROM agent_turn_telemetry WHERE conversation_id = ${conversationId}
+      UNION ALL SELECT trace_id FROM agent_tool_call_telemetry WHERE conversation_id = ${conversationId}
+      UNION ALL SELECT trace_id FROM llm_provider_calls WHERE conversation_id = ${conversationId}
+      UNION ALL SELECT trace_id FROM transcription_records WHERE conversation_id = ${conversationId}
+      UNION ALL SELECT trace_id FROM llm_runs WHERE conversation_id = ${conversationId}
+    ) correlated WHERE trace_id IS NOT NULL
+  `);
+  const turnRows = await executeRows(dbClient, dbSql`
+    SELECT DISTINCT turn_id FROM (
+      SELECT turn_id FROM agent_messages WHERE conversation_id = ${conversationId}
+      UNION ALL SELECT turn_id FROM agent_turn_telemetry WHERE conversation_id = ${conversationId}
+      UNION ALL SELECT turn_id FROM agent_tool_call_telemetry WHERE conversation_id = ${conversationId}
+      UNION ALL SELECT turn_id FROM llm_provider_calls WHERE conversation_id = ${conversationId}
+      UNION ALL SELECT turn_id FROM transcription_records WHERE conversation_id = ${conversationId}
+      UNION ALL SELECT turn_id FROM llm_runs WHERE conversation_id = ${conversationId}
+    ) correlated WHERE turn_id IS NOT NULL
+  `);
+  const traceIds = traceRows.map((row) => row.trace_id as string);
+  const turnIds = turnRows.map((row) => row.turn_id as string);
+
+  if (traceIds.length > 0) {
+    await executeRows(dbClient, dbSql`DELETE FROM action_calls WHERE trace_id IN ${sqlList(traceIds)}`);
+    await executeRows(dbClient, dbSql`DELETE FROM telemetry_events WHERE trace_id IN ${sqlList(traceIds)}`);
+    await executeRows(dbClient, dbSql`DELETE FROM food_search_events WHERE trace_id IN ${sqlList(traceIds)}`);
+  }
+  await executeRows(dbClient, dbSql`
+    DELETE FROM transcription_records
+    WHERE conversation_id = ${conversationId}
+      OR (${traceIds.length > 0}::boolean AND trace_id IN ${sqlList(traceIds.length > 0 ? traceIds : ["00000000-privacy-empty"] )})
+  `);
+  await executeRows(dbClient, dbSql`
+    DELETE FROM agent_tool_call_telemetry
+    WHERE conversation_id = ${conversationId}
+      OR (${traceIds.length > 0}::boolean AND trace_id IN ${sqlList(traceIds.length > 0 ? traceIds : ["00000000-privacy-empty"])})
+      OR (${turnIds.length > 0}::boolean AND turn_id IN ${sqlList(turnIds.length > 0 ? turnIds : ["00000000-0000-0000-0000-000000000000"])})
+  `);
+  await executeRows(dbClient, dbSql`
+    DELETE FROM llm_provider_calls
+    WHERE conversation_id = ${conversationId}
+      OR (${traceIds.length > 0}::boolean AND trace_id IN ${sqlList(traceIds.length > 0 ? traceIds : ["00000000-privacy-empty"])})
+      OR (${turnIds.length > 0}::boolean AND turn_id IN ${sqlList(turnIds.length > 0 ? turnIds : ["00000000-0000-0000-0000-000000000000"])})
+  `);
+  await executeRows(dbClient, dbSql`
+    DELETE FROM agent_turn_telemetry
+    WHERE conversation_id = ${conversationId}
+      OR (${traceIds.length > 0}::boolean AND trace_id IN ${sqlList(traceIds.length > 0 ? traceIds : ["00000000-privacy-empty"])})
+      OR (${turnIds.length > 0}::boolean AND turn_id IN ${sqlList(turnIds.length > 0 ? turnIds : ["00000000-0000-0000-0000-000000000000"])})
+  `);
+  await executeRows(dbClient, dbSql`
+    DELETE FROM llm_runs
+    WHERE conversation_id = ${conversationId}
+      OR (${traceIds.length > 0}::boolean AND trace_id IN ${sqlList(traceIds.length > 0 ? traceIds : ["00000000-privacy-empty"])})
+      OR (${turnIds.length > 0}::boolean AND turn_id IN ${sqlList(turnIds.length > 0 ? turnIds : ["00000000-0000-0000-0000-000000000000"])})
+  `);
+  await executeRows(dbClient, dbSql`DELETE FROM agent_candidate_registries WHERE conversation_id = ${conversationId}`);
+  await executeRows(dbClient, dbSql`DELETE FROM agent_messages WHERE conversation_id = ${conversationId}`);
+  await executeRows(dbClient, dbSql`DELETE FROM agent_conversations WHERE id = ${conversationId}`);
 }
 
 function mapAuthIdentity(row: Record<string, unknown>): AuthIdentityRecord {

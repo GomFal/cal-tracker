@@ -67,14 +67,7 @@
   "authCreateAccountFailedTitle": "No se pudo crear la cuenta",
   "authConfirmEmailFailedTitle": "No se pudo confirmar el correo",
   "authCheckEmailTitle": "Revisa tu correo",
-  "authCheckEmailMessage": "Te enviamos un enlace de confirmación a {email}. Ábrelo para terminar de crear tu cuenta.",
-  "@authCheckEmailMessage": {
-    "placeholders": {
-      "email": {
-        "type": "String"
-      }
-    }
-  },
+  "authCheckEmailMessage": "Si esta dirección puede usarse, recibirás un correo con el siguiente paso. Revisa también la carpeta de spam.",
   "authEmailInvalidError": "Introduce un correo válido, como nombre@example.com.",
   "authNameRequiredError": "Introduce tu nombre.",
   "authPasswordRequiredError": "Introduce tu contraseña.",
@@ -565,6 +558,10 @@
   "agentChatHistoryTitle": "Historial de chats",
   "agentChatHistoryEmpty": "Todavia no hay chats anteriores.",
   "agentChatHistoryDeleteTooltip": "Eliminar chat",
+  "agentChatDeleteDialogTitle": "¿Eliminar este chat?",
+  "agentChatDeleteDialogBody": "Desaparece ahora. Sus mensajes, transcripciones y diagnósticos vinculados se eliminan definitivamente de los sistemas activos en menos de 24 horas. No hay papelera.",
+  "agentChatDeleteConfirm": "Eliminar definitivamente",
+  "agentChatDeletionAccepted": "El chat ya está oculto. El borrado definitivo está en curso.",
   "agentChatHistoryLoadError": "No se pudo cargar este chat.",
   "agentChatHistoryUpdatedAt": "Actualizado {time}",
   "@agentChatHistoryUpdatedAt": {
@@ -573,5 +570,10 @@
     }
   },
   "agentChatHistoryRefreshing": "Actualizando...",
-  "agentChatOpenAction": "Abrir chat con el agente. Mantén pulsado para hablar"
+  "agentChatOpenAction": "Abrir chat con el agente. Mantén pulsado para hablar",
+  "aiErrorValidation": "Revisa la solicitud e inténtalo de nuevo.",
+  "aiErrorAuthentication": "Tu sesión ha caducado. Inicia sesión de nuevo.",
+  "aiErrorRateLimit": "Has alcanzado el límite actual. Espera antes de volver a intentarlo.",
+  "aiErrorProviderUnavailable": "El asistente de nutrición no está disponible temporalmente. Inténtalo de nuevo en breve.",
+  "aiErrorInternal": "Algo ha fallado por nuestra parte. Inténtalo de nuevo."
 }

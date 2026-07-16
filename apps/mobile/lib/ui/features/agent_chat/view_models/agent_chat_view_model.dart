@@ -23,6 +23,7 @@ class AgentChatEntry {
     this.toolStatus,
     this.result,
     this.error,
+    this.errorCode,
     this.suggestions = const [],
     this.completionMessage,
   });
@@ -34,6 +35,7 @@ class AgentChatEntry {
   final AgentChatToolStatus? toolStatus;
   final AgentRunResult? result;
   final String? error;
+  final String? errorCode;
   final List<AgentChatSuggestion> suggestions;
   final String? completionMessage;
 
@@ -43,6 +45,7 @@ class AgentChatEntry {
     AgentChatToolStatus? toolStatus,
     AgentRunResult? result,
     String? error,
+    String? errorCode,
     List<AgentChatSuggestion>? suggestions,
     String? completionMessage,
   }) {
@@ -54,6 +57,7 @@ class AgentChatEntry {
       toolStatus: toolStatus ?? this.toolStatus,
       result: result ?? this.result,
       error: error ?? this.error,
+      errorCode: errorCode ?? this.errorCode,
       suggestions: suggestions ?? this.suggestions,
       completionMessage: completionMessage ?? this.completionMessage,
     );
@@ -80,6 +84,7 @@ class AgentChatViewModel extends ChangeNotifier {
   final DateTime Function() _now;
 
   final List<AgentChatEntry> _entries = [];
+  final Set<String> _deletedConversationIds = {};
   List<AgentChatEntry> get entries => List.unmodifiable(_entries);
 
   String? conversationId;
@@ -90,6 +95,7 @@ class AgentChatViewModel extends ChangeNotifier {
   bool isRefreshingHistory = false;
   bool isLoadingConversation = false;
   String? errorMessage;
+  String? errorCode;
   String? statusMessage;
   final List<AgentConversationSummary> _conversations = [];
   int _entryCounter = 0;
@@ -135,6 +141,7 @@ class AgentChatViewModel extends ChangeNotifier {
     _typingCompleter = null;
     _pendingAssistantText = '';
     _entries.clear();
+    _deletedConversationIds.clear();
     _conversations.clear();
     conversationId = null;
     isSending = false;
@@ -144,6 +151,7 @@ class AgentChatViewModel extends ChangeNotifier {
     isRefreshingHistory = false;
     isLoadingConversation = false;
     errorMessage = null;
+    errorCode = null;
     statusMessage = null;
     _activeAssistantEntryId = null;
     _entryCounter = 0;
@@ -179,14 +187,15 @@ class AgentChatViewModel extends ChangeNotifier {
     notifyListeners();
     try {
       final fresh = await _nutritionRepository.listAgentConversations();
-      _replaceConversations(fresh);
-      await _cacheStore?.writeConversationSummaries(fresh);
+      final visible = await _cacheStore?.excludeDeletedConversations(fresh) ??
+          fresh
+              .where((item) => !_deletedConversationIds.contains(item.id))
+              .toList();
+      _replaceConversations(visible);
+      await _cacheStore?.writeConversationSummaries(visible);
     } catch (error) {
       if (_conversations.isEmpty) {
-        errorMessage = userVisibleErrorMessage(
-          error,
-          context: UserErrorContext.voiceAgent,
-        );
+        _captureError(error, context: UserErrorContext.voiceAgent);
       }
     } finally {
       isLoadingHistory = false;
@@ -199,6 +208,7 @@ class AgentChatViewModel extends ChangeNotifier {
     if (isBusy || isRecording) return;
     isLoadingConversation = true;
     errorMessage = null;
+    errorCode = null;
     notifyListeners();
     try {
       final cached = await _cacheStore?.readConversationDetail(id);
@@ -207,14 +217,16 @@ class AgentChatViewModel extends ChangeNotifier {
         notifyListeners();
       }
       final fresh = await _nutritionRepository.getAgentConversation(id);
+      if (_deletedConversationIds.contains(id) ||
+          await (_cacheStore?.isConversationDeleted(id) ??
+              Future.value(false))) {
+        return;
+      }
       await _cacheStore?.writeConversationDetail(fresh);
       _applyConversationDetail(fresh);
       await _saveActiveSession(unfinished: _isCurrentConversationUnfinished());
     } catch (error) {
-      errorMessage = userVisibleErrorMessage(
-        error,
-        context: UserErrorContext.voiceAgent,
-      );
+      _captureError(error, context: UserErrorContext.voiceAgent);
     } finally {
       isLoadingConversation = false;
       notifyListeners();
@@ -229,20 +241,43 @@ class AgentChatViewModel extends ChangeNotifier {
   }
 
   Future<void> deleteConversation(String id) async {
-    if (isBusy || isRecording) return;
+    errorMessage = null;
+    errorCode = null;
+    if (isRecording) {
+      try {
+        await _audioRecorderService.cancel();
+      } on Object {
+        // Continue deletion: recorder cleanup is best-effort and the backend
+        // tombstone remains the authoritative privacy operation.
+      }
+      isRecording = false;
+    }
+    AgentConversationSummary? summary;
+    for (final conversation in _conversations) {
+      if (conversation.id == id) {
+        summary = conversation;
+        break;
+      }
+    }
+    _deletedConversationIds.add(id);
+    await _cacheStore?.removeConversation(id);
+    _conversations.removeWhere((conversation) => conversation.id == id);
+    if (conversationId == id) {
+      _clearCurrentConversationState();
+      await _sessionStore?.clearActiveSession();
+    }
+    notifyListeners();
     try {
       await _nutritionRepository.deleteAgentConversation(id);
-      await _cacheStore?.removeConversation(id);
-      _conversations.removeWhere((conversation) => conversation.id == id);
-      if (conversationId == id) {
-        _clearCurrentConversationState();
-        await _sessionStore?.clearActiveSession();
-      }
     } catch (error) {
-      errorMessage = userVisibleErrorMessage(
-        error,
-        context: UserErrorContext.voiceAgent,
-      );
+      _deletedConversationIds.remove(id);
+      await _cacheStore?.restoreConversationAfterFailedDeletion(id, summary);
+      if (summary != null &&
+          !_conversations.any((conversation) => conversation.id == id)) {
+        _conversations.add(summary);
+        _conversations.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      }
+      _captureError(error, context: UserErrorContext.voiceAgent);
     } finally {
       notifyListeners();
     }
@@ -292,16 +327,14 @@ class AgentChatViewModel extends ChangeNotifier {
   Future<void> startRecording() async {
     if (isBusy || isRecording) return;
     errorMessage = null;
+    errorCode = null;
     statusMessage = null;
     notifyListeners();
     try {
       await _audioRecorderService.start();
       isRecording = true;
     } catch (error) {
-      errorMessage = userVisibleErrorMessage(
-        error,
-        context: UserErrorContext.voiceRecording,
-      );
+      _captureError(error, context: UserErrorContext.voiceRecording);
     } finally {
       notifyListeners();
     }
@@ -326,10 +359,7 @@ class AgentChatViewModel extends ChangeNotifier {
         ),
       );
     } catch (error) {
-      errorMessage = userVisibleErrorMessage(
-        error,
-        context: UserErrorContext.voiceMeal,
-      );
+      _captureError(error, context: UserErrorContext.voiceMeal);
     } finally {
       isStoppingRecording = false;
       statusMessage = null;
@@ -348,6 +378,7 @@ class AgentChatViewModel extends ChangeNotifier {
   Future<void> _runStream(Stream<AgentChatStreamEvent> stream) async {
     isSending = true;
     errorMessage = null;
+    errorCode = null;
     statusMessage = 'Thinking...';
     _activeAssistantEntryId = _nextEntryId('assistant');
     _removeAssistantPlaceholder();
@@ -357,10 +388,7 @@ class AgentChatViewModel extends ChangeNotifier {
         _applyEvent(event);
       }
     } catch (error) {
-      errorMessage = userVisibleErrorMessage(
-        error,
-        context: UserErrorContext.voiceAgent,
-      );
+      _captureError(error, context: UserErrorContext.voiceAgent);
     } finally {
       await _waitForTypingToFinish();
       isSending = false;
@@ -373,6 +401,11 @@ class AgentChatViewModel extends ChangeNotifier {
   }
 
   void _applyEvent(AgentChatStreamEvent event) {
+    final eventConversationId = event.conversationId;
+    if (eventConversationId != null &&
+        _deletedConversationIds.contains(eventConversationId)) {
+      return;
+    }
     conversationId = event.conversationId ?? conversationId;
     switch (event.type) {
       case 'conversation_started':
@@ -426,11 +459,14 @@ class AgentChatViewModel extends ChangeNotifier {
         _updateToolEntry(
           event.toolCall,
           status: AgentChatToolStatus.failed,
-          error: event.error,
+          error: event.error?.message,
+          errorCode: event.error?.code,
         );
         break;
       case 'error':
-        errorMessage = event.error ?? 'The agent could not finish.';
+        errorCode = event.error?.code ?? 'internal_error';
+        errorMessage = event.error?.message ??
+            'We could not complete that request. Try again.';
         unawaited(_saveActiveSession(unfinished: true));
         break;
       case 'done':
@@ -517,10 +553,12 @@ class AgentChatViewModel extends ChangeNotifier {
     required AgentChatToolStatus status,
     AgentRunResult? result,
     String? error,
+    String? errorCode,
   }) {
     if (toolCall == null) return;
-    final index =
-        _entries.indexWhere((entry) => entry.id == 'tool_${toolCall.id}');
+    final index = _entries.indexWhere(
+      (entry) => entry.id == 'tool_${toolCall.id}',
+    );
     if (index < 0) {
       _entries.add(
         AgentChatEntry(
@@ -530,6 +568,7 @@ class AgentChatViewModel extends ChangeNotifier {
           toolStatus: status,
           result: result,
           error: error,
+          errorCode: errorCode,
         ),
       );
       return;
@@ -539,6 +578,7 @@ class AgentChatViewModel extends ChangeNotifier {
       toolStatus: status,
       result: result,
       error: error,
+      errorCode: errorCode,
     );
   }
 
@@ -609,6 +649,7 @@ class AgentChatViewModel extends ChangeNotifier {
     _entries.clear();
     conversationId = null;
     errorMessage = null;
+    errorCode = null;
     statusMessage = null;
     _activeAssistantEntryId = null;
     _pendingAssistantText = '';
@@ -631,8 +672,14 @@ class AgentChatViewModel extends ChangeNotifier {
       ..addAll(_entriesFromStoredMessages(detail.messages));
     _entryCounter = _entries.length;
     errorMessage = null;
+    errorCode = null;
     statusMessage = null;
     _activeAssistantEntryId = null;
+  }
+
+  void _captureError(Object error, {required UserErrorContext context}) {
+    errorCode = publicAiErrorCode(error);
+    errorMessage = userVisibleErrorMessage(error, context: context);
   }
 
   List<AgentChatEntry> _entriesFromStoredMessages(
@@ -725,11 +772,15 @@ class AgentChatViewModel extends ChangeNotifier {
     if (suggestions is! List) return const [];
     return suggestions
         .whereType<Map>()
-        .map((item) => AgentChatSuggestion.fromJson(
-              item.map((key, value) => MapEntry(key.toString(), value)),
-            ))
-        .where((suggestion) =>
-            suggestion.label.isNotEmpty && suggestion.value.isNotEmpty)
+        .map(
+          (item) => AgentChatSuggestion.fromJson(
+            item.map((key, value) => MapEntry(key.toString(), value)),
+          ),
+        )
+        .where(
+          (suggestion) =>
+              suggestion.label.isNotEmpty && suggestion.value.isNotEmpty,
+        )
         .toList();
   }
 

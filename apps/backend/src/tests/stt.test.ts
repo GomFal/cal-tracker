@@ -33,7 +33,10 @@ describe("STT endpoint", () => {
     });
     expect(res.status).toBe(400);
     const json = await res.json();
-    expect(json.error.message).toContain("Missing audio file");
+    expect(json.error).toEqual(expect.objectContaining({
+      code: "validation_error",
+      message: "Check the request and try again.",
+    }));
   });
 
   it("rejects unsupported mime type", async () => {
@@ -50,7 +53,10 @@ describe("STT endpoint", () => {
     });
     expect(res.status).toBe(415);
     const json = await res.json();
-    expect(json.error.message).toContain("Unsupported audio format");
+    expect(json.error).toEqual(expect.objectContaining({
+      code: "validation_error",
+      message: "Check the request and try again.",
+    }));
   });
 
   it("rejects invalid voice meal audio uploads", async () => {
@@ -306,7 +312,7 @@ describe("STT endpoint", () => {
     expect(res.status).toBe(400);
     const json = await res.json();
     expect(json.error.code).toBe("validation_error");
-    expect(json.error.message).toBe("Invalid request");
+    expect(json.error.message).toBe("Check the request and try again.");
   });
 
   it("does not return raw provider errors to clients", async () => {
@@ -324,10 +330,12 @@ describe("STT endpoint", () => {
       body
     });
 
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(503);
     const json = await res.json();
-    expect(json.error.code).toBe("internal_error");
-    expect(json.error.message).toBe("We could not complete that request. Try again.");
+    expect(json.error.code).toBe("provider_unavailable");
+    expect(json.error.message).toBe(
+      "The nutrition assistant is temporarily unavailable. Try again shortly.",
+    );
     expect(json.error.message).not.toContain("provider secret exploded");
   });
 });

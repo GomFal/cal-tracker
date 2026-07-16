@@ -31,6 +31,19 @@ export const errorResponseSchema = z.object({
   }),
 });
 
+export const rateLimitErrorResponseSchema = z.object({
+  error: z.object({
+    code: z.literal("rate_limit_exceeded"),
+    message: z.string(),
+    traceId: z.string(),
+    details: z.object({
+      retryAfterSeconds: z.number().int().positive(),
+    }),
+  }),
+});
+
+export type RateLimitErrorResponse = z.infer<typeof rateLimitErrorResponseSchema>;
+
 export const executeActionRequestSchema = z.object({
   input: z.unknown().default({}),
   source: z
@@ -107,6 +120,10 @@ export const deleteAgentConversationResponseSchema = z.object({
   ok: z.boolean(),
   deleted: z.boolean().optional(),
   hidden: z.boolean().optional(),
+  status: z.enum(["pending", "purged", "failed"]),
+  requestedAt: isoDateTimeSchema,
+  purgeDueAt: isoDateTimeSchema,
+  purgedAt: isoDateTimeSchema.nullable().optional(),
 });
 
 export const agentRunResponseSchema = z.object({

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { summarizeError } from "../observability/localRunLogger.js";
+import { safeErrorDiagnosticMessage } from "../observability/sensitiveDataRedaction.js";
 import type {
   AdminActionCallFilter,
   AdminConversationFilter,
@@ -93,7 +94,7 @@ export class TelemetryService implements TelemetrySink {
     try {
       return await this.repository.createTelemetryEvent({
         ...event,
-        errorMessage: truncateString(event.errorMessage, MAX_METADATA_VALUE_LENGTH),
+        errorMessage: persistedErrorDiagnostic(event.errorMessage),
         metadata: sanitizeMetadata(event.metadata),
       });
     } catch (error) {
@@ -105,6 +106,7 @@ export class TelemetryService implements TelemetrySink {
   async recordLlmRun(run: LlmRunTelemetryInput | LlmTelemetryEvent): Promise<LlmRunRecord | undefined> {
     if (!this.enabled) return undefined;
     const normalized = normalizeLlmRun(run);
+    if (normalized.conversationId && await this.repository.isAgentConversationSuppressed(normalized.conversationId)) return undefined;
     try {
       return await this.repository.createLlmRun({
         ...normalized,
@@ -118,9 +120,13 @@ export class TelemetryService implements TelemetrySink {
 
   async recordAgentTurn(event: AgentTurnTelemetryEvent): Promise<AgentTurnTelemetryRecord | undefined> {
     if (!this.enabled) return undefined;
+    if (event.conversationId && await this.repository.isAgentConversationSuppressed(event.conversationId)) return undefined;
     try {
       return await this.repository.createAgentTurnTelemetry({
         ...event,
+        inputText: event.inputText === undefined ? undefined : REDACTED_METADATA_VALUE,
+        assistantText: event.assistantText === undefined ? undefined : REDACTED_METADATA_VALUE,
+        errorMessage: persistedErrorDiagnostic(event.errorMessage),
         pricingSnapshot: event.pricingSnapshot ?? {},
         metadata: sanitizeMetadata(event.metadata),
       });
@@ -132,9 +138,11 @@ export class TelemetryService implements TelemetrySink {
 
   async recordAgentToolCall(event: AgentToolCallTelemetryEvent): Promise<AgentToolCallTelemetryRecord | undefined> {
     if (!this.enabled) return undefined;
+    if (event.conversationId && await this.repository.isAgentConversationSuppressed(event.conversationId)) return undefined;
     try {
       return await this.repository.createAgentToolCallTelemetry({
         ...event,
+        errorMessage: persistedErrorDiagnostic(event.errorMessage),
         metadata: sanitizeMetadata(event.metadata),
       });
     } catch (error) {
@@ -145,9 +153,11 @@ export class TelemetryService implements TelemetrySink {
 
   async recordLlmProviderCall(event: LlmProviderCallTelemetryEvent): Promise<LlmProviderCallRecord | undefined> {
     if (!this.enabled) return undefined;
+    if (event.conversationId && await this.repository.isAgentConversationSuppressed(event.conversationId)) return undefined;
     try {
       return await this.repository.createLlmProviderCall({
         ...event,
+        errorMessage: persistedErrorDiagnostic(event.errorMessage),
         metadata: sanitizeMetadata(event.metadata),
       });
     } catch (error) {
@@ -158,9 +168,12 @@ export class TelemetryService implements TelemetrySink {
 
   async recordTranscriptionRecord(event: TranscriptionTelemetryRecordEvent): Promise<TranscriptionRecord | undefined> {
     if (!this.enabled) return undefined;
+    if (event.conversationId && await this.repository.isAgentConversationSuppressed(event.conversationId)) return undefined;
     try {
       return await this.repository.createTranscriptionRecord({
         ...event,
+        transcriptText: event.transcriptText === undefined ? undefined : REDACTED_METADATA_VALUE,
+        errorMessage: persistedErrorDiagnostic(event.errorMessage),
         metadata: sanitizeMetadata(event.metadata),
       });
     } catch (error) {
@@ -607,6 +620,11 @@ function truncateString(value: string | undefined, maxLength: number): string | 
   return value.length > maxLength ? `${value.slice(0, maxLength)}…` : value;
 }
 
+function persistedErrorDiagnostic(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  return truncateString(safeErrorDiagnosticMessage(value), MAX_METADATA_VALUE_LENGTH);
+}
+
 function sanitizeValue(value: unknown, keyHint = "", depth = 0): unknown {
   if (isSensitiveMetadataKey(keyHint)) return REDACTED_METADATA_VALUE;
   if (value === null || value === undefined) return value;
@@ -698,6 +716,8 @@ const SENSITIVE_SECRET_METADATA_KEY_TERMS = [
 
 const SENSITIVE_CONTENT_METADATA_KEY_TERMS = [
   "email",
+  "errormessage",
+  "filename",
   "originaltext",
   "query",
   "transcript",

@@ -26,6 +26,8 @@ import {
 import { cors } from "hono/cors";
 import { Hono, type Context } from "hono";
 import { HTTPException } from "hono/http-exception";
+import { getConnInfo } from "@hono/node-server/conninfo";
+import { isIP } from "node:net";
 import { ActionExecutor } from "../actions/executor.js";
 import { AdminAuthService } from "../auth/adminService.js";
 import { AuthService } from "../auth/service.js";
@@ -36,7 +38,11 @@ import {
   getTraceId,
   requestIdMiddleware,
 } from "../middleware/requestContext.js";
-import type { AppRepository, StoredUser } from "../repository/types.js";
+import type {
+  AppRepository,
+  PrivacyDeletionRequest,
+  StoredUser,
+} from "../repository/types.js";
 import type {
   SpeechToTextProvider,
   TranscriptionResult,
@@ -74,6 +80,52 @@ import {
   type TelemetryService,
   type VoiceMealRunTelemetryEvent,
 } from "../telemetry/telemetryService.js";
+import {
+  InMemoryAbuseProtection,
+  type CostOperationLease,
+} from "../security/abuseProtection.js";
+import {
+  PublicAiErrorException,
+  createPublicAiError,
+} from "../errors/publicAiErrors.js";
+import {
+  safeErrorDiagnostic,
+  safeErrorDiagnosticMessage,
+} from "../observability/sensitiveDataRedaction.js";
+
+const AUTH_RATE_LIMITED_PATHS = new Set([
+  "/auth/password-reset/confirm",
+  "/v1/admin/auth/login",
+  "/v1/auth/email/confirm",
+  "/v1/auth/google/login",
+  "/v1/auth/login",
+  "/v1/auth/password-reset/confirm",
+  "/v1/auth/password-reset/request",
+  "/v1/auth/register",
+]);
+
+const EMAIL_RATE_LIMITED_PATHS = new Set([
+  "/v1/auth/password-reset/request",
+  "/v1/auth/register",
+]);
+
+// Each accepted request spends one unit from the shared LLM/STT bucket. A
+// user retry is a new operation; provider-internal iterations are measured by
+// provider telemetry but do not spend additional endpoint quota.
+const COST_RATE_LIMITED_PATHS = new Set([
+  "/v1/agent/chat",
+  "/v1/agent/chat/audio",
+  "/v1/agent/runs",
+  "/v1/meal-templates/draft",
+  "/v1/stt/transcriptions",
+  "/v1/usual-foods/draft",
+  "/v1/voice/meal-runs",
+]);
+
+const COST_RATE_LIMITED_ACTIONS = new Set([
+  "draft_usual_food",
+  "draft_usual_meal",
+]);
 
 export function createApp(input: {
   config: AppConfig;
@@ -84,6 +136,7 @@ export function createApp(input: {
   agentProvider?: ChatAgentProvider;
   runLogger?: LocalRunLogger;
   telemetryService?: TelemetryService;
+  abuseProtection?: InMemoryAbuseProtection;
 }) {
   const app = new Hono<{
     Variables: { authUser: StoredUser; traceId: string };
@@ -102,6 +155,11 @@ export function createApp(input: {
     input.telemetryService ?? telemetry,
   );
   const adminAuthService = new AdminAuthService(config);
+  const abuseProtection = input.abuseProtection ?? new InMemoryAbuseProtection(config);
+  const costOperationStates = new WeakMap<
+    Context,
+    { lease: CostOperationLease; managedByStream: boolean }
+  >();
 
   const resolvedAgentProvider =
     agentProvider ??
@@ -214,6 +272,7 @@ export function createApp(input: {
         "X-Client-Platform",
         "X-Client-Session-Id",
       ],
+      exposeHeaders: ["Retry-After", "X-Request-Id"],
       allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     }),
   );
@@ -287,6 +346,23 @@ export function createApp(input: {
     }
   });
 
+  app.use("*", async (c, next) => {
+    const path = new URL(c.req.url).pathname;
+    if (c.req.method === "POST" && AUTH_RATE_LIMITED_PATHS.has(path)) {
+      abuseProtection.consumeAuthAttempt(resolveClientIp(c, config), path);
+    }
+    await next();
+  });
+
+  app.use("*", async (c, next) => {
+    const path = new URL(c.req.url).pathname;
+    if (c.req.method === "POST" && EMAIL_RATE_LIMITED_PATHS.has(path)) {
+      const email = await readEmailFromJsonRequest(c);
+      if (email) abuseProtection.consumeEmailAttempt(email, path);
+    }
+    await next();
+  });
+
   app.onError((err, c) => {
     return formatErrorResponse(c, err);
   });
@@ -331,13 +407,35 @@ export function createApp(input: {
     return c.json({ ok: true });
   });
   app.get("/auth/email/confirm", (c) => c.html(emailConfirmationFallbackHtml()));
+  app.get("/auth/password-reset/confirm", (c) =>
+    c.html(passwordResetFormHtml(
+      c.req.query("token") ?? "",
+      c.req.query("lang"),
+    )),
+  );
+  app.post("/auth/password-reset/confirm", async (c) => {
+    const form = await c.req.parseBody();
+    const body = passwordResetConfirmSchema.parse({
+      token: form.token,
+      newPassword: form.newPassword,
+    });
+    const matches = form.confirmPassword === body.newPassword;
+    const ok = matches && await authService.confirmPasswordReset(
+      body.token,
+      body.newPassword,
+    );
+    return c.html(passwordResetResultHtml(ok, String(form.lang ?? "")));
+  });
   app.get("/.well-known/assetlinks.json", (c) => c.json(androidAssetLinks(config)));
   app.get("/.well-known/apple-app-site-association", (c) =>
     c.json(appleAppSiteAssociation(config)),
   );
   app.post("/v1/auth/password-reset/request", async (c) => {
     const body = passwordResetRequestSchema.parse(await c.req.json());
-    return c.json(await authService.requestPasswordReset(body.email));
+    return c.json(await authService.requestPasswordReset(
+      body.email,
+      c.req.header("accept-language")?.split(",")[0],
+    ));
   });
   app.post("/v1/auth/password-reset/confirm", async (c) => {
     const body = passwordResetConfirmSchema.parse(await c.req.json());
@@ -367,6 +465,24 @@ export function createApp(input: {
     if (publicPaths.includes(path) || path.startsWith("/v1/admin/telemetry/"))
       return next();
     return authMiddleware(config, repository)(c, next);
+  });
+
+  app.use("/v1/*", async (c, next) => {
+    const path = new URL(c.req.url).pathname;
+    if (c.req.method !== "POST" || !isCostRateLimitedPath(path)) return next();
+
+    const lease = abuseProtection.acquireCostOperation({
+      userId: c.get("authUser").id,
+      clientIp: resolveClientIp(c, config),
+      route: path,
+    });
+    const state = { lease, managedByStream: false };
+    costOperationStates.set(c, state);
+    try {
+      await next();
+    } finally {
+      if (!state.managedByStream) lease.release();
+    }
   });
 
   app.get("/v1/auth/me", (c) => c.json(publicUser(c.get("authUser"))));
@@ -556,6 +672,7 @@ export function createApp(input: {
         activeProposalId: body.activeProposalId,
         inputMode: "text",
       }),
+      costLeaseForStream(c, costOperationStates),
     );
   });
 
@@ -597,7 +714,7 @@ export function createApp(input: {
             userId: user.id,
             source: upload.source ?? "flutter",
             errorStage: "stt",
-            error: summarizeError(error),
+            errorDiagnostic: summarizeError(error),
             timingsMs: { total: Date.now() - routeStarted },
           });
           recordTranscriptionTelemetry({
@@ -612,13 +729,13 @@ export function createApp(input: {
               durationMs: Date.now() - routeStarted,
               status: "failed",
               errorCode: "stt_provider_failed",
-              errorMessage: error instanceof Error ? error.message : String(error),
+              errorMessage: safeErrorDiagnosticMessage(error),
               metadata: { filename: upload.filename, source: upload.source ?? "flutter" },
             },
           });
           yield {
             type: "error",
-            error: error instanceof Error ? error.message : String(error),
+            error: createPublicAiError("provider_unavailable", traceId),
           } as AgentChatEvent;
           return;
         }
@@ -660,6 +777,7 @@ export function createApp(input: {
           yield event;
         }
       })(),
+      costLeaseForStream(c, costOperationStates),
     );
   });
 
@@ -693,15 +811,26 @@ export function createApp(input: {
 
   app.delete("/v1/agent/conversations/:id", async (c) => {
     const user = c.get("authUser");
-    const hidden = await repository.hideAgentConversationFromUser(
+    const deletion = await repository.requestAgentConversationDeletion(
       user.id,
       c.req.param("id"),
     );
-    return c.json({
-      ok: hidden,
-      deleted: hidden,
-      hidden,
-    });
+    if (!deletion) {
+      throw new HTTPException(404, { message: "agent_conversation_not_found" });
+    }
+    return c.json(deletionResponse(deletion), 202);
+  });
+
+  app.get("/v1/agent/conversations/:id/deletion", async (c) => {
+    const user = c.get("authUser");
+    const deletion = await repository.getAgentConversationDeletion(
+      user.id,
+      c.req.param("id"),
+    );
+    if (!deletion) {
+      throw new HTTPException(404, { message: "agent_conversation_not_found" });
+    }
+    return c.json(deletionResponse(deletion));
   });
 
   app.post("/v1/stt/transcriptions", async (c) => {
@@ -749,10 +878,9 @@ export function createApp(input: {
       console.error("stt.transcription.failed", {
         traceId,
         userId: user.id,
-        filename: upload.filename,
         mimeType: upload.mimeType,
         bytes: upload.buffer.byteLength,
-        error: error instanceof Error ? error.message : String(error),
+        error: safeErrorDiagnostic(error),
       });
       recordSttTelemetry({
         telemetryService,
@@ -767,7 +895,7 @@ export function createApp(input: {
           mimeType: upload.mimeType,
           bytes: upload.buffer.byteLength,
           errorCode: "stt_provider_failed",
-          errorMessage: error instanceof Error ? error.message : String(error),
+          errorMessage: safeErrorDiagnosticMessage(error),
         },
       });
       recordTranscriptionTelemetry({
@@ -781,11 +909,16 @@ export function createApp(input: {
           transcriptLength: 0,
           status: "failed",
           errorCode: "stt_provider_failed",
-          errorMessage: error instanceof Error ? error.message : String(error),
+          errorMessage: safeErrorDiagnosticMessage(error),
           metadata: { filename: upload.filename },
         },
       });
-      throw error;
+      throw new PublicAiErrorException(
+        "provider_unavailable",
+        traceId,
+        503,
+        error,
+      );
     }
 
     console.info("stt.transcription.completed", {
@@ -898,10 +1031,9 @@ export function createApp(input: {
       console.error("voice.meal_run.transcription_failed", {
         traceId,
         userId: user.id,
-        filename: upload.filename,
         mimeType: upload.mimeType,
         bytes: upload.buffer.byteLength,
-        error: error instanceof Error ? error.message : String(error),
+        error: safeErrorDiagnostic(error),
       });
       await logLocalRun(runLogger, {
         type: "voice.meal_run",
@@ -914,7 +1046,7 @@ export function createApp(input: {
           bytes: upload.buffer.byteLength,
         },
         errorStage: "stt",
-        error: summarizeError(error),
+        errorDiagnostic: summarizeError(error),
         timingsMs: {
           stt: Date.now() - routeStarted,
           total: Date.now() - routeStarted,
@@ -934,7 +1066,7 @@ export function createApp(input: {
           bytes: upload.buffer.byteLength,
           source: upload.source ?? "flutter",
           errorStage: "stt",
-          errorMessage: error instanceof Error ? error.message : String(error),
+          errorMessage: safeErrorDiagnosticMessage(error),
           timingsMs: {
             stt: Date.now() - routeStarted,
             total: Date.now() - routeStarted,
@@ -954,11 +1086,16 @@ export function createApp(input: {
           durationMs: Date.now() - routeStarted,
           status: "failed",
           errorCode: "stt_provider_failed",
-          errorMessage: error instanceof Error ? error.message : String(error),
+          errorMessage: safeErrorDiagnosticMessage(error),
           metadata: { filename: upload.filename, source: upload.source ?? "flutter" },
         },
       });
-      throw error;
+      throw new PublicAiErrorException(
+        "provider_unavailable",
+        traceId,
+        503,
+        error,
+      );
     }
 
     const transcript = transcription.text;
@@ -1238,15 +1375,11 @@ async function parseAudioUpload(
     console.warn(`${logPrefix}.invalid_multipart`, {
       traceId,
       userId: user.id,
-      error: error instanceof Error ? error.message : String(error),
+      error: safeErrorDiagnostic(error),
     });
     return c.json(
       {
-        error: {
-          code: "validation_error",
-          message: "Invalid multipart/form-data request.",
-          traceId,
-        },
+        error: createPublicAiError("validation_error", traceId),
       },
       400,
     );
@@ -1259,15 +1392,12 @@ async function parseAudioUpload(
     console.warn(`${logPrefix}.invalid_source`, {
       traceId,
       userId: user.id,
-      source: body.source,
+      sourcePresent: body.source !== undefined,
+      sourceType: typeof body.source,
     });
     return c.json(
       {
-        error: {
-          code: "validation_error",
-          message: "Invalid source.",
-          traceId,
-        },
+        error: createPublicAiError("validation_error", traceId),
       },
       400,
     );
@@ -1277,15 +1407,12 @@ async function parseAudioUpload(
     console.warn(`${logPrefix}.invalid_active_proposal`, {
       traceId,
       userId: user.id,
-      activeProposalId: body.activeProposalId,
+      activeProposalIdPresent: body.activeProposalId !== undefined,
+      activeProposalIdType: typeof body.activeProposalId,
     });
     return c.json(
       {
-        error: {
-          code: "validation_error",
-          message: "Invalid active proposal id.",
-          traceId,
-        },
+        error: createPublicAiError("validation_error", traceId),
       },
       400,
     );
@@ -1295,15 +1422,12 @@ async function parseAudioUpload(
     console.warn(`${logPrefix}.invalid_conversation`, {
       traceId,
       userId: user.id,
-      conversationId: body.conversationId,
+      conversationIdPresent: body.conversationId !== undefined,
+      conversationIdType: typeof body.conversationId,
     });
     return c.json(
       {
-        error: {
-          code: "validation_error",
-          message: "Invalid conversation id.",
-          traceId,
-        },
+        error: createPublicAiError("validation_error", traceId),
       },
       400,
     );
@@ -1317,11 +1441,7 @@ async function parseAudioUpload(
     });
     return c.json(
       {
-        error: {
-          code: "validation_error",
-          message: "Missing audio file.",
-          traceId,
-        },
+        error: createPublicAiError("validation_error", traceId),
       },
       400,
     );
@@ -1338,7 +1458,7 @@ async function parseAudioUpload(
     });
     return c.json(
       {
-        error: { code: "validation_error", message: validation.error, traceId },
+        error: createPublicAiError("validation_error", traceId),
       },
       validation.status,
     );
@@ -1355,31 +1475,63 @@ async function parseAudioUpload(
 }
 
 function streamAgentChat(
-  _c: Context,
+  c: Context,
   events: AsyncIterable<AgentChatEvent>,
+  lease?: CostOperationLease,
 ): Response {
   const encoder = new TextEncoder();
+  const traceId = getTraceId(c);
+  const iterator = events[Symbol.asyncIterator]();
+  let closed = false;
+
+  const finish = async () => {
+    if (closed) return;
+    closed = true;
+    try {
+      await iterator.return?.();
+    } finally {
+      lease?.release();
+    }
+  };
   const stream = new ReadableStream<Uint8Array>({
-    async start(controller) {
+    async pull(controller) {
+      if (closed) return;
       try {
-        for await (const event of events) {
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify(event)}\n\n`),
-          );
-          if (event.type === "done" || event.type === "error") break;
+        const next = await iterator.next();
+        if (next.done) {
+          controller.close();
+          await finish();
+          return;
+        }
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify(next.value)}\n\n`),
+        );
+        if (next.value.type === "done" || next.value.type === "error") {
+          controller.close();
+          await finish();
         }
       } catch (error) {
-        controller.enqueue(
-          encoder.encode(
-            `data: ${JSON.stringify({
-              type: "error",
-              error: error instanceof Error ? error.message : String(error),
-            })}\n\n`,
-          ),
-        );
-      } finally {
-        controller.close();
+        try {
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({
+                type: "error",
+                error: createPublicAiError("internal_error", traceId),
+              })}\n\n`,
+            ),
+          );
+          controller.close();
+        } finally {
+          console.error("agent.chat_stream.failed", {
+            traceId,
+            error: safeErrorDiagnostic(error),
+          });
+          await finish();
+        }
       }
+    },
+    async cancel() {
+      await finish();
     },
   });
   return new Response(stream, {
@@ -1389,6 +1541,60 @@ function streamAgentChat(
       Connection: "keep-alive",
     },
   });
+}
+
+function costLeaseForStream(
+  c: Context,
+  states: WeakMap<Context, { lease: CostOperationLease; managedByStream: boolean }>,
+): CostOperationLease | undefined {
+  const state = states.get(c);
+  if (!state) return undefined;
+  state.managedByStream = true;
+  return state.lease;
+}
+
+async function readEmailFromJsonRequest(c: Context): Promise<string | undefined> {
+  if (!c.req.header("content-type")?.toLowerCase().includes("application/json")) {
+    return undefined;
+  }
+  try {
+    const body = await c.req.raw.clone().json() as { email?: unknown };
+    return typeof body.email === "string" && body.email.trim().length > 0
+      ? body.email
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function resolveClientIp(c: Context, config: AppConfig): string {
+  if (config.RATE_LIMIT_TRUST_PROXY_HEADERS) {
+    const forwarded = normalizeIp(c.req.header("x-real-ip"));
+    if (forwarded) return forwarded;
+  }
+  try {
+    return normalizeIp(getConnInfo(c).remote.address) ?? "unavailable";
+  } catch {
+    // Hono's in-process app.request() test adapter has no socket. Production
+    // uses @hono/node-server, where getConnInfo is the adapter's supported API.
+    return "unavailable";
+  }
+}
+
+function normalizeIp(value: string | undefined): string | undefined {
+  const normalized = value?.trim();
+  if (!normalized || isIP(normalized) === 0) return undefined;
+  return normalized;
+}
+
+function isCostRateLimitedPath(path: string): boolean {
+  if (COST_RATE_LIMITED_PATHS.has(path)) return true;
+  const segments = path.split("/");
+  return segments.length === 5 &&
+    segments[1] === "v1" &&
+    segments[2] === "actions" &&
+    COST_RATE_LIMITED_ACTIONS.has(segments[3] ?? "") &&
+    segments[4] === "execute";
 }
 
 function parseMultipartActionSource(value: unknown): ActionSource | null {
@@ -1536,6 +1742,67 @@ function emailConfirmationFallbackHtml(): string {
 </html>`;
 }
 
+function passwordResetFormHtml(token: string, requestedLocale?: string): string {
+  const locale = requestedLocale === "es" ? "es" : "en";
+  const copy = locale === "es"
+    ? {
+        title: "Restablece tu contraseña",
+        password: "Contraseña nueva",
+        confirm: "Repite la contraseña",
+        submit: "Guardar contraseña",
+      }
+    : {
+        title: "Reset your password",
+        password: "New password",
+        confirm: "Repeat password",
+        submit: "Save password",
+      };
+  return `<!doctype html>
+<html lang="${locale}">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>${copy.title} · BetterCalories</title>
+  </head>
+  <body style="font-family:Arial,sans-serif;color:#18201b;line-height:1.5;margin:32px;max-width:480px">
+    <h1>${copy.title}</h1>
+    <form method="post" action="/auth/password-reset/confirm">
+      <input type="hidden" name="token" value="${escapeHtmlAttribute(token)}">
+      <input type="hidden" name="lang" value="${locale}">
+      <p><label>${copy.password}<br><input name="newPassword" type="password" minlength="8" required autocomplete="new-password"></label></p>
+      <p><label>${copy.confirm}<br><input name="confirmPassword" type="password" minlength="8" required autocomplete="new-password"></label></p>
+      <button type="submit">${copy.submit}</button>
+    </form>
+  </body>
+</html>`;
+}
+
+function passwordResetResultHtml(ok: boolean, requestedLocale?: string): string {
+  const locale = requestedLocale === "es" ? "es" : "en";
+  const title = ok
+    ? (locale === "es" ? "Contraseña actualizada" : "Password updated")
+    : (locale === "es" ? "No se pudo actualizar" : "Could not update password");
+  const message = ok
+    ? (locale === "es" ? "Ya puedes volver a BetterCalories e iniciar sesión." : "You can return to BetterCalories and sign in now.")
+    : (locale === "es" ? "El enlace no es válido, ha caducado o las contraseñas no coinciden." : "The link is invalid, expired, or the passwords do not match.");
+  return `<!doctype html>
+<html lang="${locale}">
+  <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title} · BetterCalories</title></head>
+  <body style="font-family:Arial,sans-serif;color:#18201b;line-height:1.5;margin:32px;max-width:480px">
+    <h1>${title}</h1>
+    <p>${message}</p>
+  </body>
+</html>`;
+}
+
+function escapeHtmlAttribute(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
 function androidAssetLinks(config: AppConfig) {
   if (config.mobileAndroidSha256CertFingerprints.length === 0) return [];
   return config.mobileAndroidAppLinkPackages.map((packageName) => ({
@@ -1572,6 +1839,18 @@ function recordBackendTelemetry(input: {
   recordTelemetry("backend_event", () =>
     input.telemetry.recordEvent(input.event),
   );
+}
+
+function deletionResponse(deletion: PrivacyDeletionRequest) {
+  return {
+    ok: true,
+    deleted: true,
+    hidden: true,
+    status: deletion.status,
+    requestedAt: deletion.requestedAt,
+    purgeDueAt: deletion.purgeDueAt,
+    purgedAt: deletion.purgedAt ?? null,
+  };
 }
 
 function recordFoodSearchTelemetry(input: {

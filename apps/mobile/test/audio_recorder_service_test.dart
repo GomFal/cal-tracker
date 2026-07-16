@@ -20,6 +20,7 @@ void main() {
   group('AudioRecorderService', () {
     late MockAudioRecorder mockRecorder;
     late AudioRecorderService service;
+    late bool serviceDisposed;
     late String tempDir;
 
     setUp(() {
@@ -29,6 +30,7 @@ void main() {
         preferredFormat: VoiceAudioFormat.m4a,
         minimumBytes: 1,
       );
+      serviceDisposed = false;
       when(() => mockRecorder.dispose()).thenAnswer((_) async {});
       when(() => mockRecorder.isEncoderSupported(AudioEncoder.aacLc))
           .thenAnswer((_) async => true);
@@ -48,7 +50,7 @@ void main() {
     });
 
     tearDown(() async {
-      await service.dispose();
+      if (!serviceDisposed) await service.dispose();
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(
               const MethodChannel('plugins.flutter.io/path_provider'), null);
@@ -123,6 +125,45 @@ void main() {
       expect(await futureState, RecorderState.idle);
       expect(service.currentPath, isNull);
       expect(await file.exists(), isFalse);
+    });
+
+    test('stop deletes an invalid temporary recording before failing',
+        () async {
+      service = AudioRecorderService(
+        recorder: mockRecorder,
+        preferredFormat: VoiceAudioFormat.m4a,
+        minimumBytes: 512,
+      );
+      when(() => mockRecorder.hasPermission()).thenAnswer((_) async => true);
+      when(() => mockRecorder.start(any(), path: any(named: 'path')))
+          .thenAnswer((_) async {});
+      await service.start();
+      final file = File(service.currentPath!);
+      await file.writeAsBytes([1, 2, 3]);
+      when(() => mockRecorder.stop()).thenAnswer((_) async => file.path);
+
+      await expectLater(
+        service.stop(),
+        throwsA(isA<RecorderException>()
+            .having((error) => error.code, 'code', 'empty_audio')),
+      );
+      expect(await file.exists(), isFalse);
+    });
+
+    test('dispose stops and deletes an active temporary recording', () async {
+      when(() => mockRecorder.hasPermission()).thenAnswer((_) async => true);
+      when(() => mockRecorder.start(any(), path: any(named: 'path')))
+          .thenAnswer((_) async {});
+      when(() => mockRecorder.stop()).thenAnswer((_) async => null);
+      await service.start();
+      final file = File(service.currentPath!);
+      await file.create(recursive: true);
+
+      await service.dispose();
+      serviceDisposed = true;
+
+      expect(await file.exists(), isFalse);
+      verify(() => mockRecorder.stop()).called(1);
     });
   });
 }

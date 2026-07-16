@@ -30,6 +30,7 @@ import {
   type LocalRunLogger,
 } from "../observability/localRunLogger.js";
 import { withSpan, withSyncSpan } from "../observability/profiler.js";
+import { safeErrorDiagnosticMessage } from "../observability/sensitiveDataRedaction.js";
 import {
   DEFAULT_TELEMETRY_SERVICE,
   type LlmTelemetryEvent,
@@ -231,7 +232,7 @@ export class AgentService {
         promptChars: modelInputStats.systemPromptChars,
         toolsJsonChars: modelInputStats.toolsJsonChars,
         messagesJsonChars: modelInputStats.messagesJsonChars,
-        errorMessage: typeof errorSummary.message === "string" ? errorSummary.message : undefined,
+        errorMessage: safeErrorDiagnosticMessage(error),
       });
       throw new AgentProviderUnavailableError(error);
     }
@@ -386,7 +387,7 @@ export class AgentService {
         promptChars: modelInputStats.systemPromptChars,
         toolsJsonChars: modelInputStats.toolsJsonChars,
         messagesJsonChars: modelInputStats.messagesJsonChars,
-        errorMessage: error instanceof Error ? error.message : String(error),
+        errorMessage: safeErrorDiagnosticMessage(error),
       });
       return mapped;
     }
@@ -520,8 +521,7 @@ export class AgentService {
         firstByteMs: decision.timingsMs?.firstByteMs,
         firstToolCallMs: decision.timingsMs?.firstToolCallMs,
         largestStreamGapMs: decision.timingsMs?.largestStreamGapMs,
-        errorMessage:
-          typeof errorSummary.message === "string" ? errorSummary.message : undefined,
+        errorMessage: safeErrorDiagnosticMessage(error),
       });
       throw error;
     }

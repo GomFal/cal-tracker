@@ -11,6 +11,7 @@ import '../../../../l10n/app_localizations_context.dart';
 import '../../../core/content_frame.dart';
 import '../../../core/design_system.dart';
 import '../../../core/motion.dart';
+import '../../../core/user_visible_error.dart';
 import '../view_models/voice_log_helpers.dart';
 import '../view_models/voice_log_view_model.dart';
 import '../../../shared/editable_meal_item_controller.dart';
@@ -94,7 +95,11 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
               ],
               if (viewModel.errorMessage != null) ...[
                 _ErrorBanner(
-                  message: viewModel.errorMessage!,
+                  message: localizedPublicAiErrorMessage(
+                    context.l10n,
+                    viewModel.errorCode,
+                    fallback: viewModel.errorMessage!,
+                  ),
                   onRetry: viewModel.retry,
                 ),
                 const SizedBox(height: FreshSpacing.md),

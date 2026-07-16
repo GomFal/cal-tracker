@@ -13,6 +13,7 @@ import {
   adminLlmProviderCallsResponseSchema,
   adminTranscriptionsResponseSchema,
   adminTokenResponseSchema,
+  agentChatRequestSchema,
   agentConversationDetailResponseSchema,
   agentConversationsResponseSchema,
   deleteAgentConversationResponseSchema,
@@ -37,7 +38,9 @@ import {
   loginRequestSchema,
   passwordResetConfirmSchema,
   passwordResetRequestSchema,
+  authRequestAcceptedResponseSchema,
   refreshRequestSchema,
+  rateLimitErrorResponseSchema,
   registerRequestSchema,
   registrationPendingResponseSchema,
   settingsUpdateSchema,
@@ -76,6 +79,17 @@ const jsonResponse = (description: string, schemaRef: string) => ({
   description,
   content: jsonContent(schemaRef)
 });
+
+const rateLimitResponse = {
+  description: "Request rate or concurrency limit exceeded",
+  headers: {
+    "Retry-After": {
+      description: "Seconds until the client should retry",
+      schema: { type: "integer", minimum: 1 },
+    },
+  },
+  content: jsonContent("#/components/schemas/RateLimitErrorResponse"),
+};
 
 const queryParameter = (
   name: string,
@@ -126,7 +140,9 @@ const spec = {
     },
     schemas: {
       ErrorResponse: schema("ErrorResponse", errorResponseSchema),
+      RateLimitErrorResponse: schema("RateLimitErrorResponse", rateLimitErrorResponseSchema),
       RegisterRequest: schema("RegisterRequest", registerRequestSchema),
+      AuthRequestAcceptedResponse: schema("AuthRequestAcceptedResponse", authRequestAcceptedResponseSchema),
       RegistrationPendingResponse: schema("RegistrationPendingResponse", registrationPendingResponseSchema),
       LoginRequest: schema("LoginRequest", loginRequestSchema),
       AdminLoginRequest: schema("AdminLoginRequest", adminLoginRequestSchema),
@@ -157,6 +173,7 @@ const spec = {
       UsualMealDraftRequest: schema("UsualMealDraftRequest", usualMealDraftRequestSchema),
       UsualMealDraftResponse: schema("UsualMealDraftResponse", usualMealDraftResponseSchema),
       AgentRunRequest: schema("AgentRunRequest", agentRunRequestSchema),
+      AgentChatRequest: schema("AgentChatRequest", agentChatRequestSchema),
       AgentRunResponse: schema("AgentRunResponse", agentRunResponseSchema),
       AgentConversationsResponse: schema("AgentConversationsResponse", agentConversationsResponseSchema),
       AgentConversationDetailResponse: schema("AgentConversationDetailResponse", agentConversationDetailResponseSchema),
@@ -200,7 +217,8 @@ const spec = {
           content: { "application/json": { schema: { $ref: "#/components/schemas/RegisterRequest" } } }
         },
         responses: {
-          "200": { description: "Confirmation email sent", content: { "application/json": { schema: { $ref: "#/components/schemas/RegistrationPendingResponse" } } } }
+          "200": { description: "Request accepted", content: { "application/json": { schema: { $ref: "#/components/schemas/AuthRequestAcceptedResponse" } } } },
+          "429": rateLimitResponse
         }
       }
     },
@@ -212,7 +230,8 @@ const spec = {
           content: { "application/json": { schema: { $ref: "#/components/schemas/EmailConfirmationRequest" } } }
         },
         responses: {
-          "200": { description: "Token pair", content: { "application/json": { schema: { $ref: "#/components/schemas/TokenPair" } } } }
+          "200": { description: "Token pair", content: { "application/json": { schema: { $ref: "#/components/schemas/TokenPair" } } } },
+          "429": rateLimitResponse
         }
       }
     },
@@ -224,7 +243,34 @@ const spec = {
           content: { "application/json": { schema: { $ref: "#/components/schemas/LoginRequest" } } }
         },
         responses: {
-          "200": { description: "Token pair", content: { "application/json": { schema: { $ref: "#/components/schemas/TokenPair" } } } }
+          "200": { description: "Token pair", content: { "application/json": { schema: { $ref: "#/components/schemas/TokenPair" } } } },
+          "429": rateLimitResponse
+        }
+      }
+    },
+    "/v1/auth/password-reset/request": {
+      post: {
+        operationId: "requestPasswordReset",
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/PasswordResetRequest" } } }
+        },
+        responses: {
+          "200": { description: "Request accepted", content: { "application/json": { schema: { $ref: "#/components/schemas/AuthRequestAcceptedResponse" } } } },
+          "429": rateLimitResponse
+        }
+      }
+    },
+    "/v1/auth/password-reset/confirm": {
+      post: {
+        operationId: "confirmPasswordReset",
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/PasswordResetConfirm" } } }
+        },
+        responses: {
+          "200": { description: "Password reset result" },
+          "429": rateLimitResponse
         }
       }
     },
@@ -236,7 +282,8 @@ const spec = {
           content: { "application/json": { schema: { $ref: "#/components/schemas/AdminLoginRequest" } } }
         },
         responses: {
-          "200": { description: "Admin token", content: { "application/json": { schema: { $ref: "#/components/schemas/AdminTokenResponse" } } } }
+          "200": { description: "Admin token", content: { "application/json": { schema: { $ref: "#/components/schemas/AdminTokenResponse" } } } },
+          "429": rateLimitResponse
         }
       }
     },
@@ -248,7 +295,8 @@ const spec = {
           content: { "application/json": { schema: { $ref: "#/components/schemas/GoogleLoginRequest" } } }
         },
         responses: {
-          "200": { description: "Token pair", content: { "application/json": { schema: { $ref: "#/components/schemas/TokenPair" } } } }
+          "200": { description: "Token pair", content: { "application/json": { schema: { $ref: "#/components/schemas/TokenPair" } } } },
+          "429": rateLimitResponse
         }
       }
     },
@@ -329,7 +377,8 @@ const spec = {
           content: { "application/json": { schema: { $ref: "#/components/schemas/ExecuteActionRequest" } } }
         },
         responses: {
-          "200": { description: "Action result", content: { "application/json": { schema: { $ref: "#/components/schemas/ExecuteActionResponse" } } } }
+          "200": { description: "Action result", content: { "application/json": { schema: { $ref: "#/components/schemas/ExecuteActionResponse" } } } },
+          "429": rateLimitResponse
         }
       }
     },
@@ -375,7 +424,8 @@ const spec = {
           content: { "application/json": { schema: { $ref: "#/components/schemas/UsualFoodDraftRequest" } } }
         },
         responses: {
-          "200": { description: "Review-only usual food draft", content: { "application/json": { schema: { $ref: "#/components/schemas/UsualFoodDraftResponse" } } } }
+          "200": { description: "Review-only usual food draft", content: { "application/json": { schema: { $ref: "#/components/schemas/UsualFoodDraftResponse" } } } },
+          "429": rateLimitResponse
         }
       }
     },
@@ -410,7 +460,55 @@ const spec = {
           content: { "application/json": { schema: { $ref: "#/components/schemas/AgentRunRequest" } } }
         },
         responses: {
-          "200": { description: "Agent result", content: { "application/json": { schema: { $ref: "#/components/schemas/AgentRunResponse" } } } }
+          "200": { description: "Agent result", content: { "application/json": { schema: { $ref: "#/components/schemas/AgentRunResponse" } } } },
+          "429": rateLimitResponse
+        }
+      }
+    },
+    "/v1/agent/chat": {
+      post: {
+        operationId: "chatWithAgent",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/AgentChatRequest" } } }
+        },
+        responses: {
+          "200": {
+            description: "Agent chat event stream",
+            content: { "text/event-stream": { schema: { type: "string" } } }
+          },
+          "429": rateLimitResponse
+        }
+      }
+    },
+    "/v1/agent/chat/audio": {
+      post: {
+        operationId: "chatWithAgentAudio",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "multipart/form-data": {
+              schema: {
+                type: "object",
+                properties: {
+                  audio: { type: "string", format: "binary" },
+                  source: { type: "string" },
+                  conversationId: { type: "string", format: "uuid" },
+                  activeProposalId: { type: "string", format: "uuid" }
+                },
+                required: ["audio"]
+              }
+            }
+          }
+        },
+        responses: {
+          "200": {
+            description: "Transcription and agent chat event stream",
+            content: { "text/event-stream": { schema: { type: "string" } } }
+          },
+          "429": rateLimitResponse
         }
       }
     },
@@ -437,7 +535,17 @@ const spec = {
         security: [{ bearerAuth: [] }],
         parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
         responses: {
-          "200": jsonResponse("Deleted agent conversation", "#/components/schemas/DeleteAgentConversationResponse")
+          "202": jsonResponse("Agent conversation deletion accepted", "#/components/schemas/DeleteAgentConversationResponse")
+        }
+      }
+    },
+    "/v1/agent/conversations/{id}/deletion": {
+      get: {
+        operationId: "getAgentConversationDeletion",
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
+        responses: {
+          "200": jsonResponse("Agent conversation deletion status", "#/components/schemas/DeleteAgentConversationResponse")
         }
       }
     },
@@ -458,7 +566,8 @@ const spec = {
           }
         },
         responses: {
-          "200": { description: "Transcript", content: { "application/json": { schema: { $ref: "#/components/schemas/TranscriptionResponse" } } } }
+          "200": { description: "Transcript", content: { "application/json": { schema: { $ref: "#/components/schemas/TranscriptionResponse" } } } },
+          "429": rateLimitResponse
         }
       }
     },
@@ -479,7 +588,8 @@ const spec = {
           }
         },
         responses: {
-          "200": { description: "Transcript and meal agent result", content: { "application/json": { schema: { $ref: "#/components/schemas/VoiceMealRunResponse" } } } }
+          "200": { description: "Transcript and meal agent result", content: { "application/json": { schema: { $ref: "#/components/schemas/VoiceMealRunResponse" } } } },
+          "429": rateLimitResponse
         }
       }
     },
@@ -811,7 +921,8 @@ const spec = {
           content: { "application/json": { schema: { $ref: "#/components/schemas/UsualMealDraftRequest" } } }
         },
         responses: {
-          "200": { description: "Review-only usual meal draft", content: { "application/json": { schema: { $ref: "#/components/schemas/UsualMealDraftResponse" } } } }
+          "200": { description: "Review-only usual meal draft", content: { "application/json": { schema: { $ref: "#/components/schemas/UsualMealDraftResponse" } } } },
+          "429": rateLimitResponse
         }
       }
     },

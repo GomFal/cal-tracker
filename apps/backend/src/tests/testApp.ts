@@ -2,10 +2,11 @@ import { ActionExecutor } from "../actions/executor.js";
 import type {
   AuthEmailSender,
   EmailConfirmationInput,
+  PasswordResetEmailInput,
 } from "../auth/email.js";
 import type { GoogleTokenVerifier } from "../auth/google.js";
 import { AuthService } from "../auth/service.js";
-import { loadConfig } from "../config/env.js";
+import { loadConfig, type AppConfig } from "../config/env.js";
 import { createApp } from "../http/app.js";
 import type { MealItem } from "@cal-tracker/contracts";
 import {
@@ -25,6 +26,10 @@ import type { UsualMealDraftProvider } from "../agent/usualMealDraftProvider.js"
 import type { LocalRunLogger } from "../observability/localRunLogger.js";
 import { TelemetryService as DbTelemetryService } from "../telemetry/service.js";
 import type { TelemetryService } from "../telemetry/telemetryService.js";
+import {
+  InMemoryAbuseProtection,
+  type AbuseProtectionLogger,
+} from "../security/abuseProtection.js";
 import { seedTestFoods } from "./foodFixtures.js";
 
 export class FakeSpeechToTextProvider implements SpeechToTextProvider {
@@ -47,9 +52,14 @@ export class FakeChatAgentProvider implements ChatAgentProvider {
 
 export class FakeAuthEmailSender implements AuthEmailSender {
   readonly confirmations: EmailConfirmationInput[] = [];
+  readonly passwordResets: PasswordResetEmailInput[] = [];
 
   async sendEmailConfirmation(input: EmailConfirmationInput): Promise<void> {
     this.confirmations.push(input);
+  }
+
+  async sendPasswordReset(input: PasswordResetEmailInput): Promise<void> {
+    this.passwordResets.push(input);
   }
 
   latestConfirmationToken(): string {
@@ -57,6 +67,14 @@ export class FakeAuthEmailSender implements AuthEmailSender {
     if (!latest) throw new Error("confirmation_email_not_sent");
     const token = new URL(latest.confirmationUrl).searchParams.get("token");
     if (!token) throw new Error("confirmation_email_token_missing");
+    return token;
+  }
+
+  latestPasswordResetToken(): string {
+    const latest = this.passwordResets.at(-1);
+    if (!latest) throw new Error("password_reset_email_not_sent");
+    const token = new URL(latest.resetUrl).searchParams.get("token");
+    if (!token) throw new Error("password_reset_token_missing");
     return token;
   }
 }
@@ -86,8 +104,14 @@ export function buildTestApp(options?: {
   usualMealDraftProvider?: UsualMealDraftProvider;
   telemetryService?: TelemetryService;
   authEmailSender?: AuthEmailSender;
+  configOverrides?: Partial<AppConfig>;
+  rateLimitNow?: () => number;
+  abuseProtectionLogger?: AbuseProtectionLogger;
 }) {
-  const config = loadConfig({ NODE_ENV: "test" } as NodeJS.ProcessEnv);
+  const config = {
+    ...loadConfig({ NODE_ENV: "test" } as NodeJS.ProcessEnv),
+    ...options?.configOverrides,
+  };
   const repository = InMemoryRepository.seeded();
   seedTestFoods(repository);
   const authEmailSender = options?.authEmailSender ?? new FakeAuthEmailSender();
@@ -140,7 +164,12 @@ export function buildTestApp(options?: {
     rawResponse: {},
   });
   const agentProvider = options?.agentProvider ?? defaultAgentProvider;
-  const app = createApp({ config, repository, authService, actionExecutor, sttProvider, agentProvider, runLogger: options?.runLogger, telemetryService: options?.telemetryService });
+  const abuseProtection = new InMemoryAbuseProtection(
+    config,
+    options?.rateLimitNow,
+    options?.abuseProtectionLogger,
+  );
+  const app = createApp({ config, repository, authService, actionExecutor, sttProvider, agentProvider, runLogger: options?.runLogger, telemetryService: options?.telemetryService, abuseProtection });
   const request = (input: string, init?: RequestInit) => Promise.resolve(app.request(input, init));
   if (authEmailSender instanceof FakeAuthEmailSender) {
     authEmailSendersByRequest.set(request, authEmailSender);

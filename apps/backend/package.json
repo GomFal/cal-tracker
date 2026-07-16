@@ -18,6 +18,7 @@
     "db:seed": "tsx scripts/seed.ts",
     "db:seed:dist": "bun dist/scripts/seed.js",
     "admin:hash-password": "tsx scripts/hash-admin-password.ts",
+    "privacy:apply-suppressions": "tsx scripts/apply-privacy-suppressions.ts",
     "embed:foods": "tsx scripts/embed-food-items.ts",
     "food-quality": "tsx scripts/food-data-quality.ts",
     "food-normalization:sample": "tsx scripts/food-normalization-sample.ts",

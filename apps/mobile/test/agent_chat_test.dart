@@ -108,6 +108,89 @@ void main() {
     expect(events[2]['type'], 'done');
   });
 
+  test('CalTrackerApiClient keeps typed safe SSE errors and trace ids',
+      () async {
+    final client = CalTrackerApiClient(
+      config: const ApiConfig(baseUrl: 'http://localhost'),
+      tokenStorage: _MemoryTokenStorage(),
+      httpClient: _StreamingClient([
+        'data: {"type":"error","error":{"code":"provider_unavailable","message":"The nutrition assistant is temporarily unavailable. Try again shortly.","traceId":"trace-sse"}}\n\n',
+      ]),
+    );
+
+    final events = await client.streamAgentChat('hello').toList();
+    final error = ApiErrorDetails.fromJson(
+      events.single['error'] as Map<String, Object?>,
+    );
+
+    expect(error.code, 'provider_unavailable');
+    expect(error.traceId, 'trace-sse');
+    expect(error.message, isNot(contains('http')));
+  });
+
+  test('CalTrackerApiClient classifies a prematurely closed SSE stream',
+      () async {
+    final client = CalTrackerApiClient(
+      config: const ApiConfig(baseUrl: 'http://localhost'),
+      tokenStorage: _MemoryTokenStorage(),
+      httpClient: _StreamingClient([
+        'data: {"type":"assistant_delta","delta":"Partial"}\n\n',
+      ]),
+    );
+
+    await expectLater(
+      client.streamAgentChat('hello').toList(),
+      throwsA(
+        isA<ApiException>()
+            .having((error) => error.code, 'code', 'internal_error'),
+      ),
+    );
+  });
+
+  test('ApiErrorDetails rejects unknown server categories', () {
+    final error = ApiErrorDetails.fromJson({
+      'code': 'provider_raw_secret_category',
+      'message': 'untrusted server text',
+      'traceId': 'trace-unknown',
+    });
+
+    expect(error.code, 'internal_error');
+    expect(error.traceId, 'trace-unknown');
+  });
+
+  test('AgentChatViewModel classifies SSE errors by code, not message',
+      () async {
+    final repository = MockNutritionRepository();
+    final recorder = MockAudioRecorderService();
+    when(
+      () => repository.streamAgentChat(
+        any(),
+        conversationId: any(named: 'conversationId'),
+        activeProposalId: any(named: 'activeProposalId'),
+      ),
+    ).thenAnswer(
+      (_) => Stream.value(
+        const AgentChatStreamEvent(
+          type: 'error',
+          error: ApiErrorDetails(
+            code: 'rate_limit_exceeded',
+            message: 'Server copy that the UI must not inspect.',
+            traceId: 'trace-rate',
+          ),
+        ),
+      ),
+    );
+    final viewModel = AgentChatViewModel(
+      nutritionRepository: repository,
+      audioRecorderService: recorder,
+    );
+
+    await viewModel.sendText('hello');
+
+    expect(viewModel.errorCode, 'rate_limit_exceeded');
+    expect(viewModel.errorMessage, 'Server copy that the UI must not inspect.');
+  });
+
   test('AgentChatViewModel turns tool events into visible timeline entries',
       () async {
     final repository = MockNutritionRepository();
@@ -762,6 +845,166 @@ void main() {
       findsNothing,
     );
     verify(() => repository.createUsualFood(any())).called(1);
+  });
+  testWidgets('chat deletion explains scope and removes the row immediately',
+      (tester) async {
+    final repository = MockNutritionRepository();
+    final recorder = MockAudioRecorderService();
+    const conversationId = '11111111-1111-1111-1111-111111111111';
+    when(() => repository.listAgentConversations()).thenAnswer(
+      (_) async => [_conversationSummary(conversationId)],
+    );
+    when(() => repository.deleteAgentConversation(conversationId))
+        .thenAnswer((_) async {});
+    final viewModel = AgentChatViewModel(
+      nutritionRepository: repository,
+      audioRecorderService: recorder,
+    );
+    await viewModel.refreshConversationHistory();
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: viewModel,
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          theme: buildLightTheme(),
+          home: const AgentChatScreen(),
+        ),
+      ),
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('agent_chat_history_button')).hitTestable(),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Saved chat'), findsOneWidget);
+
+    await tester.tap(
+      find.byKey(const ValueKey('agent_chat_history_delete_0')).hitTestable(),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining(
+          'permanently removed from active systems within 24 hours'),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.byKey(const ValueKey('agent_chat_delete_confirm')).hitTestable(),
+    );
+    await tester.pump();
+
+    expect(find.text('Saved chat'), findsNothing);
+    verify(() => repository.deleteAgentConversation(conversationId)).called(1);
+  });
+
+  test('a stale history response cannot repopulate a deleted chat', () async {
+    final repository = MockNutritionRepository();
+    final recorder = MockAudioRecorderService();
+    final storage = _MemoryPreferencesStorage();
+    final cache = AgentChatCacheStore(storage: storage)..activateUser('user-a');
+    const conversationId = '11111111-1111-1111-1111-111111111111';
+    final response = Completer<List<AgentConversationSummary>>();
+    when(() => repository.listAgentConversations())
+        .thenAnswer((_) => response.future);
+    when(() => repository.deleteAgentConversation(conversationId))
+        .thenAnswer((_) async {});
+    final viewModel = AgentChatViewModel(
+      nutritionRepository: repository,
+      audioRecorderService: recorder,
+      cacheStore: cache,
+    );
+
+    final refresh = viewModel.refreshConversationHistory();
+    await Future<void>.delayed(Duration.zero);
+    await viewModel.deleteConversation(conversationId);
+    response.complete([_conversationSummary(conversationId)]);
+    await refresh;
+
+    expect(viewModel.conversations, isEmpty);
+    expect(await cache.readConversationSummaries(), isEmpty);
+    expect(await cache.isConversationDeleted(conversationId), isTrue);
+  });
+
+  test('a failed backend deletion rolls back the tombstone and can be retried',
+      () async {
+    final repository = MockNutritionRepository();
+    final recorder = MockAudioRecorderService();
+    final storage = _MemoryPreferencesStorage();
+    final cache = AgentChatCacheStore(storage: storage)..activateUser('user-a');
+    const conversationId = '11111111-1111-1111-1111-111111111111';
+    var attempts = 0;
+    when(() => repository.listAgentConversations()).thenAnswer(
+      (_) async => [_conversationSummary(conversationId)],
+    );
+    when(() => repository.deleteAgentConversation(conversationId))
+        .thenAnswer((_) async {
+      attempts++;
+      if (attempts == 1) throw Exception('offline');
+    });
+    final viewModel = AgentChatViewModel(
+      nutritionRepository: repository,
+      audioRecorderService: recorder,
+      cacheStore: cache,
+    );
+    await viewModel.refreshConversationHistory();
+
+    await viewModel.deleteConversation(conversationId);
+    expect(viewModel.errorMessage, isNotNull);
+    expect(viewModel.conversations.map((item) => item.id), [conversationId]);
+    expect(await cache.isConversationDeleted(conversationId), isFalse);
+
+    await viewModel.deleteConversation(conversationId);
+    expect(viewModel.errorMessage, isNull);
+    expect(viewModel.conversations, isEmpty);
+    expect(await cache.isConversationDeleted(conversationId), isTrue);
+    expect(attempts, 2);
+  });
+
+  test('deleting an active conversation abandons later stream events',
+      () async {
+    final repository = MockNutritionRepository();
+    final recorder = MockAudioRecorderService();
+    final events = StreamController<AgentChatStreamEvent>();
+    const conversationId = '11111111-1111-1111-1111-111111111111';
+    when(
+      () => repository.streamAgentChat(
+        any(),
+        conversationId: any(named: 'conversationId'),
+        activeProposalId: any(named: 'activeProposalId'),
+      ),
+    ).thenAnswer((_) => events.stream);
+    when(() => repository.deleteAgentConversation(conversationId))
+        .thenAnswer((_) async {});
+    final viewModel = AgentChatViewModel(
+      nutritionRepository: repository,
+      audioRecorderService: recorder,
+    );
+
+    final send = viewModel.sendText('private message');
+    events.add(const AgentChatStreamEvent(
+      type: 'conversation_started',
+      conversationId: conversationId,
+    ));
+    await Future<void>.delayed(Duration.zero);
+    expect(viewModel.isSending, isTrue);
+    expect(viewModel.conversationId, conversationId);
+
+    await viewModel.deleteConversation(conversationId);
+    events.add(const AgentChatStreamEvent(
+      type: 'assistant_delta',
+      conversationId: conversationId,
+      delta: 'must not reappear',
+    ));
+    events.add(const AgentChatStreamEvent(
+      type: 'done',
+      conversationId: conversationId,
+    ));
+    await events.close();
+    await send;
+
+    expect(viewModel.conversationId, isNull);
+    expect(viewModel.entries.where((entry) => entry.text.contains('reappear')),
+        isEmpty);
   });
 }
 

@@ -112,14 +112,7 @@
   "authCreateAccountFailedTitle": "Account creation failed",
   "authConfirmEmailFailedTitle": "Email confirmation failed",
   "authCheckEmailTitle": "Check your email",
-  "authCheckEmailMessage": "We sent a confirmation link to {email}. Open it to finish creating your account.",
-  "@authCheckEmailMessage": {
-    "placeholders": {
-      "email": {
-        "type": "String"
-      }
-    }
-  },
+  "authCheckEmailMessage": "If this address can be used, you’ll receive an email with the next step. Check your spam folder too.",
   "authEmailInvalidError": "Enter a valid email address, like name@example.com.",
   "authNameRequiredError": "Enter your name.",
   "authPasswordRequiredError": "Enter your password.",
@@ -871,6 +864,10 @@
   "agentChatHistoryTitle": "Chat history",
   "agentChatHistoryEmpty": "No previous chats yet.",
   "agentChatHistoryDeleteTooltip": "Delete chat",
+  "agentChatDeleteDialogTitle": "Delete this chat?",
+  "agentChatDeleteDialogBody": "It disappears now. Its messages, transcripts, and linked diagnostics are permanently removed from active systems within 24 hours. There is no trash.",
+  "agentChatDeleteConfirm": "Delete permanently",
+  "agentChatDeletionAccepted": "Chat hidden now. Permanent deletion is in progress.",
   "agentChatHistoryLoadError": "Could not load this chat.",
   "agentChatHistoryUpdatedAt": "Updated {time}",
   "@agentChatHistoryUpdatedAt": {
@@ -879,5 +876,10 @@
     }
   },
   "agentChatHistoryRefreshing": "Refreshing...",
-  "agentChatOpenAction": "Open agent chat. Hold to speak"
+  "agentChatOpenAction": "Open agent chat. Hold to speak",
+  "aiErrorValidation": "Check the request and try again.",
+  "aiErrorAuthentication": "Your session expired. Sign in again.",
+  "aiErrorRateLimit": "You've reached the current limit. Wait before trying again.",
+  "aiErrorProviderUnavailable": "The nutrition assistant is temporarily unavailable. Try again shortly.",
+  "aiErrorInternal": "Something went wrong on our side. Try again."
 }

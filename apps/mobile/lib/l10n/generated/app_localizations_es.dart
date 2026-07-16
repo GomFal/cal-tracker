@@ -225,9 +225,8 @@ class AppLocalizationsEs extends AppLocalizations {
   String get authCheckEmailTitle => 'Revisa tu correo';
 
   @override
-  String authCheckEmailMessage(String email) {
-    return 'Te enviamos un enlace de confirmación a $email. Ábrelo para terminar de crear tu cuenta.';
-  }
+  String get authCheckEmailMessage =>
+      'Si esta dirección puede usarse, recibirás un correo con el siguiente paso. Revisa también la carpeta de spam.';
 
   @override
   String get authEmailInvalidError =>
@@ -1822,6 +1821,20 @@ class AppLocalizationsEs extends AppLocalizations {
   String get agentChatHistoryDeleteTooltip => 'Eliminar chat';
 
   @override
+  String get agentChatDeleteDialogTitle => '¿Eliminar este chat?';
+
+  @override
+  String get agentChatDeleteDialogBody =>
+      'Desaparece ahora. Sus mensajes, transcripciones y diagnósticos vinculados se eliminan definitivamente de los sistemas activos en menos de 24 horas. No hay papelera.';
+
+  @override
+  String get agentChatDeleteConfirm => 'Eliminar definitivamente';
+
+  @override
+  String get agentChatDeletionAccepted =>
+      'El chat ya está oculto. El borrado definitivo está en curso.';
+
+  @override
   String get agentChatHistoryLoadError => 'No se pudo cargar este chat.';
 
   @override
@@ -1835,4 +1848,23 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get agentChatOpenAction =>
       'Abrir chat con el agente. Mantén pulsado para hablar';
+
+  @override
+  String get aiErrorValidation => 'Revisa la solicitud e inténtalo de nuevo.';
+
+  @override
+  String get aiErrorAuthentication =>
+      'Tu sesión ha caducado. Inicia sesión de nuevo.';
+
+  @override
+  String get aiErrorRateLimit =>
+      'Has alcanzado el límite actual. Espera antes de volver a intentarlo.';
+
+  @override
+  String get aiErrorProviderUnavailable =>
+      'El asistente de nutrición no está disponible temporalmente. Inténtalo de nuevo en breve.';
+
+  @override
+  String get aiErrorInternal =>
+      'Algo ha fallado por nuestra parte. Inténtalo de nuevo.';
 }

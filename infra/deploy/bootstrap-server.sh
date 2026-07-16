@@ -17,7 +17,11 @@ cp postgres/init.sql "$DEPLOY_DIR/postgres/init.sql"
 cp deploy.sh "$DEPLOY_DIR/deploy.sh"
 cp backup-postgres-schema.sh "$DEPLOY_DIR/backup-postgres-schema.sh"
 cp publish-landing.sh "$DEPLOY_DIR/publish-landing.sh"
-chmod 755 "$DEPLOY_DIR/deploy.sh" "$DEPLOY_DIR/backup-postgres-schema.sh" "$DEPLOY_DIR/publish-landing.sh"
+cp privacy-ledger-overlay.sh "$DEPLOY_DIR/privacy-ledger-overlay.sh"
+cp restore-postgres-schema.sh "$DEPLOY_DIR/restore-postgres-schema.sh"
+chmod 755 "$DEPLOY_DIR/deploy.sh" "$DEPLOY_DIR/backup-postgres-schema.sh" \
+  "$DEPLOY_DIR/publish-landing.sh" "$DEPLOY_DIR/privacy-ledger-overlay.sh" \
+  "$DEPLOY_DIR/restore-postgres-schema.sh"
 cp nginx/proxy-common.conf /etc/nginx/snippets/cal-tracker-proxy-common.conf
 cp nginx/security-headers.conf /etc/nginx/snippets/cal-tracker-security-headers.conf
 touch "$STATE_DIR/dev.active" "$STATE_DIR/pro.active"
@@ -106,6 +110,21 @@ OPENROUTER_MODEL=deepseek/deepseek-v4-flash
 STT_API_KEY=replace-with-groq-key
 STT_MODEL=whisper-large-v3-turbo
 STT_BASE_URL=https://api.groq.com/openai/v1
+RATE_LIMIT_AUTH_IP_MAX=10
+RATE_LIMIT_AUTH_WINDOW_SECONDS=60
+RATE_LIMIT_EMAIL_RECIPIENT_MAX=3
+RATE_LIMIT_EMAIL_WINDOW_SECONDS=3600
+RATE_LIMIT_COST_OPERATIONS_ENABLED=true
+RATE_LIMIT_COST_USER_MAX=60
+RATE_LIMIT_COST_IP_MAX=600
+RATE_LIMIT_COST_GLOBAL_MAX=6000
+RATE_LIMIT_COST_WINDOW_SECONDS=3600
+RATE_LIMIT_COST_USER_CONCURRENCY=2
+RATE_LIMIT_COST_GLOBAL_CONCURRENCY=50
+RATE_LIMIT_CONCURRENCY_RETRY_AFTER_SECONDS=5
+RATE_LIMIT_EMERGENCY_RETRY_AFTER_SECONDS=60
+RATE_LIMIT_ALERT_PERCENT=80
+RATE_LIMIT_MAX_BUCKETS=100000
 EMBEDDING_PROVIDER=local
 EMBEDDING_MODEL=bge-m3
 EMBEDDING_DIMENSIONS=1024

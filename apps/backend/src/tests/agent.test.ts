@@ -561,8 +561,10 @@ describe("AgentService", () => {
     const body = (await res.json()) as {
       error: { code: string; message: string };
     };
-    expect(body.error.code).toBe("agent_provider_unavailable");
-    expect(body.error.message).toBe("An error occurred. Please, try again.");
+    expect(body.error.code).toBe("provider_unavailable");
+    expect(body.error.message).toBe(
+      "The nutrition assistant is temporarily unavailable. Try again shortly.",
+    );
   });
 
   it("maps calories left to get_remaining_targets", async () => {
@@ -1285,8 +1287,10 @@ describe("AgentService", () => {
     const body = (await revised.json()) as {
       error: { code: string; message: string };
     };
-    expect(body.error.code).toBe("agent_provider_unavailable");
-    expect(body.error.message).toBe("An error occurred. Please, try again.");
+    expect(body.error.code).toBe("provider_unavailable");
+    expect(body.error.message).toBe(
+      "The nutrition assistant is temporarily unavailable. Try again shortly.",
+    );
   });
 
   it("asks for clarification without changing the active proposal when the model returns no tool call", async () => {
@@ -1354,8 +1358,10 @@ describe("AgentService", () => {
     const body = (await revised.json()) as {
       error: { code: string; message: string };
     };
-    expect(body.error.code).toBe("agent_provider_unavailable");
-    expect(body.error.message).toBe("An error occurred. Please, try again.");
+    expect(body.error.code).toBe("provider_unavailable");
+    expect(body.error.message).toBe(
+      "The nutrition assistant is temporarily unavailable. Try again shortly.",
+    );
   });
 
   it("returns a provider unavailable error for ambiguous corrections when the provider fails", async () => {
@@ -1384,8 +1390,10 @@ describe("AgentService", () => {
     const body = (await revised.json()) as {
       error: { code: string; message: string };
     };
-    expect(body.error.code).toBe("agent_provider_unavailable");
-    expect(body.error.message).toBe("An error occurred. Please, try again.");
+    expect(body.error.code).toBe("provider_unavailable");
+    expect(body.error.message).toBe(
+      "The nutrition assistant is temporarily unavailable. Try again shortly.",
+    );
   });
 
   it("rejects unknown model-selected actions", async () => {

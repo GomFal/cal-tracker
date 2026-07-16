@@ -32,6 +32,7 @@ class VoiceLogUiState {
   const VoiceLogUiState({
     this.phase = VoiceLogState.idle,
     this.errorMessage,
+    this.errorCode,
     this.message,
     this.transcript = '',
     this.transcriptFromVoice = false,
@@ -58,6 +59,7 @@ class VoiceLogUiState {
 
   final VoiceLogState phase;
   final String? errorMessage;
+  final String? errorCode;
   final String? message;
   final String transcript;
   final bool transcriptFromVoice;
@@ -89,6 +91,7 @@ class VoiceLogUiState {
   VoiceLogUiState copyWith({
     VoiceLogState? phase,
     Object? errorMessage = _unchanged,
+    Object? errorCode = _unchanged,
     Object? message = _unchanged,
     String? transcript,
     bool? transcriptFromVoice,
@@ -117,6 +120,9 @@ class VoiceLogUiState {
       errorMessage: identical(errorMessage, _unchanged)
           ? this.errorMessage
           : errorMessage as String?,
+      errorCode: identical(errorCode, _unchanged)
+          ? this.errorCode
+          : errorCode as String?,
       message:
           identical(message, _unchanged) ? this.message : message as String?,
       transcript: transcript ?? this.transcript,
@@ -209,6 +215,7 @@ class VoiceLogViewModel extends ChangeNotifier {
   VoiceLogState get state => _uiState.phase;
 
   String? get errorMessage => _uiState.errorMessage;
+  String? get errorCode => _uiState.errorCode;
 
   String? get message => _uiState.message;
 
@@ -495,6 +502,7 @@ class VoiceLogViewModel extends ChangeNotifier {
                 e,
                 context: UserErrorContext.voiceTranscription,
               ),
+        code: publicAiErrorCode(e),
       );
     } finally {
       try {
@@ -559,6 +567,7 @@ class VoiceLogViewModel extends ChangeNotifier {
     } catch (error) {
       _setError(
         userVisibleErrorMessage(error, context: UserErrorContext.voiceAgent),
+        code: publicAiErrorCode(error),
       );
     }
   }
@@ -681,6 +690,7 @@ class VoiceLogViewModel extends ChangeNotifier {
     } catch (error) {
       _setError(
         userVisibleErrorMessage(error, context: UserErrorContext.voiceCommit),
+        code: publicAiErrorCode(error),
       );
     }
   }
@@ -718,6 +728,7 @@ class VoiceLogViewModel extends ChangeNotifier {
           error,
           context: UserErrorContext.voiceProposalEdit,
         ),
+        code: publicAiErrorCode(error),
       );
     }
   }
@@ -770,6 +781,7 @@ class VoiceLogViewModel extends ChangeNotifier {
           error,
           context: UserErrorContext.voiceProposalEdit,
         ),
+        code: publicAiErrorCode(error),
       );
     }
   }
@@ -847,6 +859,7 @@ class VoiceLogViewModel extends ChangeNotifier {
           error,
           context: UserErrorContext.voiceCandidateSelection,
         ),
+        code: publicAiErrorCode(error),
       );
     }
   }
@@ -870,12 +883,13 @@ class VoiceLogViewModel extends ChangeNotifier {
     _setUiState(_uiState.copyWith(phase: value));
   }
 
-  void _setError(String message) {
+  void _setError(String message, {String? code}) {
     _timers.clearProposalChangeSuccess();
     _setUiState(
       _uiState.copyWith(
         phase: VoiceLogState.error,
         errorMessage: message,
+        errorCode: code,
         showProposalChangeSuccess: false,
       ),
     );
@@ -920,7 +934,6 @@ class VoiceLogViewModel extends ChangeNotifier {
         severity: 'error',
         status: 'failure',
         errorCode: errorCode,
-        errorMessage: error.toString(),
         metadata: extra,
       ),
     );

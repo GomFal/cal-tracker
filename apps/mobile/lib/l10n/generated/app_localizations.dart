@@ -503,8 +503,8 @@ abstract class AppLocalizations {
   /// No description provided for @authCheckEmailMessage.
   ///
   /// In en, this message translates to:
-  /// **'We sent a confirmation link to {email}. Open it to finish creating your account.'**
-  String authCheckEmailMessage(String email);
+  /// **'If this address can be used, you’ll receive an email with the next step. Check your spam folder too.'**
+  String get authCheckEmailMessage;
 
   /// No description provided for @authEmailInvalidError.
   ///
@@ -3327,6 +3327,30 @@ abstract class AppLocalizations {
   /// **'Delete chat'**
   String get agentChatHistoryDeleteTooltip;
 
+  /// No description provided for @agentChatDeleteDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this chat?'**
+  String get agentChatDeleteDialogTitle;
+
+  /// No description provided for @agentChatDeleteDialogBody.
+  ///
+  /// In en, this message translates to:
+  /// **'It disappears now. Its messages, transcripts, and linked diagnostics are permanently removed from active systems within 24 hours. There is no trash.'**
+  String get agentChatDeleteDialogBody;
+
+  /// No description provided for @agentChatDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete permanently'**
+  String get agentChatDeleteConfirm;
+
+  /// No description provided for @agentChatDeletionAccepted.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat hidden now. Permanent deletion is in progress.'**
+  String get agentChatDeletionAccepted;
+
   /// No description provided for @agentChatHistoryLoadError.
   ///
   /// In en, this message translates to:
@@ -3350,6 +3374,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open agent chat. Hold to speak'**
   String get agentChatOpenAction;
+
+  /// No description provided for @aiErrorValidation.
+  ///
+  /// In en, this message translates to:
+  /// **'Check the request and try again.'**
+  String get aiErrorValidation;
+
+  /// No description provided for @aiErrorAuthentication.
+  ///
+  /// In en, this message translates to:
+  /// **'Your session expired. Sign in again.'**
+  String get aiErrorAuthentication;
+
+  /// No description provided for @aiErrorRateLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'ve reached the current limit. Wait before trying again.'**
+  String get aiErrorRateLimit;
+
+  /// No description provided for @aiErrorProviderUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The nutrition assistant is temporarily unavailable. Try again shortly.'**
+  String get aiErrorProviderUnavailable;
+
+  /// No description provided for @aiErrorInternal.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong on our side. Try again.'**
+  String get aiErrorInternal;
 }
 
 class _AppLocalizationsDelegate

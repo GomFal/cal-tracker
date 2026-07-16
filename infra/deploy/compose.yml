@@ -54,6 +54,7 @@ services:
       - path: /srv/cal-tracker/env/dev.env
         required: false
     environment:
+      RATE_LIMIT_TRUST_PROXY_HEADERS: "true"
       DATABASE_SCHEMA: cal_tracker_dev
       DATABASE_URL: postgres://cal_tracker:${POSTGRES_PASSWORD}@postgres:5432/${DEV_DATABASE_NAME:-cal_tracker}
       NODE_ENV: production
@@ -68,6 +69,7 @@ services:
       - path: /srv/cal-tracker/env/dev.env
         required: false
     environment:
+      RATE_LIMIT_TRUST_PROXY_HEADERS: "true"
       DATABASE_SCHEMA: cal_tracker_dev
       DATABASE_URL: postgres://cal_tracker:${POSTGRES_PASSWORD}@postgres:5432/${DEV_DATABASE_NAME:-cal_tracker}
       NODE_ENV: production
@@ -82,6 +84,7 @@ services:
       - path: /srv/cal-tracker/env/pro.env
         required: false
     environment:
+      RATE_LIMIT_TRUST_PROXY_HEADERS: "true"
       DATABASE_SCHEMA: cal_tracker_pro
       DATABASE_URL: postgres://cal_tracker:${POSTGRES_PASSWORD}@postgres:5432/${PRO_DATABASE_NAME:-cal_tracker}
       NODE_ENV: production
@@ -96,6 +99,7 @@ services:
       - path: /srv/cal-tracker/env/pro.env
         required: false
     environment:
+      RATE_LIMIT_TRUST_PROXY_HEADERS: "true"
       DATABASE_SCHEMA: cal_tracker_pro
       DATABASE_URL: postgres://cal_tracker:${POSTGRES_PASSWORD}@postgres:5432/${PRO_DATABASE_NAME:-cal_tracker}
       NODE_ENV: production

@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:cal_tracker_mobile/data/repositories/nutrition_repository.dart';
 import 'package:cal_tracker_mobile/data/services/agent_chat_cache_store.dart';
 import 'package:cal_tracker_mobile/data/services/app_preferences_storage.dart';
@@ -32,7 +35,9 @@ void main() {
       await store.writeConversationDetail(_detail('conversation-a'));
 
       expect(
-        (await store.readConversationDetail('conversation-a'))
+        (await store.readConversationDetail(
+          'conversation-a',
+        ))
             ?.messages
             .single
             .content,
@@ -42,10 +47,9 @@ void main() {
       await store.removeConversation('conversation-a');
 
       expect(await store.readConversationDetail('conversation-a'), isNull);
-      expect(
-        (await store.readConversationSummaries()).map((item) => item.id),
-        ['conversation-b'],
-      );
+      expect((await store.readConversationSummaries()).map((item) => item.id), [
+        'conversation-b',
+      ]);
     });
 
     test('expires stale cache entries', () async {
@@ -64,6 +68,92 @@ void main() {
 
       expect(await store.readConversationDetail('conversation-a'), isNull);
       expect(storage.values, isEmpty);
+    });
+
+    test('a tombstone loaded for user A cannot contaminate user B', () async {
+      final storage = _BlockingPreferencesStorage();
+      final store = AgentChatCacheStore(storage: storage);
+      final userA = base64Url.encode(utf8.encode('user-a'));
+      final deletionKey = 'agent_chat_cache:v1:$userA:deleted-conversations';
+      storage.values[deletionKey] = jsonEncode(['conversation-a']);
+      storage.blockNextRead(deletionKey);
+
+      store.activateUser('user-a');
+      final staleRead = store.readConversationSummaries();
+      await storage.readStarted;
+      store.activateUser('user-b');
+      storage.resumeRead();
+
+      expect(await staleRead, isEmpty);
+      await store.writeConversationDetail(_detail('conversation-a'));
+      expect(await store.readConversationDetail('conversation-a'), isNotNull);
+    });
+
+    test('a stale write for user A never writes under user B', () async {
+      final storage = _BlockingPreferencesStorage();
+      final store = AgentChatCacheStore(storage: storage);
+      final userA = base64Url.encode(utf8.encode('user-a'));
+      final userB = base64Url.encode(utf8.encode('user-b'));
+      final detailA = 'agent_chat_cache:v1:$userA:detail:conversation-a';
+      final detailB = 'agent_chat_cache:v1:$userB:detail:conversation-a';
+
+      store.activateUser('user-a');
+      storage.blockNextWrite(detailA);
+      final staleWrite =
+          store.writeConversationDetail(_detail('conversation-a'));
+      await storage.writeStarted;
+      store.activateUser('user-b');
+      storage.resumeWrite();
+      await staleWrite;
+
+      expect(storage.values.containsKey(detailA), isFalse);
+      expect(storage.values.containsKey(detailB), isFalse);
+      await store.writeConversationDetail(_detail('conversation-a'));
+      expect(storage.values.containsKey(detailB), isTrue);
+    });
+
+    test('delete keeps its user snapshot when the active user switches',
+        () async {
+      final storage = _BlockingPreferencesStorage();
+      final store = AgentChatCacheStore(storage: storage);
+      final userA = base64Url.encode(utf8.encode('user-a'));
+      final userB = base64Url.encode(utf8.encode('user-b'));
+      final detailA = 'agent_chat_cache:v1:$userA:detail:conversation-a';
+      final detailB = 'agent_chat_cache:v1:$userB:detail:conversation-b';
+      final deletionA = 'agent_chat_cache:v1:$userA:deleted-conversations';
+
+      store.activateUser('user-a');
+      await store.writeConversationDetail(_detail('conversation-a'));
+      store.activateUser('user-b');
+      await store.writeConversationDetail(_detail('conversation-b'));
+      store.activateUser('user-a');
+      storage.blockNextWrite(deletionA);
+      final deletion = store.removeConversation('conversation-a');
+      await storage.writeStarted;
+      store.activateUser('user-b');
+      storage.resumeWrite();
+      await deletion;
+
+      expect(storage.values.containsKey(detailA), isFalse);
+      expect(storage.values.containsKey(detailB), isTrue);
+      expect(
+          jsonDecode(storage.values[deletionA]!), contains('conversation-a'));
+    });
+
+    test('failed deletion removes tombstone even without a cached summary',
+        () async {
+      final storage = _MemoryPreferencesStorage();
+      final store = AgentChatCacheStore(storage: storage)
+        ..activateUser('user-a');
+      await store.removeConversation('active-conversation');
+      expect(await store.isConversationDeleted('active-conversation'), isTrue);
+
+      await store.restoreConversationAfterFailedDeletion(
+        'active-conversation',
+        null,
+      );
+
+      expect(await store.isConversationDeleted('active-conversation'), isFalse);
     });
   });
 }
@@ -118,5 +208,52 @@ class _MemoryPreferencesStorage implements AppPreferencesStorage {
   @override
   Future<void> removeWhere(bool Function(String key) test) async {
     values.removeWhere((key, value) => test(key));
+  }
+}
+
+class _BlockingPreferencesStorage extends _MemoryPreferencesStorage {
+  String? _blockedReadKey;
+  String? _blockedWriteKey;
+  Completer<void>? _readStarted;
+  Completer<void>? _writeStarted;
+  Completer<void>? _readGate;
+  Completer<void>? _writeGate;
+
+  Future<void> get readStarted => _readStarted!.future;
+  Future<void> get writeStarted => _writeStarted!.future;
+
+  void blockNextRead(String key) {
+    _blockedReadKey = key;
+    _readStarted = Completer<void>();
+    _readGate = Completer<void>();
+  }
+
+  void blockNextWrite(String key) {
+    _blockedWriteKey = key;
+    _writeStarted = Completer<void>();
+    _writeGate = Completer<void>();
+  }
+
+  void resumeRead() => _readGate!.complete();
+  void resumeWrite() => _writeGate!.complete();
+
+  @override
+  Future<String?> readString(String key) async {
+    if (key == _blockedReadKey) {
+      _blockedReadKey = null;
+      _readStarted!.complete();
+      await _readGate!.future;
+    }
+    return super.readString(key);
+  }
+
+  @override
+  Future<void> writeString(String key, String value) async {
+    if (key == _blockedWriteKey) {
+      _blockedWriteKey = null;
+      _writeStarted!.complete();
+      await _writeGate!.future;
+    }
+    await super.writeString(key, value);
   }
 }

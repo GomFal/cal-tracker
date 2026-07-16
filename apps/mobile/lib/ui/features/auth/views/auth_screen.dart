@@ -157,9 +157,7 @@ class _AuthScreenState extends State<AuthScreen> {
                               ),
                               icon: Icons.mark_email_read_outlined,
                               title: l10n.authCheckEmailTitle,
-                              message: l10n.authCheckEmailMessage(
-                                viewModel.pendingRegistrationEmail!,
-                              ),
+                              message: l10n.authCheckEmailMessage,
                               color: palette.limeDeep,
                             ),
                           ],

@@ -50,9 +50,18 @@ fi
 NEXT_SERVICE="backend-${ENVIRONMENT}-${NEXT_SLOT}"
 
 cd "$DEPLOY_DIR"
-set -a
-source "$SECRETS_FILE"
-set +a
+
+read_env_value() {
+  local key="$1"
+  awk -v key="$key" 'index($0, key "=") == 1 { print substr($0, length(key) + 2); found=1; exit } END { if (!found) exit 1 }' "$SECRETS_FILE"
+}
+
+# Never source a file writable through the deployment pipeline: dotenv values
+# are data for Docker Compose, not shell code executed with dispatcher rights.
+POSTGRES_PASSWORD="$(read_env_value POSTGRES_PASSWORD)" \
+  || { echo "POSTGRES_PASSWORD is missing from deploy.env" >&2; exit 2; }
+DEV_DATABASE_NAME="$(read_env_value DEV_DATABASE_NAME 2>/dev/null || true)"
+PRO_DATABASE_NAME="$(read_env_value PRO_DATABASE_NAME 2>/dev/null || true)"
 
 case "$ENVIRONMENT" in
   dev) DATABASE_NAME="${DEV_DATABASE_NAME:-cal_tracker}" ;;

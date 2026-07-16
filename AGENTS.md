@@ -43,6 +43,7 @@ Backend deployment rules:
 
 - Dev deploys from pushes to `develop`.
 - Production deploys from tags matching `v*`.
+- CI must use the pinned host identity and dedicated non-root deployment account documented in [docs/trusted-production-deployments.md](docs/trusted-production-deployments.md); do not reintroduce runtime `ssh-keyscan` trust.
 
 When compiling the mobile app against the deployed dev environment, use:
 

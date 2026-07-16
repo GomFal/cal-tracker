@@ -89,7 +89,7 @@ ssh -o PasswordAuthentication=no -i ~/.ssh/bettercalories-production root@better
 
 Ambos deben fallar. La cuenta nominal debe entrar con clave y `sudo -n true` debe finalizar correctamente. `status` debe mostrar UFW activo, únicamente 22/80/443, y el jail `sshd` activo. Las decisiones de un proveedor externo de red o firewall deben reflejar la misma lista.
 
-Los despliegues actuales pueden depender de `root`. Esta feature no cambia sus workflows: deben migrarse de forma coordinada en la feature de seguridad de despliegues antes de deshabilitar `root` en producción. Si GitHub Actions todavía usa `VPS_USER=root`, no ejecutes la fase `enforce`.
+Antes de deshabilitar `root`, completa la migración del usuario de despliegue descrita en [trusted-production-deployments.md](trusted-production-deployments.md). Ejecuta al menos un despliegue de desarrollo con `VPS_USER=bettercalories-deploy` y confirma su registro remoto. Si GitHub Actions todavía usa `VPS_USER=root`, no ejecutes la fase `enforce`.
 
 ## Recuperación básica
 
@@ -101,4 +101,3 @@ sudo ./harden-production-access.sh rollback-ssh --console-recovery-confirmed
 ```
 
 Esto restaura el drop-in SSH previo y mantiene TCP/22 permitido en UFW. Después corrige o rota la clave y repite todas las fases. La custodia formal, copias de emergencia y simulacros periódicos quedan diferidos hasta después de validar el MVP.
-

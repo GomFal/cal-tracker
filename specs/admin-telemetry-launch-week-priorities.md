@@ -62,6 +62,25 @@ The `/v1/agent/chat` and `/v1/agent/chat/audio` flows store:
 - tool result messages;
 - tool metadata such as `actionId` and `actionCallId`.
 
+The history implementation also gives the admin telemetry work first-class
+correlation columns on `agent_messages`:
+
+- `trace_id`;
+- `turn_id`;
+- `input_mode`;
+- `source`;
+- `active_proposal_id`.
+
+These columns are the preferred correlation spine for admin reads and telemetry
+joins. Implementations should not scrape this correlation out of message
+metadata when a first-class column is available.
+
+Conversation deletion in the user-facing app is represented by
+`agent_conversations.hidden_from_user_at`. This is a visibility flag, not hard
+deletion. Admin conversation and trace views should default to visible
+conversations only, and should expose an `includeHidden=true` filter for audit
+and telemetry review.
+
 The gap is that this stored conversation data is not currently exposed in the
 admin panel and is not presented as telemetry. The launch-week priority is not
 to build conversation persistence from scratch. The priority is to make the
@@ -666,6 +685,25 @@ questions from the panel:
 - Which provider calls have unknown or estimated cost?
 
 ## Implementation Order
+
+### Vertical Slice A
+
+The first implementation pass must make every newly stored telemetry concept
+visible in the administration panel. It includes:
+
+- admin read endpoints and views for conversations, agent turns, action calls,
+  provider calls, LLM cost, and transcriptions;
+- trace lookup enrichment with conversation messages, agent turns, provider
+  calls, action calls, transcriptions, existing events, LLM runs, and food
+  searches;
+- overview additions for conversations, turns, provider calls, total cost,
+  estimated cost, unknown cost, and transcription count;
+- `/v1/agent/chat` and `/v1/agent/chat/audio` instrumentation for turn,
+  tool-call, provider-call, cost, and transcription correlation.
+
+Food candidate drilldown, broader mobile interaction telemetry, user timeline,
+and failure review remain launch-week priorities, but they can be implemented
+after this first vertical slice.
 
 1. Add admin read endpoints for existing `agent_conversations`,
    `agent_messages`, and `action_calls`.

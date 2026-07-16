@@ -126,6 +126,54 @@
           class="tab"
           role="tab"
           aria-selected="false"
+          aria-controls="view-conversations"
+          id="tab-conversations"
+          data-target="view-conversations"
+        >Conversations</button>
+        <button
+          class="tab"
+          role="tab"
+          aria-selected="false"
+          aria-controls="view-agent-turns"
+          id="tab-agent-turns"
+          data-target="view-agent-turns"
+        >Agent turns</button>
+        <button
+          class="tab"
+          role="tab"
+          aria-selected="false"
+          aria-controls="view-action-calls"
+          id="tab-action-calls"
+          data-target="view-action-calls"
+        >Action calls</button>
+        <button
+          class="tab"
+          role="tab"
+          aria-selected="false"
+          aria-controls="view-llm-cost"
+          id="tab-llm-cost"
+          data-target="view-llm-cost"
+        >LLM cost</button>
+        <button
+          class="tab"
+          role="tab"
+          aria-selected="false"
+          aria-controls="view-provider-calls"
+          id="tab-provider-calls"
+          data-target="view-provider-calls"
+        >Provider calls</button>
+        <button
+          class="tab"
+          role="tab"
+          aria-selected="false"
+          aria-controls="view-transcriptions"
+          id="tab-transcriptions"
+          data-target="view-transcriptions"
+        >Transcriptions</button>
+        <button
+          class="tab"
+          role="tab"
+          aria-selected="false"
           aria-controls="view-food"
           id="tab-food"
           data-target="view-food"
@@ -194,6 +242,41 @@
             <h3>Zero-result rate</h3>
             <p class="card-value" data-value>—</p>
             <p class="card-foot" data-foot>fraction of searches with no result</p>
+          </article>
+          <article class="card" data-card="conversations">
+            <h3>Conversations</h3>
+            <p class="card-value" data-value>—</p>
+            <p class="card-foot" data-foot>chat histories touched</p>
+          </article>
+          <article class="card" data-card="agent_turns">
+            <h3>Agent turns</h3>
+            <p class="card-value" data-value>—</p>
+            <p class="card-foot" data-foot>chat turns tracked</p>
+          </article>
+          <article class="card" data-card="provider_calls">
+            <h3>Provider calls</h3>
+            <p class="card-value" data-value>—</p>
+            <p class="card-foot" data-foot>LLM provider requests</p>
+          </article>
+          <article class="card" data-card="transcriptions">
+            <h3>Transcriptions</h3>
+            <p class="card-value" data-value>—</p>
+            <p class="card-foot" data-foot>STT records</p>
+          </article>
+          <article class="card" data-card="provider_cost">
+            <h3>Provider cost</h3>
+            <p class="card-value" data-value>—</p>
+            <p class="card-foot" data-foot>reported spend</p>
+          </article>
+          <article class="card" data-card="estimated_cost">
+            <h3>Estimated cost</h3>
+            <p class="card-value" data-value>—</p>
+            <p class="card-foot" data-foot>pricing-table spend</p>
+          </article>
+          <article class="card" data-card="unknown_cost">
+            <h3>Unknown cost</h3>
+            <p class="card-value" data-value>—</p>
+            <p class="card-foot" data-foot>calls without cost</p>
           </article>
         </div>
 
@@ -373,6 +456,476 @@
         </div>
       </section>
 
+      <!-- ============== CONVERSATIONS ============== -->
+      <section
+        id="view-conversations"
+        class="view"
+        role="tabpanel"
+        aria-labelledby="tab-conversations"
+        hidden
+      >
+        <header class="view-header">
+          <h2>Conversations</h2>
+          <form class="filters" id="conversations-filters" autocomplete="off">
+            <label class="field">
+              <span>User ID</span>
+              <input id="conversations-user" name="userId" type="text" spellcheck="false" placeholder="optional">
+            </label>
+            <label class="field">
+              <span>Trace ID</span>
+              <input id="conversations-trace" name="traceId" type="text" spellcheck="false" placeholder="optional">
+            </label>
+            <label class="field">
+              <span>Turn ID</span>
+              <input id="conversations-turn" name="turnId" type="text" spellcheck="false" placeholder="optional">
+            </label>
+            <label class="field">
+              <span>Hidden</span>
+              <select id="conversations-hidden" name="includeHidden">
+                <option value="">visible only</option>
+                <option value="true">include hidden</option>
+              </select>
+            </label>
+            <label class="field field-narrow">
+              <span>Limit</span>
+              <input id="conversations-limit" name="limit" type="number" min="1" max="500" value="100">
+            </label>
+            <div class="filters-actions">
+              <button type="submit" class="btn btn-primary">Apply</button>
+              <button type="button" class="btn btn-ghost" data-reset="conversations-filters">Reset</button>
+            </div>
+          </form>
+        </header>
+
+        <div class="table-wrap">
+          <table class="data-table" id="conversations-table">
+            <thead>
+              <tr>
+                <th>Updated</th>
+                <th>Title</th>
+                <th>User</th>
+                <th>Conversation</th>
+                <th>Hidden</th>
+                <th>Created</th>
+              </tr>
+            </thead>
+            <tbody data-body>
+              <tr class="empty"><td colspan="6">No data loaded yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <section class="subview">
+          <h3>Conversation detail</h3>
+          <div class="table-wrap">
+            <table class="data-table" id="conversation-detail-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Turn</th>
+                  <th>Role</th>
+                  <th>Mode</th>
+	                  <th>Source</th>
+	                  <th>Trace</th>
+	                  <th>Proposal</th>
+	                  <th>Content</th>
+	                </tr>
+	              </thead>
+	              <tbody data-body>
+	                <tr class="empty"><td colspan="8">Select a conversation row.</td></tr>
+	              </tbody>
+	            </table>
+	          </div>
+	        </section>
+
+	        <section class="subview selected-message-panel" id="selected-message-accounting">
+	          <div class="subview-heading">
+	            <h3>Selected message accounting</h3>
+	            <span class="tag tag-neutral" id="selected-message-relation">select a message</span>
+	          </div>
+	          <div class="selected-message-empty" id="selected-message-empty">
+	            Select a transcript row to inspect the related LLM call, cost, latency, and tool execution.
+	          </div>
+	          <dl class="trace-meta selected-message-meta" id="selected-message-meta" hidden></dl>
+	          <div class="cards metric-cards compact-cards" id="selected-message-cards" hidden>
+	            <article class="card" data-selected-card="prompt"><h3>Prompt tok</h3><p class="card-value" data-value>—</p><p class="card-foot">exact provider call total</p></article>
+	            <article class="card" data-selected-card="completion"><h3>Completion tok</h3><p class="card-value" data-value>—</p><p class="card-foot">generated by LLM</p></article>
+	            <article class="card" data-selected-card="total"><h3>Total tok</h3><p class="card-value" data-value>—</p><p class="card-foot">prompt + completion</p></article>
+	            <article class="card" data-selected-card="reasoning"><h3>Reasoning tok</h3><p class="card-value" data-value>—</p><p class="card-foot">provider reported</p></article>
+	            <article class="card" data-selected-card="cost"><h3>Cost</h3><p class="card-value" data-value>—</p><p class="card-foot">reported or estimated</p></article>
+	            <article class="card" data-selected-card="latency"><h3>Latency</h3><p class="card-value" data-value>—</p><p class="card-foot">provider total</p></article>
+	            <article class="card" data-selected-card="status"><h3>Status</h3><p class="card-value" data-value>—</p><p class="card-foot">provider status</p></article>
+	          </div>
+
+	          <div class="table-wrap selected-table-wrap">
+	            <table class="data-table" id="selected-provider-calls-table">
+	              <thead>
+	                <tr>
+	                  <th>Time</th>
+	                  <th>Relation</th>
+	                  <th>Provider</th>
+	                  <th>Model</th>
+	                  <th>Generation</th>
+	                  <th>Prompt tok</th>
+	                  <th>Completion tok</th>
+	                  <th>Total tok</th>
+	                  <th>Reasoning tok</th>
+	                  <th>Cost</th>
+	                  <th>Latency</th>
+	                  <th>Status</th>
+	                </tr>
+	              </thead>
+	              <tbody data-body>
+	                <tr class="empty"><td colspan="12">Select a conversation message.</td></tr>
+	              </tbody>
+	            </table>
+	          </div>
+
+	          <div class="table-wrap selected-table-wrap">
+	            <table class="data-table" id="selected-tool-calls-table">
+	              <thead>
+	                <tr>
+	                  <th>Time</th>
+	                  <th>Relation</th>
+	                  <th>Action</th>
+	                  <th>Tool call</th>
+	                  <th>Status</th>
+	                  <th>Duration</th>
+	                  <th>Arguments</th>
+	                  <th>Result / error</th>
+	                </tr>
+	              </thead>
+	              <tbody data-body>
+	                <tr class="empty"><td colspan="8">No tool call selected.</td></tr>
+	              </tbody>
+	            </table>
+	          </div>
+	        </section>
+
+	        <details class="subview raw-conversation-records">
+	          <summary>Raw turn records</summary>
+	          <div class="table-wrap">
+	            <table class="data-table" id="conversation-turns-table">
+	              <thead>
+	                <tr>
+	                  <th>Time</th>
+	                  <th>User</th>
+	                  <th>Conversation</th>
+	                  <th>Turn</th>
+	                  <th>Trace</th>
+	                  <th>Mode</th>
+	                  <th>Model</th>
+	                  <th>Result</th>
+	                  <th>Stop</th>
+	                  <th>Tools</th>
+	                  <th>Prompt tok</th>
+	                  <th>Completion tok</th>
+	                  <th>Total tok</th>
+	                  <th>Reasoning tok</th>
+	                  <th>Cost</th>
+	                  <th>Latency</th>
+	                  <th>Status</th>
+	                </tr>
+	              </thead>
+	              <tbody data-body>
+	                <tr class="empty"><td colspan="17">Select a conversation row.</td></tr>
+	              </tbody>
+	            </table>
+	          </div>
+	        </details>
+
+	        <details class="subview raw-conversation-records">
+	          <summary>Raw provider calls</summary>
+	          <div class="table-wrap">
+	            <table class="data-table" id="conversation-provider-calls-table">
+	              <thead>
+	                <tr>
+	                  <th>Time</th>
+	                  <th>Provider</th>
+	                  <th>Requested</th>
+	                  <th>Served</th>
+	                  <th>Generation</th>
+	                  <th>Trace</th>
+	                  <th>Turn</th>
+	                  <th>Prompt tok</th>
+	                  <th>Completion tok</th>
+	                  <th>Total tok</th>
+	                  <th>Reasoning tok</th>
+	                  <th>Cost</th>
+	                  <th>Source</th>
+	                  <th>Latency</th>
+	                  <th>Status</th>
+	                  <th>Error</th>
+	                </tr>
+	              </thead>
+	              <tbody data-body>
+	                <tr class="empty"><td colspan="16">Select a conversation row.</td></tr>
+	              </tbody>
+	            </table>
+	          </div>
+	        </details>
+	      </section>
+
+      <!-- ============== AGENT TURNS ============== -->
+      <section
+        id="view-agent-turns"
+        class="view"
+        role="tabpanel"
+        aria-labelledby="tab-agent-turns"
+        hidden
+      >
+        <header class="view-header">
+          <h2>Agent turns</h2>
+          <form class="filters" id="agent-turns-filters" autocomplete="off">
+            <label class="field"><span>User ID</span><input id="agent-turns-user" name="userId" type="text" spellcheck="false" placeholder="optional"></label>
+            <label class="field"><span>Conversation ID</span><input id="agent-turns-conversation" name="conversationId" type="text" spellcheck="false" placeholder="optional"></label>
+            <label class="field"><span>Trace ID</span><input id="agent-turns-trace" name="traceId" type="text" spellcheck="false" placeholder="optional"></label>
+            <label class="field"><span>Turn ID</span><input id="agent-turns-turn" name="turnId" type="text" spellcheck="false" placeholder="optional"></label>
+            <label class="field field-narrow"><span>Limit</span><input id="agent-turns-limit" name="limit" type="number" min="1" max="500" value="100"></label>
+            <div class="filters-actions">
+              <button type="submit" class="btn btn-primary">Apply</button>
+              <button type="button" class="btn btn-ghost" data-reset="agent-turns-filters">Reset</button>
+            </div>
+          </form>
+        </header>
+
+        <div class="table-wrap">
+          <table class="data-table" id="agent-turns-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>User</th>
+                <th>Conversation</th>
+                <th>Turn</th>
+                <th>Trace</th>
+                <th>Mode</th>
+                <th>Model</th>
+                <th>Result</th>
+                <th>Stop</th>
+                <th>Tools</th>
+                <th>Prompt tok</th>
+                <th>Completion tok</th>
+                <th>Total tok</th>
+                <th>Reasoning tok</th>
+                <th>Cost</th>
+                <th>Latency</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody data-body>
+              <tr class="empty"><td colspan="17">No data loaded yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============== ACTION CALLS ============== -->
+      <section
+        id="view-action-calls"
+        class="view"
+        role="tabpanel"
+        aria-labelledby="tab-action-calls"
+        hidden
+      >
+        <header class="view-header">
+          <h2>Action calls</h2>
+          <form class="filters" id="action-calls-filters" autocomplete="off">
+            <label class="field"><span>User ID</span><input id="action-calls-user" name="userId" type="text" spellcheck="false" placeholder="optional"></label>
+            <label class="field"><span>Trace ID</span><input id="action-calls-trace" name="traceId" type="text" spellcheck="false" placeholder="optional"></label>
+            <label class="field"><span>Action ID</span><input id="action-calls-action" name="actionId" type="text" spellcheck="false" placeholder="optional"></label>
+            <label class="field field-narrow"><span>Limit</span><input id="action-calls-limit" name="limit" type="number" min="1" max="500" value="100"></label>
+            <div class="filters-actions">
+              <button type="submit" class="btn btn-primary">Apply</button>
+              <button type="button" class="btn btn-ghost" data-reset="action-calls-filters">Reset</button>
+            </div>
+          </form>
+        </header>
+
+        <div class="table-wrap">
+          <table class="data-table" id="action-calls-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Action</th>
+                <th>Source</th>
+                <th>User</th>
+                <th>Trace</th>
+                <th>Latency</th>
+                <th>Confirm</th>
+                <th>Input</th>
+                <th>Output</th>
+                <th>Error</th>
+              </tr>
+            </thead>
+            <tbody data-body>
+              <tr class="empty"><td colspan="10">No data loaded yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============== LLM COST ============== -->
+      <section
+        id="view-llm-cost"
+        class="view"
+        role="tabpanel"
+        aria-labelledby="tab-llm-cost"
+        hidden
+      >
+        <header class="view-header">
+          <h2>LLM cost</h2>
+          <form class="filters" id="llm-cost-filters" autocomplete="off">
+            <label class="field"><span>From</span><input type="datetime-local" id="llm-cost-from" name="from"></label>
+            <label class="field"><span>To</span><input type="datetime-local" id="llm-cost-to" name="to"></label>
+            <label class="field"><span>User ID</span><input id="llm-cost-user" name="userId" type="text" spellcheck="false" placeholder="optional"></label>
+            <label class="field"><span>Conversation ID</span><input id="llm-cost-conversation" name="conversationId" type="text" spellcheck="false" placeholder="optional"></label>
+            <label class="field"><span>Trace ID</span><input id="llm-cost-trace" name="traceId" type="text" spellcheck="false" placeholder="optional"></label>
+            <div class="filters-actions">
+              <button type="submit" class="btn btn-primary">Apply</button>
+              <button type="button" class="btn btn-ghost" data-reset="llm-cost-filters">Reset</button>
+            </div>
+          </form>
+        </header>
+
+        <div class="cards" id="llm-cost-cards">
+          <article class="card" data-cost-card="total"><h3>Total cost</h3><p class="card-value" data-value>—</p><p class="card-foot" data-foot>provider + estimated</p></article>
+          <article class="card" data-cost-card="provider"><h3>Provider cost</h3><p class="card-value" data-value>—</p><p class="card-foot" data-foot>reported by provider</p></article>
+          <article class="card" data-cost-card="estimated"><h3>Estimated cost</h3><p class="card-value" data-value>—</p><p class="card-foot" data-foot>pricing fallback</p></article>
+          <article class="card" data-cost-card="unknown"><h3>Unknown cost</h3><p class="card-value" data-value>—</p><p class="card-foot" data-foot>unpriced calls</p></article>
+          <article class="card" data-cost-card="tokens"><h3>Tokens</h3><p class="card-value" data-value>—</p><p class="card-foot" data-foot>total tokens</p></article>
+        </div>
+
+        <div class="table-wrap">
+          <table class="data-table" id="llm-cost-table">
+            <thead>
+              <tr>
+                <th>Group</th>
+                <th>Key</th>
+                <th>Provider</th>
+                <th>Estimated</th>
+                <th>Total</th>
+                <th>Unknown</th>
+                <th>Tokens</th>
+                <th>Calls</th>
+              </tr>
+            </thead>
+            <tbody data-body>
+              <tr class="empty"><td colspan="8">No data loaded yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============== PROVIDER CALLS ============== -->
+      <section
+        id="view-provider-calls"
+        class="view"
+        role="tabpanel"
+        aria-labelledby="tab-provider-calls"
+        hidden
+      >
+        <header class="view-header">
+          <h2>Provider calls</h2>
+          <form class="filters" id="provider-calls-filters" autocomplete="off">
+            <label class="field"><span>User ID</span><input id="provider-calls-user" name="userId" type="text" spellcheck="false" placeholder="optional"></label>
+            <label class="field"><span>Conversation ID</span><input id="provider-calls-conversation" name="conversationId" type="text" spellcheck="false" placeholder="optional"></label>
+            <label class="field"><span>Trace ID</span><input id="provider-calls-trace" name="traceId" type="text" spellcheck="false" placeholder="optional"></label>
+            <label class="field"><span>Provider</span><input id="provider-calls-provider" name="provider" type="text" spellcheck="false" placeholder="optional"></label>
+            <label class="field"><span>Model</span><input id="provider-calls-model" name="model" type="text" spellcheck="false" placeholder="optional"></label>
+            <label class="field field-narrow"><span>Limit</span><input id="provider-calls-limit" name="limit" type="number" min="1" max="500" value="100"></label>
+            <div class="filters-actions">
+              <button type="submit" class="btn btn-primary">Apply</button>
+              <button type="button" class="btn btn-ghost" data-reset="provider-calls-filters">Reset</button>
+            </div>
+          </form>
+        </header>
+
+        <div class="table-wrap">
+          <table class="data-table" id="provider-calls-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Provider</th>
+                <th>Requested</th>
+                <th>Served</th>
+                <th>Generation</th>
+                <th>Trace</th>
+                <th>Turn</th>
+                <th>Prompt tok</th>
+                <th>Completion tok</th>
+                <th>Total tok</th>
+                <th>Reasoning tok</th>
+                <th>Cost</th>
+                <th>Source</th>
+                <th>Latency</th>
+                <th>Status</th>
+                <th>Error</th>
+              </tr>
+            </thead>
+            <tbody data-body>
+              <tr class="empty"><td colspan="16">No data loaded yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============== TRANSCRIPTIONS ============== -->
+      <section
+        id="view-transcriptions"
+        class="view"
+        role="tabpanel"
+        aria-labelledby="tab-transcriptions"
+        hidden
+      >
+        <header class="view-header">
+          <h2>Transcriptions</h2>
+          <form class="filters" id="transcriptions-filters" autocomplete="off">
+            <label class="field"><span>User ID</span><input id="transcriptions-user" name="userId" type="text" spellcheck="false" placeholder="optional"></label>
+            <label class="field"><span>Conversation ID</span><input id="transcriptions-conversation" name="conversationId" type="text" spellcheck="false" placeholder="optional"></label>
+            <label class="field"><span>Trace ID</span><input id="transcriptions-trace" name="traceId" type="text" spellcheck="false" placeholder="optional"></label>
+            <label class="field">
+              <span>Surface</span>
+              <select id="transcriptions-surface" name="surface">
+                <option value="">any</option>
+                <option value="stt">stt</option>
+                <option value="voice_meal">voice_meal</option>
+                <option value="agent_chat_audio">agent_chat_audio</option>
+              </select>
+            </label>
+            <label class="field field-narrow"><span>Limit</span><input id="transcriptions-limit" name="limit" type="number" min="1" max="500" value="100"></label>
+            <div class="filters-actions">
+              <button type="submit" class="btn btn-primary">Apply</button>
+              <button type="button" class="btn btn-ghost" data-reset="transcriptions-filters">Reset</button>
+            </div>
+          </form>
+        </header>
+
+        <div class="table-wrap">
+          <table class="data-table" id="transcriptions-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Surface</th>
+                <th>User</th>
+                <th>Conversation</th>
+                <th>Trace</th>
+                <th>Provider</th>
+                <th>Model</th>
+                <th>Audio</th>
+                <th>Length</th>
+                <th>Duration</th>
+                <th>Status</th>
+                <th>Transcript</th>
+                <th>Error</th>
+              </tr>
+            </thead>
+            <tbody data-body>
+              <tr class="empty"><td colspan="13">No data loaded yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <!-- ============== FOOD SEARCH ============== -->
       <section
         id="view-food"
@@ -525,6 +1078,126 @@
               </thead>
               <tbody data-body>
                 <tr class="empty"><td colspan="7">No trace loaded yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="subview">
+          <h3>Conversation messages</h3>
+          <div class="table-wrap">
+            <table class="data-table" id="trace-messages-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Conversation</th>
+                  <th>Turn</th>
+	                  <th>Role</th>
+	                  <th>Mode</th>
+	                  <th>Source</th>
+	                  <th>Content</th>
+	                </tr>
+	              </thead>
+	              <tbody data-body>
+	                <tr class="empty"><td colspan="7">No trace loaded yet.</td></tr>
+	              </tbody>
+	            </table>
+	          </div>
+	        </section>
+
+        <section class="subview">
+          <h3>Agent turns</h3>
+          <div class="table-wrap">
+            <table class="data-table" id="trace-agent-turns-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Conversation</th>
+                  <th>Turn</th>
+                  <th>Mode</th>
+                  <th>Result</th>
+                  <th>Tools</th>
+                  <th>Prompt tok</th>
+                  <th>Completion tok</th>
+                  <th>Total tok</th>
+                  <th>Reasoning tok</th>
+                  <th>Cost</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody data-body>
+                <tr class="empty"><td colspan="12">No trace loaded yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="subview">
+          <h3>Tool and action calls</h3>
+          <div class="table-wrap">
+            <table class="data-table" id="trace-tool-action-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Kind</th>
+                  <th>Action</th>
+                  <th>Turn</th>
+                  <th>Status</th>
+                  <th>Latency</th>
+                  <th>Payload</th>
+                </tr>
+              </thead>
+              <tbody data-body>
+                <tr class="empty"><td colspan="7">No trace loaded yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="subview">
+          <h3>Provider calls</h3>
+          <div class="table-wrap">
+            <table class="data-table" id="trace-provider-calls-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Provider</th>
+                  <th>Model</th>
+                  <th>Generation</th>
+                  <th>Turn</th>
+                  <th>Prompt tok</th>
+                  <th>Completion tok</th>
+                  <th>Total tok</th>
+                  <th>Reasoning tok</th>
+                  <th>Cost</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody data-body>
+                <tr class="empty"><td colspan="11">No trace loaded yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="subview">
+          <h3>Transcriptions</h3>
+          <div class="table-wrap">
+            <table class="data-table" id="trace-transcriptions-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Surface</th>
+                  <th>Provider</th>
+                  <th>Conversation</th>
+                  <th>Turn</th>
+                  <th>Length</th>
+                  <th>Status</th>
+                  <th>Transcript</th>
+                </tr>
+              </thead>
+              <tbody data-body>
+                <tr class="empty"><td colspan="8">No trace loaded yet.</td></tr>
               </tbody>
             </table>
           </div>

@@ -58,14 +58,15 @@ export const agentRunRequestSchema = z.object({
   activeProposalId: uuidSchema.optional(),
 });
 
-export const agentChatRequestSchema = z.object({
-  message: z.string().trim().min(1),
-  source: z
-    .enum(["flutter", "ios_appintents", "android_appfunctions"])
-    .default("flutter"),
-  conversationId: uuidSchema.optional(),
-  activeProposalId: uuidSchema.optional(),
-});
+export const agentChatRequestSchema = z
+  .object({
+    message: z.string().trim().min(1),
+    source: z
+      .enum(["flutter", "ios_appintents", "android_appfunctions"])
+      .default("flutter"),
+    conversationId: uuidSchema.optional(),
+    activeProposalId: uuidSchema.optional(),
+  });
 
 export const agentConversationSummarySchema = z.object({
   id: uuidSchema,
@@ -481,6 +482,11 @@ export const llmRunSummarySchema = z.object({
   source: z.string().nullable().optional(),
   locale: z.string().nullable().optional(),
   timezone: z.string().nullable().optional(),
+  conversationId: uuidSchema.nullable().optional(),
+  turnId: uuidSchema.nullable().optional(),
+  provider: z.string().nullable().optional(),
+  providerRequestId: z.string().nullable().optional(),
+  providerGenerationId: z.string().nullable().optional(),
   model: z.string(),
   inputMode: z.string().nullable().optional(),
   activeProposalId: uuidSchema.nullable().optional(),
@@ -506,6 +512,11 @@ export const llmRunSummarySchema = z.object({
   emptyToolCall: z.boolean(),
   invalidToolArguments: z.boolean(),
   providerError: z.boolean(),
+  providerCostAmount: z.number().nullable().optional(),
+  estimatedCostAmount: z.number().nullable().optional(),
+  costCurrency: z.string().nullable().optional(),
+  costSource: z.string().nullable().optional(),
+  pricingSnapshot: z.record(z.unknown()).optional(),
   metadata: z.record(z.unknown()),
   createdAt: isoDateTimeSchema
 });
@@ -539,11 +550,206 @@ export const telemetryEventsResponseSchema = z.object({
   events: z.array(telemetryEventSummarySchema)
 });
 
+export const adminAgentTurnSummarySchema = z.object({
+  id: uuidSchema,
+  conversationId: uuidSchema.nullable().optional(),
+  traceId: z.string(),
+  turnId: uuidSchema,
+  userId: uuidSchema.nullable().optional(),
+  inputMode: z.string().nullable().optional(),
+  source: z.string().nullable().optional(),
+  activeProposalId: uuidSchema.nullable().optional(),
+  model: z.string().nullable().optional(),
+  inputText: z.string().nullable().optional(),
+  assistantText: z.string().nullable().optional(),
+  resultKind: z.string().nullable().optional(),
+  stopReason: z.string().nullable().optional(),
+  iterationCount: z.number().int(),
+  toolCallCount: z.number().int(),
+  promptTokens: z.number().int().nullable().optional(),
+  completionTokens: z.number().int().nullable().optional(),
+  totalTokens: z.number().int().nullable().optional(),
+  reasoningTokens: z.number().int().nullable().optional(),
+  providerCostAmount: z.number().nullable().optional(),
+  estimatedCostAmount: z.number().nullable().optional(),
+  costCurrency: z.string().nullable().optional(),
+  costSource: z.string().nullable().optional(),
+  firstByteMs: z.number().int().nullable().optional(),
+  firstToolCallMs: z.number().int().nullable().optional(),
+  largestStreamGapMs: z.number().int().nullable().optional(),
+  llmMs: z.number().int().nullable().optional(),
+  actionMs: z.number().int().nullable().optional(),
+  totalMs: z.number().int().nullable().optional(),
+  status: z.string(),
+  errorCode: z.string().nullable().optional(),
+  errorMessage: z.string().nullable().optional(),
+  metadata: z.record(z.unknown()),
+  completedAt: isoDateTimeSchema.nullable().optional(),
+  createdAt: isoDateTimeSchema
+});
+
+export const adminAgentToolCallSummarySchema = z.object({
+  id: uuidSchema,
+  agentTurnId: uuidSchema.nullable().optional(),
+  conversationId: uuidSchema.nullable().optional(),
+  traceId: z.string(),
+  turnId: uuidSchema.nullable().optional(),
+  userId: uuidSchema.nullable().optional(),
+  toolCallId: z.string().nullable().optional(),
+  actionCallId: uuidSchema.nullable().optional(),
+  actionId: z.string(),
+  arguments: z.unknown().optional(),
+  resultSummary: z.unknown().optional(),
+  status: z.string(),
+  errorMessage: z.string().nullable().optional(),
+  startedAt: isoDateTimeSchema,
+  completedAt: isoDateTimeSchema.nullable().optional(),
+  durationMs: z.number().int().nullable().optional(),
+  metadata: z.record(z.unknown()),
+  createdAt: isoDateTimeSchema
+});
+
+export const adminActionCallSummarySchema = z.object({
+  id: uuidSchema,
+  userId: uuidSchema,
+  actionId: z.string(),
+  source: z.string(),
+  input: z.unknown(),
+  output: z.unknown().optional(),
+  error: z.unknown().optional(),
+  confirmationStatus: z.string(),
+  traceId: z.string(),
+  latencyMs: z.number().int(),
+  createdAt: isoDateTimeSchema
+});
+
+export const adminLlmProviderCallSummarySchema = z.object({
+  id: uuidSchema,
+  traceId: z.string(),
+  userId: uuidSchema.nullable().optional(),
+  conversationId: uuidSchema.nullable().optional(),
+  agentTurnId: uuidSchema.nullable().optional(),
+  turnId: uuidSchema.nullable().optional(),
+  actionCallId: uuidSchema.nullable().optional(),
+  featureSurface: z.string(),
+  provider: z.string(),
+  providerRequestId: z.string().nullable().optional(),
+  providerGenerationId: z.string().nullable().optional(),
+  requestedModel: z.string(),
+  servedModel: z.string().nullable().optional(),
+  routing: z.unknown().optional(),
+  inputMode: z.string().nullable().optional(),
+  promptTokens: z.number().int().nullable().optional(),
+  completionTokens: z.number().int().nullable().optional(),
+  totalTokens: z.number().int().nullable().optional(),
+  reasoningTokens: z.number().int().nullable().optional(),
+  providerCostAmount: z.number().nullable().optional(),
+  estimatedCostAmount: z.number().nullable().optional(),
+  costCurrency: z.string().nullable().optional(),
+  costSource: z.string(),
+  pricingSource: z.string().nullable().optional(),
+  pricingVersion: z.string().nullable().optional(),
+  status: z.string(),
+  errorCode: z.string().nullable().optional(),
+  errorMessage: z.string().nullable().optional(),
+  durationMs: z.number().int().nullable().optional(),
+  metadata: z.record(z.unknown()),
+  createdAt: isoDateTimeSchema
+});
+
+export const adminTranscriptionSummarySchema = z.object({
+  id: uuidSchema,
+  traceId: z.string(),
+  userId: uuidSchema.nullable().optional(),
+  conversationId: uuidSchema.nullable().optional(),
+  turnId: uuidSchema.nullable().optional(),
+  surface: z.string(),
+  provider: z.string().nullable().optional(),
+  model: z.string().nullable().optional(),
+  language: z.string().nullable().optional(),
+  audioMimeType: z.string().nullable().optional(),
+  audioBytes: z.number().int().nullable().optional(),
+  audioDurationMs: z.number().int().nullable().optional(),
+  transcriptText: z.string().nullable().optional(),
+  transcriptLength: z.number().int(),
+  durationMs: z.number().int().nullable().optional(),
+  status: z.string(),
+  errorCode: z.string().nullable().optional(),
+  errorMessage: z.string().nullable().optional(),
+  downstreamResultKind: z.string().nullable().optional(),
+  metadata: z.record(z.unknown()),
+  createdAt: isoDateTimeSchema
+});
+
+export const adminAgentConversationsResponseSchema = z.object({
+  conversations: z.array(agentConversationSummarySchema)
+});
+
+export const adminAgentConversationDetailResponseSchema = z.object({
+  conversation: agentConversationSummarySchema,
+  messages: z.array(agentConversationMessageSchema)
+});
+
+export const adminActionCallsResponseSchema = z.object({
+  actionCalls: z.array(adminActionCallSummarySchema)
+});
+
+export const adminAgentTurnsResponseSchema = z.object({
+  agentTurns: z.array(adminAgentTurnSummarySchema)
+});
+
+export const adminAgentToolCallsResponseSchema = z.object({
+  agentToolCalls: z.array(adminAgentToolCallSummarySchema)
+});
+
+export const adminLlmProviderCallsResponseSchema = z.object({
+  providerCalls: z.array(adminLlmProviderCallSummarySchema)
+});
+
+export const adminTranscriptionsResponseSchema = z.object({
+  transcriptions: z.array(adminTranscriptionSummarySchema)
+});
+
+export const adminLlmCostBreakdownSchema = z.object({
+  key: z.string(),
+  providerCostAmount: z.number(),
+  estimatedCostAmount: z.number(),
+  totalCostAmount: z.number(),
+  unknownCostCount: z.number().int(),
+  totalTokens: z.number().int(),
+  callCount: z.number().int()
+});
+
+export const adminLlmCostResponseSchema = z.object({
+  from: isoDateTimeSchema,
+  to: isoDateTimeSchema,
+  totalProviderCostAmount: z.number(),
+  totalEstimatedCostAmount: z.number(),
+  totalCostAmount: z.number(),
+  unknownCostCount: z.number().int(),
+  totalPromptTokens: z.number().int(),
+  totalCompletionTokens: z.number().int(),
+  totalTokens: z.number().int(),
+  byUser: z.array(adminLlmCostBreakdownSchema),
+  byConversation: z.array(adminLlmCostBreakdownSchema),
+  byTurn: z.array(adminLlmCostBreakdownSchema),
+  byModel: z.array(adminLlmCostBreakdownSchema),
+  byProvider: z.array(adminLlmCostBreakdownSchema),
+  byFeature: z.array(adminLlmCostBreakdownSchema),
+  byDay: z.array(adminLlmCostBreakdownSchema)
+});
+
 export const telemetryTraceResponseSchema = z.object({
   traceId: z.string(),
   events: z.array(telemetryEventSummarySchema),
   llmRuns: z.array(llmRunSummarySchema),
-  foodSearchEvents: z.array(foodSearchEventSummarySchema)
+  foodSearchEvents: z.array(foodSearchEventSummarySchema),
+  conversationMessages: z.array(agentConversationMessageSchema).optional(),
+  agentTurns: z.array(adminAgentTurnSummarySchema).optional(),
+  agentToolCalls: z.array(adminAgentToolCallSummarySchema).optional(),
+  actionCalls: z.array(adminActionCallSummarySchema).optional(),
+  providerCalls: z.array(adminLlmProviderCallSummarySchema).optional(),
+  transcriptions: z.array(adminTranscriptionSummarySchema).optional()
 });
 
 export const telemetryOverviewResponseSchema = z.object({
@@ -552,6 +758,13 @@ export const telemetryOverviewResponseSchema = z.object({
   totalEvents: z.number().int().nonnegative(),
   totalLlmRuns: z.number().int().nonnegative(),
   totalFoodSearchEvents: z.number().int().nonnegative(),
+  totalConversations: z.number().int().nonnegative(),
+  totalAgentTurns: z.number().int().nonnegative(),
+  totalProviderCalls: z.number().int().nonnegative(),
+  totalTranscriptions: z.number().int().nonnegative(),
+  providerCostAmount: z.number(),
+  estimatedCostAmount: z.number(),
+  unknownCostCount: z.number().int().nonnegative(),
   uniqueUsers: z.number().int().nonnegative(),
   uniqueTraces: z.number().int().nonnegative(),
   eventsBySeverity: z.record(z.number().int().nonnegative()),
@@ -588,8 +801,73 @@ export const telemetryLlmRunsQuerySchema = z.object({
   executedTool: z.string().trim().max(80).optional(),
   traceId: z.string().trim().max(120).optional(),
   userId: uuidSchema.optional(),
+  conversationId: uuidSchema.optional(),
+  turnId: uuidSchema.optional(),
   from: z.string().datetime().optional(),
   to: z.string().datetime().optional()
+});
+
+export const adminIncludeHiddenSchema = z
+  .union([z.literal("true"), z.literal("false")])
+  .transform((value) => value === "true")
+  .optional();
+
+export const adminTelemetryBaseQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(500).optional(),
+  userId: uuidSchema.optional(),
+  conversationId: uuidSchema.optional(),
+  traceId: z.string().trim().max(120).optional(),
+  turnId: uuidSchema.optional(),
+  from: z.string().datetime().optional(),
+  to: z.string().datetime().optional()
+});
+
+export const adminTelemetryConversationsQuerySchema =
+  adminTelemetryBaseQuerySchema.extend({
+    includeHidden: adminIncludeHiddenSchema
+  });
+
+export const adminTelemetryActionCallsQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(500).optional(),
+  userId: uuidSchema.optional(),
+  traceId: z.string().trim().max(120).optional(),
+  actionId: z.string().trim().max(120).optional(),
+  from: z.string().datetime().optional(),
+  to: z.string().datetime().optional()
+});
+
+export const adminTelemetryAgentTurnsQuerySchema =
+  adminTelemetryBaseQuerySchema.extend({
+    inputMode: z.string().trim().max(40).optional(),
+    status: z.string().trim().max(40).optional()
+  });
+
+export const adminTelemetryAgentToolCallsQuerySchema =
+  adminTelemetryBaseQuerySchema.extend({
+    actionId: z.string().trim().max(120).optional(),
+    status: z.string().trim().max(40).optional()
+  });
+
+export const adminTelemetryProviderCallsQuerySchema =
+  adminTelemetryBaseQuerySchema.extend({
+    provider: z.string().trim().max(120).optional(),
+    model: z.string().trim().max(160).optional(),
+    status: z.string().trim().max(40).optional(),
+    costSource: z.string().trim().max(40).optional()
+  });
+
+export const adminTelemetryTranscriptionsQuerySchema =
+  adminTelemetryBaseQuerySchema.extend({
+    surface: z.string().trim().max(80).optional(),
+    status: z.string().trim().max(40).optional()
+  });
+
+export const adminTelemetryCostQuerySchema = z.object({
+  from: z.string().datetime().optional(),
+  to: z.string().datetime().optional(),
+  userId: uuidSchema.optional(),
+  conversationId: uuidSchema.optional(),
+  traceId: z.string().trim().max(120).optional()
 });
 
 export const telemetryFoodSearchQuerySchema = z.object({
@@ -629,3 +907,17 @@ export type TelemetryLlmRunsResponse = z.infer<typeof telemetryLlmRunsResponseSc
 export type TelemetryFoodSearchResponse = z.infer<typeof telemetryFoodSearchResponseSchema>;
 export type LlmRunSummary = z.infer<typeof llmRunSummarySchema>;
 export type FoodSearchEventSummary = z.infer<typeof foodSearchEventSummarySchema>;
+export type AdminAgentTurnSummary = z.infer<typeof adminAgentTurnSummarySchema>;
+export type AdminAgentToolCallSummary = z.infer<typeof adminAgentToolCallSummarySchema>;
+export type AdminActionCallSummary = z.infer<typeof adminActionCallSummarySchema>;
+export type AdminLlmProviderCallSummary = z.infer<typeof adminLlmProviderCallSummarySchema>;
+export type AdminTranscriptionSummary = z.infer<typeof adminTranscriptionSummarySchema>;
+export type AdminAgentConversationsResponse = z.infer<typeof adminAgentConversationsResponseSchema>;
+export type AdminAgentConversationDetailResponse = z.infer<typeof adminAgentConversationDetailResponseSchema>;
+export type AdminActionCallsResponse = z.infer<typeof adminActionCallsResponseSchema>;
+export type AdminAgentTurnsResponse = z.infer<typeof adminAgentTurnsResponseSchema>;
+export type AdminAgentToolCallsResponse = z.infer<typeof adminAgentToolCallsResponseSchema>;
+export type AdminLlmProviderCallsResponse = z.infer<typeof adminLlmProviderCallsResponseSchema>;
+export type AdminTranscriptionsResponse = z.infer<typeof adminTranscriptionsResponseSchema>;
+export type AdminLlmCostResponse = z.infer<typeof adminLlmCostResponseSchema>;
+export type AdminLlmCostBreakdown = z.infer<typeof adminLlmCostBreakdownSchema>;

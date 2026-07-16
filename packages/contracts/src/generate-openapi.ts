@@ -3,7 +3,15 @@ import { dirname, resolve } from "node:path";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import {
   actionDefinitions,
+  adminActionCallsResponseSchema,
+  adminAgentConversationDetailResponseSchema,
+  adminAgentConversationsResponseSchema,
+  adminAgentToolCallsResponseSchema,
+  adminAgentTurnsResponseSchema,
   adminLoginRequestSchema,
+  adminLlmCostResponseSchema,
+  adminLlmProviderCallsResponseSchema,
+  adminTranscriptionsResponseSchema,
   adminTokenResponseSchema,
   agentConversationDetailResponseSchema,
   agentConversationsResponseSchema,
@@ -162,6 +170,14 @@ const spec = {
       TelemetryOverviewResponse: schema("TelemetryOverviewResponse", telemetryOverviewResponseSchema),
       TelemetryLlmRunsResponse: schema("TelemetryLlmRunsResponse", telemetryLlmRunsResponseSchema),
       TelemetryFoodSearchResponse: schema("TelemetryFoodSearchResponse", telemetryFoodSearchResponseSchema),
+      AdminAgentConversationsResponse: schema("AdminAgentConversationsResponse", adminAgentConversationsResponseSchema),
+      AdminAgentConversationDetailResponse: schema("AdminAgentConversationDetailResponse", adminAgentConversationDetailResponseSchema),
+      AdminActionCallsResponse: schema("AdminActionCallsResponse", adminActionCallsResponseSchema),
+      AdminAgentTurnsResponse: schema("AdminAgentTurnsResponse", adminAgentTurnsResponseSchema),
+      AdminAgentToolCallsResponse: schema("AdminAgentToolCallsResponse", adminAgentToolCallsResponseSchema),
+      AdminLlmProviderCallsResponse: schema("AdminLlmProviderCallsResponse", adminLlmProviderCallsResponseSchema),
+      AdminLlmCostResponse: schema("AdminLlmCostResponse", adminLlmCostResponseSchema),
+      AdminTranscriptionsResponse: schema("AdminTranscriptionsResponse", adminTranscriptionsResponseSchema),
       ...actionSchemas
     }
   },
@@ -514,12 +530,137 @@ const spec = {
         security: [{ bearerAuth: [] }],
         parameters: [
           ...telemetryCommonQueryParameters,
+          queryParameter("conversationId", { type: "string", format: "uuid" }),
+          queryParameter("turnId", { type: "string", format: "uuid" }),
           queryParameter("resultKind", { type: "string", maxLength: 80 }),
           queryParameter("selectedTool", { type: "string", maxLength: 80 }),
           queryParameter("executedTool", { type: "string", maxLength: 80 })
         ],
         responses: {
           "200": jsonResponse("LLM telemetry runs", "#/components/schemas/TelemetryLlmRunsResponse")
+        }
+      }
+    },
+    "/v1/admin/telemetry/conversations": {
+      get: {
+        operationId: "listAdminTelemetryConversations",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          ...telemetryCommonQueryParameters,
+          queryParameter("conversationId", { type: "string", format: "uuid" }),
+          queryParameter("turnId", { type: "string", format: "uuid" }),
+          queryParameter("includeHidden", { type: "string", enum: ["true", "false"] })
+        ],
+        responses: {
+          "200": jsonResponse("Admin agent conversations", "#/components/schemas/AdminAgentConversationsResponse")
+        }
+      }
+    },
+    "/v1/admin/telemetry/conversations/{conversationId}": {
+      get: {
+        operationId: "getAdminTelemetryConversation",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "conversationId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          queryParameter("includeHidden", { type: "string", enum: ["true", "false"] })
+        ],
+        responses: {
+          "200": jsonResponse("Admin agent conversation detail", "#/components/schemas/AdminAgentConversationDetailResponse")
+        }
+      }
+    },
+    "/v1/admin/telemetry/action-calls": {
+      get: {
+        operationId: "listAdminTelemetryActionCalls",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          ...telemetryCommonQueryParameters,
+          queryParameter("actionId", { type: "string", maxLength: 120 })
+        ],
+        responses: {
+          "200": jsonResponse("Admin action calls", "#/components/schemas/AdminActionCallsResponse")
+        }
+      }
+    },
+    "/v1/admin/telemetry/agent-turns": {
+      get: {
+        operationId: "listAdminTelemetryAgentTurns",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          ...telemetryCommonQueryParameters,
+          queryParameter("conversationId", { type: "string", format: "uuid" }),
+          queryParameter("turnId", { type: "string", format: "uuid" }),
+          queryParameter("inputMode", { type: "string", maxLength: 40 }),
+          queryParameter("status", { type: "string", maxLength: 40 })
+        ],
+        responses: {
+          "200": jsonResponse("Admin agent turns", "#/components/schemas/AdminAgentTurnsResponse")
+        }
+      }
+    },
+    "/v1/admin/telemetry/agent-tool-calls": {
+      get: {
+        operationId: "listAdminTelemetryAgentToolCalls",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          ...telemetryCommonQueryParameters,
+          queryParameter("conversationId", { type: "string", format: "uuid" }),
+          queryParameter("turnId", { type: "string", format: "uuid" }),
+          queryParameter("actionId", { type: "string", maxLength: 120 }),
+          queryParameter("status", { type: "string", maxLength: 40 })
+        ],
+        responses: {
+          "200": jsonResponse("Admin agent tool calls", "#/components/schemas/AdminAgentToolCallsResponse")
+        }
+      }
+    },
+    "/v1/admin/telemetry/llm-provider-calls": {
+      get: {
+        operationId: "listAdminTelemetryLlmProviderCalls",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          ...telemetryCommonQueryParameters,
+          queryParameter("conversationId", { type: "string", format: "uuid" }),
+          queryParameter("turnId", { type: "string", format: "uuid" }),
+          queryParameter("provider", { type: "string", maxLength: 120 }),
+          queryParameter("model", { type: "string", maxLength: 160 }),
+          queryParameter("status", { type: "string", maxLength: 40 }),
+          queryParameter("costSource", { type: "string", maxLength: 40 })
+        ],
+        responses: {
+          "200": jsonResponse("Admin LLM provider calls", "#/components/schemas/AdminLlmProviderCallsResponse")
+        }
+      }
+    },
+    "/v1/admin/telemetry/llm-cost": {
+      get: {
+        operationId: "getAdminTelemetryLlmCost",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          queryParameter("from", { type: "string", format: "date-time" }),
+          queryParameter("to", { type: "string", format: "date-time" }),
+          queryParameter("userId", { type: "string", format: "uuid" }),
+          queryParameter("conversationId", { type: "string", format: "uuid" }),
+          queryParameter("traceId", { type: "string", maxLength: 120 })
+        ],
+        responses: {
+          "200": jsonResponse("Admin LLM cost overview", "#/components/schemas/AdminLlmCostResponse")
+        }
+      }
+    },
+    "/v1/admin/telemetry/transcriptions": {
+      get: {
+        operationId: "listAdminTelemetryTranscriptions",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          ...telemetryCommonQueryParameters,
+          queryParameter("conversationId", { type: "string", format: "uuid" }),
+          queryParameter("turnId", { type: "string", format: "uuid" }),
+          queryParameter("surface", { type: "string", maxLength: 80 }),
+          queryParameter("status", { type: "string", maxLength: 40 })
+        ],
+        responses: {
+          "200": jsonResponse("Admin transcriptions", "#/components/schemas/AdminTranscriptionsResponse")
         }
       }
     },

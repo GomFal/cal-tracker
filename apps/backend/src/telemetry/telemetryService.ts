@@ -16,6 +16,11 @@ export type LlmTelemetryEvent = {
   surface: "agent";
   traceId: string;
   userId?: string;
+  conversationId?: string;
+  turnId?: string;
+  provider?: string;
+  providerRequestId?: string;
+  providerGenerationId?: string;
   model: string;
   source?: string;
   locale?: string;
@@ -50,7 +55,136 @@ export type LlmTelemetryEvent = {
   emptyToolCall?: boolean;
   invalidToolArguments?: boolean;
   providerError?: boolean;
+  providerCostAmount?: number;
+  estimatedCostAmount?: number;
+  costCurrency?: string;
+  costSource?: string;
+  pricingSnapshot?: Record<string, unknown>;
   errorMessage?: string;
+  metadata?: Record<string, unknown>;
+};
+
+export type AgentTurnTelemetryEvent = {
+  traceId: string;
+  turnId: string;
+  userId?: string;
+  conversationId?: string;
+  inputMode?: "text" | "voice";
+  source?: string;
+  activeProposalId?: string;
+  model?: string;
+  inputText?: string;
+  assistantText?: string;
+  resultKind?: string;
+  stopReason?: string;
+  iterationCount: number;
+  toolCallCount: number;
+  promptChars?: number;
+  messagesJsonChars?: number;
+  toolsJsonChars?: number;
+  requestPayloadChars?: number;
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  reasoningTokens?: number;
+  providerCostAmount?: number;
+  estimatedCostAmount?: number;
+  costCurrency?: string;
+  costSource?: string;
+  pricingSnapshot?: Record<string, unknown>;
+  firstByteMs?: number;
+  firstToolCallMs?: number;
+  largestStreamGapMs?: number;
+  llmMs?: number;
+  actionMs?: number;
+  totalMs?: number;
+  status: "success" | "failure" | "partial";
+  errorCode?: string;
+  errorMessage?: string;
+  metadata?: Record<string, unknown>;
+  completedAt?: string;
+};
+
+export type AgentToolCallTelemetryEvent = {
+  agentTurnId?: string;
+  conversationId?: string;
+  traceId: string;
+  turnId?: string;
+  userId?: string;
+  toolCallId?: string;
+  actionCallId?: string;
+  actionId: string;
+  arguments?: unknown;
+  resultSummary?: unknown;
+  status: "started" | "completed" | "failed" | "skipped";
+  errorMessage?: string;
+  startedAt: string;
+  completedAt?: string;
+  durationMs?: number;
+  metadata?: Record<string, unknown>;
+};
+
+export type LlmProviderCallTelemetryEvent = {
+  traceId: string;
+  userId?: string;
+  conversationId?: string;
+  agentTurnId?: string;
+  turnId?: string;
+  actionCallId?: string;
+  featureSurface: string;
+  provider: string;
+  providerRequestId?: string;
+  providerGenerationId?: string;
+  requestedModel: string;
+  servedModel?: string;
+  routing?: unknown;
+  inputMode?: "text" | "voice";
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  reasoningTokens?: number;
+  cachedInputTokens?: number;
+  audioTokens?: number;
+  imageTokens?: number;
+  providerCostAmount?: number;
+  estimatedCostAmount?: number;
+  costCurrency?: string;
+  costSource: "provider" | "estimate" | "unknown";
+  inputTokenUnitPrice?: number;
+  outputTokenUnitPrice?: number;
+  reasoningTokenUnitPrice?: number;
+  cachedInputTokenUnitPrice?: number;
+  audioTokenUnitPrice?: number;
+  imageTokenUnitPrice?: number;
+  pricingSource?: string;
+  pricingVersion?: string;
+  pricingEffectiveAt?: string;
+  status: "success" | "failure";
+  errorCode?: string;
+  errorMessage?: string;
+  durationMs?: number;
+  metadata?: Record<string, unknown>;
+};
+
+export type TranscriptionTelemetryRecordEvent = {
+  traceId: string;
+  userId?: string;
+  conversationId?: string;
+  turnId?: string;
+  surface: "stt" | "voice_meal" | "agent_chat_audio";
+  provider?: string;
+  model?: string;
+  language?: string;
+  audioMimeType?: string;
+  audioBytes?: number;
+  audioDurationMs?: number;
+  transcriptText?: string;
+  transcriptLength: number;
+  durationMs?: number;
+  status: "started" | "completed" | "failed";
+  errorCode?: string;
+  errorMessage?: string;
+  downstreamResultKind?: string;
   metadata?: Record<string, unknown>;
 };
 
@@ -146,6 +280,10 @@ export type TelemetryEvent =
 export interface TelemetryService {
   readonly enabled: boolean;
   recordLlmRun(event: LlmTelemetryEvent): Promise<unknown>;
+  recordAgentTurn(event: AgentTurnTelemetryEvent): Promise<unknown>;
+  recordAgentToolCall(event: AgentToolCallTelemetryEvent): Promise<unknown>;
+  recordLlmProviderCall(event: LlmProviderCallTelemetryEvent): Promise<unknown>;
+  recordTranscriptionRecord(event: TranscriptionTelemetryRecordEvent): Promise<unknown>;
   recordSttEvent(event: SttTelemetryEvent): Promise<unknown>;
   recordVoiceMealRunEvent(event: VoiceMealRunTelemetryEvent): Promise<unknown>;
   recordFoodSearchEvent(event: FoodSearchTelemetryEvent): Promise<unknown>;
@@ -157,6 +295,10 @@ const NOOP_PROMISE = Promise.resolve();
 export class NoopTelemetryService implements TelemetryService {
   readonly enabled = false;
   async recordLlmRun(): Promise<void> { return NOOP_PROMISE; }
+  async recordAgentTurn(): Promise<void> { return NOOP_PROMISE; }
+  async recordAgentToolCall(): Promise<void> { return NOOP_PROMISE; }
+  async recordLlmProviderCall(): Promise<void> { return NOOP_PROMISE; }
+  async recordTranscriptionRecord(): Promise<void> { return NOOP_PROMISE; }
   async recordSttEvent(): Promise<void> { return NOOP_PROMISE; }
   async recordVoiceMealRunEvent(): Promise<void> { return NOOP_PROMISE; }
   async recordFoodSearchEvent(): Promise<void> { return NOOP_PROMISE; }
@@ -172,6 +314,22 @@ export class FireAndForgetTelemetryService implements TelemetryService {
 
   async recordLlmRun(event: LlmTelemetryEvent): Promise<void> {
     this.schedule("llm_run", () => this.sink.recordLlmRun(event));
+  }
+
+  async recordAgentTurn(event: AgentTurnTelemetryEvent): Promise<void> {
+    this.schedule("agent_turn", () => this.sink.recordAgentTurn(event));
+  }
+
+  async recordAgentToolCall(event: AgentToolCallTelemetryEvent): Promise<void> {
+    this.schedule("agent_tool_call", () => this.sink.recordAgentToolCall(event));
+  }
+
+  async recordLlmProviderCall(event: LlmProviderCallTelemetryEvent): Promise<void> {
+    this.schedule("llm_provider_call", () => this.sink.recordLlmProviderCall(event));
+  }
+
+  async recordTranscriptionRecord(event: TranscriptionTelemetryRecordEvent): Promise<void> {
+    this.schedule("transcription_record", () => this.sink.recordTranscriptionRecord(event));
   }
 
   async recordSttEvent(event: SttTelemetryEvent): Promise<void> {
@@ -212,6 +370,18 @@ export class ConsoleTelemetryService implements TelemetryService {
 
   async recordLlmRun(event: LlmTelemetryEvent): Promise<void> {
     this.safe(() => this.logger(`telemetry.llm_run ${JSON.stringify(stripUndefined(event))}`));
+  }
+  async recordAgentTurn(event: AgentTurnTelemetryEvent): Promise<void> {
+    this.safe(() => this.logger(`telemetry.agent_turn ${JSON.stringify(stripUndefined(event))}`));
+  }
+  async recordAgentToolCall(event: AgentToolCallTelemetryEvent): Promise<void> {
+    this.safe(() => this.logger(`telemetry.agent_tool_call ${JSON.stringify(stripUndefined(event))}`));
+  }
+  async recordLlmProviderCall(event: LlmProviderCallTelemetryEvent): Promise<void> {
+    this.safe(() => this.logger(`telemetry.llm_provider_call ${JSON.stringify(stripUndefined(event))}`));
+  }
+  async recordTranscriptionRecord(event: TranscriptionTelemetryRecordEvent): Promise<void> {
+    this.safe(() => this.logger(`telemetry.transcription_record ${JSON.stringify(stripUndefined(event))}`));
   }
   async recordSttEvent(event: SttTelemetryEvent): Promise<void> {
     this.safe(() => this.logger(`telemetry.stt ${JSON.stringify(stripUndefined(event))}`));
@@ -262,6 +432,18 @@ export class CompositeTelemetryService implements TelemetryService {
   }
   async recordLlmRun(event: LlmTelemetryEvent): Promise<void> {
     await Promise.all(this.services.map((s) => safeRecord(() => s.recordLlmRun(event))));
+  }
+  async recordAgentTurn(event: AgentTurnTelemetryEvent): Promise<void> {
+    await Promise.all(this.services.map((s) => safeRecord(() => s.recordAgentTurn(event))));
+  }
+  async recordAgentToolCall(event: AgentToolCallTelemetryEvent): Promise<void> {
+    await Promise.all(this.services.map((s) => safeRecord(() => s.recordAgentToolCall(event))));
+  }
+  async recordLlmProviderCall(event: LlmProviderCallTelemetryEvent): Promise<void> {
+    await Promise.all(this.services.map((s) => safeRecord(() => s.recordLlmProviderCall(event))));
+  }
+  async recordTranscriptionRecord(event: TranscriptionTelemetryRecordEvent): Promise<void> {
+    await Promise.all(this.services.map((s) => safeRecord(() => s.recordTranscriptionRecord(event))));
   }
   async recordSttEvent(event: SttTelemetryEvent): Promise<void> {
     await Promise.all(this.services.map((s) => safeRecord(() => s.recordSttEvent(event))));

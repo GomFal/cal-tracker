@@ -256,6 +256,11 @@ export type LlmRunRecord = {
   source?: string;
   locale?: string;
   timezone?: string;
+  conversationId?: string;
+  turnId?: string;
+  provider?: string;
+  providerRequestId?: string;
+  providerGenerationId?: string;
   model: string;
   inputMode?: string;
   activeProposalId?: string;
@@ -281,6 +286,11 @@ export type LlmRunRecord = {
   emptyToolCall: boolean;
   invalidToolArguments: boolean;
   providerError: boolean;
+  providerCostAmount?: number;
+  estimatedCostAmount?: number;
+  costCurrency?: string;
+  costSource?: string;
+  pricingSnapshot?: Record<string, unknown>;
   metadata: Record<string, unknown>;
   createdAt: string;
 };
@@ -310,6 +320,138 @@ export type FoodSearchEventRecord = {
   createdAt: string;
 };
 
+export type AgentTurnTelemetryRecord = {
+  id: string;
+  conversationId?: string;
+  traceId: string;
+  turnId: string;
+  userId?: string;
+  inputMode?: string;
+  source?: string;
+  activeProposalId?: string;
+  model?: string;
+  inputText?: string;
+  assistantText?: string;
+  resultKind?: string;
+  stopReason?: string;
+  iterationCount: number;
+  toolCallCount: number;
+  promptChars?: number;
+  messagesJsonChars?: number;
+  toolsJsonChars?: number;
+  requestPayloadChars?: number;
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  reasoningTokens?: number;
+  providerCostAmount?: number;
+  estimatedCostAmount?: number;
+  costCurrency?: string;
+  costSource?: string;
+  pricingSnapshot: Record<string, unknown>;
+  firstByteMs?: number;
+  firstToolCallMs?: number;
+  largestStreamGapMs?: number;
+  llmMs?: number;
+  actionMs?: number;
+  totalMs?: number;
+  status: string;
+  errorCode?: string;
+  errorMessage?: string;
+  metadata: Record<string, unknown>;
+  completedAt?: string;
+  createdAt: string;
+};
+
+export type AgentToolCallTelemetryRecord = {
+  id: string;
+  agentTurnId?: string;
+  conversationId?: string;
+  traceId: string;
+  turnId?: string;
+  userId?: string;
+  toolCallId?: string;
+  actionCallId?: string;
+  actionId: string;
+  arguments?: unknown;
+  resultSummary?: unknown;
+  status: string;
+  errorMessage?: string;
+  startedAt: string;
+  completedAt?: string;
+  durationMs?: number;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+};
+
+export type LlmProviderCallRecord = {
+  id: string;
+  traceId: string;
+  userId?: string;
+  conversationId?: string;
+  agentTurnId?: string;
+  turnId?: string;
+  actionCallId?: string;
+  featureSurface: string;
+  provider: string;
+  providerRequestId?: string;
+  providerGenerationId?: string;
+  requestedModel: string;
+  servedModel?: string;
+  routing?: unknown;
+  inputMode?: string;
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  reasoningTokens?: number;
+  cachedInputTokens?: number;
+  audioTokens?: number;
+  imageTokens?: number;
+  providerCostAmount?: number;
+  estimatedCostAmount?: number;
+  costCurrency?: string;
+  costSource: string;
+  inputTokenUnitPrice?: number;
+  outputTokenUnitPrice?: number;
+  reasoningTokenUnitPrice?: number;
+  cachedInputTokenUnitPrice?: number;
+  audioTokenUnitPrice?: number;
+  imageTokenUnitPrice?: number;
+  pricingSource?: string;
+  pricingVersion?: string;
+  pricingEffectiveAt?: string;
+  status: string;
+  errorCode?: string;
+  errorMessage?: string;
+  durationMs?: number;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+};
+
+export type TranscriptionRecord = {
+  id: string;
+  traceId: string;
+  userId?: string;
+  conversationId?: string;
+  turnId?: string;
+  surface: string;
+  provider?: string;
+  model?: string;
+  language?: string;
+  audioMimeType?: string;
+  audioBytes?: number;
+  audioDurationMs?: number;
+  transcriptText?: string;
+  transcriptLength: number;
+  durationMs?: number;
+  status: string;
+  errorCode?: string;
+  errorMessage?: string;
+  downstreamResultKind?: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+};
+
 export type TelemetryEventFilter = {
   limit?: number;
   severity?: string;
@@ -328,6 +470,8 @@ export type LlmRunFilter = {
   executedTool?: string;
   traceId?: string;
   userId?: string;
+  conversationId?: string;
+  turnId?: string;
   from?: string;
   to?: string;
 };
@@ -349,6 +493,13 @@ export type TelemetryOverview = {
   totalEvents: number;
   totalLlmRuns: number;
   totalFoodSearchEvents: number;
+  totalConversations: number;
+  totalAgentTurns: number;
+  totalProviderCalls: number;
+  totalTranscriptions: number;
+  providerCostAmount: number;
+  estimatedCostAmount: number;
+  unknownCostCount: number;
   uniqueUsers: number;
   uniqueTraces: number;
   eventsBySeverity: Record<string, number>;
@@ -357,6 +508,113 @@ export type TelemetryOverview = {
   zeroResultRate: number;
   lowConfidenceRate: number;
   providerErrorRate: number;
+};
+
+export type AdminConversationFilter = {
+  limit?: number;
+  userId?: string;
+  conversationId?: string;
+  traceId?: string;
+  turnId?: string;
+  includeHidden?: boolean;
+  from?: string;
+  to?: string;
+};
+
+export type AdminActionCallFilter = {
+  limit?: number;
+  userId?: string;
+  traceId?: string;
+  actionId?: string;
+  from?: string;
+  to?: string;
+};
+
+export type AgentTurnTelemetryFilter = {
+  limit?: number;
+  userId?: string;
+  conversationId?: string;
+  traceId?: string;
+  turnId?: string;
+  inputMode?: string;
+  status?: string;
+  from?: string;
+  to?: string;
+};
+
+export type AgentToolCallTelemetryFilter = {
+  limit?: number;
+  userId?: string;
+  conversationId?: string;
+  traceId?: string;
+  turnId?: string;
+  actionId?: string;
+  status?: string;
+  from?: string;
+  to?: string;
+};
+
+export type LlmProviderCallFilter = {
+  limit?: number;
+  userId?: string;
+  conversationId?: string;
+  traceId?: string;
+  turnId?: string;
+  provider?: string;
+  model?: string;
+  status?: string;
+  costSource?: string;
+  from?: string;
+  to?: string;
+};
+
+export type TranscriptionRecordFilter = {
+  limit?: number;
+  userId?: string;
+  conversationId?: string;
+  traceId?: string;
+  turnId?: string;
+  surface?: string;
+  status?: string;
+  from?: string;
+  to?: string;
+};
+
+export type LlmCostFilter = {
+  from: string;
+  to: string;
+  userId?: string;
+  conversationId?: string;
+  traceId?: string;
+};
+
+export type LlmCostOverview = {
+  from: string;
+  to: string;
+  totalProviderCostAmount: number;
+  totalEstimatedCostAmount: number;
+  totalCostAmount: number;
+  unknownCostCount: number;
+  totalPromptTokens: number;
+  totalCompletionTokens: number;
+  totalTokens: number;
+  byUser: LlmCostBreakdown[];
+  byConversation: LlmCostBreakdown[];
+  byTurn: LlmCostBreakdown[];
+  byModel: LlmCostBreakdown[];
+  byProvider: LlmCostBreakdown[];
+  byFeature: LlmCostBreakdown[];
+  byDay: LlmCostBreakdown[];
+};
+
+export type LlmCostBreakdown = {
+  key: string;
+  providerCostAmount: number;
+  estimatedCostAmount: number;
+  totalCostAmount: number;
+  unknownCostCount: number;
+  totalTokens: number;
+  callCount: number;
 };
 
 export type AgentConversationRecord = {
@@ -384,6 +642,23 @@ export type AgentConversationMessageRecord = {
   source?: string;
   activeProposalId?: string;
   metadata?: unknown;
+  createdAt: string;
+};
+
+export type AgentCandidateRegistryRecord = {
+  id: string;
+  userId: string;
+  conversationId: string;
+  messageId?: string;
+  traceId?: string;
+  turnId?: string;
+  actionCallId?: string;
+  searchRef: string;
+  actionId: string;
+  candidateCount: number;
+  groupCount: number;
+  threshold?: number;
+  registry: unknown;
   createdAt: string;
 };
 
@@ -545,6 +820,17 @@ export interface AppRepository {
     userId: string,
     conversationId: string,
   ): Promise<AgentConversationMessageRecord[]>;
+  saveAgentCandidateRegistry(
+    input: Omit<AgentCandidateRegistryRecord, "id" | "createdAt">,
+  ): Promise<AgentCandidateRegistryRecord>;
+  getAgentCandidateRegistryBySearchRef(
+    userId: string,
+    searchRef: string,
+  ): Promise<AgentCandidateRegistryRecord | undefined>;
+  getLatestAgentCandidateRegistry(
+    userId: string,
+    conversationId: string,
+  ): Promise<AgentCandidateRegistryRecord | undefined>;
   deleteAgentConversation(
     userId: string,
     conversationId: string,
@@ -561,7 +847,22 @@ export interface AppRepository {
     input: Omit<AuditEventRecord, "id" | "createdAt">,
   ): Promise<AuditEventRecord>;
   listActionCalls(userId: string): Promise<ActionCallRecord[]>;
+  listAdminActionCalls(
+    filter: AdminActionCallFilter,
+  ): Promise<ActionCallRecord[]>;
   listAuditEvents(userId: string): Promise<AuditEventRecord[]>;
+
+  listAdminAgentConversations(
+    filter: AdminConversationFilter,
+  ): Promise<AgentConversationRecord[]>;
+  getAdminAgentConversationMessages(
+    conversationId: string,
+    includeHidden?: boolean,
+  ): Promise<AgentConversationMessageRecord[]>;
+  listAgentConversationMessagesByTrace(
+    traceId: string,
+    includeHidden?: boolean,
+  ): Promise<AgentConversationMessageRecord[]>;
 
   createTelemetryEvent(
     input: Omit<TelemetryEventRecord, "id" | "createdAt">,
@@ -573,6 +874,31 @@ export interface AppRepository {
     input: Omit<LlmRunRecord, "id" | "createdAt">,
   ): Promise<LlmRunRecord>;
   listLlmRuns(filter: LlmRunFilter): Promise<LlmRunRecord[]>;
+  createAgentTurnTelemetry(
+    input: Omit<AgentTurnTelemetryRecord, "id" | "createdAt">,
+  ): Promise<AgentTurnTelemetryRecord>;
+  listAgentTurnTelemetry(
+    filter: AgentTurnTelemetryFilter,
+  ): Promise<AgentTurnTelemetryRecord[]>;
+  createAgentToolCallTelemetry(
+    input: Omit<AgentToolCallTelemetryRecord, "id" | "createdAt">,
+  ): Promise<AgentToolCallTelemetryRecord>;
+  listAgentToolCallTelemetry(
+    filter: AgentToolCallTelemetryFilter,
+  ): Promise<AgentToolCallTelemetryRecord[]>;
+  createLlmProviderCall(
+    input: Omit<LlmProviderCallRecord, "id" | "createdAt">,
+  ): Promise<LlmProviderCallRecord>;
+  listLlmProviderCalls(
+    filter: LlmProviderCallFilter,
+  ): Promise<LlmProviderCallRecord[]>;
+  createTranscriptionRecord(
+    input: Omit<TranscriptionRecord, "id" | "createdAt">,
+  ): Promise<TranscriptionRecord>;
+  listTranscriptionRecords(
+    filter: TranscriptionRecordFilter,
+  ): Promise<TranscriptionRecord[]>;
+  getLlmCostOverview(filter: LlmCostFilter): Promise<LlmCostOverview>;
   createFoodSearchEvent(
     input: Omit<FoodSearchEventRecord, "id" | "createdAt">,
   ): Promise<FoodSearchEventRecord>;

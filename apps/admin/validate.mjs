@@ -39,6 +39,7 @@ const read = (file) => {
 const index = read("index.html");
 const app = read("app.js");
 const config = read("config.js");
+const styles = read("styles.css");
 
 const requiredHtmlSnippets = [
   ['<title>BetterCalories Admin · Telemetry</title>', "title"],
@@ -58,13 +59,36 @@ const requiredHtmlSnippets = [
   ['id="view-overview"', "overview view"],
   ['id="view-events"', "events view"],
   ['id="view-llm"', "LLM runs view"],
+  ['id="view-conversations"', "conversations view"],
+  ['id="view-agent-turns"', "agent turns view"],
+  ['id="view-action-calls"', "action calls view"],
+  ['id="view-llm-cost"', "LLM cost view"],
+  ['id="view-provider-calls"', "provider calls view"],
+  ['id="view-transcriptions"', "transcriptions view"],
   ['id="view-food"', "food search view"],
   ['id="view-trace"', "trace view"],
   ['id="events-table"', "events table"],
   ['id="llm-table"', "LLM table"],
+  ['id="conversations-table"', "conversations table"],
+  ['id="conversation-detail-table"', "conversation detail table"],
+  ['id="selected-message-accounting"', "selected message accounting panel"],
+  ['id="selected-provider-calls-table"', "selected provider calls table"],
+  ['id="selected-tool-calls-table"', "selected tool calls table"],
+  ['id="conversation-turns-table"', "conversation turn totals table"],
+  ['id="conversation-provider-calls-table"', "conversation provider calls table"],
+  ['id="agent-turns-table"', "agent turns table"],
+  ['id="action-calls-table"', "action calls table"],
+  ['id="llm-cost-table"', "LLM cost table"],
+  ['id="provider-calls-table"', "provider calls table"],
+  ['id="transcriptions-table"', "transcriptions table"],
   ['id="food-table"', "food table"],
   ['id="trace-events-table"', "trace events table"],
   ['id="trace-llm-table"', "trace LLM table"],
+  ['id="trace-messages-table"', "trace messages table"],
+  ['id="trace-agent-turns-table"', "trace agent turns table"],
+  ['id="trace-tool-action-table"', "trace tool/action table"],
+  ['id="trace-provider-calls-table"', "trace provider calls table"],
+  ['id="trace-transcriptions-table"', "trace transcriptions table"],
   ['id="trace-food-table"', "trace food table"],
   ['id="trace-summary"', "trace summary section"],
 ];
@@ -85,6 +109,14 @@ const requiredConfigKeys = [
   "overview",
   "events",
   "llmRuns",
+  "conversations",
+  "conversation",
+  "agentTurns",
+  "agentToolCalls",
+  "actionCalls",
+  "llmCost",
+  "providerCalls",
+  "transcriptions",
   "foodSearch",
   "trace",
 ];
@@ -110,17 +142,54 @@ const requiredAppFeatures = [
   ["document.body.classList.toggle(\"is-locked\"", "body lock toggle"],
   ["renderEventsTable", "events renderer"],
   ["renderLlmTable", "LLM renderer"],
+  ["renderConversationsTable", "conversations renderer"],
+  ["renderConversationDetail", "conversation detail renderer"],
+  ["renderSelectedMessageAccounting", "selected message accounting renderer"],
+  ["selectedProviderCallsForMessage", "selected message provider-call correlation"],
+  ["selectedToolCallsForMessage", "selected message tool-call correlation"],
+  ["renderAgentTurnsTable", "agent turns renderer"],
+  ["renderActionCallsTable", "action calls renderer"],
+  ["renderLlmCostView", "LLM cost renderer"],
+  ["renderProviderCallsTable", "provider calls renderer"],
+  ["renderTranscriptionsTable", "transcriptions renderer"],
+  ["renderTraceProviderCallsTable", "trace provider calls renderer"],
+  ["renderTraceTranscriptionsTable", "trace transcriptions renderer"],
   ["renderFoodTable", "food renderer"],
   ["renderTraceView", "trace renderer"],
   ["loadOverview", "overview loader"],
   ["loadEvents", "events loader"],
   ["loadLlmRuns", "LLM loader"],
+  ["loadConversations", "conversations loader"],
+  ["loadConversationDetail", "conversation detail loader"],
+  ["loadAgentTurns", "agent turns loader"],
+  ["loadActionCalls", "action calls loader"],
+  ["loadLlmCost", "LLM cost loader"],
+  ["loadProviderCalls", "provider calls loader"],
+  ["loadTranscriptions", "transcriptions loader"],
   ["loadFoodSearch", "food search loader"],
   ["loadTrace", "trace loader"],
+  ["TAB_LOADERS", "tab auto-load mapping"],
+  ["enhanceFilterForms", "dynamic date/status/table controls"],
+  ["appendDateParams", "date filter query helper"],
+  ["applyClientControls", "client-side sorting/filtering"],
+  ["sortRows", "client-side metric sorting"],
+  ["sortableOptionsFor", "dynamic sort-by options"],
+  ["maybeRenderAggregateRows", "aggregate row renderer"],
+  ["aggregateRows", "aggregate metrics helper"],
+  ["copyableId", "copyable long ID helper"],
+  ["renderExpandableValue", "expandable JSON/text helper"],
+  ["makeTableResizable", "resizable table helper"],
   ["admin/auth/login", "admin login endpoint"],
   ["admin/telemetry/overview", "overview endpoint"],
   ["admin/telemetry/events", "events endpoint"],
   ["admin/telemetry/llm-runs", "llm-runs endpoint"],
+  ["admin/telemetry/conversations", "conversations endpoint"],
+  ["admin/telemetry/agent-turns", "agent-turns endpoint"],
+  ["admin/telemetry/agent-tool-calls", "agent-tool-calls endpoint"],
+  ["admin/telemetry/action-calls", "action-calls endpoint"],
+  ["admin/telemetry/llm-cost", "llm-cost endpoint"],
+  ["admin/telemetry/llm-provider-calls", "llm-provider-calls endpoint"],
+  ["admin/telemetry/transcriptions", "transcriptions endpoint"],
   ["admin/telemetry/food-search", "food-search endpoint"],
   ["admin/telemetry/traces/", "traces endpoint"],
   ["Bearer ", "Authorization header construction"],
@@ -133,6 +202,26 @@ for (const [snippet, label] of requiredAppFeatures) {
     fail(`app.js missing ${label}: ${snippet}`);
   } else {
     console.log(`✓ app.js · ${label}`);
+  }
+}
+
+const requiredCssSnippets = [
+  [".resize-handle", "column resize handle styles"],
+  [".copy-id", "copyable ID layout"],
+  [".copy-btn", "copy button styles"],
+  [".expandable-value", "expandable value container"],
+  [".json-cell", "JSON cell layout"],
+  [".data-table tr.is-aggregate", "aggregate row styles"],
+  [".data-table tbody tr.is-selected", "selected row styles"],
+  [".selected-message-panel", "selected message panel styles"],
+  [".raw-conversation-records", "collapsed raw conversation records"],
+];
+
+for (const [snippet, label] of requiredCssSnippets) {
+  if (!styles.includes(snippet)) {
+    fail(`styles.css missing ${label}: ${snippet}`);
+  } else {
+    console.log(`✓ styles.css · ${label}`);
   }
 }
 

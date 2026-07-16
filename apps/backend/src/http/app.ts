@@ -137,6 +137,8 @@ export function createApp(input: {
     repository,
     config.OPENROUTER_MODEL,
     runLogger,
+    telemetryService,
+    config.FOOD_RESOLVER_MIN_CONFIDENCE,
   );
 
   async function runMealInput(input: {
@@ -598,6 +600,22 @@ export function createApp(input: {
             error: summarizeError(error),
             timingsMs: { total: Date.now() - routeStarted },
           });
+          recordTranscriptionTelemetry({
+            telemetryService,
+            event: {
+              traceId,
+              userId: user.id,
+              surface: "agent_chat_audio",
+              audioMimeType: upload.mimeType,
+              audioBytes: upload.buffer.byteLength,
+              transcriptLength: 0,
+              durationMs: Date.now() - routeStarted,
+              status: "failed",
+              errorCode: "stt_provider_failed",
+              errorMessage: error instanceof Error ? error.message : String(error),
+              metadata: { filename: upload.filename, source: upload.source ?? "flutter" },
+            },
+          });
           yield {
             type: "error",
             error: error instanceof Error ? error.message : String(error),
@@ -608,13 +626,39 @@ export function createApp(input: {
           type: "transcription_completed",
           transcript: transcription.text,
         } as AgentChatEvent;
-        yield* agentChatService.chat({
+        let transcriptionRecorded = false;
+        const chatEvents = agentChatService.chat({
           text: transcription.text,
           context: buildActionContext(c, user, upload.source ?? "flutter"),
           conversationId: upload.conversationId,
           activeProposalId: upload.activeProposalId,
           inputMode: "voice",
         });
+        for await (const event of chatEvents) {
+          if (event.type === "conversation_started" && !transcriptionRecorded) {
+            transcriptionRecorded = true;
+            recordTranscriptionTelemetry({
+              telemetryService,
+              event: {
+                traceId,
+                userId: user.id,
+                conversationId: event.conversationId,
+                turnId: event.turnId,
+                surface: "agent_chat_audio",
+                provider: transcription.provider,
+                model: transcription.model,
+                audioMimeType: upload.mimeType,
+                audioBytes: upload.buffer.byteLength,
+                transcriptText: transcription.text,
+                transcriptLength: transcription.text.length,
+                durationMs: Date.now() - routeStarted,
+                status: "completed",
+                metadata: { filename: upload.filename, source: upload.source ?? "flutter" },
+              },
+            });
+          }
+          yield event;
+        }
       })(),
     );
   });
@@ -726,6 +770,21 @@ export function createApp(input: {
           errorMessage: error instanceof Error ? error.message : String(error),
         },
       });
+      recordTranscriptionTelemetry({
+        telemetryService,
+        event: {
+          traceId,
+          userId: user.id,
+          surface: "stt",
+          audioMimeType: upload.mimeType,
+          audioBytes: upload.buffer.byteLength,
+          transcriptLength: 0,
+          status: "failed",
+          errorCode: "stt_provider_failed",
+          errorMessage: error instanceof Error ? error.message : String(error),
+          metadata: { filename: upload.filename },
+        },
+      });
       throw error;
     }
 
@@ -751,6 +810,22 @@ export function createApp(input: {
         provider: result.provider,
         model: result.model,
         transcriptLength: result.text.length,
+      },
+    });
+    recordTranscriptionTelemetry({
+      telemetryService,
+      event: {
+        traceId,
+        userId: user.id,
+        surface: "stt",
+        provider: result.provider,
+        model: result.model,
+        audioMimeType: upload.mimeType,
+        audioBytes: upload.buffer.byteLength,
+        transcriptText: result.text,
+        transcriptLength: result.text.length,
+        status: "completed",
+        metadata: { filename: upload.filename },
       },
     });
 
@@ -867,6 +942,22 @@ export function createApp(input: {
           metadata: { errorCode: "stt_provider_failed" },
         },
       });
+      recordTranscriptionTelemetry({
+        telemetryService,
+        event: {
+          traceId,
+          userId: user.id,
+          surface: "voice_meal",
+          audioMimeType: upload.mimeType,
+          audioBytes: upload.buffer.byteLength,
+          transcriptLength: 0,
+          durationMs: Date.now() - routeStarted,
+          status: "failed",
+          errorCode: "stt_provider_failed",
+          errorMessage: error instanceof Error ? error.message : String(error),
+          metadata: { filename: upload.filename, source: upload.source ?? "flutter" },
+        },
+      });
       throw error;
     }
 
@@ -931,6 +1022,24 @@ export function createApp(input: {
           agent: mealInput.agentMs,
           total: Date.now() - routeStarted,
         },
+      },
+    });
+    recordTranscriptionTelemetry({
+      telemetryService,
+      event: {
+        traceId,
+        userId: user.id,
+        surface: "voice_meal",
+        provider: transcription.provider,
+        model: transcription.model,
+        audioMimeType: upload.mimeType,
+        audioBytes: upload.buffer.byteLength,
+        transcriptText: transcript,
+        transcriptLength: transcript.length,
+        durationMs: sttMs,
+        status: "completed",
+        downstreamResultKind: mealInput.result.kind,
+        metadata: { filename: upload.filename, source: upload.source ?? "flutter" },
       },
     });
 
@@ -1489,6 +1598,15 @@ function recordVoiceMealRunTelemetry(input: {
 }): void {
   recordTelemetry("voice_meal_run", () =>
     input.telemetryService.recordVoiceMealRunEvent(input.event),
+  );
+}
+
+function recordTranscriptionTelemetry(input: {
+  telemetryService: TelemetryService;
+  event: Parameters<TelemetryService["recordTranscriptionRecord"]>[0];
+}): void {
+  recordTelemetry("transcription_record", () =>
+    input.telemetryService.recordTranscriptionRecord(input.event),
   );
 }
 

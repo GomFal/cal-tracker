@@ -4,6 +4,8 @@ import type {
   AgentToolDecision,
   ChatAgentProvider,
 } from "../agent/chatAgentProvider.js";
+import { buildToolContentForModel } from "../agent/toolContent.js";
+import type { MealItem } from "@cal-tracker/contracts";
 import {
   buildTestApp,
   FakeSpeechToTextProvider,
@@ -39,12 +41,28 @@ describe("agent chat streaming", () => {
             },
           },
         ],
-        rawResponse: {},
+        rawResponse: {
+          id: "gen_chat_tool",
+          usage: {
+            prompt_tokens: 12,
+            completion_tokens: 8,
+            total_tokens: 20,
+            cost: 0.0002,
+          },
+        },
         interaction: { messages: [], streamEvents: [] },
       },
       {
         toolCalls: [],
-        rawResponse: {},
+        rawResponse: {
+          id: "gen_chat_final",
+          usage: {
+            prompt_tokens: 14,
+            completion_tokens: 16,
+            total_tokens: 30,
+            cost: 0.0003,
+          },
+        },
         interaction: {
           messages: [],
           assistantContent: "You have your daily summary above.",
@@ -52,7 +70,7 @@ describe("agent chat streaming", () => {
         },
       },
     ]);
-    const { request } = buildTestApp({ agentProvider });
+    const { request, telemetry, config } = buildTestApp({ agentProvider });
     const { authHeader } = await registerAndAuth(request);
 
     const response = await request("http://localhost/v1/agent/chat", {
@@ -139,13 +157,180 @@ describe("agent chat streaming", () => {
         turnId: [...turnIds][0],
       }),
     );
+    expect(body.messages[1]?.metadata).toEqual(
+      expect.objectContaining({
+        iteration: 1,
+        toolCallCount: 1,
+      }),
+    );
     expect(body.messages[2]?.metadata).toEqual(
       expect.objectContaining({
         actionId: "get_daily_summary",
         actionCallId: expect.any(String),
+        iteration: 1,
         resultKind: "summary",
       }),
     );
+    expect(body.messages[3]?.metadata).toEqual(
+      expect.objectContaining({
+        iteration: 2,
+        resultKind: "assistant_message",
+        stopReason: "assistant_message",
+      }),
+    );
+
+    const turnId = [...turnIds][0] as string;
+    const turns = await telemetry.listAgentTurns({ conversationId, limit: 10 });
+    expect(turns).toHaveLength(1);
+    expect(turns[0]).toMatchObject({
+      conversationId,
+      turnId,
+      inputMode: "text",
+      source: "flutter",
+      model: config.OPENROUTER_MODEL,
+      resultKind: "assistant_message",
+      stopReason: "assistant_message",
+      status: "success",
+      toolCallCount: 1,
+      promptTokens: 26,
+      completionTokens: 24,
+      totalTokens: 50,
+      providerCostAmount: 0.0005,
+      costCurrency: "USD",
+      costSource: "provider",
+    });
+
+    const providerCalls = await telemetry.listLlmProviderCalls({
+      conversationId,
+      limit: 10,
+    });
+    expect(providerCalls.map((call) => call.providerGenerationId)).toEqual([
+      "gen_chat_final",
+      "gen_chat_tool",
+    ]);
+    expect(providerCalls.every((call) => call.turnId === turnId)).toBe(true);
+    expect(providerCalls.every((call) => call.costSource === "provider")).toBe(
+      true,
+    );
+
+    const toolCalls = await telemetry.listAgentToolCalls({
+      conversationId,
+      limit: 10,
+    });
+    expect(toolCalls).toHaveLength(1);
+    expect(toolCalls[0]).toMatchObject({
+      conversationId,
+      turnId,
+      actionId: "get_daily_summary",
+      status: "completed",
+    });
+  });
+
+  it("lets the LLM resolve a compact candidate preview by reference", async () => {
+    const agentProvider = new QueueChatAgentProvider([
+      {
+        toolCalls: [
+          {
+            id: "call_candidate",
+            type: "function",
+            function: {
+              name: "resolve_candidate_reference",
+              arguments: JSON.stringify({
+                candidateRef: "g1c6",
+              }),
+            },
+          },
+        ],
+        rawResponse: { id: "gen_candidate_tool" },
+        interaction: { messages: [], streamEvents: [] },
+      },
+      {
+        toolCalls: [],
+        rawResponse: { id: "gen_selection_final" },
+        interaction: {
+          messages: [],
+          assistantContent: "I will use the selected ingredient.",
+          streamEvents: [],
+        },
+      },
+    ]);
+    const { request, repository } = buildTestApp({ agentProvider });
+    const { authHeader, user } = await registerAndAuth(request);
+    const conversation = await repository.createAgentConversation(user.id, {
+      title: "Search bread",
+    });
+    const candidates = Array.from({ length: 10 }, (_, index) =>
+      chatCandidate(index + 1),
+    );
+    const toolContent = buildToolContentForModel({
+      actionId: "search_nutrition_database",
+      actionCallId: "search-action-1",
+      toolInput: { query: "bread" },
+      mappedResult: {
+        kind: "nutrition_search",
+        message: "I found matching nutrition items.",
+        items: candidates,
+        candidateGroups: [{ candidates }],
+      },
+      rawOutput: { items: candidates, candidateGroups: [{ candidates }] },
+      threshold: 0.75,
+    });
+    const storedToolMessage = await repository.addAgentConversationMessage(user.id, conversation.id, {
+      role: "tool",
+      content: toolContent.modelContent,
+      toolCallId: "call_search",
+      metadata: {
+        candidateRegistryRef: toolContent.candidateRegistry?.searchRef,
+        searchRef: toolContent.candidateRegistry?.searchRef,
+        candidateCount: toolContent.candidateRegistry?.candidateCount,
+        groupCount: toolContent.candidateRegistry?.groupCount,
+        serializerVersion: toolContent.serializerVersion,
+      },
+    });
+    expect(storedToolMessage.metadata).not.toHaveProperty("candidateRegistry");
+    expect(toolContent.candidateRegistry).toBeDefined();
+    await repository.saveAgentCandidateRegistry({
+      userId: user.id,
+      conversationId: conversation.id,
+      messageId: storedToolMessage.id,
+      searchRef: toolContent.candidateRegistry!.searchRef,
+      actionId: toolContent.candidateRegistry!.actionId,
+      actionCallId: toolContent.candidateRegistry!.actionCallId,
+      candidateCount: toolContent.candidateRegistry!.candidateCount,
+      groupCount: toolContent.candidateRegistry!.groupCount,
+      threshold: toolContent.candidateRegistry!.threshold,
+      registry: toolContent.candidateRegistry!,
+    });
+
+    const response = await request("http://localhost/v1/agent/chat", {
+      method: "POST",
+      headers: authHeader,
+      body: JSON.stringify({
+        source: "flutter",
+        conversationId: conversation.id,
+        message: "Use the sixth result.",
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    const events = parseSse(await response.text());
+    expect(events.some((event) => event.type === "assistant_delta")).toBe(true);
+    expect(agentProvider.inputs).toHaveLength(2);
+    const firstModelMessages = agentProvider.inputs[0]!.messages;
+    const previewToolMessage = firstModelMessages.find(
+      (message) => message.role === "tool",
+    );
+    expect(previewToolMessage?.content).toContain("candidatePreview");
+    expect(previewToolMessage?.content).toContain("g1c6");
+    expect(previewToolMessage?.content).toContain("Candidate 6");
+    expect(previewToolMessage?.content).not.toContain("candidateGroups");
+
+    const secondModelMessages = agentProvider.inputs[1]!.messages;
+    const selectedToolMessage = [...secondModelMessages]
+      .reverse()
+      .find((message) => message.role === "tool");
+    expect(selectedToolMessage?.content).toContain("Selected nutrition candidate resolved");
+    expect(selectedToolMessage?.content).toContain("Candidate 6");
   });
 
   it("streams model-proposed quick reply buttons", async () => {
@@ -214,7 +399,7 @@ describe("agent chat streaming", () => {
         },
       },
     ]);
-    const { request } = buildTestApp({
+    const { request, telemetry } = buildTestApp({
       agentProvider,
       sttProvider: new FakeSpeechToTextProvider("voice message"),
     });
@@ -250,6 +435,27 @@ describe("agent chat streaming", () => {
           message.role === "user" && message.content === "voice message",
       ),
     ).toBe(true);
+    const conversationId = events.find(
+      (event) => event.type === "conversation_started",
+    )?.conversationId as string;
+    const turnId = events.find(
+      (event) => event.type === "conversation_started",
+    )?.turnId as string;
+    const transcriptions = await telemetry.listTranscriptionRecords({
+      conversationId,
+      limit: 10,
+    });
+    expect(transcriptions).toHaveLength(1);
+    expect(transcriptions[0]).toMatchObject({
+      conversationId,
+      turnId,
+      surface: "agent_chat_audio",
+      provider: "test",
+      model: "test-model",
+      transcriptText: "voice message",
+      transcriptLength: 13,
+      status: "completed",
+    });
   });
 
   it("hides deleted conversations from users while retaining stored messages", async () => {
@@ -318,6 +524,27 @@ describe("agent chat streaming", () => {
     ]);
   });
 });
+
+function chatCandidate(rank: number): MealItem {
+  return {
+    name: `Candidate ${rank}`,
+    quantity: 100,
+    unit: "g",
+    calories: 180 + rank,
+    proteinGrams: 6,
+    carbsGrams: 28,
+    fatGrams: 3,
+    source: "database",
+    originalText: "bread",
+    canonicalName: `candidate ${rank}`,
+    externalSource: "test",
+    externalId: `candidate-${rank}`,
+    confidence: 0.6,
+    needsReview: true,
+    rank,
+    matchScore: 0.6,
+  };
+}
 
 function parseSse(raw: string): Array<Record<string, unknown>> {
   return raw

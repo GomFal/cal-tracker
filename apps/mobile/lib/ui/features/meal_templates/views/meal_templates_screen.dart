@@ -6,6 +6,7 @@ import '../../../../domain/models/nutrition_models.dart';
 import '../../../../l10n/app_localizations_context.dart';
 import '../../../core/content_frame.dart';
 import '../../../core/design_system.dart';
+import '../../../core/motion.dart';
 import '../../voice_log/views/voice_log_screen.dart';
 import '../view_models/meal_templates_view_model.dart';
 import 'meal_template_editor_screen.dart';
@@ -34,7 +35,7 @@ class _MealTemplatesScreenState extends State<MealTemplatesScreen> {
     final viewModel = context.watch<MealTemplatesViewModel>();
     final l10n = context.l10n;
     final palette = context.freshPalette;
-    return ContentFrame(
+    return ContentSliverFrame(
       title: l10n.templatesTitle,
       actions: [
         FreshIconButton(
@@ -52,58 +53,67 @@ class _MealTemplatesScreenState extends State<MealTemplatesScreen> {
           foregroundColor: Theme.of(context).colorScheme.onPrimary,
         ),
       ],
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SegmentedButton<_UsualSection>(
-            key: const ValueKey('usuals_section_tabs'),
-            segments: [
-              ButtonSegment(
-                value: _UsualSection.meals,
-                label: Text(l10n.usualsMealsTab),
-                icon: const Icon(Icons.restaurant_menu_rounded),
+      slivers: [
+        SliverToBoxAdapter(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SegmentedButton<_UsualSection>(
+                key: const ValueKey('usuals_section_tabs'),
+                segments: [
+                  ButtonSegment(
+                    value: _UsualSection.meals,
+                    label: KeyedSubtree(
+                      key: const ValueKey('usuals_tab_meals'),
+                      child: Text(l10n.usualsMealsTab),
+                    ),
+                    icon: const Icon(Icons.restaurant_menu_rounded),
+                  ),
+                  ButtonSegment(
+                    value: _UsualSection.ingredients,
+                    label: KeyedSubtree(
+                      key: const ValueKey('usuals_tab_ingredients'),
+                      child: Text(l10n.usualsIngredientsTab),
+                    ),
+                    icon: const Icon(Icons.shopping_basket_rounded),
+                  ),
+                ],
+                selected: {_selectedSection},
+                onSelectionChanged: (selection) {
+                  setState(() => _selectedSection = selection.single);
+                },
               ),
-              ButtonSegment(
-                value: _UsualSection.ingredients,
-                label: Text(l10n.usualsIngredientsTab),
-                icon: const Icon(Icons.shopping_basket_rounded),
+              const SizedBox(height: FreshSpacing.lg),
+              Text(
+                _selectedSection == _UsualSection.meals
+                    ? l10n.templatesExplainer
+                    : l10n.usualFoodsExplainer,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
               ),
+              const SizedBox(height: FreshSpacing.lg),
+              if (viewModel.isLoading) ...[
+                const LinearProgressIndicator(minHeight: 3),
+                const SizedBox(height: FreshSpacing.md),
+              ],
+              if (viewModel.error != null) ...[
+                FreshStatusBanner(
+                  icon: Icons.error_outline_rounded,
+                  title: l10n.usualsCouldNotLoad,
+                  message: viewModel.error!,
+                  color: palette.coral,
+                ),
+                const SizedBox(height: FreshSpacing.md),
+              ],
             ],
-            selected: {_selectedSection},
-            onSelectionChanged: (selection) {
-              setState(() => _selectedSection = selection.single);
-            },
           ),
-          const SizedBox(height: FreshSpacing.lg),
-          Text(
-            _selectedSection == _UsualSection.meals
-                ? l10n.templatesExplainer
-                : l10n.usualFoodsExplainer,
-            style: Theme.of(context)
-                .textTheme
-                .bodyMedium
-                ?.copyWith(color: palette.inkMuted),
-          ),
-          const SizedBox(height: FreshSpacing.lg),
-          if (viewModel.isLoading) ...[
-            const LinearProgressIndicator(minHeight: 3),
-            const SizedBox(height: FreshSpacing.md),
-          ],
-          if (viewModel.error != null) ...[
-            FreshStatusBanner(
-              icon: Icons.error_outline_rounded,
-              title: l10n.usualsCouldNotLoad,
-              message: viewModel.error!,
-              color: palette.coral,
-            ),
-            const SizedBox(height: FreshSpacing.md),
-          ],
-          if (_selectedSection == _UsualSection.meals)
-            _MealsSection(viewModel: viewModel)
-          else
-            _IngredientsSection(viewModel: viewModel),
-        ],
-      ),
+        ),
+        if (_selectedSection == _UsualSection.meals)
+          _MealsSection(viewModel: viewModel)
+        else
+          _IngredientsSection(viewModel: viewModel),
+      ],
     );
   }
 
@@ -126,28 +136,30 @@ class _MealsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (viewModel.templates.isEmpty) {
-      return FreshEmptyState(
-        icon: Icons.restaurant_menu_rounded,
-        title: context.l10n.templatesNoUsualMealsYet,
-        message: context.l10n.templatesNoUsualMealsMessage,
+      return SliverToBoxAdapter(
+        child: FreshEmptyState(
+          icon: Icons.restaurant_menu_rounded,
+          title: context.l10n.templatesNoUsualMealsYet,
+          message: context.l10n.templatesNoUsualMealsMessage,
+        ),
       );
     }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (final template in viewModel.templates)
-          _TemplateCard(
-            template: template,
-            onLog: () => context.push(
-              '/meal/create',
-              extra: MealCreateInitialItems(template.items),
-            ),
-            onEdit: () => context.push(
-              MealTemplateEditorScreen.editRoute(template.id),
-            ),
-            onDelete: () => _confirmDeleteTemplate(context, viewModel, template),
+    return SliverList(
+      delegate: SliverChildBuilderDelegate((context, index) {
+        final template = viewModel.templates[index];
+        return _TemplateCard(
+          template: template,
+          onLog: () => context.push(
+            '/meal/create',
+            extra: MealCreateInitialItems(template.items),
           ),
-      ],
+          onEdit: () => context.push(
+            MealTemplateEditorScreen.editRoute(template.id),
+            extra: template,
+          ),
+          onDelete: () => _confirmDeleteTemplate(context, viewModel, template),
+        );
+      }, childCount: viewModel.templates.length),
     );
   }
 
@@ -187,22 +199,26 @@ class _IngredientsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (viewModel.usualFoods.isEmpty) {
-      return FreshEmptyState(
-        icon: Icons.shopping_basket_rounded,
-        title: context.l10n.usualFoodsEmptyTitle,
-        message: context.l10n.usualFoodsEmptyMessage,
+      return SliverToBoxAdapter(
+        child: FreshEmptyState(
+          icon: Icons.shopping_basket_rounded,
+          title: context.l10n.usualFoodsEmptyTitle,
+          message: context.l10n.usualFoodsEmptyMessage,
+        ),
       );
     }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (final food in viewModel.usualFoods)
-          _UsualFoodCard(
-            food: food,
-            onEdit: () => context.push(UsualFoodEditorScreen.editRoute(food.id)),
-            onDelete: () => _confirmDeleteFood(context, viewModel, food),
+    return SliverList(
+      delegate: SliverChildBuilderDelegate((context, index) {
+        final food = viewModel.usualFoods[index];
+        return _UsualFoodCard(
+          food: food,
+          onEdit: () => context.push(
+            UsualFoodEditorScreen.editRoute(food.id),
+            extra: food,
           ),
-      ],
+          onDelete: () => _confirmDeleteFood(context, viewModel, food),
+        );
+      }, childCount: viewModel.usualFoods.length),
     );
   }
 
@@ -433,6 +449,7 @@ class _TemplateCard extends StatelessWidget {
     await showModalBottomSheet<void>(
       context: context,
       useSafeArea: true,
+      sheetAnimationStyle: freshSheetAnimationStyle(context),
       builder: (sheetContext) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
@@ -440,7 +457,10 @@ class _TemplateCard extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(template.title, style: Theme.of(context).textTheme.titleMedium),
+              Text(
+                template.title,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
               const SizedBox(height: FreshSpacing.md),
               TextButton.icon(
                 key: ValueKey('meal_template_edit_${template.id}'),

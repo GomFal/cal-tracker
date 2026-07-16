@@ -1,0 +1,18 @@
+export {
+  MODEL_FACING_SERIALIZER_VERSION,
+  approxTokens,
+  buildToolContentForModel,
+  mealItemForToolUse,
+  resolveCandidateReferenceFromMessages,
+  resolveCandidateReferenceFromRegistry,
+  selectedCandidateContent,
+  serializeForModel,
+  ultraCompactToolContent,
+  type AgentCandidateSelectionState,
+  type AgentChatCandidateSelection,
+  type CandidateRegistryMetadata,
+  type ModelFacingRepresentation,
+  type ModelFacingTonTable,
+  type ModelFacingSerializationInput,
+  type ToolContentBuildResult,
+} from "./modelFacingSerialization.js";

@@ -1143,6 +1143,11 @@ export const llmRuns = pgTable(
     source: text("source"),
     locale: text("locale"),
     timezone: text("timezone"),
+    conversationId: uuid("conversation_id"),
+    turnId: uuid("turn_id"),
+    provider: text("provider"),
+    providerRequestId: text("provider_request_id"),
+    providerGenerationId: text("provider_generation_id"),
     model: text("model").notNull(),
     inputMode: text("input_mode"),
     activeProposalId: uuid("active_proposal_id"),
@@ -1170,6 +1175,20 @@ export const llmRuns = pgTable(
       .notNull()
       .default(false),
     providerError: boolean("provider_error").notNull().default(false),
+    providerCostAmount: numeric("provider_cost_amount", {
+      precision: 12,
+      scale: 6,
+    }),
+    estimatedCostAmount: numeric("estimated_cost_amount", {
+      precision: 12,
+      scale: 6,
+    }),
+    costCurrency: text("cost_currency"),
+    costSource: text("cost_source"),
+    pricingSnapshotJson: jsonb("pricing_snapshot_json")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
     metadataJson: jsonb("metadata_json")
       .$type<Record<string, unknown>>()
       .notNull()
@@ -1181,6 +1200,11 @@ export const llmRuns = pgTable(
   (table) => [
     index("llm_runs_created_at_idx").on(sql`${table.createdAt} DESC`),
     index("llm_runs_trace_id_idx").on(table.traceId),
+    index("llm_runs_conversation_created_at_idx").on(
+      table.conversationId,
+      sql`${table.createdAt} DESC`,
+    ),
+    index("llm_runs_turn_id_idx").on(table.turnId),
     index("llm_runs_user_id_created_at_idx").on(
       table.userId,
       sql`${table.createdAt} DESC`,
@@ -1322,6 +1346,336 @@ export const agentMessages = pgTable(
   ],
 );
 
+export const agentCandidateRegistries = pgTable(
+  "agent_candidate_registries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => agentConversations.id, { onDelete: "cascade" }),
+    messageId: uuid("message_id").references(() => agentMessages.id, {
+      onDelete: "set null",
+    }),
+    traceId: text("trace_id"),
+    turnId: uuid("turn_id"),
+    actionCallId: uuid("action_call_id"),
+    searchRef: text("search_ref").notNull(),
+    actionId: text("action_id").notNull(),
+    candidateCount: integer("candidate_count").notNull(),
+    groupCount: integer("group_count").notNull(),
+    threshold: numeric("threshold"),
+    registryJson: jsonb("registry_json").$type<JsonObject>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("agent_candidate_registries_user_search_ref_unique").on(
+      table.userId,
+      table.searchRef,
+    ),
+    index("agent_candidate_registries_conversation_created_idx").on(
+      table.conversationId,
+      sql`${table.createdAt} DESC`,
+    ),
+    index("agent_candidate_registries_turn_id_idx").on(table.turnId),
+    index("agent_candidate_registries_trace_id_idx").on(table.traceId),
+  ],
+);
+
+export const agentTurnTelemetry = pgTable(
+  "agent_turn_telemetry",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    conversationId: uuid("conversation_id").references(
+      () => agentConversations.id,
+      { onDelete: "set null" },
+    ),
+    traceId: text("trace_id").notNull(),
+    turnId: uuid("turn_id").notNull(),
+    userId: uuid("user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    inputMode: text("input_mode"),
+    source: text("source"),
+    activeProposalId: uuid("active_proposal_id"),
+    model: text("model"),
+    inputText: text("input_text"),
+    assistantText: text("assistant_text"),
+    resultKind: text("result_kind"),
+    stopReason: text("stop_reason"),
+    iterationCount: integer("iteration_count").notNull().default(0),
+    toolCallCount: integer("tool_call_count").notNull().default(0),
+    promptChars: integer("prompt_chars"),
+    messagesJsonChars: integer("messages_json_chars"),
+    toolsJsonChars: integer("tools_json_chars"),
+    requestPayloadChars: integer("request_payload_chars"),
+    promptTokens: integer("prompt_tokens"),
+    completionTokens: integer("completion_tokens"),
+    totalTokens: integer("total_tokens"),
+    reasoningTokens: integer("reasoning_tokens"),
+    providerCostAmount: numeric("provider_cost_amount", {
+      precision: 12,
+      scale: 6,
+    }),
+    estimatedCostAmount: numeric("estimated_cost_amount", {
+      precision: 12,
+      scale: 6,
+    }),
+    costCurrency: text("cost_currency"),
+    costSource: text("cost_source"),
+    pricingSnapshotJson: jsonb("pricing_snapshot_json")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    firstByteMs: integer("first_byte_ms"),
+    firstToolCallMs: integer("first_tool_call_ms"),
+    largestStreamGapMs: integer("largest_stream_gap_ms"),
+    llmMs: integer("llm_ms"),
+    actionMs: integer("action_ms"),
+    totalMs: integer("total_ms"),
+    status: text("status").notNull().default("success"),
+    errorCode: text("error_code"),
+    errorMessage: text("error_message"),
+    metadataJson: jsonb("metadata_json")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("agent_turn_telemetry_turn_id_unique").on(table.turnId),
+    index("agent_turn_telemetry_created_at_idx").on(
+      sql`${table.createdAt} DESC`,
+    ),
+    index("agent_turn_telemetry_trace_id_idx").on(table.traceId),
+    index("agent_turn_telemetry_user_created_at_idx").on(
+      table.userId,
+      sql`${table.createdAt} DESC`,
+    ),
+    index("agent_turn_telemetry_conversation_created_at_idx").on(
+      table.conversationId,
+      sql`${table.createdAt} DESC`,
+    ),
+  ],
+);
+
+export const agentToolCallTelemetry = pgTable(
+  "agent_tool_call_telemetry",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    agentTurnId: uuid("agent_turn_id").references(
+      () => agentTurnTelemetry.id,
+      { onDelete: "set null" },
+    ),
+    conversationId: uuid("conversation_id").references(
+      () => agentConversations.id,
+      { onDelete: "set null" },
+    ),
+    traceId: text("trace_id").notNull(),
+    turnId: uuid("turn_id"),
+    userId: uuid("user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    toolCallId: text("tool_call_id"),
+    actionCallId: uuid("action_call_id"),
+    actionId: text("action_id").notNull(),
+    argumentsJson: jsonb("arguments_json").$type<unknown>(),
+    resultSummaryJson: jsonb("result_summary_json").$type<unknown>(),
+    status: text("status").notNull(),
+    errorMessage: text("error_message"),
+    startedAt: timestamp("started_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    durationMs: integer("duration_ms"),
+    metadataJson: jsonb("metadata_json")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("agent_tool_call_telemetry_created_at_idx").on(
+      sql`${table.createdAt} DESC`,
+    ),
+    index("agent_tool_call_telemetry_trace_id_idx").on(table.traceId),
+    index("agent_tool_call_telemetry_turn_id_idx").on(table.turnId),
+    index("agent_tool_call_telemetry_action_call_id_idx").on(
+      table.actionCallId,
+    ),
+    index("agent_tool_call_telemetry_user_created_at_idx").on(
+      table.userId,
+      sql`${table.createdAt} DESC`,
+    ),
+  ],
+);
+
+export const llmProviderCalls = pgTable(
+  "llm_provider_calls",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    traceId: text("trace_id").notNull(),
+    userId: uuid("user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    conversationId: uuid("conversation_id").references(
+      () => agentConversations.id,
+      { onDelete: "set null" },
+    ),
+    agentTurnId: uuid("agent_turn_id").references(
+      () => agentTurnTelemetry.id,
+      { onDelete: "set null" },
+    ),
+    turnId: uuid("turn_id"),
+    actionCallId: uuid("action_call_id"),
+    featureSurface: text("feature_surface").notNull(),
+    provider: text("provider").notNull(),
+    providerRequestId: text("provider_request_id"),
+    providerGenerationId: text("provider_generation_id"),
+    requestedModel: text("requested_model").notNull(),
+    servedModel: text("served_model"),
+    routingJson: jsonb("routing_json").$type<unknown>(),
+    inputMode: text("input_mode"),
+    promptTokens: integer("prompt_tokens"),
+    completionTokens: integer("completion_tokens"),
+    totalTokens: integer("total_tokens"),
+    reasoningTokens: integer("reasoning_tokens"),
+    cachedInputTokens: integer("cached_input_tokens"),
+    audioTokens: integer("audio_tokens"),
+    imageTokens: integer("image_tokens"),
+    providerCostAmount: numeric("provider_cost_amount", {
+      precision: 12,
+      scale: 6,
+    }),
+    estimatedCostAmount: numeric("estimated_cost_amount", {
+      precision: 12,
+      scale: 6,
+    }),
+    costCurrency: text("cost_currency"),
+    costSource: text("cost_source").notNull().default("unknown"),
+    inputTokenUnitPrice: numeric("input_token_unit_price", {
+      precision: 12,
+      scale: 8,
+    }),
+    outputTokenUnitPrice: numeric("output_token_unit_price", {
+      precision: 12,
+      scale: 8,
+    }),
+    reasoningTokenUnitPrice: numeric("reasoning_token_unit_price", {
+      precision: 12,
+      scale: 8,
+    }),
+    cachedInputTokenUnitPrice: numeric("cached_input_token_unit_price", {
+      precision: 12,
+      scale: 8,
+    }),
+    audioTokenUnitPrice: numeric("audio_token_unit_price", {
+      precision: 12,
+      scale: 8,
+    }),
+    imageTokenUnitPrice: numeric("image_token_unit_price", {
+      precision: 12,
+      scale: 8,
+    }),
+    pricingSource: text("pricing_source"),
+    pricingVersion: text("pricing_version"),
+    pricingEffectiveAt: timestamp("pricing_effective_at", {
+      withTimezone: true,
+    }),
+    status: text("status").notNull(),
+    errorCode: text("error_code"),
+    errorMessage: text("error_message"),
+    durationMs: integer("duration_ms"),
+    metadataJson: jsonb("metadata_json")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("llm_provider_calls_created_at_idx").on(
+      sql`${table.createdAt} DESC`,
+    ),
+    index("llm_provider_calls_trace_id_idx").on(table.traceId),
+    index("llm_provider_calls_user_created_at_idx").on(
+      table.userId,
+      sql`${table.createdAt} DESC`,
+    ),
+    index("llm_provider_calls_conversation_created_at_idx").on(
+      table.conversationId,
+      sql`${table.createdAt} DESC`,
+    ),
+    index("llm_provider_calls_turn_id_idx").on(table.turnId),
+    index("llm_provider_calls_model_created_at_idx").on(
+      table.requestedModel,
+      sql`${table.createdAt} DESC`,
+    ),
+  ],
+);
+
+export const transcriptionRecords = pgTable(
+  "transcription_records",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    traceId: text("trace_id").notNull(),
+    userId: uuid("user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    conversationId: uuid("conversation_id").references(
+      () => agentConversations.id,
+      { onDelete: "set null" },
+    ),
+    turnId: uuid("turn_id"),
+    surface: text("surface").notNull(),
+    provider: text("provider"),
+    model: text("model"),
+    language: text("language"),
+    audioMimeType: text("audio_mime_type"),
+    audioBytes: integer("audio_bytes"),
+    audioDurationMs: integer("audio_duration_ms"),
+    transcriptText: text("transcript_text"),
+    transcriptLength: integer("transcript_length").notNull().default(0),
+    durationMs: integer("duration_ms"),
+    status: text("status").notNull(),
+    errorCode: text("error_code"),
+    errorMessage: text("error_message"),
+    downstreamResultKind: text("downstream_result_kind"),
+    metadataJson: jsonb("metadata_json")
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("transcription_records_created_at_idx").on(
+      sql`${table.createdAt} DESC`,
+    ),
+    index("transcription_records_trace_id_idx").on(table.traceId),
+    index("transcription_records_user_created_at_idx").on(
+      table.userId,
+      sql`${table.createdAt} DESC`,
+    ),
+    index("transcription_records_conversation_created_at_idx").on(
+      table.conversationId,
+      sql`${table.createdAt} DESC`,
+    ),
+    index("transcription_records_turn_id_idx").on(table.turnId),
+  ],
+);
+
 export const agentConnections = pgTable("agent_connections", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id")
@@ -1388,9 +1742,13 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   auditEvents: many(auditEvents),
   telemetryEvents: many(telemetryEvents),
   llmRuns: many(llmRuns),
+  agentTurns: many(agentTurnTelemetry),
+  llmProviderCalls: many(llmProviderCalls),
+  transcriptionRecords: many(transcriptionRecords),
   foodSearchEvents: many(foodSearchEvents),
   agentConversations: many(agentConversations),
   agentMessages: many(agentMessages),
+  agentCandidateRegistries: many(agentCandidateRegistries),
 }));
 
 export const foodItemsRelations = relations(foodItems, ({ one, many }) => ({
@@ -1450,13 +1808,109 @@ export const agentConversationsRelations = relations(
       references: [users.id],
     }),
     messages: many(agentMessages),
+    turns: many(agentTurnTelemetry),
+    toolCalls: many(agentToolCallTelemetry),
+    providerCalls: many(llmProviderCalls),
+    transcriptionRecords: many(transcriptionRecords),
+    candidateRegistries: many(agentCandidateRegistries),
   }),
 );
 
-export const agentMessagesRelations = relations(agentMessages, ({ one }) => ({
-  user: one(users, { fields: [agentMessages.userId], references: [users.id] }),
-  conversation: one(agentConversations, {
-    fields: [agentMessages.conversationId],
-    references: [agentConversations.id],
+export const agentMessagesRelations = relations(
+  agentMessages,
+  ({ one, many }) => ({
+    user: one(users, {
+      fields: [agentMessages.userId],
+      references: [users.id],
+    }),
+    conversation: one(agentConversations, {
+      fields: [agentMessages.conversationId],
+      references: [agentConversations.id],
+    }),
+    candidateRegistries: many(agentCandidateRegistries),
   }),
-}));
+);
+
+export const agentCandidateRegistriesRelations = relations(
+  agentCandidateRegistries,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [agentCandidateRegistries.userId],
+      references: [users.id],
+    }),
+    conversation: one(agentConversations, {
+      fields: [agentCandidateRegistries.conversationId],
+      references: [agentConversations.id],
+    }),
+    message: one(agentMessages, {
+      fields: [agentCandidateRegistries.messageId],
+      references: [agentMessages.id],
+    }),
+  }),
+);
+
+export const agentTurnTelemetryRelations = relations(
+  agentTurnTelemetry,
+  ({ one, many }) => ({
+    user: one(users, {
+      fields: [agentTurnTelemetry.userId],
+      references: [users.id],
+    }),
+    conversation: one(agentConversations, {
+      fields: [agentTurnTelemetry.conversationId],
+      references: [agentConversations.id],
+    }),
+    toolCalls: many(agentToolCallTelemetry),
+    providerCalls: many(llmProviderCalls),
+  }),
+);
+
+export const agentToolCallTelemetryRelations = relations(
+  agentToolCallTelemetry,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [agentToolCallTelemetry.userId],
+      references: [users.id],
+    }),
+    conversation: one(agentConversations, {
+      fields: [agentToolCallTelemetry.conversationId],
+      references: [agentConversations.id],
+    }),
+    turn: one(agentTurnTelemetry, {
+      fields: [agentToolCallTelemetry.agentTurnId],
+      references: [agentTurnTelemetry.id],
+    }),
+  }),
+);
+
+export const llmProviderCallsRelations = relations(
+  llmProviderCalls,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [llmProviderCalls.userId],
+      references: [users.id],
+    }),
+    conversation: one(agentConversations, {
+      fields: [llmProviderCalls.conversationId],
+      references: [agentConversations.id],
+    }),
+    turn: one(agentTurnTelemetry, {
+      fields: [llmProviderCalls.agentTurnId],
+      references: [agentTurnTelemetry.id],
+    }),
+  }),
+);
+
+export const transcriptionRecordsRelations = relations(
+  transcriptionRecords,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [transcriptionRecords.userId],
+      references: [users.id],
+    }),
+    conversation: one(agentConversations, {
+      fields: [transcriptionRecords.conversationId],
+      references: [agentConversations.id],
+    }),
+  }),
+);

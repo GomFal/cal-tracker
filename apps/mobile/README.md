@@ -88,3 +88,19 @@ Release and uploads the `.apk` plus `.sha256`.
 Mobile release tags intentionally use the prefix `mobile-...` and must not
 start with `v`, because this repository deploys the backend to production from
 `v*` tags.
+
+## Deploy APKs To The Server
+
+Server-hosted APKs are built by the manual **Mobile APK Deploy** GitHub Actions
+workflow. The workflow generates the Flutter `dart-define` config from these
+repository secrets before running the Android build:
+
+- `MOBILE_DEV_API_BASE_URL`
+- `MOBILE_DEV_GOOGLE_SERVER_CLIENT_ID`
+- `MOBILE_DEV_GOOGLE_ANDROID_CLIENT_ID`
+- `MOBILE_PROD_API_BASE_URL`
+- `MOBILE_PROD_GOOGLE_SERVER_CLIENT_ID`
+- `MOBILE_PROD_GOOGLE_ANDROID_CLIENT_ID`
+
+It then publishes the already-built APK through
+`scripts/mobile/deploy-server-apks.sh`.

@@ -20,6 +20,13 @@ import { subtractNutrition, sumNutrition } from "../utils/nutrition.js";
 import { fuzzyFoodScore, lexicalFoodScore } from "./foodSearchScoring.js";
 import type {
   ActionCallRecord,
+  AdminActionCallFilter,
+  AdminConversationFilter,
+  AgentToolCallTelemetryFilter,
+  AgentToolCallTelemetryRecord,
+  AgentTurnTelemetryFilter,
+  AgentTurnTelemetryRecord,
+  AgentCandidateRegistryRecord,
   AgentConversationMessageRecord,
   AgentConversationRecord,
   AppRepository,
@@ -35,6 +42,10 @@ import type {
   FoodSearchEventRecord,
   LlmRunFilter,
   LlmRunRecord,
+  LlmCostFilter,
+  LlmCostOverview,
+  LlmProviderCallFilter,
+  LlmProviderCallRecord,
   MemoryMatch,
   PendingRegistrationRecord,
   StoredSession,
@@ -42,6 +53,8 @@ import type {
   TelemetryEventFilter,
   TelemetryEventRecord,
   TelemetryOverview,
+  TranscriptionRecord,
+  TranscriptionRecordFilter,
   UpsertFoodItemEmbeddingInput,
   UserFoodPreference,
   UpdateDailyGoalsInput,
@@ -104,11 +117,16 @@ export class InMemoryRepository implements AppRepository {
   private telemetryEvents: TelemetryEventRecord[] = [];
   private llmRuns: LlmRunRecord[] = [];
   private foodSearchEvents: FoodSearchEventRecord[] = [];
+  private agentTurns: AgentTurnTelemetryRecord[] = [];
+  private agentToolCalls: AgentToolCallTelemetryRecord[] = [];
+  private llmProviderCalls: LlmProviderCallRecord[] = [];
+  private transcriptionRecords: TranscriptionRecord[] = [];
   private agentConversations = new Map<string, AgentConversationRecord>();
   private agentConversationMessages = new Map<
     string,
     AgentConversationMessageRecord[]
   >();
+  private agentCandidateRegistries = new Map<string, AgentCandidateRegistryRecord>();
 
   static seeded(): InMemoryRepository {
     return new InMemoryRepository();
@@ -1073,6 +1091,41 @@ export class InMemoryRepository implements AppRepository {
     return [...(this.agentConversationMessages.get(conversationId) ?? [])];
   }
 
+  async saveAgentCandidateRegistry(
+    input: Omit<AgentCandidateRegistryRecord, "id" | "createdAt">,
+  ): Promise<AgentCandidateRegistryRecord> {
+    const key = `${input.userId}:${input.searchRef}`;
+    const existing = this.agentCandidateRegistries.get(key);
+    const registry: AgentCandidateRegistryRecord = {
+      ...input,
+      id: existing?.id ?? newId(),
+      messageId: input.messageId ?? existing?.messageId,
+      createdAt: existing?.createdAt ?? new Date().toISOString(),
+    };
+    this.agentCandidateRegistries.set(key, registry);
+    return registry;
+  }
+
+  async getAgentCandidateRegistryBySearchRef(
+    userId: string,
+    searchRef: string,
+  ): Promise<AgentCandidateRegistryRecord | undefined> {
+    return this.agentCandidateRegistries.get(`${userId}:${searchRef}`);
+  }
+
+  async getLatestAgentCandidateRegistry(
+    userId: string,
+    conversationId: string,
+  ): Promise<AgentCandidateRegistryRecord | undefined> {
+    return [...this.agentCandidateRegistries.values()]
+      .filter(
+        (registry) =>
+          registry.userId === userId &&
+          registry.conversationId === conversationId,
+      )
+      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))[0];
+  }
+
   async deleteAgentConversation(
     userId: string,
     conversationId: string,
@@ -1126,8 +1179,88 @@ export class InMemoryRepository implements AppRepository {
     return this.actionCalls.filter((call) => call.userId === userId);
   }
 
+  async listAdminActionCalls(
+    filter: AdminActionCallFilter,
+  ): Promise<ActionCallRecord[]> {
+    const rows = this.actionCalls.filter((call) => {
+      if (filter.userId && call.userId !== filter.userId) return false;
+      if (filter.traceId && call.traceId !== filter.traceId) return false;
+      if (filter.actionId && call.actionId !== filter.actionId) return false;
+      if (filter.from && call.createdAt < filter.from) return false;
+      if (filter.to && call.createdAt > filter.to) return false;
+      return true;
+    });
+    return newestFirst(rows, filter.limit);
+  }
+
   async listAuditEvents(userId: string): Promise<AuditEventRecord[]> {
     return this.auditEvents.filter((event) => event.userId === userId);
+  }
+
+  async listAdminAgentConversations(
+    filter: AdminConversationFilter,
+  ): Promise<AgentConversationRecord[]> {
+    const matchingMessageConversationIds = new Set<string>();
+    if (filter.traceId || filter.turnId) {
+      for (const [conversationId, messages] of this.agentConversationMessages) {
+        if (
+          messages.some((message) => {
+            if (filter.traceId && message.traceId !== filter.traceId) {
+              return false;
+            }
+            if (filter.turnId && message.turnId !== filter.turnId) {
+              return false;
+            }
+            return true;
+          })
+        ) {
+          matchingMessageConversationIds.add(conversationId);
+        }
+      }
+    }
+    const rows = [...this.agentConversations.values()].filter((conversation) => {
+      if (!filter.includeHidden && conversation.hiddenFromUserAt) return false;
+      if (filter.userId && conversation.userId !== filter.userId) return false;
+      if (filter.conversationId && conversation.id !== filter.conversationId) {
+        return false;
+      }
+      if (
+        (filter.traceId || filter.turnId) &&
+        !matchingMessageConversationIds.has(conversation.id)
+      ) {
+        return false;
+      }
+      if (filter.from && conversation.updatedAt < filter.from) return false;
+      if (filter.to && conversation.updatedAt > filter.to) return false;
+      return true;
+    });
+    return newestFirst(rows, filter.limit, "updatedAt");
+  }
+
+  async getAdminAgentConversationMessages(
+    conversationId: string,
+    includeHidden = false,
+  ): Promise<AgentConversationMessageRecord[]> {
+    const conversation = this.agentConversations.get(conversationId);
+    if (!conversation) return [];
+    if (!includeHidden && conversation.hiddenFromUserAt) return [];
+    return [...(this.agentConversationMessages.get(conversationId) ?? [])].sort(
+      (a, b) => a.createdAt.localeCompare(b.createdAt),
+    );
+  }
+
+  async listAgentConversationMessagesByTrace(
+    traceId: string,
+    includeHidden = false,
+  ): Promise<AgentConversationMessageRecord[]> {
+    const rows: AgentConversationMessageRecord[] = [];
+    for (const [conversationId, messages] of this.agentConversationMessages) {
+      const conversation = this.agentConversations.get(conversationId);
+      if (!conversation) continue;
+      if (!includeHidden && conversation.hiddenFromUserAt) continue;
+      rows.push(...messages.filter((message) => message.traceId === traceId));
+    }
+    return rows.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   }
 
   async createTelemetryEvent(
@@ -1182,12 +1315,155 @@ export class InMemoryRepository implements AppRepository {
         return false;
       if (filter.traceId && run.traceId !== filter.traceId) return false;
       if (filter.userId && run.userId !== filter.userId) return false;
+      if (filter.conversationId && run.conversationId !== filter.conversationId)
+        return false;
+      if (filter.turnId && run.turnId !== filter.turnId) return false;
       if (filter.from && run.createdAt < filter.from) return false;
       if (filter.to && run.createdAt > filter.to) return false;
       return true;
     });
     rows.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
     return filter.limit !== undefined ? rows.slice(0, filter.limit) : rows;
+  }
+
+  async createAgentTurnTelemetry(
+    input: Omit<AgentTurnTelemetryRecord, "id" | "createdAt">,
+  ): Promise<AgentTurnTelemetryRecord> {
+    const record: AgentTurnTelemetryRecord = {
+      ...input,
+      id: newId(),
+      createdAt: new Date().toISOString(),
+    };
+    this.agentTurns.push(record);
+    return record;
+  }
+
+  async listAgentTurnTelemetry(
+    filter: AgentTurnTelemetryFilter,
+  ): Promise<AgentTurnTelemetryRecord[]> {
+    const rows = this.agentTurns.filter((turn) => {
+      if (filter.userId && turn.userId !== filter.userId) return false;
+      if (filter.conversationId && turn.conversationId !== filter.conversationId)
+        return false;
+      if (filter.traceId && turn.traceId !== filter.traceId) return false;
+      if (filter.turnId && turn.turnId !== filter.turnId) return false;
+      if (filter.inputMode && turn.inputMode !== filter.inputMode) return false;
+      if (filter.status && turn.status !== filter.status) return false;
+      if (filter.from && turn.createdAt < filter.from) return false;
+      if (filter.to && turn.createdAt > filter.to) return false;
+      return true;
+    });
+    return newestFirst(rows, filter.limit);
+  }
+
+  async createAgentToolCallTelemetry(
+    input: Omit<AgentToolCallTelemetryRecord, "id" | "createdAt">,
+  ): Promise<AgentToolCallTelemetryRecord> {
+    const record: AgentToolCallTelemetryRecord = {
+      ...input,
+      id: newId(),
+      createdAt: new Date().toISOString(),
+    };
+    this.agentToolCalls.push(record);
+    return record;
+  }
+
+  async listAgentToolCallTelemetry(
+    filter: AgentToolCallTelemetryFilter,
+  ): Promise<AgentToolCallTelemetryRecord[]> {
+    const rows = this.agentToolCalls.filter((call) => {
+      if (filter.userId && call.userId !== filter.userId) return false;
+      if (filter.conversationId && call.conversationId !== filter.conversationId)
+        return false;
+      if (filter.traceId && call.traceId !== filter.traceId) return false;
+      if (filter.turnId && call.turnId !== filter.turnId) return false;
+      if (filter.actionId && call.actionId !== filter.actionId) return false;
+      if (filter.status && call.status !== filter.status) return false;
+      if (filter.from && call.createdAt < filter.from) return false;
+      if (filter.to && call.createdAt > filter.to) return false;
+      return true;
+    });
+    return newestFirst(rows, filter.limit);
+  }
+
+  async createLlmProviderCall(
+    input: Omit<LlmProviderCallRecord, "id" | "createdAt">,
+  ): Promise<LlmProviderCallRecord> {
+    const record: LlmProviderCallRecord = {
+      ...input,
+      id: newId(),
+      createdAt: new Date().toISOString(),
+    };
+    this.llmProviderCalls.push(record);
+    return record;
+  }
+
+  async listLlmProviderCalls(
+    filter: LlmProviderCallFilter,
+  ): Promise<LlmProviderCallRecord[]> {
+    const rows = this.llmProviderCalls.filter((call) => {
+      if (filter.userId && call.userId !== filter.userId) return false;
+      if (filter.conversationId && call.conversationId !== filter.conversationId)
+        return false;
+      if (filter.traceId && call.traceId !== filter.traceId) return false;
+      if (filter.turnId && call.turnId !== filter.turnId) return false;
+      if (filter.provider && call.provider !== filter.provider) return false;
+      if (filter.model && call.requestedModel !== filter.model) return false;
+      if (filter.status && call.status !== filter.status) return false;
+      if (filter.costSource && call.costSource !== filter.costSource)
+        return false;
+      if (filter.from && call.createdAt < filter.from) return false;
+      if (filter.to && call.createdAt > filter.to) return false;
+      return true;
+    });
+    return newestFirst(rows, filter.limit);
+  }
+
+  async createTranscriptionRecord(
+    input: Omit<TranscriptionRecord, "id" | "createdAt">,
+  ): Promise<TranscriptionRecord> {
+    const record: TranscriptionRecord = {
+      ...input,
+      id: newId(),
+      createdAt: new Date().toISOString(),
+    };
+    this.transcriptionRecords.push(record);
+    return record;
+  }
+
+  async listTranscriptionRecords(
+    filter: TranscriptionRecordFilter,
+  ): Promise<TranscriptionRecord[]> {
+    const rows = this.transcriptionRecords.filter((record) => {
+      if (filter.userId && record.userId !== filter.userId) return false;
+      if (
+        filter.conversationId &&
+        record.conversationId !== filter.conversationId
+      )
+        return false;
+      if (filter.traceId && record.traceId !== filter.traceId) return false;
+      if (filter.turnId && record.turnId !== filter.turnId) return false;
+      if (filter.surface && record.surface !== filter.surface) return false;
+      if (filter.status && record.status !== filter.status) return false;
+      if (filter.from && record.createdAt < filter.from) return false;
+      if (filter.to && record.createdAt > filter.to) return false;
+      return true;
+    });
+    return newestFirst(rows, filter.limit);
+  }
+
+  async getLlmCostOverview(filter: LlmCostFilter): Promise<LlmCostOverview> {
+    const calls = this.llmProviderCalls.filter((call) => {
+      if (call.createdAt < filter.from || call.createdAt > filter.to) {
+        return false;
+      }
+      if (filter.userId && call.userId !== filter.userId) return false;
+      if (filter.conversationId && call.conversationId !== filter.conversationId)
+        return false;
+      if (filter.traceId && call.traceId !== filter.traceId) return false;
+      return true;
+    });
+    return buildCostOverview(filter.from, filter.to, calls);
   }
 
   async createFoodSearchEvent(
@@ -1237,6 +1513,16 @@ export class InMemoryRepository implements AppRepository {
     const foodSearches = this.foodSearchEvents.filter((s) =>
       inRange(s.createdAt),
     );
+    const conversations = [...this.agentConversations.values()].filter((c) =>
+      inRange(c.updatedAt),
+    );
+    const agentTurns = this.agentTurns.filter((t) => inRange(t.createdAt));
+    const providerCalls = this.llmProviderCalls.filter((c) =>
+      inRange(c.createdAt),
+    );
+    const transcriptions = this.transcriptionRecords.filter((r) =>
+      inRange(r.createdAt),
+    );
     const eventsBySeverity: Record<string, number> = {};
     const eventsBySurface: Record<string, number> = {};
     const userIds = new Set<string>();
@@ -1257,6 +1543,18 @@ export class InMemoryRepository implements AppRepository {
       traceIds.add(search.traceId);
       if (search.userId) userIds.add(search.userId);
     }
+    for (const turn of agentTurns) {
+      traceIds.add(turn.traceId);
+      if (turn.userId) userIds.add(turn.userId);
+    }
+    for (const call of providerCalls) {
+      traceIds.add(call.traceId);
+      if (call.userId) userIds.add(call.userId);
+    }
+    for (const record of transcriptions) {
+      traceIds.add(record.traceId);
+      if (record.userId) userIds.add(record.userId);
+    }
     const recentResultKinds: Record<string, number> = {};
     for (const run of llmRuns) {
       if (!run.resultKind) continue;
@@ -1276,6 +1574,19 @@ export class InMemoryRepository implements AppRepository {
       totalEvents: events.length,
       totalLlmRuns: llmRuns.length,
       totalFoodSearchEvents: foodSearches.length,
+      totalConversations: conversations.length,
+      totalAgentTurns: agentTurns.length,
+      totalProviderCalls: providerCalls.length,
+      totalTranscriptions: transcriptions.length,
+      providerCostAmount: sumOptionalNumber(
+        providerCalls.map((call) => call.providerCostAmount),
+      ),
+      estimatedCostAmount: sumOptionalNumber(
+        providerCalls.map((call) => call.estimatedCostAmount),
+      ),
+      unknownCostCount: providerCalls.filter(
+        (call) => call.costSource === "unknown",
+      ).length,
       uniqueUsers: userIds.size,
       uniqueTraces: traceIds.size,
       eventsBySeverity,
@@ -1408,6 +1719,89 @@ function aliasesFromNutrients(
 
 function uniqueStrings(values: string[]): string[] {
   return [...new Set(values)];
+}
+
+function newestFirst<T extends Record<string, unknown>>(
+  rows: T[],
+  limit?: number,
+  timestampKey: keyof T = "createdAt",
+): T[] {
+  const sorted = [...rows].sort((a, b) =>
+    String(a[timestampKey]) < String(b[timestampKey]) ? 1 : -1,
+  );
+  return limit !== undefined ? sorted.slice(0, limit) : sorted;
+}
+
+function buildCostOverview(
+  from: string,
+  to: string,
+  calls: LlmProviderCallRecord[],
+): LlmCostOverview {
+  const providerCost = sumOptionalNumber(
+    calls.map((call) => call.providerCostAmount),
+  );
+  const estimatedCost = sumOptionalNumber(
+    calls.map((call) => call.estimatedCostAmount),
+  );
+  return {
+    from,
+    to,
+    totalProviderCostAmount: providerCost,
+    totalEstimatedCostAmount: estimatedCost,
+    totalCostAmount: providerCost + estimatedCost,
+    unknownCostCount: calls.filter((call) => call.costSource === "unknown")
+      .length,
+    totalPromptTokens: sumOptionalNumber(calls.map((call) => call.promptTokens)),
+    totalCompletionTokens: sumOptionalNumber(
+      calls.map((call) => call.completionTokens),
+    ),
+    totalTokens: sumOptionalNumber(calls.map((call) => call.totalTokens)),
+    byUser: costBreakdown(calls, (call) => call.userId ?? "unknown"),
+    byConversation: costBreakdown(
+      calls,
+      (call) => call.conversationId ?? "unknown",
+    ),
+    byTurn: costBreakdown(calls, (call) => call.turnId ?? "unknown"),
+    byModel: costBreakdown(calls, (call) => call.requestedModel),
+    byProvider: costBreakdown(calls, (call) => call.provider),
+    byFeature: costBreakdown(calls, (call) => call.featureSurface),
+    byDay: costBreakdown(calls, (call) => call.createdAt.slice(0, 10)),
+  };
+}
+
+function costBreakdown(
+  calls: LlmProviderCallRecord[],
+  keyFor: (call: LlmProviderCallRecord) => string,
+): LlmCostOverview["byUser"] {
+  const grouped = new Map<string, LlmProviderCallRecord[]>();
+  for (const call of calls) {
+    const key = keyFor(call);
+    grouped.set(key, [...(grouped.get(key) ?? []), call]);
+  }
+  return [...grouped.entries()]
+    .map(([key, group]) => {
+      const providerCostAmount = sumOptionalNumber(
+        group.map((call) => call.providerCostAmount),
+      );
+      const estimatedCostAmount = sumOptionalNumber(
+        group.map((call) => call.estimatedCostAmount),
+      );
+      return {
+        key,
+        providerCostAmount,
+        estimatedCostAmount,
+        totalCostAmount: providerCostAmount + estimatedCostAmount,
+        unknownCostCount: group.filter((call) => call.costSource === "unknown")
+          .length,
+        totalTokens: sumOptionalNumber(group.map((call) => call.totalTokens)),
+        callCount: group.length,
+      };
+    })
+    .sort((a, b) => b.totalCostAmount - a.totalCostAmount);
+}
+
+function sumOptionalNumber(values: Array<number | undefined>): number {
+  return values.reduce<number>((sum, value) => sum + (value ?? 0), 0);
 }
 
 function sanitizeLimit(limit?: number): number {

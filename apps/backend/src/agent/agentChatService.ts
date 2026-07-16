@@ -22,11 +22,20 @@ import type {
   AppRepository,
 } from "../repository/types.js";
 import {
+  extractGenerationId,
+  extractReasoningTokens,
+  extractTokenUsage,
   summarizeError,
   type LocalRunLogger,
 } from "../observability/localRunLogger.js";
+import {
+  DEFAULT_TELEMETRY_SERVICE,
+  type TelemetryService,
+} from "../telemetry/telemetryService.js";
+import { resolveLlmCost, type LlmCostResult } from "../telemetry/llmCost.js";
 import type {
   AgentMessage,
+  AgentToolDefinition,
   AgentToolCall,
   AgentToolDecision,
   ChatAgentProvider,
@@ -34,12 +43,24 @@ import type {
 import { buildChatSystemMessage } from "./agentMessages.js";
 import { buildToolSchemas } from "./toolSchemas.js";
 import { filterToolsByPolicy } from "./agentPolicy.js";
+import {
+  MODEL_FACING_SERIALIZER_VERSION,
+  buildToolContentForModel,
+  resolveCandidateReferenceFromMessages,
+  resolveCandidateReferenceFromRegistry,
+  selectedCandidateContent,
+  ultraCompactToolContent,
+  type AgentCandidateSelectionState,
+  type AgentChatCandidateSelection,
+  type CandidateRegistryMetadata,
+} from "./toolContent.js";
 
 const MAX_CHAT_ITERATIONS = 6;
 const MAX_TOOL_CALLS_PER_TURN = 8;
 const STORED_TOOL_RESULT_MAX_CHARS = 12000;
 const MAX_CONVERSATION_TITLE_CHARS = 64;
 const CHAT_OPTIONS_TOOL_NAME = "show_chat_options";
+const RESOLVE_CANDIDATE_REFERENCE_TOOL_NAME = "resolve_candidate_reference";
 
 type ChatTurnCorrelation = {
   traceId: string;
@@ -81,6 +102,7 @@ export type AgentChatMappedResult =
       message: string;
       options?: unknown[];
       candidateGroups?: unknown[];
+      selectionState?: AgentCandidateSelectionState;
     }
   | {
       kind: "meal_committed";
@@ -88,6 +110,7 @@ export type AgentChatMappedResult =
       message: string;
       options?: unknown[];
       candidateGroups?: unknown[];
+      selectionState?: AgentCandidateSelectionState;
     }
   | {
       kind: "meal_corrected";
@@ -109,6 +132,8 @@ export type AgentChatMappedResult =
       items: MealItem[];
       message: string;
       options?: unknown[];
+      candidateGroups?: unknown[];
+      selectionState?: AgentCandidateSelectionState;
     }
   | { kind: "usual_foods"; usualFoods: UsualFood[]; message: string }
   | { kind: "templates"; templates: MealTemplate[]; message: string }
@@ -125,6 +150,7 @@ export type AgentChatMappedResult =
       message: string;
       options?: unknown[];
       candidateGroups?: unknown[];
+      selectionState?: AgentCandidateSelectionState;
     }
   | {
       kind: "confirmation_required";
@@ -140,6 +166,7 @@ export type AgentChatMappedResult =
       options?: unknown[];
       candidateGroups?: unknown[];
       resolvedItems?: MealItem[];
+      selectionState?: AgentCandidateSelectionState;
     };
 
 export type AgentToolFeedback = {
@@ -157,7 +184,7 @@ export type AgentWidgetPayload = {
 };
 
 export type AgentChatEvent =
-  | { type: "conversation_started"; conversationId: string }
+  | { type: "conversation_started"; conversationId: string; turnId: string }
   | { type: "thinking"; conversationId?: string; message: string }
   | {
       type: "transcription_completed";
@@ -198,6 +225,8 @@ export class AgentChatService {
     private readonly repository: AppRepository,
     private readonly model: string,
     private readonly runLogger?: LocalRunLogger,
+    private readonly telemetryService: TelemetryService = DEFAULT_TELEMETRY_SERVICE,
+    private readonly selectionConfidenceThreshold = 0.75,
   ) {}
 
   async *chat(input: {
@@ -223,7 +252,11 @@ export class AgentChatService {
       conversationId: conversation.id,
       activeProposalId: input.activeProposalId,
     };
-    yield { type: "conversation_started", conversationId: conversation.id };
+    yield {
+      type: "conversation_started",
+      conversationId: conversation.id,
+      turnId: correlation.turnId,
+    };
 
     const text = input.text.trim();
     if (!text) {
@@ -273,6 +306,7 @@ export class AgentChatService {
               .parameters ?? {},
         },
       })),
+      candidateReferenceToolDefinition(),
       chatOptionsToolDefinition(),
     ];
 
@@ -285,6 +319,23 @@ export class AgentChatService {
     const executedSignatures = new Set<string>();
     let iteration = 0;
     let toolCallCount = 0;
+    let accumulatedPromptTokens = 0;
+    let accumulatedCompletionTokens = 0;
+    let accumulatedTotalTokens = 0;
+    let accumulatedReasoningTokens = 0;
+    let accumulatedProviderCost = 0;
+    let accumulatedEstimatedCost = 0;
+    let costCurrency: string | undefined;
+    let costSource: string | undefined;
+    let lastPricingSnapshot: Record<string, unknown> = {};
+    let latestAssistantText = "";
+    let latestResultKind: string | undefined;
+    let latestStopReason: string | undefined;
+    let firstByteMs: number | undefined;
+    let firstToolCallMs: number | undefined;
+    let largestStreamGapMs: number | undefined;
+    let accumulatedLlmMs = 0;
+    let accumulatedActionMs = 0;
 
     while (iteration < MAX_CHAT_ITERATIONS) {
       iteration++;
@@ -313,6 +364,18 @@ export class AgentChatService {
           error: summarizeError(error),
           timingsMs: { total: Date.now() - runStarted },
         });
+        await this.recordTurnTelemetry({
+          correlation,
+          userId: input.context.actorUserId,
+          text,
+          model: this.model,
+          iterationCount: iteration,
+          toolCallCount,
+          status: "failure",
+          errorCode: "provider_error",
+          errorMessage: error instanceof Error ? error.message : String(error),
+          totalMs: Date.now() - runStarted,
+        });
         yield {
           type: "error",
           conversationId: conversation.id,
@@ -323,8 +386,42 @@ export class AgentChatService {
 
       const assistantText =
         decision.interaction?.assistantContent?.trim() ?? "";
+      latestAssistantText = assistantText || latestAssistantText;
+      const tokenMetrics = extractLlmTokenMetrics(decision.rawResponse);
+      accumulatedPromptTokens += tokenMetrics.promptTokens ?? 0;
+      accumulatedCompletionTokens += tokenMetrics.completionTokens ?? 0;
+      accumulatedTotalTokens += tokenMetrics.totalTokens ?? 0;
+      accumulatedReasoningTokens += tokenMetrics.reasoningTokens ?? 0;
+      firstByteMs ??= decision.timingsMs?.firstByteMs;
+      firstToolCallMs ??= decision.timingsMs?.firstToolCallMs;
+      largestStreamGapMs = maxOptional(
+        largestStreamGapMs,
+        decision.timingsMs?.largestStreamGapMs,
+      );
+      accumulatedLlmMs += decision.timingsMs?.totalMs ?? 0;
+      const cost = resolveLlmCost({
+        rawResponse: decision.rawResponse,
+        model: this.model,
+        metrics: tokenMetrics,
+      });
+      accumulatedProviderCost += cost.providerCostAmount ?? 0;
+      accumulatedEstimatedCost += cost.estimatedCostAmount ?? 0;
+      costCurrency = cost.costCurrency ?? costCurrency;
+      costSource = mergeCostSource(costSource, cost.costSource);
+      lastPricingSnapshot = cost.pricingSnapshot;
+      await this.recordProviderTelemetry({
+        correlation,
+        userId: input.context.actorUserId,
+        decision,
+        iteration,
+        cost,
+        tokenMetrics,
+      });
       if (decision.toolCalls.length === 0) {
         const finalText = assistantText || "Done.";
+        latestAssistantText = finalText;
+        latestResultKind = "assistant_message";
+        latestStopReason = "assistant_message";
         await this.repository.addAgentConversationMessage(
           input.context.actorUserId,
           conversation.id,
@@ -332,6 +429,7 @@ export class AgentChatService {
             role: "assistant",
             content: finalText,
             ...messageCorrelation(correlation, {
+              iteration,
               resultKind: "assistant_message",
               stopReason: "assistant_message",
             }),
@@ -353,6 +451,33 @@ export class AgentChatService {
           toolCallCount,
           timingsMs: { total: Date.now() - runStarted },
         });
+        await this.recordTurnTelemetry({
+          correlation,
+          userId: input.context.actorUserId,
+          text,
+          assistantText: latestAssistantText,
+          model: this.model,
+          resultKind: latestResultKind,
+          stopReason: latestStopReason,
+          iterationCount: iteration,
+          toolCallCount,
+          promptTokens: zeroAsUndefined(accumulatedPromptTokens),
+          completionTokens: zeroAsUndefined(accumulatedCompletionTokens),
+          totalTokens: zeroAsUndefined(accumulatedTotalTokens),
+          reasoningTokens: zeroAsUndefined(accumulatedReasoningTokens),
+          providerCostAmount: zeroAsUndefined(accumulatedProviderCost),
+          estimatedCostAmount: zeroAsUndefined(accumulatedEstimatedCost),
+          costCurrency,
+          costSource,
+          pricingSnapshot: lastPricingSnapshot,
+          firstByteMs,
+          firstToolCallMs,
+          largestStreamGapMs,
+          llmMs: zeroAsUndefined(accumulatedLlmMs),
+          actionMs: zeroAsUndefined(accumulatedActionMs),
+          totalMs: Date.now() - runStarted,
+          status: "success",
+        });
         yield { type: "done", conversationId: conversation.id };
         return;
       }
@@ -362,6 +487,19 @@ export class AgentChatService {
         MAX_TOOL_CALLS_PER_TURN - toolCallCount,
       );
       if (toolCalls.length === 0) {
+        await this.recordTurnTelemetry({
+          correlation,
+          userId: input.context.actorUserId,
+          text,
+          assistantText: latestAssistantText,
+          model: this.model,
+          iterationCount: iteration,
+          toolCallCount,
+          status: "failure",
+          errorCode: "tool_call_limit",
+          errorMessage: "The assistant reached the tool-call limit for this turn.",
+          totalMs: Date.now() - runStarted,
+        });
         yield {
           type: "error",
           conversationId: conversation.id,
@@ -417,6 +555,16 @@ export class AgentChatService {
             correlation,
             { iteration, errorCode: "invalid_tool_arguments" },
           );
+          await this.recordToolCallTelemetry({
+            correlation,
+            userId: input.context.actorUserId,
+            toolCall,
+            actionId,
+            status: "failed",
+            errorMessage: error,
+            iteration,
+            toolCallIndex: toolCallCount,
+          });
           continue;
         }
 
@@ -441,6 +589,17 @@ export class AgentChatService {
               correlation,
               { iteration, errorCode: "invalid_chat_options" },
             );
+            await this.recordToolCallTelemetry({
+              correlation,
+              userId: input.context.actorUserId,
+              toolCall,
+              actionId,
+              arguments: parsedInput,
+              status: "failed",
+              errorMessage: error,
+              iteration,
+              toolCallIndex: toolCallCount,
+            });
             continue;
           }
 
@@ -467,6 +626,9 @@ export class AgentChatService {
             conversationId: conversation.id,
             suggestions: quickReply.suggestions,
           };
+          latestAssistantText = quickReply.message;
+          latestResultKind = "assistant_options";
+          latestStopReason = "assistant_options";
           await this.logRun({
             type: "agent.chat",
             traceId: input.context.traceId,
@@ -478,8 +640,126 @@ export class AgentChatService {
             toolCallCount,
             timingsMs: { total: Date.now() - runStarted },
           });
+          await this.recordToolCallTelemetry({
+            correlation,
+            userId: input.context.actorUserId,
+            toolCall,
+            actionId,
+            arguments: parsedInput,
+            resultSummary: quickReply,
+            status: "completed",
+            iteration,
+            toolCallIndex: toolCallCount,
+          });
+          await this.recordTurnTelemetry({
+            correlation,
+            userId: input.context.actorUserId,
+            text,
+            assistantText: latestAssistantText,
+            model: this.model,
+            resultKind: latestResultKind,
+            stopReason: latestStopReason,
+            iterationCount: iteration,
+            toolCallCount,
+            promptTokens: zeroAsUndefined(accumulatedPromptTokens),
+            completionTokens: zeroAsUndefined(accumulatedCompletionTokens),
+            totalTokens: zeroAsUndefined(accumulatedTotalTokens),
+            reasoningTokens: zeroAsUndefined(accumulatedReasoningTokens),
+            providerCostAmount: zeroAsUndefined(accumulatedProviderCost),
+            estimatedCostAmount: zeroAsUndefined(accumulatedEstimatedCost),
+            costCurrency,
+            costSource,
+            pricingSnapshot: lastPricingSnapshot,
+            firstByteMs,
+            firstToolCallMs,
+            largestStreamGapMs,
+            llmMs: zeroAsUndefined(accumulatedLlmMs),
+            actionMs: zeroAsUndefined(accumulatedActionMs),
+            totalMs: Date.now() - runStarted,
+            status: "success",
+          });
           yield { type: "done", conversationId: conversation.id };
           return;
+        }
+
+        if (actionId === RESOLVE_CANDIDATE_REFERENCE_TOOL_NAME) {
+          const feedback = describeToolCall(toolCall, parsedInput);
+          yield {
+            type: "tool_call_started",
+            conversationId: conversation.id,
+            toolCall: feedback,
+          };
+          const resolved = await this.resolveCandidateSelection(
+            input.context.actorUserId,
+            conversation.id,
+            parsedInput as AgentChatCandidateSelection,
+          );
+          const contentValue = resolved
+            ? selectedCandidateContent({
+                selection: parsedInput as AgentChatCandidateSelection,
+                resolved,
+              })
+            : {
+                actionId,
+                input: parsedInput,
+                error: "candidate_reference_not_found",
+              };
+          const toolContent = safeToolContent(JSON.stringify(contentValue));
+          const toolMessage: AgentMessage = {
+            role: "tool",
+            toolCallId: toolCall.id,
+            content: toolContent,
+          };
+          messages.push(toolMessage);
+          await this.repository.addAgentConversationMessage(
+            input.context.actorUserId,
+            conversation.id,
+            {
+              role: "tool",
+              content: toolContent,
+              toolCallId: toolCall.id,
+              ...messageCorrelation(correlation, {
+                actionId,
+                resultKind: resolved ? "candidate_reference" : "error",
+                iteration,
+                toolCallIndex: toolCallCount,
+              }),
+            },
+          );
+          if (resolved) {
+            yield {
+              type: "tool_call_completed",
+              conversationId: conversation.id,
+              toolCall: feedback,
+              result: {
+                kind: "nutrition_search",
+                items: [resolved.item],
+                message: "Selected nutrition candidate resolved.",
+              },
+            };
+          } else {
+            yield {
+              type: "tool_call_failed",
+              conversationId: conversation.id,
+              toolCall: feedback,
+              error: "Candidate reference not found.",
+            };
+          }
+          await this.recordToolCallTelemetry({
+            correlation,
+            userId: input.context.actorUserId,
+            toolCall,
+            actionId,
+            arguments: parsedInput,
+            resultSummary: resolved
+              ? { candidateRef: resolved.candidateRef }
+              : undefined,
+            status: resolved ? "completed" : "failed",
+            errorMessage: resolved ? undefined : "candidate_reference_not_found",
+            iteration,
+            toolCallIndex: toolCallCount,
+          });
+          continue;
         }
 
         if (!allowedActions.some((action) => action.id === actionId)) {
@@ -501,6 +781,17 @@ export class AgentChatService {
             correlation,
             { iteration, errorCode: "disallowed_tool" },
           );
+          await this.recordToolCallTelemetry({
+            correlation,
+            userId: input.context.actorUserId,
+            toolCall,
+            actionId,
+            arguments: parsedInput,
+            status: "failed",
+            errorMessage: error,
+            iteration,
+            toolCallIndex: toolCallCount,
+          });
           continue;
         }
 
@@ -538,6 +829,17 @@ export class AgentChatService {
             correlation,
             { iteration, errorCode: "repeated_tool_call" },
           );
+          await this.recordToolCallTelemetry({
+            correlation,
+            userId: input.context.actorUserId,
+            toolCall,
+            actionId,
+            arguments: parsedInput,
+            status: "skipped",
+            errorMessage: error,
+            iteration,
+            toolCallIndex: toolCallCount,
+          });
           continue;
         }
         executedSignatures.add(signature);
@@ -547,6 +849,7 @@ export class AgentChatService {
           toolCall: feedback,
         };
 
+        const actionStarted = Date.now();
         try {
           const result = await this.actionExecutor.execute(
             actionId,
@@ -557,6 +860,9 @@ export class AgentChatService {
             },
           );
           const mapped = mapActionResult(actionId, result, text);
+          const actionMs = Date.now() - actionStarted;
+          accumulatedActionMs += actionMs;
+          latestResultKind = mapped.kind;
           if ("proposal" in mapped && mapped.proposal) {
             currentActiveProposal = mapped.proposal;
           }
@@ -566,28 +872,36 @@ export class AgentChatService {
           ) {
             currentActiveProposal = undefined;
           }
-          const widget = widgetForResult(mapped);
+          const modelToolContent = buildToolContentForModel({
+            actionId,
+            actionCallId: result.actionCallId,
+            toolInput: parsedInput,
+            mappedResult: mapped as Record<string, unknown>,
+            rawOutput: result.output,
+            threshold: this.selectionConfidenceThreshold,
+          });
+          const mappedForUi = withSelectionState(
+            mapped,
+            modelToolContent.selectionState,
+          );
+          const widget = widgetForResult(mappedForUi);
           yield {
             type: "tool_call_completed",
             conversationId: conversation.id,
             toolCall: feedback,
-            result: mapped,
+            result: mappedForUi,
             widget,
           };
 
-          const toolContent = safeToolContent({
-            actionId,
-            input: parsedInput,
-            result: mapped,
-            rawOutput: result.output,
-          });
+          const toolContent = safeToolContent(modelToolContent.modelContent);
           const toolMessage: AgentMessage = {
             role: "tool",
             toolCallId: toolCall.id,
             content: toolContent,
           };
           messages.push(toolMessage);
-          await this.repository.addAgentConversationMessage(
+          const candidateRegistry = modelToolContent.candidateRegistry;
+          const storedToolMessage = await this.repository.addAgentConversationMessage(
             input.context.actorUserId,
             conversation.id,
             {
@@ -600,9 +914,60 @@ export class AgentChatService {
                 iteration,
                 toolCallIndex: toolCallCount,
                 resultKind: mapped.kind,
+                ...(candidateRegistry
+                  ? {
+                      candidateRegistryRef: candidateRegistry.searchRef,
+                      searchRef: candidateRegistry.searchRef,
+                      candidateCount: candidateRegistry.candidateCount,
+                      groupCount: candidateRegistry.groupCount,
+                    }
+                  : {}),
+                selectionState: modelToolContent.selectionState,
+                toolContentCompacted: true,
+                serializerVersion: modelToolContent.serializerVersion,
+                modelFacingRepresentation: modelToolContent.representation,
+                rawToolContentChars: modelToolContent.rawContentChars,
+                rawToolContentApproxTokens:
+                  modelToolContent.rawContentApproxTokens,
+                modelToolContentChars: modelToolContent.modelContentChars,
+                modelToolContentApproxTokens:
+                  modelToolContent.modelContentApproxTokens,
+                compressionRatio: modelToolContent.compressionRatio,
+                omittedPaths: modelToolContent.omittedPaths,
+                preservedPaths: modelToolContent.preservedPaths,
+                tonTables: modelToolContent.tonTables,
               }),
             },
           );
+          if (candidateRegistry) {
+            await this.repository.saveAgentCandidateRegistry({
+              userId: input.context.actorUserId,
+              conversationId: conversation.id,
+              messageId: storedToolMessage.id,
+              traceId: correlation.traceId,
+              turnId: correlation.turnId,
+              actionCallId: result.actionCallId,
+              searchRef: candidateRegistry.searchRef,
+              actionId,
+              candidateCount: candidateRegistry.candidateCount,
+              groupCount: candidateRegistry.groupCount,
+              threshold: candidateRegistry.threshold,
+              registry: candidateRegistry,
+            });
+          }
+          await this.recordToolCallTelemetry({
+            correlation,
+            userId: input.context.actorUserId,
+            toolCall,
+            actionId,
+            actionCallId: result.actionCallId,
+            arguments: parsedInput,
+            resultSummary: mapped,
+            status: "completed",
+            iteration,
+            toolCallIndex: toolCallCount,
+            durationMs: actionMs,
+          });
         } catch (error) {
           const errorText =
             error instanceof Error ? error.message : String(error);
@@ -633,6 +998,20 @@ export class AgentChatService {
               }),
             },
           );
+          const actionMs = Date.now() - actionStarted;
+          accumulatedActionMs += actionMs;
+          await this.recordToolCallTelemetry({
+            correlation,
+            userId: input.context.actorUserId,
+            toolCall,
+            actionId,
+            arguments: parsedInput,
+            status: "failed",
+            errorMessage: errorText,
+            iteration,
+            toolCallIndex: toolCallCount,
+            durationMs: actionMs,
+          });
         }
       }
     }
@@ -642,6 +1021,35 @@ export class AgentChatService {
       conversationId: conversation.id,
       error: "The assistant stopped after the maximum number of steps.",
     };
+    await this.recordTurnTelemetry({
+      correlation,
+      userId: input.context.actorUserId,
+      text,
+      assistantText: latestAssistantText,
+      model: this.model,
+      resultKind: latestResultKind,
+      stopReason: "max_iterations",
+      iterationCount: iteration,
+      toolCallCount,
+      promptTokens: zeroAsUndefined(accumulatedPromptTokens),
+      completionTokens: zeroAsUndefined(accumulatedCompletionTokens),
+      totalTokens: zeroAsUndefined(accumulatedTotalTokens),
+      reasoningTokens: zeroAsUndefined(accumulatedReasoningTokens),
+      providerCostAmount: zeroAsUndefined(accumulatedProviderCost),
+      estimatedCostAmount: zeroAsUndefined(accumulatedEstimatedCost),
+      costCurrency,
+      costSource,
+      pricingSnapshot: lastPricingSnapshot,
+      firstByteMs,
+      firstToolCallMs,
+      largestStreamGapMs,
+      llmMs: zeroAsUndefined(accumulatedLlmMs),
+      actionMs: zeroAsUndefined(accumulatedActionMs),
+      totalMs: Date.now() - runStarted,
+      status: "failure",
+      errorCode: "max_iterations",
+      errorMessage: "The assistant stopped after the maximum number of steps.",
+    });
   }
 
   private async resolveConversation(
@@ -698,8 +1106,230 @@ export class AgentChatService {
     );
     return [
       buildChatSystemMessage(context, activeProposal),
-      ...stored.map(storedMessageToAgentMessage),
+      ...storedMessagesForModel(stored),
     ];
+  }
+
+  private async resolveCandidateSelection(
+    userId: string,
+    conversationId: string,
+    selection: AgentChatCandidateSelection,
+  ): Promise<
+    | {
+        registry: CandidateRegistryMetadata;
+        candidateRef: string;
+        item: MealItem;
+      }
+    | undefined
+  > {
+    const storedRegistry = selection.searchRef
+      ? await this.repository.getAgentCandidateRegistryBySearchRef(
+          userId,
+          selection.searchRef,
+        )
+      : await this.repository.getLatestAgentCandidateRegistry(
+          userId,
+          conversationId,
+        );
+    const registry = candidateRegistryFromStoredValue(storedRegistry?.registry);
+    const resolved = resolveCandidateReferenceFromRegistry(registry, selection);
+    if (resolved) return resolved;
+    const stored = await this.repository.listAgentConversationMessages(
+      userId,
+      conversationId,
+    );
+    return resolveCandidateReferenceFromMessages(stored, selection);
+  }
+
+  private async recordProviderTelemetry(input: {
+    correlation: ChatTurnCorrelation;
+    userId: string;
+    decision: AgentToolDecision;
+    iteration: number;
+    cost: LlmCostResult;
+    tokenMetrics: ReturnType<typeof extractLlmTokenMetrics>;
+  }): Promise<void> {
+    try {
+      await this.telemetryService.recordLlmProviderCall({
+        traceId: input.correlation.traceId,
+        userId: input.userId,
+        conversationId: input.correlation.conversationId,
+        turnId: input.correlation.turnId,
+        featureSurface: "agent_chat",
+        provider: "openrouter",
+        providerGenerationId: extractGenerationId(input.decision.rawResponse),
+        requestedModel: this.model,
+        routing: input.decision.providerRouting,
+        inputMode: input.correlation.inputMode,
+        promptTokens: input.tokenMetrics.promptTokens,
+        completionTokens: input.tokenMetrics.completionTokens,
+        totalTokens: input.tokenMetrics.totalTokens,
+        reasoningTokens: input.tokenMetrics.reasoningTokens,
+        providerCostAmount: input.cost.providerCostAmount,
+        estimatedCostAmount: input.cost.estimatedCostAmount,
+        costCurrency: input.cost.costCurrency,
+        costSource: input.cost.costSource,
+        inputTokenUnitPrice: input.cost.inputTokenUnitPrice,
+        outputTokenUnitPrice: input.cost.outputTokenUnitPrice,
+        reasoningTokenUnitPrice: input.cost.reasoningTokenUnitPrice,
+        cachedInputTokenUnitPrice: input.cost.cachedInputTokenUnitPrice,
+        pricingSource: input.cost.pricingSource,
+        pricingVersion: input.cost.pricingVersion,
+        pricingEffectiveAt: input.cost.pricingEffectiveAt,
+        status: "success",
+        durationMs: input.decision.timingsMs?.totalMs,
+        metadata: {
+          iteration: input.iteration,
+          toolCallCount: input.decision.toolCalls.length,
+          streamEventCount: input.decision.timingsMs?.streamEventCount,
+        },
+      });
+      await this.telemetryService.recordLlmRun({
+        flow: "llm_run",
+        surface: "agent",
+        traceId: input.correlation.traceId,
+        userId: input.userId,
+        conversationId: input.correlation.conversationId,
+        turnId: input.correlation.turnId,
+        provider: "openrouter",
+        providerGenerationId: extractGenerationId(input.decision.rawResponse),
+        model: this.model,
+        source: input.correlation.source,
+        inputMode: input.correlation.inputMode,
+        activeProposalId: input.correlation.activeProposalId,
+        outcome: "success",
+        selectedTool: input.decision.toolCalls[0]?.function.name,
+        promptTokens: input.tokenMetrics.promptTokens,
+        completionTokens: input.tokenMetrics.completionTokens,
+        totalTokens: input.tokenMetrics.totalTokens,
+        reasoningTokens: input.tokenMetrics.reasoningTokens,
+        firstByteMs: input.decision.timingsMs?.firstByteMs,
+        firstToolCallMs: input.decision.timingsMs?.firstToolCallMs,
+        largestStreamGapMs: input.decision.timingsMs?.largestStreamGapMs,
+        timingsMs: { llm: input.decision.timingsMs?.totalMs },
+        providerCostAmount: input.cost.providerCostAmount,
+        estimatedCostAmount: input.cost.estimatedCostAmount,
+        costCurrency: input.cost.costCurrency,
+        costSource: input.cost.costSource,
+        pricingSnapshot: input.cost.pricingSnapshot,
+        metadata: { iteration: input.iteration },
+      });
+    } catch (error) {
+      console.warn("agent.chat_provider_telemetry.failed", summarizeError(error));
+    }
+  }
+
+  private async recordToolCallTelemetry(input: {
+    correlation: ChatTurnCorrelation;
+    userId: string;
+    toolCall: AgentToolCall;
+    actionId: string;
+    actionCallId?: string;
+    arguments?: unknown;
+    resultSummary?: unknown;
+    status: "started" | "completed" | "failed" | "skipped";
+    errorMessage?: string;
+    iteration: number;
+    toolCallIndex: number;
+    durationMs?: number;
+  }): Promise<void> {
+    try {
+      const completedAt =
+        input.status === "started" ? undefined : new Date().toISOString();
+      await this.telemetryService.recordAgentToolCall({
+        conversationId: input.correlation.conversationId,
+        traceId: input.correlation.traceId,
+        turnId: input.correlation.turnId,
+        userId: input.userId,
+        toolCallId: input.toolCall.id,
+        actionCallId: input.actionCallId,
+        actionId: input.actionId,
+        arguments: input.arguments ?? safeParseJson(input.toolCall.function.arguments),
+        resultSummary: input.resultSummary,
+        status: input.status,
+        errorMessage: input.errorMessage,
+        startedAt: new Date(Date.now() - (input.durationMs ?? 0)).toISOString(),
+        completedAt,
+        durationMs: input.durationMs,
+        metadata: {
+          iteration: input.iteration,
+          toolCallIndex: input.toolCallIndex,
+        },
+      });
+    } catch (error) {
+      console.warn("agent.chat_tool_telemetry.failed", summarizeError(error));
+    }
+  }
+
+  private async recordTurnTelemetry(input: {
+    correlation: ChatTurnCorrelation;
+    userId: string;
+    text: string;
+    assistantText?: string;
+    model: string;
+    resultKind?: string;
+    stopReason?: string;
+    iterationCount: number;
+    toolCallCount: number;
+    promptTokens?: number;
+    completionTokens?: number;
+    totalTokens?: number;
+    reasoningTokens?: number;
+    providerCostAmount?: number;
+    estimatedCostAmount?: number;
+    costCurrency?: string;
+    costSource?: string;
+    pricingSnapshot?: Record<string, unknown>;
+    firstByteMs?: number;
+    firstToolCallMs?: number;
+    largestStreamGapMs?: number;
+    llmMs?: number;
+    actionMs?: number;
+    totalMs?: number;
+    status: "success" | "failure" | "partial";
+    errorCode?: string;
+    errorMessage?: string;
+  }): Promise<void> {
+    try {
+      await this.telemetryService.recordAgentTurn({
+        traceId: input.correlation.traceId,
+        turnId: input.correlation.turnId,
+        userId: input.userId,
+        conversationId: input.correlation.conversationId,
+        inputMode: input.correlation.inputMode,
+        source: input.correlation.source,
+        activeProposalId: input.correlation.activeProposalId,
+        model: input.model,
+        inputText: input.text,
+        assistantText: input.assistantText,
+        resultKind: input.resultKind,
+        stopReason: input.stopReason,
+        iterationCount: input.iterationCount,
+        toolCallCount: input.toolCallCount,
+        promptTokens: input.promptTokens,
+        completionTokens: input.completionTokens,
+        totalTokens: input.totalTokens,
+        reasoningTokens: input.reasoningTokens,
+        providerCostAmount: input.providerCostAmount,
+        estimatedCostAmount: input.estimatedCostAmount,
+        costCurrency: input.costCurrency,
+        costSource: input.costSource,
+        pricingSnapshot: input.pricingSnapshot ?? {},
+        firstByteMs: input.firstByteMs,
+        firstToolCallMs: input.firstToolCallMs,
+        largestStreamGapMs: input.largestStreamGapMs,
+        llmMs: input.llmMs,
+        actionMs: input.actionMs,
+        totalMs: input.totalMs,
+        status: input.status,
+        errorCode: input.errorCode,
+        errorMessage: input.errorMessage,
+        completedAt: new Date().toISOString(),
+        metadata: {},
+      });
+    } catch (error) {
+      console.warn("agent.chat_turn_telemetry.failed", summarizeError(error));
+    }
   }
 
   private async logRun(event: Record<string, unknown>): Promise<void> {
@@ -711,8 +1341,23 @@ export class AgentChatService {
   }
 }
 
+function storedMessagesForModel(
+  messages: AgentConversationMessageRecord[],
+): AgentMessage[] {
+  const recentTurnIds = lastTurnIds(messages, 2);
+  return messages.map((message) =>
+    storedMessageToAgentMessage(message, {
+      compactToolContent:
+        message.role === "tool" &&
+        message.turnId !== undefined &&
+        !recentTurnIds.has(message.turnId),
+    }),
+  );
+}
+
 function storedMessageToAgentMessage(
   message: AgentConversationMessageRecord,
+  options: { compactToolContent?: boolean } = {},
 ): AgentMessage {
   if (message.role === "assistant") {
     return {
@@ -726,16 +1371,160 @@ function storedMessageToAgentMessage(
   if (message.role === "tool") {
     return {
       role: "tool",
-      content: message.content,
+      content: options.compactToolContent
+        ? compactStoredToolContentForReplay(message)
+        : message.content,
       toolCallId: message.toolCallId ?? "",
     };
   }
   return { role: "user", content: message.content };
 }
 
-function chatOptionsToolDefinition() {
+function lastTurnIds(
+  messages: AgentConversationMessageRecord[],
+  count: number,
+): Set<string> {
+  const turnIds: string[] = [];
+  for (const message of messages) {
+    if (message.turnId && turnIds[turnIds.length - 1] !== message.turnId) {
+      turnIds.push(message.turnId);
+    }
+  }
+  return new Set(turnIds.slice(-count));
+}
+
+function compactStoredToolContentForReplay(
+  message: AgentConversationMessageRecord,
+): string {
+  const metadata = isRecord(message.metadata) ? message.metadata : {};
+  if (metadata.serializerVersion === MODEL_FACING_SERIALIZER_VERSION) {
+    return ultraCompactToolContent(message.content, metadata);
+  }
+  if (message.content.endsWith("...")) {
+    return [
+      `tool=${textValue(metadata.actionId, "unknown")}`,
+      `kind=${textValue(metadata.resultKind, "legacy_tool_result")}`,
+      `chars=${message.content.length}`,
+      "status=truncated_legacy_content",
+    ].join(" ");
+  }
+  return message.content;
+}
+
+function candidateRegistryFromStoredValue(
+  value: unknown,
+): CandidateRegistryMetadata | undefined {
+  return isRecord(value) && value.kind === "agent_candidate_registry"
+    ? (value as CandidateRegistryMetadata)
+    : undefined;
+}
+
+function withSelectionState<T extends AgentChatMappedResult>(
+  mapped: T,
+  selectionState: AgentCandidateSelectionState | undefined,
+): T {
+  return selectionState
+    ? ({ ...mapped, selectionState } as T)
+    : mapped;
+}
+
+function extractLlmTokenMetrics(rawResponse: unknown): {
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  reasoningTokens?: number;
+} {
+  const usage = extractTokenUsage(rawResponse);
+  if (!usage) return {};
   return {
-    type: "function" as const,
+    promptTokens: asNumber(usage.prompt_tokens),
+    completionTokens: asNumber(usage.completion_tokens),
+    totalTokens: asNumber(usage.total_tokens),
+    reasoningTokens: extractReasoningTokens(rawResponse),
+  };
+}
+
+function asNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function zeroAsUndefined(value: number): number | undefined {
+  return value === 0 ? undefined : value;
+}
+
+function maxOptional(
+  left: number | undefined,
+  right: number | undefined,
+): number | undefined {
+  if (left === undefined) return right;
+  if (right === undefined) return left;
+  return Math.max(left, right);
+}
+
+function mergeCostSource(
+  existing: string | undefined,
+  next: string,
+): string {
+  if (!existing) return next;
+  if (existing === next) return existing;
+  if (existing === "provider" && next === "estimate") return "mixed";
+  if (existing === "estimate" && next === "provider") return "mixed";
+  if (existing === "mixed" || next === "mixed") return "mixed";
+  if (existing === "unknown") return next;
+  if (next === "unknown") return existing;
+  return "mixed";
+}
+
+function safeParseJson(value: string): unknown {
+  try {
+    return JSON.parse(value || "{}");
+  } catch {
+    return undefined;
+  }
+}
+
+function candidateReferenceToolDefinition(): AgentToolDefinition {
+  return {
+    type: "function",
+    function: {
+      name: RESOLVE_CANDIDATE_REFERENCE_TOOL_NAME,
+      description: [
+        "Resolve a prior nutrition search candidate selected by the user.",
+        "Use when the user refers to a displayed search result by number or candidateRef, such as 'use the 6th one'.",
+        "This returns the selected MealItem; do not reconstruct nutrition fields yourself.",
+      ].join(" "),
+      parameters: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          searchRef: {
+            type: "string",
+            description:
+              "The searchRef from the prior candidate_preview result. Omit only when referring to the latest candidate list.",
+          },
+          candidateRef: {
+            type: "string",
+            description: "Exact candidateRef if available.",
+          },
+          groupIndex: {
+            type: "integer",
+            minimum: 1,
+            description: "1-based candidate group index.",
+          },
+          candidateIndex: {
+            type: "integer",
+            minimum: 1,
+            description: "1-based candidate index shown to the user.",
+          },
+        },
+      },
+    },
+  };
+}
+
+function chatOptionsToolDefinition(): AgentToolDefinition {
+  return {
+    type: "function",
     function: {
       name: CHAT_OPTIONS_TOOL_NAME,
       description: [
@@ -869,6 +1658,7 @@ function mapActionResult(
         kind: "nutrition_search",
         items,
         options,
+        candidateGroups: options,
         message:
           items.length > 0
             ? "I found matching nutrition items."
@@ -1066,8 +1856,7 @@ function widgetForResult(result: AgentChatMappedResult): AgentWidgetPayload {
   return { kind: result.kind, title: titles[result.kind], result };
 }
 
-function safeToolContent(value: unknown): string {
-  const content = JSON.stringify(value);
+function safeToolContent(content: string): string {
   if (content.length <= STORED_TOOL_RESULT_MAX_CHARS) return content;
   return `${content.slice(0, STORED_TOOL_RESULT_MAX_CHARS)}...`;
 }

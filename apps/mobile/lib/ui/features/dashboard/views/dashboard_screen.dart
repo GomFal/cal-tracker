@@ -10,6 +10,7 @@ import '../../../../l10n/generated/app_localizations.dart';
 import '../../../../l10n/meal_label_localizations.dart';
 import '../../../core/content_frame.dart';
 import '../../../core/design_system.dart';
+import '../../../core/motion.dart';
 import '../../../shared/meal_item_editor_sheet.dart';
 import '../../auth/view_models/auth_view_model.dart';
 import '../../hydration/hydration_format.dart';
@@ -111,6 +112,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
+      sheetAnimationStyle: freshSheetAnimationStyle(context),
       builder: (context) => MealItemEditorSheet(
         meal: meal,
         keyPrefix: 'dashboard',
@@ -167,6 +169,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
+      sheetAnimationStyle: freshSheetAnimationStyle(context),
       builder: (context) => CalorieTargetSheet(
         initialValue: summary?.target.calories ?? 2200,
         estimateCalories: viewModel.estimateCalories,
@@ -195,9 +198,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         selection.macroConfig != null) {
       return;
     }
-    final shouldConfigure = await showModalBottomSheet<bool>(
+    final shouldConfigure =
+        await showModalBottomSheet<bool>(
           context: context,
           useSafeArea: true,
+          sheetAnimationStyle: freshSheetAnimationStyle(context),
           builder: (context) =>
               PostCalorieSaveMacroPrompt(calories: selection.calories),
         ) ??
@@ -207,6 +212,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
+      sheetAnimationStyle: freshSheetAnimationStyle(context),
       builder: (context) =>
           MacroDistributionSheet(calories: selection.calories),
     );
@@ -294,8 +300,9 @@ class _HeroCalorieSection extends StatelessWidget {
     final remaining = (summary?.remaining.calories ?? target - consumed)
         .clamp(0, target)
         .toInt();
-    final progress =
-        target <= 0 ? 0.0 : (consumed / target).clamp(0, 1).toDouble();
+    final progress = target <= 0
+        ? 0.0
+        : (consumed / target).clamp(0, 1).toDouble();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

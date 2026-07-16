@@ -536,18 +536,6 @@ abstract class AppLocalizations {
   /// **'Track your\ncalories, better.'**
   String get authHeroHeadline;
 
-  /// No description provided for @darkModeSwitchToLight.
-  ///
-  /// In en, this message translates to:
-  /// **'Switch to light mode'**
-  String get darkModeSwitchToLight;
-
-  /// No description provided for @darkModeSwitchToDark.
-  ///
-  /// In en, this message translates to:
-  /// **'Switch to dark mode'**
-  String get darkModeSwitchToDark;
-
   /// No description provided for @settingsTitle.
   ///
   /// In en, this message translates to:
@@ -2900,12 +2888,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Confirm'**
   String get mealProposalConfirm;
-
-  /// No description provided for @mealConfirmationEmbedded.
-  ///
-  /// In en, this message translates to:
-  /// **'Meal confirmation is embedded in the logging flow.'**
-  String get mealConfirmationEmbedded;
 
   /// No description provided for @localToolkitToolButtonTooltip.
   ///

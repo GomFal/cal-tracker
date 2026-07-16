@@ -1,0 +1,204 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-06-21T20:40:38+01:00",
+  "title": "Design System: Better Calories",
+  "extensions": {
+    "designAuthority": {
+      "source": "Recent mobile AMOLED redesign commits",
+      "note": "AMOLED pure black is intentional for mobile dark mode. Do not normalize the dark canvas to near-black."
+    },
+    "colorMeta": {
+      "dark-screen": {
+        "role": "neutral",
+        "displayName": "AMOLED Black Canvas",
+        "canonical": "#000000",
+        "tonalRamp": ["#000000", "#000000", "#0a0a0a", "#111111", "#1a1a1a", "#1f1f1f", "#6e6e6e", "#ffffff"],
+        "note": "Pure black is the product decision for mobile OLED behavior, not a placeholder neutral."
+      },
+      "dark-surface": {
+        "role": "neutral",
+        "displayName": "AMOLED Surface Ladder",
+        "canonical": "#0a0a0a",
+        "tonalRamp": ["#000000", "#0a0a0a", "#111111", "#1a1a1a", "#1f1f1f", "#2a2a2a", "#6e6e6e", "#b8b8b8"]
+      },
+      "light-screen": {
+        "role": "neutral",
+        "displayName": "Light Screen",
+        "canonical": "#ffffff",
+        "tonalRamp": ["#10120d", "#393d33", "#74796d", "#dde1d4", "#e9ebe2", "#f4f5ef", "#f7f8f2", "#ffffff"]
+      },
+      "lime": {
+        "role": "primary",
+        "displayName": "Ledger Lime",
+        "canonical": "#c8e14c",
+        "tonalRamp": ["#13160a", "#1f2410", "#5f850f", "#8fbd20", "#b8d142", "#c8e14c", "#e7f5c4", "#f3fae4"]
+      },
+      "coral": {
+        "role": "secondary",
+        "displayName": "Stop Coral",
+        "canonical": "#ff6f80",
+        "tonalRamp": ["#321016", "#5b1e29", "#8f2e3d", "#d5485a", "#ff6f80", "#ffa2ad", "#ffd0d6", "#ffe5e8"]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Rare large values and high-impact empty or onboarding moments."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Screen-level context and major sheet steps."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Screen titles, section titles, row groups, and modal headings."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Meal names, explanations, field values, result rows, and settings summaries."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Field labels, metadata, units, nav labels, and compact status text."
+      }
+    },
+    "shadows": [
+      {
+        "name": "dark-ambient-lift",
+        "value": "0 10px 28px rgba(0, 0, 0, 0.38)",
+        "purpose": "Rare raised choices or floating controls in dark mode when spacing and rules are not enough."
+      },
+      {
+        "name": "voice-pulse-shadow",
+        "value": "0 0 0 8px rgba(200, 225, 76, 0.22)",
+        "purpose": "Recording readiness or active recording feedback on the voice action."
+      }
+    ],
+    "motion": [
+      {
+        "name": "state-standard",
+        "value": "150ms to 250ms ease-out",
+        "purpose": "Fast state changes, feedback, loading, and reveal."
+      }
+    ],
+    "components": [
+      {
+        "name": "Primary Button",
+        "kind": "button",
+        "refersTo": "button-primary",
+        "description": "Lime action button for save, confirm, submit, and primary forward actions.",
+        "html": "<button class=\"ds-btn-primary\">Confirm meal</button>",
+        "css": ".ds-btn-primary { background: #c8e14c; color: #000000; min-height: 52px; padding: 14px 22px; border: 0; border-radius: 999px; font-family: SF Pro Text, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Arial, sans-serif; font-size: 16px; font-weight: 600; letter-spacing: 0; transition: background-color 180ms ease-out, opacity 180ms ease-out; } .ds-btn-primary:hover { background: #b8d142; } .ds-btn-primary:focus-visible { outline: 2px solid #c8e14c; outline-offset: 3px; } .ds-btn-primary:disabled { background: #111111; color: #6e6e6e; }"
+      },
+      {
+        "name": "Underline Field",
+        "kind": "input",
+        "refersTo": "input-underline",
+        "description": "Default field style: label above value, one underline, no filled rounded box.",
+        "html": "<label class=\"ds-field\"><span class=\"ds-field-label\">Food</span><input class=\"ds-field-input\" value=\"Greek yogurt\" /></label>",
+        "css": ".ds-field { display: grid; gap: 4px; font-family: SF Pro Text, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Arial, sans-serif; } .ds-field-label { color: #6e6e6e; font-size: 12px; font-weight: 700; letter-spacing: 0; } .ds-field-input { background: #000000; color: #ffffff; border: 0; border-bottom: 1.1px solid #1f1f1f; padding: 0 0 9px 0; font-size: 16px; font-weight: 600; letter-spacing: 0; outline: none; } .ds-field-input:focus { border-bottom-color: #c8e14c; border-bottom-width: 2px; }"
+      },
+      {
+        "name": "Number Unit Field",
+        "kind": "input",
+        "refersTo": "input-underline",
+        "description": "A nutrition value and its unit on one baseline.",
+        "html": "<div class=\"ds-number-unit\"><span class=\"ds-number\">150</span><span class=\"ds-unit\">g</span></div>",
+        "css": ".ds-number-unit { display: inline-flex; align-items: baseline; gap: 8px; background: #000000; border-bottom: 1.1px solid #1f1f1f; padding-bottom: 9px; font-family: SF Pro Text, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Arial, sans-serif; } .ds-number { color: #ffffff; font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; } .ds-unit { color: #6e6e6e; font-size: 14px; font-weight: 700; }"
+      },
+      {
+        "name": "Open Row",
+        "kind": "custom",
+        "description": "Default list, settings, meal, and search result structure.",
+        "html": "<div class=\"ds-open-row\"><div><strong>Breakfast</strong><span>Greek yogurt, berries</span></div><b>320 kcal</b></div>",
+        "css": ".ds-open-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; background: #000000; padding: 12px 0; border-bottom: 1px solid #1f1f1f; font-family: SF Pro Text, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Arial, sans-serif; color: #ffffff; } .ds-open-row strong { display: block; font-size: 16px; font-weight: 700; } .ds-open-row span { display: block; margin-top: 4px; color: #6e6e6e; font-size: 14px; } .ds-open-row b { font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }"
+      },
+      {
+        "name": "Status Banner",
+        "kind": "custom",
+        "description": "Compact status surface for errors, warnings, and confirmation feedback.",
+        "html": "<div class=\"ds-status-banner\"><strong>Check ingredient details</strong><span>Calories and macros do not match.</span></div>",
+        "css": ".ds-status-banner { background: rgba(255, 111, 128, 0.14); color: #ffffff; border-radius: 10px; padding: 12px 14px; font-family: SF Pro Text, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Arial, sans-serif; } .ds-status-banner strong { display: block; font-size: 14px; font-weight: 800; } .ds-status-banner span { display: block; margin-top: 4px; color: #b8b8b8; font-size: 14px; line-height: 1.35; }"
+      }
+    ],
+    "narrative": {
+      "northStar": "AMOLED Food Ledger",
+      "overview": "Better Calories is a mobile-first product for logging meals quickly without losing trust. The current visual direction is the recent AMOLED redesign: pure black dark surfaces, quiet rows, inspectable numbers, and controls that keep the user in the logging task. The dark theme uses true AMOLED black on purpose.",
+      "keyCharacteristics": [
+        "Mobile-first dark mode with intentional #000000 AMOLED canvas.",
+        "One visual language across dark and light themes: sections, rows, rules, and underlined fields.",
+        "Lime is functional only: action, selected state, focus, recording/progress, or confirmation.",
+        "Nutrition values are plain text first: calories, macros, units, dates, portions, and source context stay visible.",
+        "Cards are exceptional surfaces, not the default layout primitive.",
+        "Voice and agent features support structured logging; they do not replace inspectable controls."
+      ],
+      "rules": [
+        {
+          "name": "The AMOLED Is Intentional Rule",
+          "body": "The dark canvas is pure black. Do not tint it to near-black, gradient it, or add decorative background layers.",
+          "section": "colors"
+        },
+        {
+          "name": "The Lime Has A Job Rule",
+          "body": "Lime must mean action, selection, progress, focus, recording, or confirmation. If a user cannot explain why something is lime, remove the color.",
+          "section": "colors"
+        },
+        {
+          "name": "The Same Structure Rule",
+          "body": "Light and dark themes keep the same layout and component language. Light mode must not fall back to legacy rounded cards and filled input pills.",
+          "section": "colors"
+        },
+        {
+          "name": "The Useful Number Rule",
+          "body": "Calories, macros, portions, and dates must be visible as text. Do not hide them behind icon-only controls.",
+          "section": "typography"
+        },
+        {
+          "name": "The No Decorative Type Rule",
+          "body": "No display fonts in labels, buttons, rows, or data. Letter spacing is zero.",
+          "section": "typography"
+        },
+        {
+          "name": "The Unit Stays With The Value Rule",
+          "body": "A number and its unit read as one control or phrase. Avoid separate boxed fields for amount and unit.",
+          "section": "typography"
+        },
+        {
+          "name": "The Flat First Rule",
+          "body": "If a section can be understood with a title, spacing, and a divider, do not add a card.",
+          "section": "elevation"
+        },
+        {
+          "name": "The No Nested Surface Rule",
+          "body": "Do not put cards inside cards. Dense forms use rows, underlines, dividers, and progressive disclosure.",
+          "section": "elevation"
+        },
+        {
+          "name": "The Camera Exception Rule",
+          "body": "Black, white, translucency, and blur are allowed over live camera imagery for readability. They are not default product chrome.",
+          "section": "elevation"
+        }
+      ],
+      "dos": [
+        "Do keep the AMOLED dark canvas pure black (#000000) for mobile OLED behavior.",
+        "Do keep light and AMOLED themes structurally identical.",
+        "Do show calories, macros, units, dates, portions, and source context plainly.",
+        "Do use open sections, full-width rows, subtle rules, and underline fields as the default structure.",
+        "Do reserve cards for exceptional states, dialogs, dense choice groups, and readability over camera imagery.",
+        "Do make save, confirm, correct, continue, and submit actions obvious with familiar platform controls.",
+        "Do preserve WCAG AA contrast, 44px tap targets, readable errors, and non-speech alternatives for voice flows."
+      ],
+      "donts": [
+        "Don't tint the AMOLED canvas to near-black or add decorative gradients behind product screens.",
+        "Don't make Better Calories feel like a cluttered MyFitnessPal-style database browser where the user does all the work.",
+        "Don't make it feel like a clinical diet or medical compliance app.",
+        "Don't make it feel like a dark gym-performance dashboard dominated by aggressive metrics.",
+        "Don't make it chatbot-first. Agent and voice features must not hide structured controls behind conversation.",
+        "Don't make it feel like a spreadsheet-like macro tracker with dense tables as the default surface.",
+        "Don't make it feel like a generic AI app that invents nutrition values without source clarity or confirmation.",
+        "Don't use side-stripe borders, gradient text, decorative blur, glassmorphism, identical card grids, or cards as the first layout answer.",
+        "Don't let the light theme keep legacy rounded cards, filled pills, or decorative icon chips while the dark theme uses open sections."
+      ]
+    }
+  }
+}

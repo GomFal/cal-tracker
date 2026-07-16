@@ -78,6 +78,47 @@ void main() {
       },
     );
 
+    for (final testCase in <(Locale, String)>[
+      (
+        const Locale('en'),
+        'Microphone access is off. Enable it in your device settings to record, or log your meal manually.',
+      ),
+      (
+        const Locale('es'),
+        'El acceso al micrófono está desactivado. Actívalo en los ajustes del dispositivo para grabar o registra tu comida manualmente.',
+      ),
+    ]) {
+      testWidgets(
+        'localizes microphone denial recovery in ${testCase.$1.languageCode}',
+        (tester) async {
+          when(
+            () => audioRecorderService.start(),
+          ).thenThrow(const RecorderException('permission_denied'));
+
+          await viewModel.startRecording();
+          await tester.pumpWidget(
+            ChangeNotifierProvider<VoiceLogViewModel>.value(
+              value: viewModel,
+              child: MaterialApp(
+                locale: testCase.$1,
+                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                theme: buildLightTheme(),
+                home: const MealCreateScreen(),
+              ),
+            ),
+          );
+          await tester.pump();
+
+          expect(find.text(testCase.$2), findsOneWidget);
+          expect(
+            find.byKey(const ValueKey('manual_food_search_panel')),
+            findsOneWidget,
+          );
+        },
+      );
+    }
+
     testWidgets(
       'starts voice-only and keeps voice action while reviewing a proposal',
       skip:

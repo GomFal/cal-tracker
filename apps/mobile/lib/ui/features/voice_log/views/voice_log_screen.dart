@@ -52,6 +52,11 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
     final viewModel = context.watch<VoiceLogViewModel>();
     final canStartOver = _canStartOver(viewModel);
     final palette = context.freshPalette;
+    final errorMessage = switch (viewModel.errorCode) {
+      VoiceLogErrorCode.microphonePermissionDenied =>
+        context.l10n.voiceMicrophonePermissionDenied,
+      VoiceLogErrorCode.none => viewModel.errorMessage,
+    };
 
     return Scaffold(
       backgroundColor: palette.screen,
@@ -92,9 +97,9 @@ class _MealCreateScreenState extends State<MealCreateScreen> {
                 ),
                 const SizedBox(height: FreshSpacing.md),
               ],
-              if (viewModel.errorMessage != null) ...[
+              if (errorMessage != null) ...[
                 _ErrorBanner(
-                  message: viewModel.errorMessage!,
+                  message: errorMessage,
                   onRetry: viewModel.retry,
                 ),
                 const SizedBox(height: FreshSpacing.md),

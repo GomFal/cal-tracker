@@ -14,6 +14,11 @@ enum AgentChatToolStatus { running, completed, failed }
 
 enum AgentChatEntryKind { user, assistant, tool }
 
+enum AgentChatErrorCode {
+  none,
+  microphonePermissionDenied,
+}
+
 class AgentChatEntry {
   const AgentChatEntry({
     required this.id,
@@ -90,6 +95,7 @@ class AgentChatViewModel extends ChangeNotifier {
   bool isRefreshingHistory = false;
   bool isLoadingConversation = false;
   String? errorMessage;
+  AgentChatErrorCode errorCode = AgentChatErrorCode.none;
   String? statusMessage;
   final List<AgentConversationSummary> _conversations = [];
   int _entryCounter = 0;
@@ -144,6 +150,7 @@ class AgentChatViewModel extends ChangeNotifier {
     isRefreshingHistory = false;
     isLoadingConversation = false;
     errorMessage = null;
+    errorCode = AgentChatErrorCode.none;
     statusMessage = null;
     _activeAssistantEntryId = null;
     _entryCounter = 0;
@@ -183,6 +190,7 @@ class AgentChatViewModel extends ChangeNotifier {
       await _cacheStore?.writeConversationSummaries(fresh);
     } catch (error) {
       if (_conversations.isEmpty) {
+        errorCode = AgentChatErrorCode.none;
         errorMessage = userVisibleErrorMessage(
           error,
           context: UserErrorContext.voiceAgent,
@@ -198,6 +206,7 @@ class AgentChatViewModel extends ChangeNotifier {
   Future<void> loadConversation(String id) async {
     if (isBusy || isRecording) return;
     isLoadingConversation = true;
+    errorCode = AgentChatErrorCode.none;
     errorMessage = null;
     notifyListeners();
     try {
@@ -211,6 +220,7 @@ class AgentChatViewModel extends ChangeNotifier {
       _applyConversationDetail(fresh);
       await _saveActiveSession(unfinished: _isCurrentConversationUnfinished());
     } catch (error) {
+      errorCode = AgentChatErrorCode.none;
       errorMessage = userVisibleErrorMessage(
         error,
         context: UserErrorContext.voiceAgent,
@@ -239,6 +249,7 @@ class AgentChatViewModel extends ChangeNotifier {
         await _sessionStore?.clearActiveSession();
       }
     } catch (error) {
+      errorCode = AgentChatErrorCode.none;
       errorMessage = userVisibleErrorMessage(
         error,
         context: UserErrorContext.voiceAgent,
@@ -292,11 +303,21 @@ class AgentChatViewModel extends ChangeNotifier {
   Future<void> startRecording() async {
     if (isBusy || isRecording) return;
     errorMessage = null;
+    errorCode = AgentChatErrorCode.none;
     statusMessage = null;
     notifyListeners();
     try {
       await _audioRecorderService.start();
       isRecording = true;
+    } on RecorderException catch (error) {
+      if (error.code == 'permission_denied') {
+        errorCode = AgentChatErrorCode.microphonePermissionDenied;
+      } else {
+        errorMessage = userVisibleErrorMessage(
+          error,
+          context: UserErrorContext.voiceRecording,
+        );
+      }
     } catch (error) {
       errorMessage = userVisibleErrorMessage(
         error,
@@ -311,6 +332,7 @@ class AgentChatViewModel extends ChangeNotifier {
     if (!isRecording) return;
     isRecording = false;
     isStoppingRecording = true;
+    errorCode = AgentChatErrorCode.none;
     statusMessage = 'Preparing voice message...';
     notifyListeners();
     String? path;
@@ -347,6 +369,7 @@ class AgentChatViewModel extends ChangeNotifier {
 
   Future<void> _runStream(Stream<AgentChatStreamEvent> stream) async {
     isSending = true;
+    errorCode = AgentChatErrorCode.none;
     errorMessage = null;
     statusMessage = 'Thinking...';
     _activeAssistantEntryId = _nextEntryId('assistant');
@@ -357,6 +380,7 @@ class AgentChatViewModel extends ChangeNotifier {
         _applyEvent(event);
       }
     } catch (error) {
+      errorCode = AgentChatErrorCode.none;
       errorMessage = userVisibleErrorMessage(
         error,
         context: UserErrorContext.voiceAgent,
@@ -430,6 +454,7 @@ class AgentChatViewModel extends ChangeNotifier {
         );
         break;
       case 'error':
+        errorCode = AgentChatErrorCode.none;
         errorMessage = event.error ?? 'The agent could not finish.';
         unawaited(_saveActiveSession(unfinished: true));
         break;
@@ -609,6 +634,7 @@ class AgentChatViewModel extends ChangeNotifier {
     _entries.clear();
     conversationId = null;
     errorMessage = null;
+    errorCode = AgentChatErrorCode.none;
     statusMessage = null;
     _activeAssistantEntryId = null;
     _pendingAssistantText = '';
@@ -631,6 +657,7 @@ class AgentChatViewModel extends ChangeNotifier {
       ..addAll(_entriesFromStoredMessages(detail.messages));
     _entryCounter = _entries.length;
     errorMessage = null;
+    errorCode = AgentChatErrorCode.none;
     statusMessage = null;
     _activeAssistantEntryId = null;
   }

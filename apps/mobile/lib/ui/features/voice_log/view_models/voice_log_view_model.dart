@@ -27,9 +27,16 @@ enum VoiceLogState {
   clarificationRequired,
   error,
 }
+
+enum VoiceLogErrorCode {
+  none,
+  microphonePermissionDenied,
+}
+
 class VoiceLogUiState {
   const VoiceLogUiState({
     this.phase = VoiceLogState.idle,
+    this.errorCode = VoiceLogErrorCode.none,
     this.errorMessage,
     this.message,
     this.transcript = '',
@@ -56,6 +63,7 @@ class VoiceLogUiState {
   });
 
   final VoiceLogState phase;
+  final VoiceLogErrorCode errorCode;
   final String? errorMessage;
   final String? message;
   final String transcript;
@@ -87,6 +95,7 @@ class VoiceLogUiState {
 
   VoiceLogUiState copyWith({
     VoiceLogState? phase,
+    VoiceLogErrorCode? errorCode,
     Object? errorMessage = _unchanged,
     Object? message = _unchanged,
     String? transcript,
@@ -113,6 +122,7 @@ class VoiceLogUiState {
   }) {
     return VoiceLogUiState(
       phase: phase ?? this.phase,
+      errorCode: errorCode ?? this.errorCode,
       errorMessage: identical(errorMessage, _unchanged)
           ? this.errorMessage
           : errorMessage as String?,
@@ -208,6 +218,8 @@ class VoiceLogViewModel extends ChangeNotifier {
   VoiceLogState get state => _uiState.phase;
 
   String? get errorMessage => _uiState.errorMessage;
+
+  VoiceLogErrorCode get errorCode => _uiState.errorCode;
 
   String? get message => _uiState.message;
 
@@ -322,6 +334,7 @@ class VoiceLogViewModel extends ChangeNotifier {
     _setUiState(
       _uiState.copyWith(
         phase: VoiceLogState.requestingPermission,
+        errorCode: VoiceLogErrorCode.none,
         transcript: '',
         transcriptFromVoice: false,
         errorMessage: null,
@@ -367,7 +380,8 @@ class VoiceLogViewModel extends ChangeNotifier {
       );
       if (e.code == 'permission_denied') {
         _setError(
-          e.message ?? AudioRecorderService.microphonePermissionDeniedMessage,
+          null,
+          errorCode: VoiceLogErrorCode.microphonePermissionDenied,
         );
       } else {
         _setError(
@@ -861,6 +875,7 @@ class VoiceLogViewModel extends ChangeNotifier {
     _setUiState(
       _uiState.copyWith(
         phase: VoiceLogState.idle,
+        errorCode: VoiceLogErrorCode.none,
         errorMessage: null,
         showProposalChangeSuccess: false,
       ),
@@ -871,11 +886,15 @@ class VoiceLogViewModel extends ChangeNotifier {
     _setUiState(_uiState.copyWith(phase: value));
   }
 
-  void _setError(String message) {
+  void _setError(
+    String? message, {
+    VoiceLogErrorCode errorCode = VoiceLogErrorCode.none,
+  }) {
     _timers.clearProposalChangeSuccess();
     _setUiState(
       _uiState.copyWith(
         phase: VoiceLogState.error,
+        errorCode: errorCode,
         errorMessage: message,
         showProposalChangeSuccess: false,
       ),

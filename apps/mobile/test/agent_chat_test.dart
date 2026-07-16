@@ -108,6 +108,66 @@ void main() {
     expect(events[2]['type'], 'done');
   });
 
+  for (final testCase in <(Locale, String)>[
+    (
+      const Locale('en'),
+      'Microphone access is off. Enable it in your device settings to record, or log your meal manually.',
+    ),
+    (
+      const Locale('es'),
+      'El acceso al micrófono está desactivado. Actívalo en los ajustes del dispositivo para grabar o registra tu comida manualmente.',
+    ),
+  ]) {
+    testWidgets(
+      'AgentChatScreen localizes microphone denial recovery in ${testCase.$1.languageCode}',
+      (tester) async {
+        final repository = MockNutritionRepository();
+        final recorder = MockAudioRecorderService();
+        when(
+          () => recorder.start(),
+        ).thenThrow(const RecorderException('permission_denied'));
+        final viewModel = AgentChatViewModel(
+          nutritionRepository: repository,
+          audioRecorderService: recorder,
+        );
+
+        await tester.pumpWidget(
+          ChangeNotifierProvider<AgentChatViewModel>.value(
+            value: viewModel,
+            child: MaterialApp(
+              locale: testCase.$1,
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              theme: buildLightTheme(),
+              home: const AgentChatScreen(),
+            ),
+          ),
+        );
+        await tester.pump();
+        await tester.tap(
+          find.byKey(const ValueKey('agent_chat_mic_button')),
+        );
+        await tester.pump();
+
+        expect(
+          viewModel.errorCode,
+          AgentChatErrorCode.microphonePermissionDenied,
+        );
+        expect(viewModel.errorMessage, isNull);
+        expect(find.text(testCase.$2), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('agent_chat_message_field')),
+          findsOneWidget,
+        );
+
+        await tester.pump(const Duration(milliseconds: 250));
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pump(const Duration(milliseconds: 250));
+        viewModel.dispose();
+      },
+    );
+  }
+
   test('AgentChatViewModel turns tool events into visible timeline entries',
       () async {
     final repository = MockNutritionRepository();

@@ -712,6 +712,7 @@
   "voiceRecordVoiceTooltip": "Record voice",
   "voiceRecordingIndicator": "Recording. Tap stop when you finish.",
   "voiceErrorTitle": "Something went wrong",
+  "voiceMicrophonePermissionDenied": "Microphone access is off. Enable it in your device settings to record, or log your meal manually.",
   "voiceLoggedMessage": "Logged. You can correct it from history.",
   "voiceMessageMealLogged": "Meal logged.",
   "voiceMessageProposalUpdated": "Proposal updated.",

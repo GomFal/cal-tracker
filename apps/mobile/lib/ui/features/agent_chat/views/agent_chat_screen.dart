@@ -56,6 +56,11 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
   Widget build(BuildContext context) {
     final viewModel = context.watch<AgentChatViewModel>();
     final palette = context.freshPalette;
+    final errorMessage = switch (viewModel.errorCode) {
+      AgentChatErrorCode.microphonePermissionDenied =>
+        context.l10n.voiceMicrophonePermissionDenied,
+      AgentChatErrorCode.none => viewModel.errorMessage,
+    };
     _scheduleScrollToBottom(viewModel);
     return Scaffold(
       backgroundColor: palette.screen,
@@ -107,12 +112,12 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
                         controller: _scrollController,
                         padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
                         children: [
-                          if (viewModel.errorMessage != null) ...[
+                          if (errorMessage != null) ...[
                             FreshFadeSlide(
                               child: FreshStatusBanner(
                                 icon: Icons.error_outline_rounded,
                                 title: context.l10n.agentChatErrorTitle,
-                                message: viewModel.errorMessage,
+                                message: errorMessage,
                                 color: palette.coral,
                               ),
                             ),
@@ -174,6 +179,7 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
         '${entry.id}:${entry.text.length}:${entry.toolStatus}:${entry.result?.kind}:${entry.error ?? ''}',
       viewModel.statusMessage ?? '',
       viewModel.errorMessage ?? '',
+      viewModel.errorCode.name,
     ].join('|');
     if (signature == _lastScrollSignature) return;
     _lastScrollSignature = signature;

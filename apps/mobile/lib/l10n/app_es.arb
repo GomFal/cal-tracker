@@ -413,6 +413,7 @@
   "voiceRecordVoiceTooltip": "Grabar voz",
   "voiceRecordingIndicator": "Grabando. Toca detener cuando termines.",
   "voiceErrorTitle": "Algo salió mal",
+  "voiceMicrophonePermissionDenied": "El acceso al micrófono está desactivado. Actívalo en los ajustes del dispositivo para grabar o registra tu comida manualmente.",
   "voiceLoggedMessage": "Registrado. Puedes corregirlo desde el historial.",
   "voiceMessageMealLogged": "Comida registrada.",
   "voiceMessageProposalUpdated": "Propuesta actualizada.",

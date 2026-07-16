@@ -1379,6 +1379,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get voiceErrorTitle => 'Something went wrong';
 
   @override
+  String get voiceMicrophonePermissionDenied =>
+      'Microphone access is off. Enable it in your device settings to record, or log your meal manually.';
+
+  @override
   String get voiceLoggedMessage => 'Logged. You can correct it from history.';
 
   @override

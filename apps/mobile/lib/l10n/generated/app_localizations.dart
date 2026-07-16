@@ -2535,6 +2535,12 @@ abstract class AppLocalizations {
   /// **'Something went wrong'**
   String get voiceErrorTitle;
 
+  /// No description provided for @voiceMicrophonePermissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Microphone access is off. Enable it in your device settings to record, or log your meal manually.'**
+  String get voiceMicrophonePermissionDenied;
+
   /// No description provided for @voiceLoggedMessage.
   ///
   /// In en, this message translates to:

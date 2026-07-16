@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 backend="$ROOT_DIR/.github/workflows/backend-deploy.yml"
 mobile="$ROOT_DIR/.github/workflows/mobile-apk-deploy.yml"
 policy_ci="$ROOT_DIR/.github/workflows/deployment-policy-ci.yml"
+bootstrap="$ROOT_DIR/infra/deploy/bootstrap-server.sh"
 
 if grep -R -n 'ssh-keyscan' "$backend" "$mobile"; then
   echo "Deployment workflows must not learn host keys at runtime." >&2
@@ -25,6 +26,7 @@ grep -Fq 'publish-apk' "$ROOT_DIR/scripts/mobile/deploy-server-apks.sh"
 grep -Fq 'NOPASSWD: /usr/local/sbin/bettercalories-deploy' "$ROOT_DIR/infra/deploy/provision-deploy-user.sh"
 grep -Fq 'test-configure-ssh.sh' "$policy_ci"
 grep -Fq 'test-provision-deploy-user.sh' "$policy_ci"
+grep -Fq 'install -d -m 0700 "$ENV_DIR"' "$bootstrap"
 for deploy_script in \
   "$ROOT_DIR/infra/deploy/deploy.sh" \
   "$ROOT_DIR/infra/deploy/restore-postgres-schema.sh"; do

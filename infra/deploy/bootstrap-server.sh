@@ -8,7 +8,8 @@ DEPLOY_DIR="/srv/cal-tracker/deploy"
 ENV_DIR="/srv/cal-tracker/env"
 STATE_DIR="/srv/cal-tracker/state"
 
-install -d -m 0755 "$DEPLOY_DIR" "$DEPLOY_DIR/postgres" "$DEPLOY_DIR/nginx" "$ENV_DIR" "$STATE_DIR" /etc/nginx/snippets
+install -d -m 0755 "$DEPLOY_DIR" "$DEPLOY_DIR/postgres" "$DEPLOY_DIR/nginx" "$STATE_DIR" /etc/nginx/snippets
+install -d -m 0700 "$ENV_DIR"
 install -d -m 0755 /srv/cal-tracker/mobile/dev /srv/cal-tracker/mobile/prod
 install -d -m 0755 /var/www/bettercalories.app/html
 

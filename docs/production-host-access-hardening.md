@@ -101,4 +101,3 @@ sudo ./harden-production-access.sh rollback-ssh --console-recovery-confirmed
 ```
 
 Esto restaura el drop-in SSH previo y mantiene TCP/22 permitido en UFW. Después corrige o rota la clave y repite todas las fases. La custodia formal, copias de emergencia y simulacros periódicos quedan diferidos hasta después de validar el MVP.
-

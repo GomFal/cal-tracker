@@ -71,6 +71,24 @@
         ],
         "additionalProperties": false
       },
+      "RegistrationPendingResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          }
+        },
+        "required": [
+          "ok",
+          "email"
+        ],
+        "additionalProperties": false
+      },
       "LoginRequest": {
         "type": "object",
         "properties": {
@@ -152,6 +170,19 @@
         ],
         "additionalProperties": false
       },
+      "EmailConfirmationRequest": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 32
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "additionalProperties": false
+      },
       "RefreshRequest": {
         "type": "object",
         "properties": {
@@ -225,6 +256,17 @@
               },
               "trustedModeEnabled": {
                 "type": "boolean"
+              },
+              "emailVerifiedAt": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "createdAt": {
                 "type": "string",
@@ -16710,6 +16752,33 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Confirmation email sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationPendingResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/email/confirm": {
+      "post": {
+        "operationId": "confirmEmail",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailConfirmationRequest"
               }
             }
           }

@@ -4,7 +4,7 @@ import '../../../../data/repositories/auth_repository.dart';
 import '../../../../domain/models/auth_models.dart';
 import '../../../core/user_visible_error.dart';
 
-enum AuthErrorSource { login, register, google, session }
+enum AuthErrorSource { login, register, google, emailConfirmation, session }
 
 enum AuthStatus {
   restoring,
@@ -23,6 +23,7 @@ class AuthViewModel extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
   AuthErrorSource? _errorSource;
+  String? _pendingRegistrationEmail;
 
   AuthUser? get user => _user;
   AuthStatus get status => _status;
@@ -31,6 +32,7 @@ class AuthViewModel extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   AuthErrorSource? get errorSource => _errorSource;
+  String? get pendingRegistrationEmail => _pendingRegistrationEmail;
 
   Future<void> restoreSession() async {
     _status = AuthStatus.restoring;
@@ -41,6 +43,7 @@ class AuthViewModel extends ChangeNotifier {
           _user == null ? AuthStatus.unauthenticated : AuthStatus.authenticated;
       _error = null;
       _errorSource = null;
+      _pendingRegistrationEmail = null;
     } catch (error) {
       _user = null;
       _status = AuthStatus.unauthenticated;
@@ -58,6 +61,7 @@ class AuthViewModel extends ChangeNotifier {
       _status = AuthStatus.authenticated;
       _error = null;
       _errorSource = null;
+      _pendingRegistrationEmail = null;
     } catch (error) {
       _user = null;
       _status = AuthStatus.unauthenticated;
@@ -76,6 +80,7 @@ class AuthViewModel extends ChangeNotifier {
         _status = AuthStatus.authenticated;
         _error = null;
         _errorSource = null;
+        _pendingRegistrationEmail = null;
       } else if (_user == null) {
         _status = AuthStatus.unauthenticated;
       }
@@ -96,15 +101,16 @@ class AuthViewModel extends ChangeNotifier {
   ) async {
     _setLoading(true);
     try {
-      _user = (await _authRepository.register(
+      await _authRepository.register(
         email: email,
         password: password,
         displayName: displayName,
-      ))
-          .user;
-      _status = AuthStatus.authenticated;
+      );
+      _user = null;
+      _status = AuthStatus.unauthenticated;
       _error = null;
       _errorSource = null;
+      _pendingRegistrationEmail = email;
     } catch (error) {
       _user = null;
       _status = AuthStatus.unauthenticated;
@@ -114,16 +120,35 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
+  Future<void> confirmEmail(String token) async {
+    _setLoading(true);
+    try {
+      _user = (await _authRepository.confirmEmail(token)).user;
+      _status = AuthStatus.authenticated;
+      _error = null;
+      _errorSource = null;
+      _pendingRegistrationEmail = null;
+    } catch (error) {
+      _user = null;
+      _status = AuthStatus.unauthenticated;
+      _setError(error, AuthErrorSource.emailConfirmation);
+    } finally {
+      _setLoading(false);
+    }
+  }
+
   Future<void> logout() async {
     await _authRepository.logout();
     _user = null;
     _status = AuthStatus.unauthenticated;
+    _pendingRegistrationEmail = null;
     notifyListeners();
   }
 
   void setUser(AuthUser user) {
     _user = user;
     _status = AuthStatus.authenticated;
+    _pendingRegistrationEmail = null;
     notifyListeners();
   }
 
@@ -131,6 +156,12 @@ class AuthViewModel extends ChangeNotifier {
     if (_error == null && _errorSource == null) return;
     _error = null;
     _errorSource = null;
+    notifyListeners();
+  }
+
+  void clearPendingRegistrationNotice() {
+    if (_pendingRegistrationEmail == null) return;
+    _pendingRegistrationEmail = null;
     notifyListeners();
   }
 
@@ -147,6 +178,8 @@ class AuthViewModel extends ChangeNotifier {
         AuthErrorSource.login => UserErrorContext.authLogin,
         AuthErrorSource.register => UserErrorContext.authRegister,
         AuthErrorSource.google => UserErrorContext.authGoogle,
+        AuthErrorSource.emailConfirmation =>
+          UserErrorContext.authEmailConfirmation,
         AuthErrorSource.session => UserErrorContext.sessionRestore,
       },
     );

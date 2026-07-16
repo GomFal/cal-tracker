@@ -1,4 +1,8 @@
 import { ActionExecutor } from "../actions/executor.js";
+import type {
+  AuthEmailSender,
+  EmailConfirmationInput,
+} from "../auth/email.js";
 import type { GoogleTokenVerifier } from "../auth/google.js";
 import { AuthService } from "../auth/service.js";
 import { loadConfig } from "../config/env.js";
@@ -41,6 +45,27 @@ export class FakeChatAgentProvider implements ChatAgentProvider {
   }
 }
 
+export class FakeAuthEmailSender implements AuthEmailSender {
+  readonly confirmations: EmailConfirmationInput[] = [];
+
+  async sendEmailConfirmation(input: EmailConfirmationInput): Promise<void> {
+    this.confirmations.push(input);
+  }
+
+  latestConfirmationToken(): string {
+    const latest = this.confirmations.at(-1);
+    if (!latest) throw new Error("confirmation_email_not_sent");
+    const token = new URL(latest.confirmationUrl).searchParams.get("token");
+    if (!token) throw new Error("confirmation_email_token_missing");
+    return token;
+  }
+}
+
+const authEmailSendersByRequest = new WeakMap<
+  (input: string, init?: RequestInit) => Promise<Response>,
+  FakeAuthEmailSender
+>();
+
 export const testBreadItem: MealItem = {
   name: "Bread",
   quantity: 100,
@@ -60,11 +85,18 @@ export function buildTestApp(options?: {
   usualFoodDraftProvider?: UsualFoodDraftProvider;
   usualMealDraftProvider?: UsualMealDraftProvider;
   telemetryService?: TelemetryService;
+  authEmailSender?: AuthEmailSender;
 }) {
   const config = loadConfig({ NODE_ENV: "test" } as NodeJS.ProcessEnv);
   const repository = InMemoryRepository.seeded();
   seedTestFoods(repository);
-  const authService = new AuthService(config, repository, options?.googleTokenVerifier);
+  const authEmailSender = options?.authEmailSender ?? new FakeAuthEmailSender();
+  const authService = new AuthService(
+    config,
+    repository,
+    options?.googleTokenVerifier,
+    authEmailSender,
+  );
   const foodResolver = new FoodResolver(
     new LocalFoodDataProvider(repository, { allowSeededPortionFallback: true }),
     config.FOOD_RESOLVER_MIN_CONFIDENCE
@@ -110,8 +142,11 @@ export function buildTestApp(options?: {
   const agentProvider = options?.agentProvider ?? defaultAgentProvider;
   const app = createApp({ config, repository, authService, actionExecutor, sttProvider, agentProvider, runLogger: options?.runLogger, telemetryService: options?.telemetryService });
   const request = (input: string, init?: RequestInit) => Promise.resolve(app.request(input, init));
+  if (authEmailSender instanceof FakeAuthEmailSender) {
+    authEmailSendersByRequest.set(request, authEmailSender);
+  }
   const telemetry = new DbTelemetryService(repository, { enabled: true });
-  return { app, request, config, repository, authService, actionExecutor, sttProvider, agentProvider, telemetry };
+  return { app, request, config, repository, authService, authEmailSender, actionExecutor, sttProvider, agentProvider, telemetry };
 }
 
 export async function createTestUsualBreakfastTemplate(
@@ -144,13 +179,32 @@ export async function loginAdmin(request: (input: string, init?: RequestInit) =>
   };
 }
 
-export async function registerAndAuth(request: (input: string, init?: RequestInit) => Promise<Response>) {
+export async function registerAndAuth(
+  request: (input: string, init?: RequestInit) => Promise<Response>,
+  input: { email?: string; password?: string; displayName?: string } = {},
+) {
+  const email = input.email ?? "test@example.com";
+  const password = input.password ?? "password123";
+  const displayName = input.displayName ?? "Test User";
   const response = await request("http://localhost/v1/auth/register", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email: "test@example.com", password: "password123", displayName: "Test User" })
+    body: JSON.stringify({ email, password, displayName })
   });
-  const body = await response.json() as { accessToken: string; refreshToken: string; user: { id: string } };
+  if (response.status !== 200) {
+    throw new Error(`register_failed_${response.status}`);
+  }
+  const authEmailSender = authEmailSendersByRequest.get(request);
+  if (!authEmailSender) {
+    throw new Error("registerAndAuth requires buildTestApp request helpers to expose authEmailSender");
+  }
+  const token = authEmailSender.latestConfirmationToken();
+  const confirm = await request("http://localhost/v1/auth/email/confirm", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ token })
+  });
+  const body = await confirm.json() as { accessToken: string; refreshToken: string; user: { id: string } };
   return {
     ...body,
     authHeader: { authorization: `Bearer ${body.accessToken}`, "content-type": "application/json" }

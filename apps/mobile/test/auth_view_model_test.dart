@@ -57,6 +57,33 @@ void main() {
     expect(viewModel.status, AuthStatus.unauthenticated);
     expect(viewModel.user, isNull);
   });
+
+  test('register leaves the user unauthenticated until email confirmation',
+      () async {
+    when(() => repository.register(
+          email: 'user@example.com',
+          password: 'password123',
+          displayName: 'Test User',
+        )).thenAnswer((_) async {});
+
+    await viewModel.register('user@example.com', 'password123', 'Test User');
+
+    expect(viewModel.status, AuthStatus.unauthenticated);
+    expect(viewModel.hasSession, isFalse);
+    expect(viewModel.user, isNull);
+    expect(viewModel.pendingRegistrationEmail, 'user@example.com');
+  });
+
+  test('confirmEmail authenticates with the returned session', () async {
+    when(() => repository.confirmEmail('confirmation-token'))
+        .thenAnswer((_) async => _session);
+
+    await viewModel.confirmEmail('confirmation-token');
+
+    expect(viewModel.status, AuthStatus.authenticated);
+    expect(viewModel.user, _user);
+    expect(viewModel.pendingRegistrationEmail, isNull);
+  });
 }
 
 const _user = AuthUser(

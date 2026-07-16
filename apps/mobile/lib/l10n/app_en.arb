@@ -110,6 +110,16 @@
   "authContinueWithGoogleButton": "Continue with Google",
   "authSignInFailedTitle": "Sign in failed",
   "authCreateAccountFailedTitle": "Account creation failed",
+  "authConfirmEmailFailedTitle": "Email confirmation failed",
+  "authCheckEmailTitle": "Check your email",
+  "authCheckEmailMessage": "We sent a confirmation link to {email}. Open it to finish creating your account.",
+  "@authCheckEmailMessage": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
   "authEmailInvalidError": "Enter a valid email address, like name@example.com.",
   "authNameRequiredError": "Enter your name.",
   "authPasswordRequiredError": "Enter your password.",

@@ -81,6 +81,15 @@ class CalTrackerApiClient {
         authenticated: false);
   }
 
+  Future<Map<String, Object?>> confirmEmail({required String token}) {
+    return _post(
+        '/v1/auth/email/confirm',
+        {
+          'token': token,
+        },
+        authenticated: false);
+  }
+
   Future<Map<String, Object?>> login({
     required String email,
     required String password,

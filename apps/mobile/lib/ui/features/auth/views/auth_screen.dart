@@ -148,6 +148,21 @@ class _AuthScreenState extends State<AuthScreen> {
                                   : l10n.authCreateAccountLink,
                             ),
                           ),
+                          if (viewModel.pendingRegistrationEmail != null &&
+                              viewModel.error == null) ...[
+                            const SizedBox(height: FreshSpacing.sm),
+                            FreshStatusBanner(
+                              key: const ValueKey(
+                                'auth_check_email_banner',
+                              ),
+                              icon: Icons.mark_email_read_outlined,
+                              title: l10n.authCheckEmailTitle,
+                              message: l10n.authCheckEmailMessage(
+                                viewModel.pendingRegistrationEmail!,
+                              ),
+                              color: palette.limeDeep,
+                            ),
+                          ],
                           if (viewModel.error != null) ...[
                             const SizedBox(height: FreshSpacing.sm),
                             FreshStatusBanner(
@@ -173,7 +188,7 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
-  Future<void> _submit() {
+  Future<void> _submit() async {
     final viewModel = context.read<AuthViewModel>();
     viewModel.clearError();
     final l10n = context.l10n;
@@ -200,17 +215,24 @@ class _AuthScreenState extends State<AuthScreen> {
     if (nextNameError != null ||
         nextEmailError != null ||
         nextPasswordError != null) {
-      return Future<void>.value();
+      return;
     }
 
     if (_registerMode) {
-      return viewModel.register(email, password, displayName);
+      await viewModel.register(email, password, displayName);
+      if (!mounted) return;
+      if (context.read<AuthViewModel>().pendingRegistrationEmail != null) {
+        setState(() => _registerMode = false);
+      }
+      return;
     }
-    return viewModel.login(email, password);
+    await viewModel.login(email, password);
   }
 
   void _toggleMode() {
-    context.read<AuthViewModel>().clearError();
+    final viewModel = context.read<AuthViewModel>();
+    viewModel.clearError();
+    viewModel.clearPendingRegistrationNotice();
     setState(() {
       _registerMode = !_registerMode;
       _nameError = null;
@@ -225,7 +247,11 @@ class _AuthScreenState extends State<AuthScreen> {
     bool password = false,
     bool remote = false,
   }) {
-    if (remote) context.read<AuthViewModel>().clearError();
+    if (remote) {
+      final viewModel = context.read<AuthViewModel>();
+      viewModel.clearError();
+      viewModel.clearPendingRegistrationNotice();
+    }
     if ((name && _nameError != null) ||
         (email && _emailError != null) ||
         (password && _passwordError != null)) {
@@ -240,6 +266,7 @@ class _AuthScreenState extends State<AuthScreen> {
   String _authErrorTitle(AppLocalizations l10n, AuthErrorSource? source) {
     return switch (source) {
       AuthErrorSource.register => l10n.authCreateAccountFailedTitle,
+      AuthErrorSource.emailConfirmation => l10n.authConfirmEmailFailedTitle,
       _ => l10n.authSignInFailedTitle,
     };
   }

@@ -9,6 +9,7 @@ enum UserErrorContext {
   authLogin,
   authRegister,
   authGoogle,
+  authEmailConfirmation,
   sessionRestore,
   dashboardLoad,
   dashboardSave,
@@ -49,6 +50,12 @@ String userVisibleErrorMessage(
     if (context == UserErrorContext.authLogin &&
         code == 'invalid_credentials') {
       return 'Email or password does not match.';
+    }
+    if (code == 'email_not_verified') {
+      return 'Check your email and confirm your account before signing in.';
+    }
+    if (code == 'invalid_email_confirmation_token') {
+      return 'That confirmation link is invalid or expired. Create your account again to get a new link.';
     }
     if (context == UserErrorContext.authGoogle ||
         code == 'invalid_google_token') {
@@ -103,6 +110,8 @@ String _validationMessage(UserErrorContext context) {
       return 'Enter a valid email address and password.';
     case UserErrorContext.authRegister:
       return 'Check your name, email, and password, then try again.';
+    case UserErrorContext.authEmailConfirmation:
+      return 'Open the latest confirmation link from your email.';
     case UserErrorContext.calorieEstimate:
       return 'Check the details and try again.';
     case UserErrorContext.voiceTranscription:
@@ -134,6 +143,8 @@ String _fallbackMessage(UserErrorContext context) {
       return 'We could not create your account. Try again.';
     case UserErrorContext.authGoogle:
       return 'Google sign-in did not finish. Try again.';
+    case UserErrorContext.authEmailConfirmation:
+      return 'We could not confirm your email. Try the latest link again.';
     case UserErrorContext.sessionRestore:
       return 'Your session expired. Sign in again.';
     case UserErrorContext.dashboardLoad:

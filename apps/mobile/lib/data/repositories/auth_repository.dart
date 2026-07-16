@@ -17,13 +17,17 @@ class AuthRepository {
   final TokenStorage _tokenStorage;
   final GoogleSignInService _googleSignInService;
 
-  Future<AuthSession> register({
+  Future<void> register({
     required String email,
     required String password,
     required String displayName,
   }) async {
-    final json = await _apiClient.register(
+    await _apiClient.register(
         email: email, password: password, displayName: displayName);
+  }
+
+  Future<AuthSession> confirmEmail(String token) async {
+    final json = await _apiClient.confirmEmail(token: token);
     final session = AuthSession.fromJson(json);
     await _tokenStorage.write(StoredTokens(
         accessToken: session.accessToken, refreshToken: session.refreshToken));

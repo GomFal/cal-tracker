@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:go_router/go_router.dart';
@@ -324,6 +325,8 @@ class _CalTrackerAppState extends State<_CalTrackerApp> {
   AuthViewModel? _authViewModel;
   GoRouter? _router;
   final _navigatorKey = GlobalKey<NavigatorState>();
+  StreamSubscription<Uri>? _linkSubscription;
+  bool _linkListenerStarted = false;
 
   @override
   void didChangeDependencies() {
@@ -333,10 +336,12 @@ class _CalTrackerAppState extends State<_CalTrackerApp> {
     _router?.dispose();
     _authViewModel = authViewModel;
     _router = buildRouter(authViewModel, navigatorKey: _navigatorKey);
+    _startAuthLinkListener();
   }
 
   @override
   void dispose() {
+    unawaited(_linkSubscription?.cancel());
     _router?.dispose();
     super.dispose();
   }
@@ -373,6 +378,42 @@ class _CalTrackerAppState extends State<_CalTrackerApp> {
         return PerformanceOverlayHost(child: wrappedApp);
       },
     );
+  }
+
+  void _startAuthLinkListener() {
+    if (_linkListenerStarted) return;
+    _linkListenerStarted = true;
+    try {
+      final appLinks = AppLinks();
+      unawaited(_handleInitialAuthLink(appLinks));
+      _linkSubscription = appLinks.uriLinkStream.listen(
+        (uri) => unawaited(_handleAuthLink(uri)),
+        onError: (_) {},
+      );
+    } on Object {
+      // Deep links are opportunistic during tests and unsupported platforms.
+    }
+  }
+
+  Future<void> _handleInitialAuthLink(AppLinks appLinks) async {
+    try {
+      final uri = await appLinks.getInitialLink();
+      if (uri != null) await _handleAuthLink(uri);
+    } on Object {
+      // Missing platform plugins in widget tests should not block startup.
+    }
+  }
+
+  Future<void> _handleAuthLink(Uri uri) async {
+    if (uri.path != '/auth/email/confirm') return;
+    final token = uri.queryParameters['token'];
+    if (token == null || token.isEmpty) return;
+    final authViewModel = _authViewModel;
+    final router = _router;
+    if (authViewModel == null || router == null) return;
+    await authViewModel.confirmEmail(token);
+    if (!mounted) return;
+    router.go(authViewModel.hasSession ? '/dashboard' : '/auth');
   }
 }
 

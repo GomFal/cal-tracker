@@ -47,6 +47,7 @@ import type {
   LlmProviderCallFilter,
   LlmProviderCallRecord,
   MemoryMatch,
+  PendingRegistrationRecord,
   StoredSession,
   StoredUser,
   TelemetryEventFilter,
@@ -79,6 +80,7 @@ export class InMemoryRepository implements AppRepository {
     string,
     { userId: string; expiresAt: string; usedAt?: string }
   >();
+  private pendingRegistrations = new Map<string, PendingRegistrationRecord>();
   private foods = new Map<string, FoodItemRecord>();
   private targets = new Map<string, NutritionSnapshot>();
   private hydrationGoals = new Map<string, number>();
@@ -134,6 +136,7 @@ export class InMemoryRepository implements AppRepository {
     email: string;
     displayName: string;
     passwordHash?: string;
+    emailVerifiedAt?: string;
     scopes?: typeof defaultUserScopes;
   }): Promise<StoredUser> {
     if (await this.findUserByEmail(input.email)) {
@@ -145,6 +148,7 @@ export class InMemoryRepository implements AppRepository {
       displayName: input.displayName,
       trustedModeEnabled: false,
       createdAt: new Date().toISOString(),
+      emailVerifiedAt: input.emailVerifiedAt ?? new Date().toISOString(),
       ...(input.passwordHash ? { passwordHash: input.passwordHash } : {}),
       scopes: input.scopes ?? defaultUserScopes,
     };
@@ -159,6 +163,63 @@ export class InMemoryRepository implements AppRepository {
     this.calorieTargetConfigured.set(user.id, false);
     this.calorieTargetSources.set(user.id, "default");
     return user;
+  }
+
+  async upsertPendingRegistration(input: {
+    email: string;
+    displayName: string;
+    passwordHash: string;
+    tokenHash: string;
+    expiresAt: string;
+  }): Promise<PendingRegistrationRecord> {
+    const now = new Date().toISOString();
+    const normalizedEmail = input.email.toLowerCase();
+    for (const pending of this.pendingRegistrations.values()) {
+      if (pending.email === normalizedEmail && !pending.consumedAt) {
+        pending.consumedAt = now;
+        pending.updatedAt = now;
+      }
+    }
+    const pending: PendingRegistrationRecord = {
+      id: newId(),
+      email: normalizedEmail,
+      displayName: input.displayName,
+      passwordHash: input.passwordHash,
+      tokenHash: input.tokenHash,
+      expiresAt: input.expiresAt,
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.pendingRegistrations.set(pending.id, pending);
+    return pending;
+  }
+
+  async findPendingRegistrationByEmail(
+    email: string,
+  ): Promise<PendingRegistrationRecord | undefined> {
+    const normalizedEmail = email.toLowerCase();
+    const now = Date.now();
+    return [...this.pendingRegistrations.values()].find(
+      (pending) =>
+        pending.email === normalizedEmail &&
+        !pending.consumedAt &&
+        Date.parse(pending.expiresAt) > now,
+    );
+  }
+
+  async consumePendingRegistration(
+    tokenHash: string,
+  ): Promise<PendingRegistrationRecord | undefined> {
+    const pending = [...this.pendingRegistrations.values()].find(
+      (registration) =>
+        registration.tokenHash === tokenHash &&
+        !registration.consumedAt &&
+        Date.parse(registration.expiresAt) > Date.now(),
+    );
+    if (!pending) return undefined;
+    pending.consumedAt = new Date().toISOString();
+    pending.updatedAt = pending.consumedAt;
+    return pending;
   }
 
   async findUserByEmail(email: string): Promise<StoredUser | undefined> {

@@ -1,8 +1,56 @@
 import { describe, expect, it } from "vitest";
 import type { GoogleTokenVerifier } from "../auth/google.js";
-import { buildTestApp, registerAndAuth } from "./testApp.js";
+import { buildTestApp, FakeAuthEmailSender, registerAndAuth } from "./testApp.js";
 
 describe("auth routes", () => {
+  it("registers pending accounts by email and confirms them once", async () => {
+    const authEmailSender = new FakeAuthEmailSender();
+    const { request, repository } = buildTestApp({ authEmailSender });
+
+    const register = await request("http://localhost/v1/auth/register", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "accept-language": "es-ES,es;q=0.9",
+      },
+      body: JSON.stringify({
+        email: "test@example.com",
+        password: "password123",
+        displayName: "Test User"
+      })
+    });
+    expect(register.status).toBe(200);
+    expect(await register.json()).toEqual({ ok: true, email: "test@example.com" });
+    await expect(repository.findUserByEmail("test@example.com")).resolves.toBeUndefined();
+    expect(authEmailSender.confirmations).toHaveLength(1);
+    expect(authEmailSender.confirmations[0]).toMatchObject({
+      locale: "es-ES",
+      expiresInMinutes: 30,
+    });
+
+    const confirm = await request("http://localhost/v1/auth/email/confirm", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token: authEmailSender.latestConfirmationToken() })
+    });
+    expect(confirm.status).toBe(200);
+    const body = await confirm.json() as { accessToken: string; refreshToken: string; user: { email: string; emailVerifiedAt?: string } };
+    expect(body.accessToken).toBeTruthy();
+    expect(body.refreshToken).toBeTruthy();
+    expect(body.user.email).toBe("test@example.com");
+    expect(body.user.emailVerifiedAt).toBeTruthy();
+
+    const reuse = await request("http://localhost/v1/auth/email/confirm", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ token: authEmailSender.latestConfirmationToken() })
+    });
+    expect(reuse.status).toBe(400);
+    expect(await reuse.json()).toMatchObject({
+      error: { code: "invalid_email_confirmation_token" }
+    });
+  });
+
   it("registers, logs in, refreshes, returns me, and logs out", async () => {
     const { request } = buildTestApp();
     const registered = await registerAndAuth(request);
@@ -98,6 +146,40 @@ describe("auth routes", () => {
         code: "email_already_registered",
         message: "An account already exists for this email"
       }
+    });
+  });
+
+  it("blocks password login before email confirmation", async () => {
+    const { request } = buildTestApp();
+    const register = await request("http://localhost/v1/auth/register", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: "test@example.com",
+        password: "password123",
+        displayName: "Test User"
+      })
+    });
+    expect(register.status).toBe(200);
+
+    const login = await request("http://localhost/v1/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "test@example.com", password: "password123" })
+    });
+    expect(login.status).toBe(403);
+    expect(await login.json()).toMatchObject({
+      error: { code: "email_not_verified" }
+    });
+
+    const wrongPassword = await request("http://localhost/v1/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "test@example.com", password: "wrongpassword" })
+    });
+    expect(wrongPassword.status).toBe(401);
+    expect(await wrongPassword.json()).toMatchObject({
+      error: { code: "invalid_credentials" }
     });
   });
 

@@ -857,6 +857,29 @@ class VoiceLogViewModel extends ChangeNotifier {
     _setUiState(const VoiceLogUiState());
   }
 
+  void resetForLogout() {
+    final shouldCancelRecording = {
+      VoiceLogState.requestingPermission,
+      VoiceLogState.ready,
+      VoiceLogState.recording,
+      VoiceLogState.stopping,
+    }.contains(state);
+    _timers.clearProposalChangeSuccess();
+    _timers.stopRecordingDuration();
+    _setUiState(const VoiceLogUiState());
+    if (shouldCancelRecording) {
+      unawaited(_cancelRecordingForLogout());
+    }
+  }
+
+  Future<void> _cancelRecordingForLogout() async {
+    try {
+      await _audioRecorderService.cancel();
+    } on Object {
+      // Recorder cleanup is independent from authentication state teardown.
+    }
+  }
+
   void retry() {
     _setUiState(
       _uiState.copyWith(

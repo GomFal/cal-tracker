@@ -1304,6 +1304,22 @@ void main() {
         expect(viewModel.errorMessage, isNull);
         expect(viewModel.transcript, isEmpty);
       });
+
+      test('logout reset clears state and cancels an active recording',
+          () async {
+        when(() => mockAudioRecorderService.start()).thenAnswer((_) async {});
+        when(() => mockAudioRecorderService.cancel()).thenAnswer((_) async {});
+        await viewModel.startRecording();
+        viewModel.updateTranscript('private transcript');
+
+        viewModel.resetForLogout();
+        await Future<void>.delayed(Duration.zero);
+
+        expect(viewModel.state, VoiceLogState.idle);
+        expect(viewModel.transcript, isEmpty);
+        expect(viewModel.proposal, isNull);
+        verify(() => mockAudioRecorderService.cancel()).called(1);
+      });
     });
 
     group('retry', () {

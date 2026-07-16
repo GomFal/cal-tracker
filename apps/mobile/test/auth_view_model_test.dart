@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cal_tracker_mobile/data/repositories/auth_repository.dart';
 import 'package:cal_tracker_mobile/domain/models/auth_models.dart';
 import 'package:cal_tracker_mobile/ui/features/auth/view_models/auth_view_model.dart';
@@ -56,6 +58,84 @@ void main() {
 
     expect(viewModel.status, AuthStatus.unauthenticated);
     expect(viewModel.user, isNull);
+  });
+
+  test('logout invalidates UI state before repository work finishes', () async {
+    final remoteLogout = Completer<void>();
+    when(() => repository.logout()).thenAnswer((_) => remoteLogout.future);
+    viewModel.setUser(_user);
+
+    final logout = viewModel.logout();
+    var repositoryFinished = false;
+    unawaited(logout.then((_) => repositoryFinished = true));
+    await Future<void>.delayed(Duration.zero);
+
+    expect(viewModel.status, AuthStatus.unauthenticated);
+    expect(viewModel.hasSession, isFalse);
+    expect(viewModel.user, isNull);
+    expect(repositoryFinished, isFalse);
+
+    remoteLogout.complete();
+    await logout;
+  });
+
+  test('duplicate logout calls share one repository operation', () async {
+    final remoteLogout = Completer<void>();
+    when(() => repository.logout()).thenAnswer((_) => remoteLogout.future);
+    viewModel.setUser(_user);
+
+    final first = viewModel.logout();
+    final second = viewModel.logout();
+
+    expect(identical(first, second), isTrue);
+    verify(() => repository.logout()).called(1);
+
+    remoteLogout.complete();
+    await Future.wait([first, second]);
+  });
+
+  test('rapid login waits until the previous logout teardown is complete',
+      () async {
+    final remoteLogout = Completer<void>();
+    when(() => repository.logout()).thenAnswer((_) => remoteLogout.future);
+    when(() => repository.login(
+          email: 'user@example.com',
+          password: 'new-session',
+        )).thenAnswer((_) async => _session);
+    viewModel.setUser(_user);
+
+    final logout = viewModel.logout();
+    final login = viewModel.login('user@example.com', 'new-session');
+    await Future<void>.delayed(Duration.zero);
+
+    verifyNever(() => repository.login(
+          email: any(named: 'email'),
+          password: any(named: 'password'),
+        ));
+    expect(viewModel.status, AuthStatus.unauthenticated);
+
+    remoteLogout.complete();
+    await Future.wait([logout, login]);
+
+    verify(() => repository.login(
+          email: 'user@example.com',
+          password: 'new-session',
+        )).called(1);
+    expect(viewModel.status, AuthStatus.authenticated);
+    expect(viewModel.user, _user);
+  });
+
+  test('repository logout failure never restores or errors the local session',
+      () async {
+    when(() => repository.logout())
+        .thenThrow(StateError('unexpected adapter failure'));
+    viewModel.setUser(_user);
+
+    await expectLater(viewModel.logout(), completes);
+
+    expect(viewModel.status, AuthStatus.unauthenticated);
+    expect(viewModel.user, isNull);
+    expect(viewModel.error, isNull);
   });
 
   test('register leaves the user unauthenticated until email confirmation',

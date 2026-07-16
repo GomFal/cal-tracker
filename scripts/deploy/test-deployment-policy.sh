@@ -24,6 +24,7 @@ grep -Fq 'BETTERCALORIES_DEPLOY_SOURCE_COMMIT' "$mobile"
 grep -Fq 'publish-apk' "$ROOT_DIR/scripts/mobile/deploy-server-apks.sh"
 grep -Fq 'NOPASSWD: /usr/local/sbin/bettercalories-deploy' "$ROOT_DIR/infra/deploy/provision-deploy-user.sh"
 grep -Fq 'test-configure-ssh.sh' "$policy_ci"
+grep -Fq 'test-provision-deploy-user.sh' "$policy_ci"
 if grep -Eq '^[[:space:]]*(source|\.)[[:space:]]+.*SECRETS_FILE' "$ROOT_DIR/infra/deploy/deploy.sh"; then
   echo "Deployment env files must never be executed as shell code." >&2
   exit 1

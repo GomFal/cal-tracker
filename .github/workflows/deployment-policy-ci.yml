@@ -39,6 +39,7 @@ jobs:
             scripts/deploy/configure-ssh.sh \
             scripts/deploy/test-configure-ssh.sh \
             scripts/deploy/test-deployment-policy.sh \
+            scripts/deploy/test-provision-deploy-user.sh \
             scripts/deploy-landing.sh \
             scripts/mobile/deploy-server-apks.sh \
             infra/deploy/bettercalories-deploy \
@@ -51,4 +52,5 @@ jobs:
         run: |
           set -euo pipefail
           scripts/deploy/test-configure-ssh.sh
+          scripts/deploy/test-provision-deploy-user.sh
           scripts/deploy/test-deployment-policy.sh

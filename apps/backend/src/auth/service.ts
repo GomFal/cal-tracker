@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { defaultUserScopes, type AuthUser, type GoogleLoginRequest, type LoginRequest, type RegisterRequest, type RegistrationPendingResponse, type TokenPair } from "@cal-tracker/contracts";
+import { defaultUserScopes, type AuthRequestAcceptedResponse, type AuthUser, type GoogleLoginRequest, type LoginRequest, type RegisterRequest, type TokenPair } from "@cal-tracker/contracts";
 import type { AppConfig } from "../config/env.js";
 import type { AppRepository } from "../repository/types.js";
 import { newId } from "../utils/ids.js";
@@ -31,38 +31,57 @@ export class AuthService {
   async register(
     input: RegisterRequest,
     locale?: string,
-  ): Promise<RegistrationPendingResponse> {
-    if (await this.repository.findUserByEmail(input.email)) {
-      throw new AuthError(
-        "email_already_registered",
-        "An account already exists for this email",
-        409,
-      );
+  ): Promise<AuthRequestAcceptedResponse> {
+    const startedAt = Date.now();
+    try {
+      const [existingUser, passwordHash] = await Promise.all([
+        this.repository.findUserByEmail(input.email),
+        hashPassword(input.password),
+      ]);
+      if (existingUser) {
+        await this.repository.recordAuditEvent({
+          userId: existingUser.id,
+          eventType: "auth.registration_request_ignored",
+          metadata: { reason: "email_already_registered" },
+          traceId: "auth-register",
+        });
+        return { ok: true };
+      }
+
+      const confirmationToken = randomBytes(40).toString("base64url");
+      const expiresAt = new Date(Date.now() + this.config.AUTH_EMAIL_CONFIRMATION_TTL_MINUTES * 60 * 1000).toISOString();
+      const pending = await this.repository.upsertPendingRegistration({
+        email: input.email,
+        displayName: input.displayName,
+        passwordHash,
+        tokenHash: hashRefreshToken(this.config, confirmationToken),
+        expiresAt
+      });
+      try {
+        await this.emailSender.sendEmailConfirmation({
+          to: pending.email,
+          displayName: pending.displayName,
+          confirmationUrl: this.emailConfirmationUrl(confirmationToken),
+          expiresAt: pending.expiresAt,
+          expiresInMinutes: this.config.AUTH_EMAIL_CONFIRMATION_TTL_MINUTES,
+          locale,
+        });
+      } catch {
+        await this.repository.recordAuditEvent({
+          eventType: "auth.email_delivery_failed",
+          metadata: { purpose: "email_confirmation", email: pending.email },
+          traceId: "auth-register",
+        });
+      }
+      await this.repository.recordAuditEvent({
+        eventType: "auth.email_confirmation_requested",
+        metadata: { email: pending.email },
+        traceId: "auth-register"
+      });
+      return { ok: true };
+    } finally {
+      await this.settleNeutralResponse(startedAt);
     }
-    const passwordHash = await hashPassword(input.password);
-    const confirmationToken = randomBytes(40).toString("base64url");
-    const expiresAt = new Date(Date.now() + this.config.AUTH_EMAIL_CONFIRMATION_TTL_MINUTES * 60 * 1000).toISOString();
-    const pending = await this.repository.upsertPendingRegistration({
-      email: input.email,
-      displayName: input.displayName,
-      passwordHash,
-      tokenHash: hashRefreshToken(this.config, confirmationToken),
-      expiresAt
-    });
-    await this.emailSender.sendEmailConfirmation({
-      to: pending.email,
-      displayName: pending.displayName,
-      confirmationUrl: this.emailConfirmationUrl(confirmationToken),
-      expiresAt: pending.expiresAt,
-      expiresInMinutes: this.config.AUTH_EMAIL_CONFIRMATION_TTL_MINUTES,
-      locale,
-    });
-    await this.repository.recordAuditEvent({
-      eventType: "auth.email_confirmation_requested",
-      metadata: { email: pending.email },
-      traceId: "auth-register"
-    });
-    return { ok: true, email: pending.email };
   }
 
   async login(input: LoginRequest): Promise<TokenPair> {
@@ -202,22 +221,48 @@ export class AuthService {
     await this.repository.revokeAllSessions(userId);
   }
 
-  async requestPasswordReset(email: string): Promise<{ resetToken?: string }> {
-    const user = await this.repository.findUserByEmail(email);
-    if (!user) return {};
-    const resetToken = randomBytes(40).toString("base64url");
-    await this.repository.createPasswordReset({
-      userId: user.id,
-      tokenHash: hashRefreshToken(this.config, resetToken),
-      expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString()
-    });
-    await this.repository.recordAuditEvent({
-      userId: user.id,
-      eventType: "auth.password_reset_requested",
-      metadata: {},
-      traceId: "auth-reset"
-    });
-    return this.config.NODE_ENV === "production" ? {} : { resetToken };
+  async requestPasswordReset(
+    email: string,
+    locale?: string,
+  ): Promise<AuthRequestAcceptedResponse> {
+    const startedAt = Date.now();
+    try {
+      const user = await this.repository.findUserByEmail(email);
+      if (!user) return { ok: true };
+
+      const resetToken = randomBytes(40).toString("base64url");
+      const expiresInMinutes = 30;
+      await this.repository.createPasswordReset({
+        userId: user.id,
+        tokenHash: hashRefreshToken(this.config, resetToken),
+        expiresAt: new Date(Date.now() + expiresInMinutes * 60 * 1000).toISOString()
+      });
+      try {
+        await this.emailSender.sendPasswordReset({
+          to: user.email,
+          displayName: user.displayName,
+          resetUrl: this.passwordResetUrl(resetToken, locale),
+          expiresInMinutes,
+          locale,
+        });
+      } catch {
+        await this.repository.recordAuditEvent({
+          userId: user.id,
+          eventType: "auth.email_delivery_failed",
+          metadata: { purpose: "password_reset" },
+          traceId: "auth-reset",
+        });
+      }
+      await this.repository.recordAuditEvent({
+        userId: user.id,
+        eventType: "auth.password_reset_requested",
+        metadata: {},
+        traceId: "auth-reset"
+      });
+      return { ok: true };
+    } finally {
+      await this.settleNeutralResponse(startedAt);
+    }
   }
 
   async confirmPasswordReset(token: string, newPassword: string): Promise<boolean> {
@@ -245,6 +290,23 @@ export class AuthService {
     const url = new URL("/auth/email/confirm", this.config.APP_BASE_URL);
     url.searchParams.set("token", token);
     return url.toString();
+  }
+
+  private passwordResetUrl(token: string, locale?: string): string {
+    const url = new URL("/auth/password-reset/confirm", this.config.APP_BASE_URL);
+    url.searchParams.set("token", token);
+    url.searchParams.set("lang", locale?.toLowerCase().startsWith("es") ? "es" : "en");
+    return url.toString();
+  }
+
+  private async settleNeutralResponse(startedAt: number): Promise<void> {
+    const minimumDurationMs = this.config.NODE_ENV === "test"
+      ? 25
+      : 900 + (randomBytes(1)[0] % 300);
+    const remainingMs = minimumDurationMs - (Date.now() - startedAt);
+    if (remainingMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, remainingMs));
+    }
   }
 }
 

@@ -47,7 +47,7 @@ void main() {
       expect(error.toString(), isNot(contains('trace-secret')));
       expect(
         userVisibleErrorMessage(error, context: UserErrorContext.authRegister),
-        'An account already exists for this email. Sign in instead.',
+        'We could not create your account. Try again.',
       );
     },
   );

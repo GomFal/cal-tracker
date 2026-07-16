@@ -37,6 +37,7 @@ import {
   loginRequestSchema,
   passwordResetConfirmSchema,
   passwordResetRequestSchema,
+  authRequestAcceptedResponseSchema,
   refreshRequestSchema,
   registerRequestSchema,
   registrationPendingResponseSchema,
@@ -127,6 +128,7 @@ const spec = {
     schemas: {
       ErrorResponse: schema("ErrorResponse", errorResponseSchema),
       RegisterRequest: schema("RegisterRequest", registerRequestSchema),
+      AuthRequestAcceptedResponse: schema("AuthRequestAcceptedResponse", authRequestAcceptedResponseSchema),
       RegistrationPendingResponse: schema("RegistrationPendingResponse", registrationPendingResponseSchema),
       LoginRequest: schema("LoginRequest", loginRequestSchema),
       AdminLoginRequest: schema("AdminLoginRequest", adminLoginRequestSchema),
@@ -200,7 +202,7 @@ const spec = {
           content: { "application/json": { schema: { $ref: "#/components/schemas/RegisterRequest" } } }
         },
         responses: {
-          "200": { description: "Confirmation email sent", content: { "application/json": { schema: { $ref: "#/components/schemas/RegistrationPendingResponse" } } } }
+          "200": { description: "Request accepted", content: { "application/json": { schema: { $ref: "#/components/schemas/AuthRequestAcceptedResponse" } } } }
         }
       }
     },
@@ -225,6 +227,30 @@ const spec = {
         },
         responses: {
           "200": { description: "Token pair", content: { "application/json": { schema: { $ref: "#/components/schemas/TokenPair" } } } }
+        }
+      }
+    },
+    "/v1/auth/password-reset/request": {
+      post: {
+        operationId: "requestPasswordReset",
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/PasswordResetRequest" } } }
+        },
+        responses: {
+          "200": { description: "Request accepted", content: { "application/json": { schema: { $ref: "#/components/schemas/AuthRequestAcceptedResponse" } } } }
+        }
+      }
+    },
+    "/v1/auth/password-reset/confirm": {
+      post: {
+        operationId: "confirmPasswordReset",
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/PasswordResetConfirm" } } }
+        },
+        responses: {
+          "200": { description: "Password reset result" }
         }
       }
     },

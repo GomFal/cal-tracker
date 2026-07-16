@@ -67,14 +67,7 @@
   "authCreateAccountFailedTitle": "No se pudo crear la cuenta",
   "authConfirmEmailFailedTitle": "No se pudo confirmar el correo",
   "authCheckEmailTitle": "Revisa tu correo",
-  "authCheckEmailMessage": "Te enviamos un enlace de confirmación a {email}. Ábrelo para terminar de crear tu cuenta.",
-  "@authCheckEmailMessage": {
-    "placeholders": {
-      "email": {
-        "type": "String"
-      }
-    }
-  },
+  "authCheckEmailMessage": "Si esta dirección puede usarse, recibirás un correo con el siguiente paso. Revisa también la carpeta de spam.",
   "authEmailInvalidError": "Introduce un correo válido, como nombre@example.com.",
   "authNameRequiredError": "Introduce tu nombre.",
   "authPasswordRequiredError": "Introduce tu contraseña.",

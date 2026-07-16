@@ -16,6 +16,14 @@ export type EmailConfirmationMessage = {
   text: string;
 };
 
+export type PasswordResetEmailInput = {
+  to: string;
+  displayName: string;
+  resetUrl: string;
+  expiresInMinutes: number;
+  locale?: string;
+};
+
 type ResendMessage = EmailConfirmationMessage & {
   from: string;
   to: string;
@@ -46,6 +54,7 @@ type EmailCopy = {
 
 export interface AuthEmailSender {
   sendEmailConfirmation(input: EmailConfirmationInput): Promise<void>;
+  sendPasswordReset(input: PasswordResetEmailInput): Promise<void>;
 }
 
 export class ResendAuthEmailSender implements AuthEmailSender {
@@ -81,6 +90,26 @@ export class ResendAuthEmailSender implements AuthEmailSender {
       throw new Error("Unable to send confirmation email");
     }
   }
+
+  async sendPasswordReset(input: PasswordResetEmailInput): Promise<void> {
+    if (!this.resend || !this.config.RESEND_FROM_EMAIL.trim()) {
+      console.info("auth.password_reset.dev_link", {
+        email: input.to,
+        resetUrl: input.resetUrl,
+      });
+      return;
+    }
+
+    const message = buildPasswordResetMessage(input);
+    const result = await this.resend.emails.send({
+      from: this.config.RESEND_FROM_EMAIL,
+      to: input.to,
+      ...message,
+    });
+    if (result.error) {
+      throw new Error("Unable to send password reset email");
+    }
+  }
 }
 
 export function buildEmailConfirmationMessage(
@@ -93,6 +122,63 @@ export function buildEmailConfirmationMessage(
     subject: copy.subject,
     text: confirmationEmailText(input, copy),
     html: confirmationEmailHtml(input, locale, copy),
+  };
+}
+
+export function buildPasswordResetMessage(
+  input: PasswordResetEmailInput,
+): EmailConfirmationMessage {
+  const locale = resolveEmailLocale(input.locale);
+  const minutes = Math.max(1, Math.round(input.expiresInMinutes));
+  const copy = locale === "es"
+    ? {
+        subject: "Restablece tu contraseña de BetterCalories",
+        greeting: `Hola, ${input.displayName}`,
+        body: "Usa este enlace para elegir una contraseña nueva.",
+        cta: "Restablecer contraseña",
+        expiry: minutes === 1
+          ? "Este enlace caduca en 1 minuto."
+          : `Este enlace caduca en ${minutes} minutos.`,
+        ignore: "Si no solicitaste este cambio, puedes ignorar este correo.",
+      }
+    : {
+        subject: "Reset your BetterCalories password",
+        greeting: `Hi, ${input.displayName}`,
+        body: "Use this link to choose a new password.",
+        cta: "Reset password",
+        expiry: minutes === 1
+          ? "This link expires in 1 minute."
+          : `This link expires in ${minutes} minutes.`,
+        ignore: "If you did not request this change, you can ignore this email.",
+      };
+  const escapedUrl = escapeHtml(input.resetUrl);
+  const escaped = Object.fromEntries(
+    Object.entries(copy).map(([key, value]) => [key, escapeHtml(value)]),
+  ) as typeof copy;
+
+  return {
+    subject: copy.subject,
+    text: [
+      copy.greeting,
+      "",
+      copy.body,
+      `${copy.cta}: ${input.resetUrl}`,
+      copy.expiry,
+      "",
+      copy.ignore,
+    ].join("\n"),
+    html: `<!doctype html>
+<html lang="${locale}">
+  <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escaped.subject}</title></head>
+  <body style="font-family:Arial,sans-serif;color:#18201b;line-height:1.5;margin:32px">
+    <h1>${escaped.subject}</h1>
+    <p><strong>${escaped.greeting}</strong></p>
+    <p>${escaped.body}</p>
+    <p><a href="${escapedUrl}">${escaped.cta}</a></p>
+    <p>${escaped.expiry}</p>
+    <p>${escaped.ignore}</p>
+  </body>
+</html>`,
   };
 }
 

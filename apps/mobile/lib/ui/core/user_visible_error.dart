@@ -43,10 +43,6 @@ String userVisibleErrorMessage(
 
   if (error is ApiException) {
     final code = error.code;
-    if (context == UserErrorContext.authRegister &&
-        (code == 'email_already_registered' || error.statusCode == 409)) {
-      return 'An account already exists for this email. Sign in instead.';
-    }
     if (context == UserErrorContext.authLogin &&
         code == 'invalid_credentials') {
       return 'Email or password does not match.';

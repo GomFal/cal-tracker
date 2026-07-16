@@ -223,9 +223,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authCheckEmailTitle => 'Check your email';
 
   @override
-  String authCheckEmailMessage(String email) {
-    return 'We sent a confirmation link to $email. Open it to finish creating your account.';
-  }
+  String get authCheckEmailMessage =>
+      'If this address can be used, you’ll receive an email with the next step. Check your spam folder too.';
 
   @override
   String get authEmailInvalidError =>

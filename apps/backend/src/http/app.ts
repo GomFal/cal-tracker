@@ -331,13 +331,35 @@ export function createApp(input: {
     return c.json({ ok: true });
   });
   app.get("/auth/email/confirm", (c) => c.html(emailConfirmationFallbackHtml()));
+  app.get("/auth/password-reset/confirm", (c) =>
+    c.html(passwordResetFormHtml(
+      c.req.query("token") ?? "",
+      c.req.query("lang"),
+    )),
+  );
+  app.post("/auth/password-reset/confirm", async (c) => {
+    const form = await c.req.parseBody();
+    const body = passwordResetConfirmSchema.parse({
+      token: form.token,
+      newPassword: form.newPassword,
+    });
+    const matches = form.confirmPassword === body.newPassword;
+    const ok = matches && await authService.confirmPasswordReset(
+      body.token,
+      body.newPassword,
+    );
+    return c.html(passwordResetResultHtml(ok, String(form.lang ?? "")));
+  });
   app.get("/.well-known/assetlinks.json", (c) => c.json(androidAssetLinks(config)));
   app.get("/.well-known/apple-app-site-association", (c) =>
     c.json(appleAppSiteAssociation(config)),
   );
   app.post("/v1/auth/password-reset/request", async (c) => {
     const body = passwordResetRequestSchema.parse(await c.req.json());
-    return c.json(await authService.requestPasswordReset(body.email));
+    return c.json(await authService.requestPasswordReset(
+      body.email,
+      c.req.header("accept-language")?.split(",")[0],
+    ));
   });
   app.post("/v1/auth/password-reset/confirm", async (c) => {
     const body = passwordResetConfirmSchema.parse(await c.req.json());
@@ -1534,6 +1556,67 @@ function emailConfirmationFallbackHtml(): string {
     <p>If nothing happened, install or open BetterCalories and tap the email link again.</p>
   </body>
 </html>`;
+}
+
+function passwordResetFormHtml(token: string, requestedLocale?: string): string {
+  const locale = requestedLocale === "es" ? "es" : "en";
+  const copy = locale === "es"
+    ? {
+        title: "Restablece tu contraseña",
+        password: "Contraseña nueva",
+        confirm: "Repite la contraseña",
+        submit: "Guardar contraseña",
+      }
+    : {
+        title: "Reset your password",
+        password: "New password",
+        confirm: "Repeat password",
+        submit: "Save password",
+      };
+  return `<!doctype html>
+<html lang="${locale}">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>${copy.title} · BetterCalories</title>
+  </head>
+  <body style="font-family:Arial,sans-serif;color:#18201b;line-height:1.5;margin:32px;max-width:480px">
+    <h1>${copy.title}</h1>
+    <form method="post" action="/auth/password-reset/confirm">
+      <input type="hidden" name="token" value="${escapeHtmlAttribute(token)}">
+      <input type="hidden" name="lang" value="${locale}">
+      <p><label>${copy.password}<br><input name="newPassword" type="password" minlength="8" required autocomplete="new-password"></label></p>
+      <p><label>${copy.confirm}<br><input name="confirmPassword" type="password" minlength="8" required autocomplete="new-password"></label></p>
+      <button type="submit">${copy.submit}</button>
+    </form>
+  </body>
+</html>`;
+}
+
+function passwordResetResultHtml(ok: boolean, requestedLocale?: string): string {
+  const locale = requestedLocale === "es" ? "es" : "en";
+  const title = ok
+    ? (locale === "es" ? "Contraseña actualizada" : "Password updated")
+    : (locale === "es" ? "No se pudo actualizar" : "Could not update password");
+  const message = ok
+    ? (locale === "es" ? "Ya puedes volver a BetterCalories e iniciar sesión." : "You can return to BetterCalories and sign in now.")
+    : (locale === "es" ? "El enlace no es válido, ha caducado o las contraseñas no coinciden." : "The link is invalid, expired, or the passwords do not match.");
+  return `<!doctype html>
+<html lang="${locale}">
+  <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title} · BetterCalories</title></head>
+  <body style="font-family:Arial,sans-serif;color:#18201b;line-height:1.5;margin:32px;max-width:480px">
+    <h1>${title}</h1>
+    <p>${message}</p>
+  </body>
+</html>`;
+}
+
+function escapeHtmlAttribute(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
 }
 
 function androidAssetLinks(config: AppConfig) {

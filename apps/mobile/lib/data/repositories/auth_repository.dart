@@ -34,6 +34,21 @@ class AuthRepository {
     return session;
   }
 
+  Future<void> requestPasswordReset(String email) async {
+    await _apiClient.requestPasswordReset(email: email);
+  }
+
+  Future<bool> confirmPasswordReset({
+    required String token,
+    required String newPassword,
+  }) async {
+    final json = await _apiClient.confirmPasswordReset(
+      token: token,
+      newPassword: newPassword,
+    );
+    return json['ok'] == true;
+  }
+
   Future<AuthSession> login(
       {required String email, required String password}) async {
     final json = await _apiClient.login(email: email, password: password);

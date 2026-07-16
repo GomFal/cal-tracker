@@ -90,6 +90,23 @@ class CalTrackerApiClient {
         authenticated: false);
   }
 
+  Future<Map<String, Object?>> requestPasswordReset({required String email}) {
+    return _post(
+        '/v1/auth/password-reset/request',
+        {'email': email},
+        authenticated: false);
+  }
+
+  Future<Map<String, Object?>> confirmPasswordReset({
+    required String token,
+    required String newPassword,
+  }) {
+    return _post(
+        '/v1/auth/password-reset/confirm',
+        {'token': token, 'newPassword': newPassword},
+        authenticated: false);
+  }
+
   Future<Map<String, Object?>> login({
     required String email,
     required String password,

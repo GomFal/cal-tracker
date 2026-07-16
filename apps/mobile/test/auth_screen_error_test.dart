@@ -37,7 +37,7 @@ void main() {
     },
   );
 
-  testWidgets('duplicate registration shows actionable public copy', (
+  testWidgets('registration errors do not expose account existence', (
     tester,
   ) async {
     final repository = _FakeAuthRepository(
@@ -58,9 +58,10 @@ void main() {
 
     expect(find.text('Account creation failed'), findsOneWidget);
     expect(
-      find.text('An account already exists for this email. Sign in instead.'),
+      find.text('We could not create your account. Try again.'),
       findsOneWidget,
     );
+    expect(find.textContaining('already exists'), findsNothing);
     expect(find.textContaining('ApiException'), findsNothing);
     expect(find.textContaining('409'), findsNothing);
     expect(find.textContaining('trace-secret'), findsNothing);
@@ -85,7 +86,7 @@ void main() {
     expect(find.text('Check your email'), findsOneWidget);
     expect(
       find.text(
-        'We sent a confirmation link to demo@example.com. Open it to finish creating your account.',
+        'If this address can be used, you’ll receive an email with the next step. Check your spam folder too.',
       ),
       findsOneWidget,
     );

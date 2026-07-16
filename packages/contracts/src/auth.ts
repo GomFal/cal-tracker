@@ -7,10 +7,11 @@ export const registerRequestSchema = z.object({
   displayName: z.string().min(1).max(120)
 });
 
-export const registrationPendingResponseSchema = z.object({
-  ok: z.literal(true),
-  email: z.string().email()
+export const authRequestAcceptedResponseSchema = z.object({
+  ok: z.literal(true)
 });
+
+export const registrationPendingResponseSchema = authRequestAcceptedResponseSchema;
 
 export const loginRequestSchema = z.object({
   email: z.string().email(),
@@ -72,6 +73,7 @@ export const adminTokenResponseSchema = z.object({
 });
 
 export type RegisterRequest = z.infer<typeof registerRequestSchema>;
+export type AuthRequestAcceptedResponse = z.infer<typeof authRequestAcceptedResponseSchema>;
 export type RegistrationPendingResponse = z.infer<typeof registrationPendingResponseSchema>;
 export type LoginRequest = z.infer<typeof loginRequestSchema>;
 export type AdminLoginRequest = z.infer<typeof adminLoginRequestSchema>;

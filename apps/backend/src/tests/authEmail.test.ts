@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   buildEmailConfirmationMessage,
+  buildPasswordResetMessage,
   ResendAuthEmailSender,
   type EmailConfirmationInput,
+  type PasswordResetEmailInput,
 } from "../auth/email.js";
 import { loadConfig } from "../config/env.js";
 
@@ -11,6 +13,13 @@ const confirmation: EmailConfirmationInput = {
   displayName: "Antonio",
   confirmationUrl: "https://api.bettercalories.app/auth/email/confirm?token=test-token",
   expiresAt: "2026-07-16T12:30:00.000Z",
+  expiresInMinutes: 30,
+};
+
+const passwordReset: PasswordResetEmailInput = {
+  to: "antonio@example.com",
+  displayName: "Antonio",
+  resetUrl: "https://api.bettercalories.app/auth/password-reset/confirm?token=test-token",
   expiresInMinutes: 30,
 };
 
@@ -61,6 +70,35 @@ describe("email confirmation messages", () => {
     expect(send).toHaveBeenCalledWith(expect.objectContaining({
       to: confirmation.to,
       subject: "Confirm your BetterCalories email",
+    }));
+  });
+
+  it("renders localized password reset messages without exposing the token beyond the link", () => {
+    const message = buildPasswordResetMessage({
+      ...passwordReset,
+      locale: "es-ES",
+    });
+
+    expect(message.subject).toBe("Restablece tu contraseña de BetterCalories");
+    expect(message.text).toContain("Este enlace caduca en 30 minutos.");
+    expect(message.html).toContain('<html lang="es">');
+    expect(message.html).toContain(passwordReset.resetUrl);
+  });
+
+  it("sends password reset mail through the configured provider", async () => {
+    const send = vi.fn().mockResolvedValue({ error: null });
+    const config = loadConfig({
+      NODE_ENV: "test",
+      RESEND_API_KEY: "re_test_key",
+      RESEND_FROM_EMAIL: "BetterCalories <auth@bettercalories.app>",
+    } as NodeJS.ProcessEnv);
+    const sender = new ResendAuthEmailSender(config, { emails: { send } });
+
+    await sender.sendPasswordReset(passwordReset);
+
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({
+      to: passwordReset.to,
+      subject: "Reset your BetterCalories password",
     }));
   });
 });

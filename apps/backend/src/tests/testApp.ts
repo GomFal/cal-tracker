@@ -2,6 +2,7 @@ import { ActionExecutor } from "../actions/executor.js";
 import type {
   AuthEmailSender,
   EmailConfirmationInput,
+  PasswordResetEmailInput,
 } from "../auth/email.js";
 import type { GoogleTokenVerifier } from "../auth/google.js";
 import { AuthService } from "../auth/service.js";
@@ -47,9 +48,14 @@ export class FakeChatAgentProvider implements ChatAgentProvider {
 
 export class FakeAuthEmailSender implements AuthEmailSender {
   readonly confirmations: EmailConfirmationInput[] = [];
+  readonly passwordResets: PasswordResetEmailInput[] = [];
 
   async sendEmailConfirmation(input: EmailConfirmationInput): Promise<void> {
     this.confirmations.push(input);
+  }
+
+  async sendPasswordReset(input: PasswordResetEmailInput): Promise<void> {
+    this.passwordResets.push(input);
   }
 
   latestConfirmationToken(): string {
@@ -57,6 +63,14 @@ export class FakeAuthEmailSender implements AuthEmailSender {
     if (!latest) throw new Error("confirmation_email_not_sent");
     const token = new URL(latest.confirmationUrl).searchParams.get("token");
     if (!token) throw new Error("confirmation_email_token_missing");
+    return token;
+  }
+
+  latestPasswordResetToken(): string {
+    const latest = this.passwordResets.at(-1);
+    if (!latest) throw new Error("password_reset_email_not_sent");
+    const token = new URL(latest.resetUrl).searchParams.get("token");
+    if (!token) throw new Error("password_reset_token_missing");
     return token;
   }
 }

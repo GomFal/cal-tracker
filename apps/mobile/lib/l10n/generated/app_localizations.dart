@@ -503,8 +503,8 @@ abstract class AppLocalizations {
   /// No description provided for @authCheckEmailMessage.
   ///
   /// In en, this message translates to:
-  /// **'We sent a confirmation link to {email}. Open it to finish creating your account.'**
-  String authCheckEmailMessage(String email);
+  /// **'If this address can be used, you’ll receive an email with the next step. Check your spam folder too.'**
+  String get authCheckEmailMessage;
 
   /// No description provided for @authEmailInvalidError.
   ///

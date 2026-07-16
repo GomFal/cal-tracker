@@ -20,7 +20,7 @@ describe("auth routes", () => {
       })
     });
     expect(register.status).toBe(200);
-    expect(await register.json()).toEqual({ ok: true, email: "test@example.com" });
+    expect(await register.json()).toEqual({ ok: true });
     await expect(repository.findUserByEmail("test@example.com")).resolves.toBeUndefined();
     expect(authEmailSender.confirmations).toHaveLength(1);
     expect(authEmailSender.confirmations[0]).toMatchObject({
@@ -88,7 +88,7 @@ describe("auth routes", () => {
   });
 
   it("resets the password, revokes every refresh session, and records the security audit", async () => {
-    const { request, repository } = buildTestApp();
+    const { request, repository, authEmailSender } = buildTestApp();
     const registered = await registerAndAuth(request);
     const secondLogin = await request("http://localhost/v1/auth/login", {
       method: "POST",
@@ -109,8 +109,9 @@ describe("auth routes", () => {
       body: JSON.stringify({ email: "test@example.com" })
     });
     expect(resetRequest.status).toBe(200);
-    const { resetToken } = await resetRequest.json() as { resetToken: string };
-    expect(resetToken).toBeTruthy();
+    expect(await resetRequest.json()).toEqual({ ok: true });
+    expect(authEmailSender).toBeInstanceOf(FakeAuthEmailSender);
+    const resetToken = (authEmailSender as FakeAuthEmailSender).latestPasswordResetToken();
 
     const confirm = await request("http://localhost/v1/auth/password-reset/confirm", {
       method: "POST",
@@ -217,9 +218,11 @@ describe("auth routes", () => {
     expect(body.error.message).toBe("Invalid request");
   });
 
-  it("rejects duplicate registration with actionable public copy", async () => {
-    const { request } = buildTestApp();
+  it("accepts duplicate registration neutrally without sending another email", async () => {
+    const authEmailSender = new FakeAuthEmailSender();
+    const { request } = buildTestApp({ authEmailSender });
     await registerAndAuth(request);
+    expect(authEmailSender.confirmations).toHaveLength(1);
 
     const response = await request("http://localhost/v1/auth/register", {
       method: "POST",
@@ -231,13 +234,158 @@ describe("auth routes", () => {
       })
     });
 
-    expect(response.status).toBe(409);
-    expect(await response.json()).toMatchObject({
-      error: {
-        code: "email_already_registered",
-        message: "An account already exists for this email"
-      }
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true });
+    expect(authEmailSender.confirmations).toHaveLength(1);
+  });
+
+  it("does not turn email delivery failures into an account-state oracle", async () => {
+    const authEmailSender = new FakeAuthEmailSender();
+    vi.spyOn(authEmailSender, "sendEmailConfirmation").mockRejectedValue(
+      new Error("provider unavailable"),
+    );
+    const { request } = buildTestApp({ authEmailSender });
+
+    const response = await request("http://localhost/v1/auth/register", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: "new@example.com",
+        password: "password123",
+        displayName: "New User",
+      }),
     });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true });
+  });
+
+  it("keeps registration responses equivalent for new, pending, and existing emails", async () => {
+    const authEmailSender = new FakeAuthEmailSender();
+    const { request } = buildTestApp({ authEmailSender });
+    await registerAndAuth(request, { email: "existing@example.com" });
+
+    await request("http://localhost/v1/auth/register", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: "pending@example.com",
+        password: "password123",
+        displayName: "Pending User",
+      }),
+    });
+
+    const cases = [
+      { email: "new@example.com", displayName: "New User" },
+      { email: "pending@example.com", displayName: "Pending User" },
+      { email: "existing@example.com", displayName: "Existing User" },
+    ];
+    const durations: number[] = [];
+    for (const item of cases) {
+      const startedAt = performance.now();
+      const response = await request("http://localhost/v1/auth/register", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ...item,
+          password: "password123",
+        }),
+      });
+      durations.push(performance.now() - startedAt);
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ ok: true });
+    }
+    expect(Math.max(...durations) - Math.min(...durations)).toBeLessThan(150);
+  });
+
+  it("keeps password reset responses equivalent and emails only real accounts", async () => {
+    const authEmailSender = new FakeAuthEmailSender();
+    const { request } = buildTestApp({ authEmailSender });
+    await registerAndAuth(request, { email: "existing@example.com" });
+    await request("http://localhost/v1/auth/register", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: "pending@example.com",
+        password: "password123",
+        displayName: "Pending User",
+      }),
+    });
+
+    const durations: number[] = [];
+    for (const email of [
+      "existing@example.com",
+      "pending@example.com",
+      "missing@example.com",
+    ]) {
+      const startedAt = performance.now();
+      const response = await request("http://localhost/v1/auth/password-reset/request", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "accept-language": "es-ES",
+        },
+        body: JSON.stringify({ email }),
+      });
+      durations.push(performance.now() - startedAt);
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ ok: true });
+    }
+
+    expect(authEmailSender.passwordResets).toHaveLength(1);
+    expect(authEmailSender.passwordResets[0]).toMatchObject({
+      to: "existing@example.com",
+      locale: "es-ES",
+    });
+    expect(Math.max(...durations) - Math.min(...durations)).toBeLessThan(100);
+  });
+
+  it("provides a functional localized password reset link without exposing account state", async () => {
+    const authEmailSender = new FakeAuthEmailSender();
+    const { request } = buildTestApp({ authEmailSender });
+    await registerAndAuth(request);
+
+    const resetRequest = await request("http://localhost/v1/auth/password-reset/request", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "accept-language": "es-ES",
+      },
+      body: JSON.stringify({ email: "test@example.com" }),
+    });
+    expect(await resetRequest.json()).toEqual({ ok: true });
+
+    const resetUrl = authEmailSender.passwordResets[0]?.resetUrl;
+    expect(resetUrl).toContain("lang=es");
+    const form = await request(resetUrl!);
+    expect(form.status).toBe(200);
+    const html = await form.text();
+    expect(html).toContain("Restablece tu contraseña");
+    expect(html).toContain('autocomplete="new-password"');
+
+    const token = authEmailSender.latestPasswordResetToken();
+    const confirm = await request("http://localhost/auth/password-reset/confirm", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        token,
+        lang: "es",
+        newPassword: "newpassword123",
+        confirmPassword: "newpassword123",
+      }),
+    });
+    expect(confirm.status).toBe(200);
+    expect(await confirm.text()).toContain("Contraseña actualizada");
+
+    const login = await request("http://localhost/v1/auth/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        email: "test@example.com",
+        password: "newpassword123",
+      }),
+    });
+    expect(login.status).toBe(200);
   });
 
   it("blocks password login before email confirmation", async () => {

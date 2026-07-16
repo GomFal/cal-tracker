@@ -71,23 +71,21 @@
         ],
         "additionalProperties": false
       },
-      "RegistrationPendingResponse": {
+      "AuthRequestAcceptedResponse": {
         "type": "object",
         "properties": {
           "ok": {
             "type": "boolean",
             "const": true
-          },
-          "email": {
-            "type": "string",
-            "format": "email"
           }
         },
         "required": [
-          "ok",
-          "email"
+          "ok"
         ],
         "additionalProperties": false
+      },
+      "RegistrationPendingResponse": {
+        "$ref": "#/components/schemas/AuthRequestAcceptedResponse"
       },
       "LoginRequest": {
         "type": "object",
@@ -16758,11 +16756,11 @@
         },
         "responses": {
           "200": {
-            "description": "Confirmation email sent",
+            "description": "Request accepted",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/RegistrationPendingResponse"
+                  "$ref": "#/components/schemas/AuthRequestAcceptedResponse"
                 }
               }
             }
@@ -16820,6 +16818,53 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/v1/auth/password-reset/request": {
+      "post": {
+        "operationId": "requestPasswordReset",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordResetRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Request accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthRequestAcceptedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/auth/password-reset/confirm": {
+      "post": {
+        "operationId": "confirmPasswordReset",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordResetConfirm"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password reset result"
           }
         }
       }

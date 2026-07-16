@@ -11,6 +11,7 @@ import 'app/app.dart';
 import 'app/locale_view_model.dart';
 import 'app/performance_overlay_view_model.dart';
 import 'app/theme_mode_view_model.dart';
+import 'data/services/api_config.dart';
 import 'l10n/generated/app_localizations.dart';
 import 'local_toolkit/data/local_toolkit_data.dart';
 import 'local_toolkit/ui/local_toolkit_overlay.dart';
@@ -40,6 +41,7 @@ class _LocalToolkitApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CalTrackerBootstrap(
+      apiConfig: const ApiConfig(baseUrl: 'http://localhost:3000'),
       tokenStorage: dependencies.tokenStorage,
       authRepository: dependencies.authRepository,
       nutritionRepository: dependencies.nutritionRepository,

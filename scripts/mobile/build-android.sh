@@ -57,6 +57,9 @@ build_flavor() {
   local flavor="$1"
   local api_base_url="$2"
 
+  "$ROOT_DIR/scripts/mobile/validate-api-base-url.sh" \
+    "$flavor" "$api_base_url" "$BUILD_MODE"
+
   if [[ "$flavor" == "prod" && ! -f "$MOBILE_DIR/android/key.properties" && "${ALLOW_DEBUG_SIGNING:-}" != "1" ]]; then
     cat >&2 <<'MESSAGE'
 Refusing to build prod with the debug signing key.

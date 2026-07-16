@@ -89,6 +89,8 @@ jobs:
             exit 1
           fi
 
+          scripts/mobile/validate-api-base-url.sh "$flavor" "$api_base_url" release
+
           CONFIG_PATH="$config_dir/$flavor.json" \
           API_BASE_URL="$api_base_url" \
           GOOGLE_SERVER_CLIENT_ID="$google_server_client_id" \

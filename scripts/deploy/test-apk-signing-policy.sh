@@ -111,8 +111,12 @@ expect_failure "invalid APK signature" \
   "$APK_VERIFIER" "$FIXTURE/app.apk" "$fingerprint"
 
 real_apksigner="$(command -v apksigner || true)"
-if [[ -z "$real_apksigner" ]]; then
-  real_apksigner="$(find /home/antonio/Android/Sdk/build-tools -path '*/apksigner' -type f 2>/dev/null | sort -V | tail -n 1)"
+android_sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+if [[ -z "$android_sdk_root" && -d /home/antonio/Android/Sdk ]]; then
+  android_sdk_root=/home/antonio/Android/Sdk
+fi
+if [[ -z "$real_apksigner" && -n "$android_sdk_root" && -d "$android_sdk_root/build-tools" ]]; then
+  real_apksigner="$(find "$android_sdk_root/build-tools" -path '*/apksigner' -type f | sort -V | tail -n 1)"
 fi
 if [[ -n "$real_apksigner" ]] && command -v keytool >/dev/null 2>&1 && command -v jar >/dev/null 2>&1; then
   real_dir="$FIXTURE/real"

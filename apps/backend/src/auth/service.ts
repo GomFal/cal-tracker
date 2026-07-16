@@ -28,7 +28,10 @@ export class AuthService {
     private readonly emailSender: AuthEmailSender = new ResendAuthEmailSender(config)
   ) {}
 
-  async register(input: RegisterRequest): Promise<RegistrationPendingResponse> {
+  async register(
+    input: RegisterRequest,
+    locale?: string,
+  ): Promise<RegistrationPendingResponse> {
     if (await this.repository.findUserByEmail(input.email)) {
       throw new AuthError(
         "email_already_registered",
@@ -50,7 +53,9 @@ export class AuthService {
       to: pending.email,
       displayName: pending.displayName,
       confirmationUrl: this.emailConfirmationUrl(confirmationToken),
-      expiresAt: pending.expiresAt
+      expiresAt: pending.expiresAt,
+      expiresInMinutes: this.config.AUTH_EMAIL_CONFIRMATION_TTL_MINUTES,
+      locale,
     });
     await this.repository.recordAuditEvent({
       eventType: "auth.email_confirmation_requested",

@@ -160,8 +160,8 @@
     "semantic_hash": ""
   },
   "apps/backend/src/auth/service.ts": {
-    "mtime": 1782069106.7537658,
-    "ast_hash": "a79fa44699a94fa735f9ef14ded3656b",
+    "mtime": 1784199959.44879,
+    "ast_hash": "e34c3f0e9be0909d7bddcdce635c8430",
     "semantic_hash": ""
   },
   "apps/backend/src/config/env.ts": {
@@ -220,8 +220,8 @@
     "semantic_hash": ""
   },
   "apps/backend/src/http/app.ts": {
-    "mtime": 1782069138.0797465,
-    "ast_hash": "6e9af458f4248c8f12cdea6e4738297a",
+    "mtime": 1784199959.4497895,
+    "ast_hash": "7b2a9d772cca92ed099f979bd690a46f",
     "semantic_hash": ""
   },
   "apps/backend/src/index.ts": {
@@ -360,8 +360,8 @@
     "semantic_hash": ""
   },
   "apps/backend/src/tests/auth.test.ts": {
-    "mtime": 1782069208.293945,
-    "ast_hash": "a94ceddc0cac030a383d91ae37346230",
+    "mtime": 1784199989.0445004,
+    "ast_hash": "4ad43580b89af6fe701a0029465111d7",
     "semantic_hash": ""
   },
   "apps/backend/src/tests/calorieEstimator.test.ts": {
@@ -585,13 +585,13 @@
     "semantic_hash": ""
   },
   "apps/mobile/ios/Flutter/ephemeral/flutter_lldb_helper.py": {
-    "mtime": 1782069337.5069716,
+    "mtime": 1784198744.8029146,
     "ast_hash": "98fc75412162af387e2e3461e4e58094",
     "semantic_hash": ""
   },
   "apps/mobile/ios/Flutter/flutter_export_environment.sh": {
-    "mtime": 1782069337.5109696,
-    "ast_hash": "478145be9d8e7a62ee0c25acefa03fa5",
+    "mtime": 1784198744.8089147,
+    "ast_hash": "41ab47dd5c2a00230921d9373066ebee",
     "semantic_hash": ""
   },
   "apps/mobile/ios/Runner/AppDelegate.swift": {
@@ -2705,13 +2705,18 @@
     "semantic_hash": ""
   },
   "apps/backend/src/auth/email.ts": {
-    "mtime": 1782069076.4995773,
-    "ast_hash": "cd26b91e452af71ce4737346b2fc380f",
+    "mtime": 1784201203.9727445,
+    "ast_hash": "eb256a57b4b8d7402adb3ec69124d0e6",
     "semantic_hash": ""
   },
   "infra/db/migrations/0018_email_confirmation.sql": {
     "mtime": 1782069032.2115505,
     "ast_hash": "a62ac999b608cd890b1a8a54962e9f97",
+    "semantic_hash": ""
+  },
+  "apps/backend/src/tests/authEmail.test.ts": {
+    "mtime": 1784199989.0445004,
+    "ast_hash": "5a54ec6098931aaed517f6be7630d666",
     "semantic_hash": ""
   }
 }

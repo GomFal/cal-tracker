@@ -297,6 +297,7 @@ export function createApp(input: {
     c.json(
       await authService.register(
         registerRequestSchema.parse(await c.req.json()),
+        c.req.header("accept-language")?.split(",")[0],
       ),
     ),
   );

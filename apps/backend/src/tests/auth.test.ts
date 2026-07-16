@@ -9,7 +9,10 @@ describe("auth routes", () => {
 
     const register = await request("http://localhost/v1/auth/register", {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        "accept-language": "es-ES,es;q=0.9",
+      },
       body: JSON.stringify({
         email: "test@example.com",
         password: "password123",
@@ -20,6 +23,10 @@ describe("auth routes", () => {
     expect(await register.json()).toEqual({ ok: true, email: "test@example.com" });
     await expect(repository.findUserByEmail("test@example.com")).resolves.toBeUndefined();
     expect(authEmailSender.confirmations).toHaveLength(1);
+    expect(authEmailSender.confirmations[0]).toMatchObject({
+      locale: "es-ES",
+      expiresInMinutes: 30,
+    });
 
     const confirm = await request("http://localhost/v1/auth/email/confirm", {
       method: "POST",

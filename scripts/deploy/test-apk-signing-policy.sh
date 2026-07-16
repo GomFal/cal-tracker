@@ -110,15 +110,19 @@ expect_failure "invalid APK signature" \
   env APKSIGNER_BIN="$fake_bin/apksigner" APKSIGNER_REPORT="$release_report" APKSIGNER_FAIL=1 \
   "$APK_VERIFIER" "$FIXTURE/app.apk" "$fingerprint"
 
-real_apksigner="$(command -v apksigner || true)"
-android_sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
-if [[ -z "$android_sdk_root" && -d /home/antonio/Android/Sdk ]]; then
-  android_sdk_root=/home/antonio/Android/Sdk
-fi
-if [[ -z "$real_apksigner" && -n "$android_sdk_root" && -d "$android_sdk_root/build-tools" ]]; then
-  real_apksigner="$(find "$android_sdk_root/build-tools" -path '*/apksigner' -type f | sort -V | tail -n 1)"
-fi
-if [[ -n "$real_apksigner" ]] && command -v keytool >/dev/null 2>&1 && command -v jar >/dev/null 2>&1; then
+if [[ "${RUN_REAL_APK_SIGNING_TESTS:-0}" == "1" ]]; then
+  real_apksigner="$(command -v apksigner || true)"
+  android_sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+  if [[ -z "$android_sdk_root" && -d /home/antonio/Android/Sdk ]]; then
+    android_sdk_root=/home/antonio/Android/Sdk
+  fi
+  if [[ -z "$real_apksigner" && -n "$android_sdk_root" && -d "$android_sdk_root/build-tools" ]]; then
+    real_apksigner="$(find "$android_sdk_root/build-tools" -path '*/apksigner' -type f | sort -V | tail -n 1)"
+  fi
+  [[ -n "$real_apksigner" ]] || { echo "Real apksigner test requested but apksigner is unavailable." >&2; exit 1; }
+  command -v keytool >/dev/null 2>&1 || { echo "Real apksigner test requested but keytool is unavailable." >&2; exit 1; }
+  command -v jar >/dev/null 2>&1 || { echo "Real apksigner test requested but jar is unavailable." >&2; exit 1; }
+
   real_dir="$FIXTURE/real"
   mkdir -p "$real_dir/payload"
   printf '<manifest package="app.bettercalories.signingtest" />\n' > "$real_dir/payload/AndroidManifest.xml"

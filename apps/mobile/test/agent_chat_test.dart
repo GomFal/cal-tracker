@@ -30,16 +30,16 @@ class MockAudioRecorderService extends Mock implements AudioRecorderService {}
 
 class _FakeAgentOcrScanViewModel extends UsualFoodScanViewModel {
   _FakeAgentOcrScanViewModel(this.context)
-    : super(
-        nutritionRepository: MockNutritionRepository(),
-        initializeCamera: () async {},
-        takePicture: () async => '/tmp/label.jpg',
-        pausePreview: () async {},
-        resumePreview: () async {},
-        recognizeText: (_) async => '',
-        deleteCapturedFile: (_) async {},
-        draftFromRecognizedText: false,
-      );
+      : super(
+          nutritionRepository: MockNutritionRepository(),
+          initializeCamera: () async {},
+          takePicture: () async => '/tmp/label.jpg',
+          pausePreview: () async {},
+          resumePreview: () async {},
+          recognizeText: (_) async => '',
+          deleteCapturedFile: (_) async {},
+          draftFromRecognizedText: false,
+        );
 
   final BuildContext context;
 
@@ -108,7 +108,8 @@ void main() {
     expect(events[2]['type'], 'done');
   });
 
-  test('CalTrackerApiClient keeps typed safe SSE errors and trace ids', () async {
+  test('CalTrackerApiClient keeps typed safe SSE errors and trace ids',
+      () async {
     final client = CalTrackerApiClient(
       config: const ApiConfig(baseUrl: 'http://localhost'),
       tokenStorage: _MemoryTokenStorage(),
@@ -199,6 +200,24 @@ void main() {
       );
     },
   );
+
+  test('logout reset cancels an active chat recording', () async {
+    final repository = MockNutritionRepository();
+    final recorder = MockAudioRecorderService();
+    when(() => recorder.start()).thenAnswer((_) async {});
+    when(() => recorder.cancel()).thenAnswer((_) async {});
+    final viewModel = AgentChatViewModel(
+      nutritionRepository: repository,
+      audioRecorderService: recorder,
+    );
+
+    await viewModel.startRecording();
+    viewModel.reset();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(viewModel.isRecording, isFalse);
+    verify(() => recorder.cancel()).called(1);
+  });
 
   for (final testCase in <(Locale, String)>[
     (

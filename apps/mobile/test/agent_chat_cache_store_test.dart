@@ -181,6 +181,27 @@ void main() {
       },
     );
 
+    test('logout removes a write that completes after cleanup starts',
+        () async {
+      final storage = _BlockingPreferencesStorage();
+      final store = AgentChatCacheStore(storage: storage);
+      final userA = base64Url.encode(utf8.encode('user-a'));
+      final detailA = 'agent_chat_cache:v1:$userA:detail:conversation-a';
+
+      store.activateUser('user-a');
+      storage.blockNextWrite(detailA);
+      final staleWrite =
+          store.writeConversationDetail(_detail('conversation-a'));
+      await storage.writeStarted;
+      final cleanup = store.clearActiveUserData();
+      storage.resumeWrite();
+      await Future.wait([staleWrite, cleanup]);
+
+      store.activateUser('user-a');
+      expect(await store.readConversationDetail('conversation-a'), isNull);
+      expect(storage.values.containsKey(detailA), isFalse);
+    });
+
     test('removes corrupt conversation cache', () async {
       final storage = _MemoryPreferencesStorage();
       final store = AgentChatCacheStore(storage: storage);

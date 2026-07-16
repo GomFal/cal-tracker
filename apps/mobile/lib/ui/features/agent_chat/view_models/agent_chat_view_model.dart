@@ -71,11 +71,11 @@ class AgentChatViewModel extends ChangeNotifier {
     AgentChatSessionStore? sessionStore,
     AgentChatCacheStore? cacheStore,
     DateTime Function()? now,
-  }) : _nutritionRepository = nutritionRepository,
-       _audioRecorderService = audioRecorderService,
-       _sessionStore = sessionStore,
-       _cacheStore = cacheStore,
-       _now = now ?? DateTime.now;
+  })  : _nutritionRepository = nutritionRepository,
+        _audioRecorderService = audioRecorderService,
+        _sessionStore = sessionStore,
+        _cacheStore = cacheStore,
+        _now = now ?? DateTime.now;
 
   final NutritionRepository _nutritionRepository;
   final AudioRecorderService _audioRecorderService;
@@ -136,6 +136,7 @@ class AgentChatViewModel extends ChangeNotifier {
   }
 
   void reset() {
+    final shouldCancelRecording = isRecording || isStoppingRecording;
     _typingTimer?.cancel();
     _typingTimer = null;
     _typingCompleter = null;
@@ -156,6 +157,17 @@ class AgentChatViewModel extends ChangeNotifier {
     _activeAssistantEntryId = null;
     _entryCounter = 0;
     notifyListeners();
+    if (shouldCancelRecording) {
+      unawaited(_cancelRecordingForLogout());
+    }
+  }
+
+  Future<void> _cancelRecordingForLogout() async {
+    try {
+      await _audioRecorderService.cancel();
+    } on Object {
+      // Recorder cleanup is independent from authentication state teardown.
+    }
   }
 
   Future<void> prepareForEntry() async {
@@ -187,8 +199,7 @@ class AgentChatViewModel extends ChangeNotifier {
     notifyListeners();
     try {
       final fresh = await _nutritionRepository.listAgentConversations();
-      final visible =
-          await _cacheStore?.excludeDeletedConversations(fresh) ??
+      final visible = await _cacheStore?.excludeDeletedConversations(fresh) ??
           fresh
               .where((item) => !_deletedConversationIds.contains(item.id))
               .toList();
@@ -476,8 +487,7 @@ class AgentChatViewModel extends ChangeNotifier {
         break;
       case 'error':
         errorCode = event.error?.code ?? 'internal_error';
-        errorMessage =
-            event.error?.message ??
+        errorMessage = event.error?.message ??
             'We could not complete that request. Try again.';
         unawaited(_saveActiveSession(unfinished: true));
         break;
@@ -730,8 +740,7 @@ class AgentChatViewModel extends ChangeNotifier {
               id: 'tool_${message.toolCallId ?? message.id}',
               kind: AgentChatEntryKind.tool,
               toolCall: toolCall,
-              toolStatus:
-                  message.metadata is Map &&
+              toolStatus: message.metadata is Map &&
                       (message.metadata as Map)['error'] != null
                   ? AgentChatToolStatus.failed
                   : AgentChatToolStatus.completed,
@@ -752,8 +761,7 @@ class AgentChatViewModel extends ChangeNotifier {
   ) {
     final metadata = message.metadata is Map ? message.metadata as Map : null;
     final content = _jsonObjectOrNull(message.content);
-    final actionId =
-        metadata?['actionId'] as String? ??
+    final actionId = metadata?['actionId'] as String? ??
         content?['actionId'] as String? ??
         'agent_action';
     return AgentToolCallFeedback(

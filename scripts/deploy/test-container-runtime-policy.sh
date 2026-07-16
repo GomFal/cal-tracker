@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DEPLOY_COMPOSE="$ROOT_DIR/infra/deploy/compose.yml"
 LOCAL_COMPOSE="$ROOT_DIR/docker-compose.yml"
 DEPLOY_SCRIPT="$ROOT_DIR/infra/deploy/deploy.sh"
+RESTORE_SCRIPT="$ROOT_DIR/infra/deploy/restore-postgres-schema.sh"
 DOCKERFILE="$ROOT_DIR/apps/backend/Dockerfile"
 DEFAULT_CONFIG="$(mktemp)"
 OVERRIDE_CONFIG="$(mktemp)"
@@ -62,11 +63,22 @@ for key in ("security_opt", "cap_drop", "cpus", "mem_limit"):
 PY
 
 grep -Eq '^USER[[:space:]]+bun$' "$DOCKERFILE"
-grep -Fq -- '--security-opt no-new-privileges:true' "$DEPLOY_SCRIPT"
-grep -Fq -- '--cap-drop ALL' "$DEPLOY_SCRIPT"
-grep -Fq -- '--cpus "$BACKEND_CPU_LIMIT"' "$DEPLOY_SCRIPT"
-grep -Fq -- '--memory "$BACKEND_MEMORY_LIMIT"' "$DEPLOY_SCRIPT"
-grep -Fq 'bun dist/scripts/migrate.js' "$DEPLOY_SCRIPT"
+for one_off_script in "$DEPLOY_SCRIPT" "$RESTORE_SCRIPT"; do
+  run_count="$(grep -c '^docker run --rm' "$one_off_script")"
+  for required_flag in \
+    '--security-opt no-new-privileges:true' \
+    '--cap-drop ALL' \
+    '--cpus "$BACKEND_CPU_LIMIT"' \
+    '--memory "$BACKEND_MEMORY_LIMIT"'; do
+    flag_count="$(grep -Fc -- "$required_flag" "$one_off_script")"
+    [[ "$flag_count" -eq "$run_count" ]] || {
+      echo "Every one-off container in $one_off_script must use $required_flag" >&2
+      exit 1
+    }
+  done
+  grep -Fq 'bun dist/scripts/migrate.js' "$one_off_script"
+  grep -Fq 'bun dist/scripts/apply-privacy-suppressions.js' "$one_off_script"
+done
 
 if grep -Eq 'docker\.sock|/run/secrets|/var/run' "$DEPLOY_COMPOSE"; then
   echo "Backend deployment Compose must not mount host sockets or new secret paths." >&2

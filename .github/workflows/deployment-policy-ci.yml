@@ -19,7 +19,11 @@ on:
       - "scripts/deploy-landing.sh"
       - "scripts/mobile/build-android.sh"
       - "scripts/mobile/deploy-server-apks.sh"
+      - "scripts/mobile/test-update-manifest-policy.sh"
+      - "scripts/mobile/validate-api-base-url.sh"
+      - "scripts/mobile/validate-update-manifest.py"
       - "scripts/mobile/validate-android-release-signing.sh"
+      - "scripts/mobile/verify-update-apk-metadata.sh"
       - "scripts/mobile/verify-apk-signing.sh"
   push:
     branches:
@@ -42,7 +46,11 @@ on:
       - "scripts/deploy-landing.sh"
       - "scripts/mobile/build-android.sh"
       - "scripts/mobile/deploy-server-apks.sh"
+      - "scripts/mobile/test-update-manifest-policy.sh"
+      - "scripts/mobile/validate-api-base-url.sh"
+      - "scripts/mobile/validate-update-manifest.py"
       - "scripts/mobile/validate-android-release-signing.sh"
+      - "scripts/mobile/verify-update-apk-metadata.sh"
       - "scripts/mobile/verify-apk-signing.sh"
 
 permissions:
@@ -71,13 +79,19 @@ jobs:
             scripts/deploy-landing.sh \
             scripts/mobile/build-android.sh \
             scripts/mobile/deploy-server-apks.sh \
+            scripts/mobile/test-update-manifest-policy.sh \
+            scripts/mobile/validate-api-base-url.sh \
             scripts/mobile/validate-android-release-signing.sh \
             scripts/mobile/verify-apk-signing.sh \
+            scripts/mobile/verify-update-apk-metadata.sh \
             infra/deploy/bettercalories-deploy \
+            infra/deploy/backup-postgres-schema.sh \
             infra/deploy/provision-deploy-user.sh \
             infra/deploy/publish-landing.sh \
+            infra/deploy/privacy-ledger-overlay.sh \
             infra/deploy/bootstrap-server.sh \
-            infra/deploy/deploy.sh
+            infra/deploy/deploy.sh \
+            infra/deploy/restore-postgres-schema.sh
 
       - name: Test pinned SSH and deployment policy
         run: |
@@ -88,6 +102,9 @@ jobs:
           scripts/deploy/test-apk-signing-policy.sh
           scripts/deploy/test-deployment-policy.sh
           scripts/deploy/test-supply-chain-policy.sh
+          scripts/mobile/test-update-manifest-policy.sh
+          infra/deploy/tests/backup-retention-test.sh
+          infra/deploy/tests/privacy-ledger-overlay-test.sh
 
       - name: Test admin origin and web security policies
         run: |

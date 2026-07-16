@@ -422,7 +422,7 @@ void main() {
         expect(viewModel.state, VoiceLogState.error);
         expect(
           viewModel.errorCode,
-          VoiceLogErrorCode.microphonePermissionDenied,
+          'microphone_permission_denied',
         );
         expect(viewModel.errorMessage, isNull);
       });

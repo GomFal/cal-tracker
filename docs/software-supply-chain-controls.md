@@ -8,7 +8,7 @@ Dockerfile deben coincidir con ella.
 Las bases revisadas son:
 
 - `oven/bun:1.3.13` para construir y ejecutar el backend;
-- `pgvector/pgvector:0.8.1-pg16-bookworm` para PostgreSQL 16 con pgvector, tanto
+- `pgvector/pgvector:0.8.2-pg16-bookworm` para PostgreSQL 16 con pgvector, tanto
   en el despliegue como en el entorno local y el smoke test de runtime.
 
 Los tags operativos del backend (`dev-*`, `pro-*` y `*-latest`) no son imágenes

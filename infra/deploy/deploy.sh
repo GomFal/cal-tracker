@@ -122,6 +122,10 @@ docker run --rm \
 # Reapply every durable suppression before a restored row can be served. This
 # command is idempotent and fails the deploy if any purge needs operator action.
 docker run --rm \
+  --security-opt no-new-privileges:true \
+  --cap-drop ALL \
+  --cpus "$BACKEND_CPU_LIMIT" \
+  --memory "$BACKEND_MEMORY_LIMIT" \
   --network cal-tracker-internal \
   --env-file "$ENV_DIR/${ENVIRONMENT}.env" \
   -e "DATABASE_SCHEMA=$SCHEMA" \

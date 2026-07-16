@@ -44,7 +44,7 @@ EOF
   cat > "$FIXTURE/infra/deploy/compose.yml" <<'EOF'
 services:
   postgres:
-    image: pgvector/pgvector:0.8.1-pg16-bookworm
+    image: pgvector/pgvector:0.8.2-pg16-bookworm
   backend:
     image: ${BACKEND_IMAGE:?BACKEND_IMAGE is required}
 EOF
@@ -52,7 +52,7 @@ EOF
 flutter pub get --enforce-lockfile
 EOF
   cat > "$FIXTURE/scripts/deploy/smoke-container-runtime-hardening.sh" <<'EOF'
-docker run pgvector/pgvector:0.8.1-pg16-bookworm
+docker run pgvector/pgvector:0.8.2-pg16-bookworm
 EOF
 
   # These deliberately mutable references are outside production policy
@@ -89,7 +89,7 @@ sed -i '0,/oven\/bun:1.3.13/s//oven\/bun:1.3.12/' "$FIXTURE/apps/backend/Dockerf
 expect_failure "backend base does not match the canonical Bun version"
 write_valid_fixture
 
-sed -i 's/0.8.1-pg16-bookworm/pg16/' "$FIXTURE/infra/deploy/compose.yml"
+sed -i 's/0.8.2-pg16-bookworm/pg16/' "$FIXTURE/infra/deploy/compose.yml"
 expect_failure "major-only PostgreSQL image"
 write_valid_fixture
 

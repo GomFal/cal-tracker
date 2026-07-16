@@ -32,7 +32,7 @@ validate_concrete_image() {
 
   # Concrete MVP tags start with at least major.minor. This rejects mutable
   # major-only aliases such as oven/bun:1 and pgvector/pgvector:pg16 while
-  # accepting reviewed tags such as 1.3.13 and 0.8.1-pg16-bookworm.
+  # accepting reviewed tags such as 1.3.13 and 0.8.2-pg16-bookworm.
   [[ "$tag" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?([._-][A-Za-z0-9][A-Za-z0-9._-]*)?$ ]] \
     || fail "$source does not use a concrete version tag: $image"
 }

@@ -825,6 +825,18 @@ abstract class AppLocalizations {
   /// **'Later'**
   String get mobileUpdateLater;
 
+  /// No description provided for @mobileUpdateVerificationFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'This update could not be verified, so the download was blocked.'**
+  String get mobileUpdateVerificationFailed;
+
+  /// No description provided for @mobileUpdateOpenFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The verified update could not be opened. Please try again later.'**
+  String get mobileUpdateOpenFailed;
+
   /// No description provided for @settingsMacroRequiresCaloriesTitle.
   ///
   /// In en, this message translates to:

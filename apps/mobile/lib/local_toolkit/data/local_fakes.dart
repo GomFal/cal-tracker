@@ -471,6 +471,8 @@ class LocalMobileUpdateService extends MobileUpdateService {
       installedVersionName: 'local',
       installedVersionCode: 1,
       manifest: MobileUpdateManifest(
+        channel: 'local',
+        packageName: 'app.bettercalories.dev.local',
         versionName: 'local',
         versionCode: 1,
         apkUrl: 'http://localhost/local.apk',

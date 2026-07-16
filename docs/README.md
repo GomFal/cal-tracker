@@ -17,6 +17,7 @@ Current authoritative files:
 | `food-data-quality-cleanse-findings.md` | Food corpus quality findings, search eligibility meaning, invalid nutrition/duplicate/suspicious row slices, and operational use of `food-quality`. | Runtime ranking strategy, normalized search query plans. |
 | `food-data-quality-normalized-search-plan.md` | Implemented PostgreSQL normalized food search runbook: quality/normalization tables, scripts, env flags, rollout sequence, and runtime search behavior. | General product nutrition-source priority outside normalized PostgreSQL search. |
 | `food-search-benchmark-acceptance-plan.md` | Reusable food search benchmark and primary-position validation commands, metrics, acceptance gates, and profiling workflow. | Data normalization rules and production rollout sequencing. |
+| `trusted-mobile-update-delivery.md` | Temporary direct-APK update trust contract, exact dev/prod origins, manifest validation and browser handoff. | Production key custody, Play Store migration or an internal APK downloader. |
 
 This split is intentional:
 

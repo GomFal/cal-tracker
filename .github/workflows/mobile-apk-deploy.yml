@@ -11,11 +11,6 @@ on:
         options:
           - dev
           - prod
-      allow_non_incremental_version:
-        description: Allow republishing the same or lower mobile versionCode
-        required: true
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -148,10 +143,7 @@ jobs:
 
       - name: Publish APK to server
         env:
-          ALLOW_NON_INCREMENTAL_APK_VERSION: ${{ inputs.allow_non_incremental_version && '1' || '0' }}
           BETTERCALORIES_APK_SSH_HOST: ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}
-          DEV_PUBLIC_BASE_URL: ${{ secrets.MOBILE_DEV_API_BASE_URL }}
-          PROD_PUBLIC_BASE_URL: ${{ secrets.MOBILE_PROD_API_BASE_URL }}
         run: |
           set -euo pipefail
           SKIP_ANDROID_BUILD=1 scripts/mobile/deploy-server-apks.sh "$MOBILE_FLAVOR"

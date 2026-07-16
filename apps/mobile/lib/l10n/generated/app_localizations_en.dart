@@ -408,6 +408,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mobileUpdateLater => 'Later';
 
   @override
+  String get mobileUpdateVerificationFailed =>
+      'This update could not be verified, so the download was blocked.';
+
+  @override
+  String get mobileUpdateOpenFailed =>
+      'The verified update could not be opened. Please try again later.';
+
+  @override
   String get settingsMacroRequiresCaloriesTitle => 'Set calories first';
 
   @override

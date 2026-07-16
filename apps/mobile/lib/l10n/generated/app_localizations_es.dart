@@ -411,6 +411,14 @@ class AppLocalizationsEs extends AppLocalizations {
   String get mobileUpdateLater => 'Ahora no';
 
   @override
+  String get mobileUpdateVerificationFailed =>
+      'No se pudo verificar esta actualización, así que se bloqueó la descarga.';
+
+  @override
+  String get mobileUpdateOpenFailed =>
+      'No se pudo abrir la actualización verificada. Inténtalo de nuevo más tarde.';
+
+  @override
   String get settingsMacroRequiresCaloriesTitle =>
       'Configura primero tus calorías';
 

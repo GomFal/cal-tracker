@@ -28,14 +28,20 @@ void main() {
         return true;
       },
       httpClient: MockClient((request) async {
+        if (request.method == 'HEAD') {
+          return http.Response('', 200);
+        }
         return http.Response(
           jsonEncode({
+            'channel': 'dev',
+            'packageName': 'app.bettercalories.dev',
             'versionName': '0.1.1',
             'versionCode': 2,
             'apkUrl': 'https://dev-api.bettercalories.app/apk/app-dev.apk',
             'publishedAt': '2026-05-21T00:00:00Z',
           }),
           200,
+          headers: {'content-type': 'application/json'},
         );
       }),
     );

@@ -535,7 +535,17 @@ const spec = {
         security: [{ bearerAuth: [] }],
         parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
         responses: {
-          "200": jsonResponse("Deleted agent conversation", "#/components/schemas/DeleteAgentConversationResponse")
+          "202": jsonResponse("Agent conversation deletion accepted", "#/components/schemas/DeleteAgentConversationResponse")
+        }
+      }
+    },
+    "/v1/agent/conversations/{id}/deletion": {
+      get: {
+        operationId: "getAgentConversationDeletion",
+        security: [{ bearerAuth: [] }],
+        parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }],
+        responses: {
+          "200": jsonResponse("Agent conversation deletion status", "#/components/schemas/DeleteAgentConversationResponse")
         }
       }
     },

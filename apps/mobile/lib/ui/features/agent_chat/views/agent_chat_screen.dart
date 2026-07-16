@@ -339,7 +339,11 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
                                     context.l10n.agentChatHistoryDeleteTooltip,
                                 icon: const Icon(Icons.delete_outline_rounded),
                                 onPressed: () => unawaited(
-                                  model.deleteConversation(conversation.id),
+                                  _confirmDeleteConversation(
+                                    sheetContext,
+                                    model,
+                                    conversation.id,
+                                  ),
                                 ),
                               ),
                             );
@@ -361,6 +365,37 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
     final date = MaterialLocalizations.of(context).formatShortDate(local);
     final time = TimeOfDay.fromDateTime(local).format(context);
     return '$date $time';
+  }
+
+  Future<void> _confirmDeleteConversation(
+    BuildContext sheetContext,
+    AgentChatViewModel model,
+    String conversationId,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: sheetContext,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(dialogContext.l10n.agentChatDeleteDialogTitle),
+        content: Text(dialogContext.l10n.agentChatDeleteDialogBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(dialogContext.l10n.commonCancel),
+          ),
+          FilledButton(
+            key: const ValueKey('agent_chat_delete_confirm'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(dialogContext.l10n.agentChatDeleteConfirm),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await model.deleteConversation(conversationId);
+    if (!sheetContext.mounted || model.errorMessage != null) return;
+    ScaffoldMessenger.of(sheetContext).showSnackBar(
+      SnackBar(content: Text(sheetContext.l10n.agentChatDeletionAccepted)),
+    );
   }
 }
 

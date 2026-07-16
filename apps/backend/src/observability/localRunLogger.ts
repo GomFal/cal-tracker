@@ -1,4 +1,4 @@
-import { mkdir, appendFile } from "node:fs/promises";
+import { mkdir, appendFile, readdir, rm } from "node:fs/promises";
 import { isAbsolute, resolve } from "node:path";
 import { activeProfileSnapshot } from "./profiler.js";
 import {
@@ -20,6 +20,36 @@ export function createLocalRunLogger(input: {
     ? input.directory
     : resolve(input.cwd ?? process.cwd(), input.directory);
   return new JsonlRunLogger(input.enabled, directory);
+}
+
+export async function pruneLocalRunLogs(input: {
+  directory: string;
+  cwd?: string;
+  now?: Date;
+  maxAgeDays?: number;
+}): Promise<number> {
+  const directory = isAbsolute(input.directory)
+    ? input.directory
+    : resolve(input.cwd ?? process.cwd(), input.directory);
+  const cutoff = (input.now ?? new Date()).getTime() -
+    (input.maxAgeDays ?? 30) * 24 * 60 * 60 * 1000;
+  let entries: string[];
+  try {
+    entries = await readdir(directory);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return 0;
+    throw error;
+  }
+  let removed = 0;
+  for (const entry of entries) {
+    const match = /^runs-(\d{4}-\d{2}-\d{2})\.jsonl$/.exec(entry);
+    if (!match) continue;
+    const timestamp = Date.parse(`${match[1]}T00:00:00.000Z`);
+    if (!Number.isFinite(timestamp) || timestamp >= cutoff) continue;
+    await rm(resolve(directory, entry), { force: true });
+    removed++;
+  }
+  return removed;
 }
 
 class JsonlRunLogger implements LocalRunLogger {

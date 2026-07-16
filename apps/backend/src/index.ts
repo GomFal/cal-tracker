@@ -23,6 +23,7 @@ import { createLocalRunLogger } from "./observability/localRunLogger.js";
 import { PostgresRepository } from "./repository/postgres.js";
 import { RemoteSpeechToTextProvider } from "./stt/speechToTextProvider.js";
 import { TelemetryService } from "./telemetry/service.js";
+import { startPrivacyLifecycleWorker } from "./privacy/lifecycleWorker.js";
 
 const config = loadConfig();
 const repository = new PostgresRepository(config.DATABASE_URL, {
@@ -94,6 +95,11 @@ const app = createApp({
   agentProvider,
   runLogger,
   telemetryService,
+});
+
+startPrivacyLifecycleWorker({
+  repository,
+  runLogDirectory: config.AGENT_RUN_LOG_DIR,
 });
 
 serve({ fetch: app.fetch, port: config.PORT });

@@ -272,11 +272,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String settingsMacroPresetSubtitle(
-    String preset,
-    int protein,
-    int carbs,
-    int fat,
-  ) {
+      String preset, int protein, int carbs, int fat) {
     return '$preset: $protein% protein, $carbs% carbs, $fat% fat';
   }
 
@@ -1802,6 +1798,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get agentChatHistoryDeleteTooltip => 'Delete chat';
+
+  @override
+  String get agentChatDeleteDialogTitle => 'Delete this chat?';
+
+  @override
+  String get agentChatDeleteDialogBody =>
+      'It disappears now. Its messages, transcripts, and linked diagnostics are permanently removed from active systems within 24 hours. There is no trash.';
+
+  @override
+  String get agentChatDeleteConfirm => 'Delete permanently';
+
+  @override
+  String get agentChatDeletionAccepted =>
+      'Chat hidden now. Permanent deletion is in progress.';
 
   @override
   String get agentChatHistoryLoadError => 'Could not load this chat.';

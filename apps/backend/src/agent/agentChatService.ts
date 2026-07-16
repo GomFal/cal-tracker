@@ -344,6 +344,14 @@ export class AgentChatService {
     let accumulatedActionMs = 0;
 
     while (iteration < MAX_CHAT_ITERATIONS) {
+      if (await this.repository.isAgentConversationSuppressed(conversation.id)) {
+        yield {
+          type: "error",
+          conversationId: conversation.id,
+          error: createPublicAiError("validation_error", correlation.traceId),
+        };
+        return;
+      }
       iteration++;
       yield {
         type: "thinking",
@@ -389,6 +397,18 @@ export class AgentChatService {
             "provider_unavailable",
             correlation.traceId,
           ),
+        };
+        return;
+      }
+
+      // A deletion may arrive while the provider request is in flight. Stop
+      // before telemetry, tool execution, persistence, or another user-visible
+      // delta can recreate content for the tombstoned conversation.
+      if (await this.repository.isAgentConversationSuppressed(conversation.id)) {
+        yield {
+          type: "error",
+          conversationId: conversation.id,
+          error: createPublicAiError("validation_error", correlation.traceId),
         };
         return;
       }
@@ -868,6 +888,14 @@ export class AgentChatService {
               source: "internal_agent",
             },
           );
+          if (await this.repository.isAgentConversationSuppressed(conversation.id)) {
+            yield {
+              type: "error",
+              conversationId: conversation.id,
+              error: createPublicAiError("validation_error", correlation.traceId),
+            };
+            return;
+          }
           const mapped = mapActionResult(actionId, result, text);
           const actionMs = Date.now() - actionStarted;
           accumulatedActionMs += actionMs;
@@ -1161,6 +1189,7 @@ export class AgentChatService {
     tokenMetrics: ReturnType<typeof extractLlmTokenMetrics>;
   }): Promise<void> {
     try {
+      if (await this.repository.isAgentConversationSuppressed(input.correlation.conversationId)) return;
       await this.telemetryService.recordLlmProviderCall({
         traceId: input.correlation.traceId,
         userId: input.userId,
@@ -1245,6 +1274,7 @@ export class AgentChatService {
     durationMs?: number;
   }): Promise<void> {
     try {
+      if (await this.repository.isAgentConversationSuppressed(input.correlation.conversationId)) return;
       const completedAt =
         input.status === "started" ? undefined : new Date().toISOString();
       await this.telemetryService.recordAgentToolCall({
@@ -1302,6 +1332,7 @@ export class AgentChatService {
     errorMessage?: string;
   }): Promise<void> {
     try {
+      if (await this.repository.isAgentConversationSuppressed(input.correlation.conversationId)) return;
       await this.telemetryService.recordAgentTurn({
         traceId: input.correlation.traceId,
         turnId: input.correlation.turnId,

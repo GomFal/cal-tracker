@@ -1302,6 +1302,31 @@ export const agentConversations = pgTable(
   ],
 );
 
+// Intentionally has no FK to users or conversations: suppression records must
+// survive account deletion and restored backups. It stores identifiers and
+// lifecycle timestamps only, never chat or transcript content.
+export const privacyDeletionRequests = pgTable(
+  "privacy_deletion_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    subjectUserId: uuid("subject_user_id").notNull(),
+    conversationId: uuid("conversation_id").notNull(),
+    requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().defaultNow(),
+    purgeDueAt: timestamp("purge_due_at", { withTimezone: true }).notNull(),
+    status: text("status").notNull().default("pending"),
+    purgedAt: timestamp("purged_at", { withTimezone: true }),
+    lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    resultCode: text("result_code"),
+  },
+  (table) => [
+    uniqueIndex("privacy_deletion_requests_conversation_unique").on(table.conversationId),
+    index("privacy_deletion_requests_status_requested_idx").on(table.status, table.requestedAt),
+    index("privacy_deletion_requests_subject_idx").on(table.subjectUserId),
+    check("privacy_deletion_requests_status_check", sql`${table.status} IN ('pending','purged','failed')`),
+  ],
+);
+
 export const agentMessages = pgTable(
   "agent_messages",
   {

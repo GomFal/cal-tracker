@@ -458,7 +458,7 @@ describe("agent chat streaming", () => {
     });
   });
 
-  it("hides deleted conversations from users while retaining stored messages", async () => {
+  it("hides immediately and permanently purges a deleted conversation", async () => {
     const agentProvider = new QueueChatAgentProvider([
       {
         toolCalls: [],
@@ -491,11 +491,12 @@ describe("agent chat streaming", () => {
       `http://localhost/v1/agent/conversations/${conversationId}`,
       { method: "DELETE", headers: authHeader },
     );
-    expect(deleteResponse.status).toBe(200);
-    await expect(deleteResponse.json()).resolves.toEqual({
+    expect(deleteResponse.status).toBe(202);
+    await expect(deleteResponse.json()).resolves.toMatchObject({
       ok: true,
       deleted: true,
       hidden: true,
+      status: "pending",
     });
 
     const listResponse = await request("http://localhost/v1/agent/conversations", {
@@ -522,6 +523,14 @@ describe("agent chat streaming", () => {
       user.id,
       user.id,
     ]);
+
+    await repository.runPrivacyLifecycle();
+    const purged = (
+      repository as unknown as {
+        agentConversationMessages: Map<string, unknown[]>;
+      }
+    ).agentConversationMessages.get(conversationId);
+    expect(purged).toBeUndefined();
   });
 
   it("uses the same safe envelope for provider failures without leaking reflected input", async () => {

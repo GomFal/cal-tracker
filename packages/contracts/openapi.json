@@ -7188,10 +7188,40 @@
           },
           "hidden": {
             "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "purged",
+              "failed"
+            ]
+          },
+          "requestedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "purgeDueAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "purgedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
-          "ok"
+          "ok",
+          "status",
+          "requestedAt",
+          "purgeDueAt"
         ],
         "additionalProperties": false
       },
@@ -20282,8 +20312,41 @@
           }
         ],
         "responses": {
+          "202": {
+            "description": "Agent conversation deletion accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteAgentConversationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/agent/conversations/{id}/deletion": {
+      "get": {
+        "operationId": "getAgentConversationDeletion",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
           "200": {
-            "description": "Deleted agent conversation",
+            "description": "Agent conversation deletion status",
             "content": {
               "application/json": {
                 "schema": {

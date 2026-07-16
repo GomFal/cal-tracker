@@ -106,6 +106,7 @@ export class TelemetryService implements TelemetrySink {
   async recordLlmRun(run: LlmRunTelemetryInput | LlmTelemetryEvent): Promise<LlmRunRecord | undefined> {
     if (!this.enabled) return undefined;
     const normalized = normalizeLlmRun(run);
+    if (normalized.conversationId && await this.repository.isAgentConversationSuppressed(normalized.conversationId)) return undefined;
     try {
       return await this.repository.createLlmRun({
         ...normalized,
@@ -119,6 +120,7 @@ export class TelemetryService implements TelemetrySink {
 
   async recordAgentTurn(event: AgentTurnTelemetryEvent): Promise<AgentTurnTelemetryRecord | undefined> {
     if (!this.enabled) return undefined;
+    if (event.conversationId && await this.repository.isAgentConversationSuppressed(event.conversationId)) return undefined;
     try {
       return await this.repository.createAgentTurnTelemetry({
         ...event,
@@ -136,6 +138,7 @@ export class TelemetryService implements TelemetrySink {
 
   async recordAgentToolCall(event: AgentToolCallTelemetryEvent): Promise<AgentToolCallTelemetryRecord | undefined> {
     if (!this.enabled) return undefined;
+    if (event.conversationId && await this.repository.isAgentConversationSuppressed(event.conversationId)) return undefined;
     try {
       return await this.repository.createAgentToolCallTelemetry({
         ...event,
@@ -150,6 +153,7 @@ export class TelemetryService implements TelemetrySink {
 
   async recordLlmProviderCall(event: LlmProviderCallTelemetryEvent): Promise<LlmProviderCallRecord | undefined> {
     if (!this.enabled) return undefined;
+    if (event.conversationId && await this.repository.isAgentConversationSuppressed(event.conversationId)) return undefined;
     try {
       return await this.repository.createLlmProviderCall({
         ...event,
@@ -164,6 +168,7 @@ export class TelemetryService implements TelemetrySink {
 
   async recordTranscriptionRecord(event: TranscriptionTelemetryRecordEvent): Promise<TranscriptionRecord | undefined> {
     if (!this.enabled) return undefined;
+    if (event.conversationId && await this.repository.isAgentConversationSuppressed(event.conversationId)) return undefined;
     try {
       return await this.repository.createTranscriptionRecord({
         ...event,

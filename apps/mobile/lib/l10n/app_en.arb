@@ -864,6 +864,10 @@
   "agentChatHistoryTitle": "Chat history",
   "agentChatHistoryEmpty": "No previous chats yet.",
   "agentChatHistoryDeleteTooltip": "Delete chat",
+  "agentChatDeleteDialogTitle": "Delete this chat?",
+  "agentChatDeleteDialogBody": "It disappears now. Its messages, transcripts, and linked diagnostics are permanently removed from active systems within 24 hours. There is no trash.",
+  "agentChatDeleteConfirm": "Delete permanently",
+  "agentChatDeletionAccepted": "Chat hidden now. Permanent deletion is in progress.",
   "agentChatHistoryLoadError": "Could not load this chat.",
   "agentChatHistoryUpdatedAt": "Updated {time}",
   "@agentChatHistoryUpdatedAt": {

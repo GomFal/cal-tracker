@@ -275,11 +275,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String settingsMacroPresetSubtitle(
-    String preset,
-    int protein,
-    int carbs,
-    int fat,
-  ) {
+      String preset, int protein, int carbs, int fat) {
     return '$preset: $protein % proteína, $carbs % carbohidratos, $fat % grasa';
   }
 
@@ -1823,6 +1819,20 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get agentChatHistoryDeleteTooltip => 'Eliminar chat';
+
+  @override
+  String get agentChatDeleteDialogTitle => '¿Eliminar este chat?';
+
+  @override
+  String get agentChatDeleteDialogBody =>
+      'Desaparece ahora. Sus mensajes, transcripciones y diagnósticos vinculados se eliminan definitivamente de los sistemas activos en menos de 24 horas. No hay papelera.';
+
+  @override
+  String get agentChatDeleteConfirm => 'Eliminar definitivamente';
+
+  @override
+  String get agentChatDeletionAccepted =>
+      'El chat ya está oculto. El borrado definitivo está en curso.';
 
   @override
   String get agentChatHistoryLoadError => 'No se pudo cargar este chat.';

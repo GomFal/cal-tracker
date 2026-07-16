@@ -38,7 +38,11 @@ import {
   getTraceId,
   requestIdMiddleware,
 } from "../middleware/requestContext.js";
-import type { AppRepository, StoredUser } from "../repository/types.js";
+import type {
+  AppRepository,
+  PrivacyDeletionRequest,
+  StoredUser,
+} from "../repository/types.js";
 import type {
   SpeechToTextProvider,
   TranscriptionResult,
@@ -807,15 +811,26 @@ export function createApp(input: {
 
   app.delete("/v1/agent/conversations/:id", async (c) => {
     const user = c.get("authUser");
-    const hidden = await repository.hideAgentConversationFromUser(
+    const deletion = await repository.requestAgentConversationDeletion(
       user.id,
       c.req.param("id"),
     );
-    return c.json({
-      ok: hidden,
-      deleted: hidden,
-      hidden,
-    });
+    if (!deletion) {
+      throw new HTTPException(404, { message: "agent_conversation_not_found" });
+    }
+    return c.json(deletionResponse(deletion), 202);
+  });
+
+  app.get("/v1/agent/conversations/:id/deletion", async (c) => {
+    const user = c.get("authUser");
+    const deletion = await repository.getAgentConversationDeletion(
+      user.id,
+      c.req.param("id"),
+    );
+    if (!deletion) {
+      throw new HTTPException(404, { message: "agent_conversation_not_found" });
+    }
+    return c.json(deletionResponse(deletion));
   });
 
   app.post("/v1/stt/transcriptions", async (c) => {
@@ -1824,6 +1839,18 @@ function recordBackendTelemetry(input: {
   recordTelemetry("backend_event", () =>
     input.telemetry.recordEvent(input.event),
   );
+}
+
+function deletionResponse(deletion: PrivacyDeletionRequest) {
+  return {
+    ok: true,
+    deleted: true,
+    hidden: true,
+    status: deletion.status,
+    requestedAt: deletion.requestedAt,
+    purgeDueAt: deletion.purgeDueAt,
+    purgedAt: deletion.purgedAt ?? null,
+  };
 }
 
 function recordFoodSearchTelemetry(input: {

@@ -120,6 +120,10 @@ export const deleteAgentConversationResponseSchema = z.object({
   ok: z.boolean(),
   deleted: z.boolean().optional(),
   hidden: z.boolean().optional(),
+  status: z.enum(["pending", "purged", "failed"]),
+  requestedAt: isoDateTimeSchema,
+  purgeDueAt: isoDateTimeSchema,
+  purgedAt: isoDateTimeSchema.nullable().optional(),
 });
 
 export const agentRunResponseSchema = z.object({

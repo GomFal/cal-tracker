@@ -626,6 +626,29 @@ export type AgentConversationRecord = {
   updatedAt: string;
 };
 
+export type PrivacyDeletionStatus = "pending" | "purged" | "failed";
+
+export type PrivacyDeletionRequest = {
+  id: string;
+  subjectUserId: string;
+  conversationId: string;
+  requestedAt: string;
+  purgeDueAt: string;
+  status: PrivacyDeletionStatus;
+  purgedAt?: string;
+  lastAttemptAt?: string;
+  attemptCount: number;
+  resultCode?: string;
+};
+
+export type PrivacyLifecycleResult = {
+  lockAcquired: boolean;
+  processed: number;
+  purged: number;
+  failed: number;
+  rawTelemetryExpired: number;
+};
+
 export type AgentConversationMessageRole = "user" | "assistant" | "tool";
 
 export type AgentConversationMessageRecord = {
@@ -839,6 +862,20 @@ export interface AppRepository {
     userId: string,
     conversationId: string,
   ): Promise<boolean>;
+  requestAgentConversationDeletion(
+    userId: string,
+    conversationId: string,
+  ): Promise<PrivacyDeletionRequest | undefined>;
+  getAgentConversationDeletion(
+    userId: string,
+    conversationId: string,
+  ): Promise<PrivacyDeletionRequest | undefined>;
+  isAgentConversationSuppressed(conversationId: string): Promise<boolean>;
+  runPrivacyLifecycle(input?: {
+    now?: string;
+    batchSize?: number;
+    reapplyBefore?: string;
+  }): Promise<PrivacyLifecycleResult>;
 
   recordActionCall(
     input: Omit<ActionCallRecord, "id" | "createdAt">,

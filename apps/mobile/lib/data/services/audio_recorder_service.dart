@@ -5,12 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 
-enum RecorderState {
-  idle,
-  recording,
-  stopping,
-  error,
-}
+enum RecorderState { idle, recording, stopping, error }
 
 class RecorderException implements Exception {
   const RecorderException(this.code, [this.message]);
@@ -22,10 +17,7 @@ class RecorderException implements Exception {
   String toString() => message ?? 'RecorderException($code)';
 }
 
-enum VoiceAudioFormat {
-  m4a,
-  wav,
-}
+enum VoiceAudioFormat { m4a, wav }
 
 class RecordedAudio {
   const RecordedAudio({
@@ -89,11 +81,14 @@ class AudioRecorderService {
     final file = File(path);
     if (!await file.exists()) {
       throw const RecorderException(
-          'missing_file', 'No audio file was created.');
+        'missing_file',
+        'No audio file was created.',
+      );
     }
 
     final sizeBytes = await file.length();
     if (sizeBytes < _minimumBytes) {
+      await _deleteTemporaryFile(file);
       throw const RecorderException(
         'empty_audio',
         'The recording was empty or too short. Try again and speak clearly after the recording indicator appears.',
@@ -121,6 +116,16 @@ class AudioRecorderService {
   }
 
   Future<void> dispose() async {
+    final path = _currentPath;
+    if (path != null) {
+      try {
+        await _recorder.stop();
+      } on Object {
+        // Continue with local cleanup even when the native recorder fails.
+      }
+      await _deleteTemporaryFile(File(path));
+      _currentPath = null;
+    }
     await _recorder.dispose();
     await _stateController.close();
   }
@@ -140,8 +145,10 @@ class AudioRecorderService {
     if (await _recorder.isEncoderSupported(AudioEncoder.aacLc)) {
       return VoiceAudioFormat.m4a;
     }
-    throw const RecorderException('unsupported_encoder',
-        'No supported audio encoder is available on this device.');
+    throw const RecorderException(
+      'unsupported_encoder',
+      'No supported audio encoder is available on this device.',
+    );
   }
 
   static VoiceAudioFormat _defaultFormat() {
@@ -167,5 +174,13 @@ class AudioRecorderService {
 
   static String _mimeTypeFor(String path) {
     return path.toLowerCase().endsWith('.wav') ? 'audio/wav' : 'audio/m4a';
+  }
+
+  static Future<void> _deleteTemporaryFile(File file) async {
+    try {
+      if (await file.exists()) await file.delete();
+    } on Object {
+      // The caller must still receive the original recording failure.
+    }
   }
 }

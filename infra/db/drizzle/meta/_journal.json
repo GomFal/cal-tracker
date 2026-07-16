@@ -141,6 +141,20 @@
       "when": 1781889000000,
       "tag": "0019_admin_telemetry_vertical_slice",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1784192400000,
+      "tag": "0020_agent_candidate_registries",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1784196000000,
+      "tag": "0021_chat_transcript_lifecycle",
+      "breakpoints": true
     }
   ]
 }

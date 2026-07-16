@@ -558,6 +558,10 @@
   "agentChatHistoryTitle": "Historial de chats",
   "agentChatHistoryEmpty": "Todavia no hay chats anteriores.",
   "agentChatHistoryDeleteTooltip": "Eliminar chat",
+  "agentChatDeleteDialogTitle": "¿Eliminar este chat?",
+  "agentChatDeleteDialogBody": "Desaparece ahora. Sus mensajes, transcripciones y diagnósticos vinculados se eliminan definitivamente de los sistemas activos en menos de 24 horas. No hay papelera.",
+  "agentChatDeleteConfirm": "Eliminar definitivamente",
+  "agentChatDeletionAccepted": "El chat ya está oculto. El borrado definitivo está en curso.",
   "agentChatHistoryLoadError": "No se pudo cargar este chat.",
   "agentChatHistoryUpdatedAt": "Actualizado {time}",
   "@agentChatHistoryUpdatedAt": {

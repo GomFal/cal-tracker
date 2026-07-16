@@ -13,7 +13,10 @@ cp compose.yml "$DEPLOY_DIR/compose.yml"
 cp postgres/init.sql "$DEPLOY_DIR/postgres/init.sql"
 cp deploy.sh "$DEPLOY_DIR/deploy.sh"
 cp backup-postgres-schema.sh "$DEPLOY_DIR/backup-postgres-schema.sh"
-chmod 755 "$DEPLOY_DIR/deploy.sh" "$DEPLOY_DIR/backup-postgres-schema.sh"
+cp privacy-ledger-overlay.sh "$DEPLOY_DIR/privacy-ledger-overlay.sh"
+cp restore-postgres-schema.sh "$DEPLOY_DIR/restore-postgres-schema.sh"
+chmod 755 "$DEPLOY_DIR/deploy.sh" "$DEPLOY_DIR/backup-postgres-schema.sh" \
+  "$DEPLOY_DIR/privacy-ledger-overlay.sh" "$DEPLOY_DIR/restore-postgres-schema.sh"
 cp nginx/proxy-common.conf /etc/nginx/snippets/cal-tracker-proxy-common.conf
 touch "$STATE_DIR/dev.active" "$STATE_DIR/pro.active"
 

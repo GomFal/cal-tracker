@@ -11,7 +11,6 @@ enum RecorderState {
   stopping,
   error,
 }
-
 class RecorderException implements Exception {
   const RecorderException(this.code, [this.message]);
 
@@ -40,6 +39,9 @@ class RecordedAudio {
 }
 
 class AudioRecorderService {
+  static const microphonePermissionDeniedMessage =
+      'Microphone access is off. Enable it in your device settings to record, or log your meal manually.';
+
   AudioRecorderService({
     AudioRecorder? recorder,
     VoiceAudioFormat? preferredFormat,
@@ -62,7 +64,10 @@ class AudioRecorderService {
 
   Future<void> start() async {
     if (!await hasPermission()) {
-      throw const RecorderException('permission_denied');
+      throw const RecorderException(
+        'permission_denied',
+        microphonePermissionDeniedMessage,
+      );
     }
     final dir = await getTemporaryDirectory();
     final format = await _resolveFormat();

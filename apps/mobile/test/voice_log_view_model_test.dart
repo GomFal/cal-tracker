@@ -420,7 +420,8 @@ void main() {
         await viewModel.toggleRecording();
 
         expect(viewModel.state, VoiceLogState.error);
-        expect(viewModel.errorMessage, contains('Microphone permission'));
+        expect(viewModel.errorMessage, contains('device settings'));
+        expect(viewModel.errorMessage, contains('manually'));
       });
 
       test('shows error on transcription failure', () async {
@@ -1324,7 +1325,6 @@ void main() {
     });
   });
 }
-
 FoodCandidateGroup _candidateGroup({
   required String originalText,
   required String canonicalEnglishName,

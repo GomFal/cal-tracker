@@ -27,7 +27,6 @@ enum VoiceLogState {
   clarificationRequired,
   error,
 }
-
 class VoiceLogUiState {
   const VoiceLogUiState({
     this.phase = VoiceLogState.idle,
@@ -367,7 +366,9 @@ class VoiceLogViewModel extends ChangeNotifier {
         extra: <String, Object?>{'stage': 'start'},
       );
       if (e.code == 'permission_denied') {
-        _setError('Microphone permission is required to record voice logs.');
+        _setError(
+          e.message ?? AudioRecorderService.microphonePermissionDeniedMessage,
+        );
       } else {
         _setError(
           e.message ??

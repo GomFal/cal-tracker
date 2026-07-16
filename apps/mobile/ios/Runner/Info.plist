@@ -61,6 +61,8 @@
 	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>BetterCalories uses the camera to read the nutrition label of your usual ingredients so you can fill the form without typing.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>BetterCalories uses the microphone when you choose to log a meal by voice, to transcribe the audio and complete your nutrition log</string>
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

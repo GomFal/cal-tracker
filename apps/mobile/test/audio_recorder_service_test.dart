@@ -60,6 +60,11 @@ void main() {
       expect(result, isTrue);
     });
 
+    test('does not request microphone permission before recording starts',
+        () async {
+      verifyNever(() => mockRecorder.hasPermission());
+    });
+
     test('start recording emits recording state and sets currentPath',
         () async {
       when(() => mockRecorder.hasPermission()).thenAnswer((_) async => true);
@@ -82,7 +87,15 @@ void main() {
       expect(
         () => service.start(),
         throwsA(isA<RecorderException>()
-            .having((e) => e.code, 'code', 'permission_denied')),
+            .having((e) => e.code, 'code', 'permission_denied')
+            .having(
+              (e) => e.message,
+              'message',
+              contains('device settings'),
+            )),
+      );
+      verifyNever(
+        () => mockRecorder.start(any(), path: any(named: 'path')),
       );
     });
 

@@ -136,20 +136,33 @@ jobs:
       - name: Configure SSH
         env:
           VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          VPS_SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
+          VPS_SSH_HOST_KEY_FINGERPRINTS: ${{ secrets.VPS_SSH_HOST_KEY_FINGERPRINTS }}
           VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
         run: |
           set -euo pipefail
-          install -m 700 -d ~/.ssh
-          printf '%s\n' "$VPS_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
+          [[ -n "$VPS_USER" && "$VPS_USER" != "root" ]] || {
+            echo "VPS_USER must be the dedicated, non-root deployment account." >&2
+            exit 1
+          }
+          scripts/deploy/configure-ssh.sh
 
       - name: Publish APK to server
         env:
           ALLOW_NON_INCREMENTAL_APK_VERSION: ${{ inputs.allow_non_incremental_version && '1' || '0' }}
           BETTERCALORIES_APK_SSH_HOST: ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}
+          BETTERCALORIES_DEPLOY_SOURCE_COMMIT: ${{ github.sha }}
+          BETTERCALORIES_DEPLOY_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          BETTERCALORIES_DEPLOY_ACTOR: ${{ github.actor }}
           DEV_PUBLIC_BASE_URL: ${{ secrets.MOBILE_DEV_API_BASE_URL }}
           PROD_PUBLIC_BASE_URL: ${{ secrets.MOBILE_PROD_API_BASE_URL }}
         run: |
           set -euo pipefail
           SKIP_ANDROID_BUILD=1 scripts/mobile/deploy-server-apks.sh "$MOBILE_FLAVOR"
+          {
+            echo "### Mobile APK deployment"
+            echo "- Environment: \`$MOBILE_FLAVOR\`"
+            echo "- Source commit: \`$GITHUB_SHA\`"
+            echo "- Initiated by: \`$BETTERCALORIES_DEPLOY_ACTOR\`"
+          } >> "$GITHUB_STEP_SUMMARY"

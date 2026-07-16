@@ -4,13 +4,16 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 MOBILE_DIR="$ROOT_DIR/apps/mobile"
 DIST_DIR="$ROOT_DIR/dist/mobile/android"
-REMOTE_HOST="${BETTERCALORIES_APK_SSH_HOST:-root@bettercalories.app}"
+REMOTE_HOST="${BETTERCALORIES_APK_SSH_HOST:-bettercalories-deploy@bettercalories.app}"
 ENVIRONMENT="${1:-all}"
 ALLOW_NON_INCREMENTAL_VERSION="${ALLOW_NON_INCREMENTAL_APK_VERSION:-0}"
 SKIP_ANDROID_BUILD="${SKIP_ANDROID_BUILD:-0}"
 
 DEV_PUBLIC_BASE_URL="${DEV_PUBLIC_BASE_URL:-https://dev-api.bettercalories.app}"
 PROD_PUBLIC_BASE_URL="${PROD_PUBLIC_BASE_URL:-https://api.bettercalories.app}"
+DEPLOY_SOURCE_COMMIT="${BETTERCALORIES_DEPLOY_SOURCE_COMMIT:-$(git -C "$ROOT_DIR" rev-parse HEAD)}"
+DEPLOY_RUN_ID="${BETTERCALORIES_DEPLOY_RUN_ID:-$(date -u +%s)}"
+DEPLOY_ACTOR="${BETTERCALORIES_DEPLOY_ACTOR:-$(id -un)}"
 
 usage() {
   cat <<'USAGE'
@@ -20,7 +23,10 @@ Usage:
   scripts/mobile/deploy-server-apks.sh all
 
 Environment variables:
-  BETTERCALORIES_APK_SSH_HOST        Defaults to root@bettercalories.app
+  BETTERCALORIES_APK_SSH_HOST        Defaults to bettercalories-deploy@bettercalories.app
+  BETTERCALORIES_DEPLOY_SOURCE_COMMIT  Source Git commit (defaults to HEAD)
+  BETTERCALORIES_DEPLOY_RUN_ID         Numeric deployment/run identifier
+  BETTERCALORIES_DEPLOY_ACTOR          Account initiating the deployment
   DEV_PUBLIC_BASE_URL                Defaults to https://dev-api.bettercalories.app
   PROD_PUBLIC_BASE_URL               Defaults to https://api.bettercalories.app
   ALLOW_NON_INCREMENTAL_APK_VERSION  Set to 1 to republish the same/lower versionCode
@@ -46,6 +52,19 @@ case "$ENVIRONMENT" in
     exit 1
     ;;
 esac
+
+[[ "$DEPLOY_SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]] || {
+  echo "Invalid BETTERCALORIES_DEPLOY_SOURCE_COMMIT." >&2
+  exit 1
+}
+[[ "$DEPLOY_RUN_ID" =~ ^[0-9]+(-[0-9]+)?$ ]] || {
+  echo "Invalid BETTERCALORIES_DEPLOY_RUN_ID." >&2
+  exit 1
+}
+[[ "$DEPLOY_ACTOR" =~ ^[A-Za-z0-9_.-]{1,64}$ ]] || {
+  echo "Invalid BETTERCALORIES_DEPLOY_ACTOR." >&2
+  exit 1
+}
 
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -87,7 +106,6 @@ fi
 publish_flavor() {
   local flavor="$1"
   local public_base_url="$2"
-  local remote_dir="$3"
   local local_manifest
   local apk_name
   local source_apk
@@ -95,6 +113,7 @@ publish_flavor() {
   local size_bytes
   local published_at
   local previous_version_code
+  local remote_stage
 
   previous_version_code="$(
     curl -fsS "$public_base_url/apk/latest.json" 2>/dev/null | extract_json_number versionCode || true
@@ -118,6 +137,10 @@ publish_flavor() {
   fi
 
   apk_name="$(basename "$source_apk")"
+  [[ "$apk_name" =~ ^bettercalories-(dev|prod)-[A-Za-z0-9._-]+\.apk$ ]] || {
+    echo "Unsafe APK file name: $apk_name" >&2
+    exit 1
+  }
   sha256="$(sha256sum "$source_apk" | awk '{print $1}')"
   size_bytes="$(stat -c%s "$source_apk")"
   published_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
@@ -130,21 +153,22 @@ publish_flavor() {
   "apkUrl": "$public_base_url/apk/$apk_name",
   "sha256": "$sha256",
   "sizeBytes": $size_bytes,
-  "publishedAt": "$published_at"
+  "publishedAt": "$published_at",
+  "sourceCommit": "$DEPLOY_SOURCE_COMMIT",
+  "deploymentRunId": "$DEPLOY_RUN_ID",
+  "deploymentActor": "$DEPLOY_ACTOR"
 }
 JSON
 
-  echo "Uploading $flavor APK to $REMOTE_HOST:$remote_dir"
-  ssh "$REMOTE_HOST" "install -d -m 0755 '$remote_dir'"
-  scp "$source_apk" "$REMOTE_HOST:/tmp/$apk_name"
-  scp "$local_manifest" "$REMOTE_HOST:/tmp/bettercalories-$flavor-latest.json"
-  ssh "$REMOTE_HOST" "mv '/tmp/$apk_name' '$remote_dir/$apk_name' && mv '/tmp/bettercalories-$flavor-latest.json' '$remote_dir/latest.json' && ln -sfn '$apk_name' '$remote_dir/latest.apk' && chmod 0644 '$remote_dir/$apk_name' '$remote_dir/latest.json'"
+  remote_stage="/srv/cal-tracker/incoming/mobile-$DEPLOY_RUN_ID-$flavor"
+  echo "Uploading $flavor APK to the restricted staging area on $REMOTE_HOST"
+  ssh "$REMOTE_HOST" "rm -rf '$remote_stage' && install -d -m 0700 '$remote_stage'"
+  scp "$source_apk" "$REMOTE_HOST:$remote_stage/$apk_name"
+  scp "$local_manifest" "$REMOTE_HOST:$remote_stage/latest.json"
+  ssh "$REMOTE_HOST" sudo -n /usr/local/sbin/bettercalories-deploy publish-apk \
+    "$flavor" "$remote_stage/$apk_name" "$remote_stage/latest.json" "$sha256" \
+    "$DEPLOY_SOURCE_COMMIT" "$DEPLOY_RUN_ID" "$DEPLOY_ACTOR"
   rm -f "$local_manifest"
-}
-
-publish_nginx_config() {
-  scp "$ROOT_DIR/infra/deploy/nginx/api.bettercalories.app.conf" "$REMOTE_HOST:/tmp/api.bettercalories.app.conf"
-  ssh "$REMOTE_HOST" "cp /tmp/api.bettercalories.app.conf /etc/nginx/sites-available/api.bettercalories.app && nginx -t && systemctl reload nginx && rm -f /tmp/api.bettercalories.app.conf"
 }
 
 validate_public_download() {
@@ -164,18 +188,16 @@ validate_public_download() {
 
 case "$ENVIRONMENT" in
   dev)
-    publish_flavor dev "$DEV_PUBLIC_BASE_URL" /srv/cal-tracker/mobile/dev
+    publish_flavor dev "$DEV_PUBLIC_BASE_URL"
     ;;
   prod)
-    publish_flavor prod "$PROD_PUBLIC_BASE_URL" /srv/cal-tracker/mobile/prod
+    publish_flavor prod "$PROD_PUBLIC_BASE_URL"
     ;;
   all)
-    publish_flavor dev "$DEV_PUBLIC_BASE_URL" /srv/cal-tracker/mobile/dev
-    publish_flavor prod "$PROD_PUBLIC_BASE_URL" /srv/cal-tracker/mobile/prod
+    publish_flavor dev "$DEV_PUBLIC_BASE_URL"
+    publish_flavor prod "$PROD_PUBLIC_BASE_URL"
     ;;
 esac
-
-publish_nginx_config
 
 if [[ "$ENVIRONMENT" == "dev" || "$ENVIRONMENT" == "all" ]]; then
   validate_public_download "$DEV_PUBLIC_BASE_URL"

@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
 DEPLOY_DIR="/srv/cal-tracker/deploy"
 ENV_DIR="/srv/cal-tracker/env"
 STATE_DIR="/srv/cal-tracker/state"
@@ -13,7 +16,8 @@ cp compose.yml "$DEPLOY_DIR/compose.yml"
 cp postgres/init.sql "$DEPLOY_DIR/postgres/init.sql"
 cp deploy.sh "$DEPLOY_DIR/deploy.sh"
 cp backup-postgres-schema.sh "$DEPLOY_DIR/backup-postgres-schema.sh"
-chmod 755 "$DEPLOY_DIR/deploy.sh" "$DEPLOY_DIR/backup-postgres-schema.sh"
+cp publish-landing.sh "$DEPLOY_DIR/publish-landing.sh"
+chmod 755 "$DEPLOY_DIR/deploy.sh" "$DEPLOY_DIR/backup-postgres-schema.sh" "$DEPLOY_DIR/publish-landing.sh"
 cp nginx/proxy-common.conf /etc/nginx/snippets/cal-tracker-proxy-common.conf
 touch "$STATE_DIR/dev.active" "$STATE_DIR/pro.active"
 
@@ -48,6 +52,10 @@ fi
 
 cp nginx/api.bettercalories.app.conf /etc/nginx/sites-available/api.bettercalories.app
 ln -sfn /etc/nginx/sites-available/api.bettercalories.app /etc/nginx/sites-enabled/api.bettercalories.app
+if [[ -f /etc/letsencrypt/live/bettercalories.app/fullchain.pem ]]; then
+  cp nginx/bettercalories.app.conf /etc/nginx/sites-available/bettercalories.app
+  ln -sfn /etc/nginx/sites-available/bettercalories.app /etc/nginx/sites-enabled/bettercalories.app
+fi
 
 write_proxy_snippet() {
   local environment="$1"
@@ -80,6 +88,8 @@ if [[ ! -f "$ENV_DIR/deploy.env" ]]; then
   cat > "$ENV_DIR/deploy.env" <<'EOF'
 POSTGRES_PASSWORD=replace-with-strong-postgres-password
 BACKEND_IMAGE=ghcr.io/autofactu/cal-tracker-backend:bootstrap
+BACKEND_CPU_LIMIT=1.0
+BACKEND_MEMORY_LIMIT=768m
 EOF
   chmod 600 "$ENV_DIR/deploy.env"
 fi

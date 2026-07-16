@@ -104,3 +104,8 @@ repository secrets before running the Android build:
 
 It then publishes the already-built APK through
 `scripts/mobile/deploy-server-apks.sh`.
+
+Deployment SSH uses the dedicated `bettercalories-deploy` account and pinned
+host keys. Configure the shared deployment secrets and provision the remote
+dispatcher as described in
+[`docs/trusted-production-deployments.md`](../../docs/trusted-production-deployments.md).

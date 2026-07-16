@@ -43,6 +43,7 @@ Backend deployment rules:
 
 - Dev deploys from pushes to `develop`.
 - Production deploys from tags matching `v*`.
+- CI must use the pinned host identity and dedicated non-root deployment account documented in [docs/trusted-production-deployments.md](docs/trusted-production-deployments.md); do not reintroduce runtime `ssh-keyscan` trust.
 
 When compiling the mobile app against the deployed dev environment, use:
 
@@ -61,28 +62,14 @@ flutter build apk --flavor dev --debug --dart-define=API_BASE_URL=http://10.0.2.
 
 ## Production VPS SSH Access
 
-Production host:
+Production host: `bettercalories.app` (verified OS hostname: `ubuntu`).
 
-- Host: `bettercalories.app`
-- User: `root`
-- Verified OS hostname: `ubuntu`
+Administrative access must use a nominal account, public-key authentication and `sudo`; do not add shared usernames, passwords or private-key locations to the repository. Because the migration may not have been applied yet, confirm the actual server state before relying on the target policy. Follow [docs/production-host-access-hardening.md](docs/production-host-access-hardening.md) for the fail-safe migration and recovery procedure.
 
-Use this non-mutating smoke test to confirm access:
+After migration, use the nominal account for the non-mutating smoke test:
 
 ```bash
-ssh -o BatchMode=yes -o ConnectTimeout=10 root@bettercalories.app 'printf "connected as %s on %s\n" "$(whoami)" "$(hostname)"'
-```
-
-Expected response:
-
-```text
-connected as root on ubuntu
-```
-
-If the named private key is available locally, keep it under `~/.ssh/jgf` with private-key permissions and connect explicitly:
-
-```bash
-ssh -i ~/.ssh/jgf root@bettercalories.app
+ssh -o BatchMode=yes -o PasswordAuthentication=no -o ConnectTimeout=10 "$BETTERCALORIES_SSH_USER@bettercalories.app" 'printf "connected as %s on %s\n" "$(whoami)" "$(hostname)"'
 ```
 
 ---

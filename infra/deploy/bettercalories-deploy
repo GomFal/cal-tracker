@@ -1,0 +1,160 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly DEPLOY_ROOT="/srv/cal-tracker"
+readonly INCOMING_ROOT="$DEPLOY_ROOT/incoming"
+readonly DEPLOY_DIR="$DEPLOY_ROOT/deploy"
+readonly ENV_DIR="$DEPLOY_ROOT/env"
+readonly STATE_DIR="$DEPLOY_ROOT/state"
+readonly DEPLOY_USER_FILE="/etc/bettercalories-deploy-user"
+
+die() {
+  printf 'ERROR: %s\n' "$*" >&2
+  exit 1
+}
+
+require_root_and_deploy_user() {
+  [[ "${EUID}" -eq 0 ]] || die "This command must run through sudo."
+  local expected_user
+  expected_user="$(cat "$DEPLOY_USER_FILE" 2>/dev/null || true)"
+  [[ -n "$expected_user" ]] || die "The deployment account has not been provisioned."
+  [[ "${SUDO_USER:-}" == "$expected_user" ]] \
+    || die "Only the configured deployment account may invoke this command."
+}
+
+validate_environment() {
+  case "$1" in dev|pro|prod) ;; *) die "Invalid deployment environment." ;; esac
+}
+
+validate_provenance() {
+  local commit="$1" run_id="$2" actor="$3"
+  [[ "$commit" =~ ^[0-9a-f]{40}$ ]] || die "Invalid source commit."
+  [[ "$run_id" =~ ^[0-9]+(-[0-9]+)?$ ]] || die "Invalid deployment run id."
+  [[ "$actor" =~ ^[A-Za-z0-9_.-]{1,64}$ ]] || die "Invalid deployment actor."
+}
+
+incoming_path() {
+  local requested="$1" resolved
+  [[ "$requested" == "$INCOMING_ROOT/"* ]] || die "Staging path is outside the incoming directory."
+  resolved="$(realpath -e -- "$requested")" || die "Staging path does not exist."
+  [[ "$resolved" == "$INCOMING_ROOT/"* ]] || die "Staging path resolves outside the incoming directory."
+  printf '%s\n' "$resolved"
+}
+
+claim_incoming_file() {
+  local source claimed
+  source="$(incoming_path "$1")"
+  [[ -f "$source" ]] || die "Staged input is not a regular file."
+  claimed="$(mktemp "$STATE_DIR/.claimed.XXXXXX")"
+  cp --reflink=never -- "$source" "$claimed"
+  chmod 0600 "$claimed"
+  rm -f -- "$source"
+  printf '%s\n' "$claimed"
+}
+
+record_deployment() {
+  local environment="$1" artifact="$2" commit="$3" run_id="$4" actor="$5"
+  install -d -m 0755 "$STATE_DIR"
+  touch "$STATE_DIR/deployments.jsonl"
+  chmod 0640 "$STATE_DIR/deployments.jsonl"
+  printf '{"deployedAt":"%s","environment":"%s","artifact":"%s","sourceCommit":"%s","runId":"%s","actor":"%s"}\n' \
+    "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" "$environment" "$artifact" "$commit" "$run_id" "$actor" \
+    >> "$STATE_DIR/deployments.jsonl"
+}
+
+write_env() {
+  [[ $# -eq 1 ]] || die "Usage: write-env <deploy.env|dev.env|pro.env>"
+  case "$1" in deploy.env|dev.env|pro.env) ;; *) die "Invalid environment file name." ;; esac
+  local temporary
+  temporary="$(mktemp "$ENV_DIR/.${1}.XXXXXX")"
+  trap 'rm -f "$temporary"' EXIT
+  cat > "$temporary"
+  [[ -s "$temporary" ]] || die "Refusing to install an empty environment file."
+  chmod 0600 "$temporary"
+  mv -f "$temporary" "$ENV_DIR/$1"
+  trap - EXIT
+}
+
+ghcr_login() {
+  [[ $# -eq 1 && "$1" =~ ^[A-Za-z0-9_.-]+$ ]] || die "Invalid GHCR username."
+  docker login ghcr.io -u "$1" --password-stdin
+}
+
+deploy_backend() {
+  [[ $# -eq 5 ]] || die "Usage: deploy-backend <dev|pro> <image@digest> <commit> <run-id> <actor>"
+  local environment="$1" image="$2" commit="$3" run_id="$4" actor="$5"
+  validate_environment "$environment"
+  [[ "$environment" != "prod" ]] || environment="pro"
+  [[ "$image" =~ ^ghcr\.io/autofactu/cal-tracker-backend@sha256:[0-9a-f]{64}$ ]] \
+    || die "Backend deployments require the immutable GHCR image digest."
+  validate_provenance "$commit" "$run_id" "$actor"
+  bash "$DEPLOY_DIR/deploy.sh" "$environment" "$image"
+  record_deployment "$environment" "$image" "$commit" "$run_id" "$actor"
+}
+
+publish_apk() {
+  [[ $# -eq 7 ]] \
+    || die "Usage: publish-apk <dev|prod> <apk> <manifest> <sha256> <commit> <run-id> <actor>"
+  local environment="$1" apk manifest expected_sha commit="$5" run_id="$6" actor="$7" destination
+  validate_environment "$environment"
+  [[ "$environment" != "pro" ]] || environment="prod"
+  [[ "$(basename "$2")" =~ ^bettercalories-(dev|prod)-[A-Za-z0-9._-]+\.apk$ ]] || die "Invalid staged APK name."
+  apk="$(claim_incoming_file "$2")"
+  manifest="$(claim_incoming_file "$3")"
+  trap 'rm -f -- "$apk" "$manifest"' EXIT
+  expected_sha="$4"
+  [[ "$expected_sha" =~ ^[0-9a-f]{64}$ ]] || die "Invalid APK SHA-256."
+  validate_provenance "$commit" "$run_id" "$actor"
+  printf '%s  %s\n' "$expected_sha" "$apk" | sha256sum -c - >/dev/null
+  grep -Fq "\"sha256\": \"$expected_sha\"" "$manifest" \
+    || die "APK manifest checksum does not match the artifact."
+  grep -Fq "\"sourceCommit\": \"$commit\"" "$manifest" \
+    || die "APK manifest source commit does not match the deployment."
+  grep -Fq "\"deploymentRunId\": \"$run_id\"" "$manifest" \
+    || die "APK manifest run id does not match the deployment."
+  grep -Fq "\"deploymentActor\": \"$actor\"" "$manifest" \
+    || die "APK manifest actor does not match the deployment."
+
+  destination="$DEPLOY_ROOT/mobile/$environment"
+  install -d -m 0755 "$destination"
+  install -m 0644 "$apk" "$destination/$(basename "$2")"
+  install -m 0644 "$manifest" "$destination/latest.json"
+  ln -sfn "$(basename "$2")" "$destination/latest.apk"
+  rm -f -- "$apk" "$manifest"
+  trap - EXIT
+  record_deployment "mobile-$environment" "sha256:$expected_sha" "$commit" "$run_id" "$actor"
+}
+
+publish_landing() {
+  [[ $# -eq 8 ]] \
+    || die "Usage: publish-landing <archive> <release-id> <root> <state> <commit> <run-id> <actor> <public-url>"
+  local archive release_id="$2" remote_root="$3" remote_state="$4" commit="$5" run_id="$6" actor="$7" public_url="$8"
+  archive="$(claim_incoming_file "$1")"
+  trap 'rm -f -- "$archive"' EXIT
+  [[ "$release_id" =~ ^[0-9]{8}T[0-9]{6}Z$ ]] || die "Invalid landing release id."
+  [[ "$remote_root" == "/var/www/bettercalories.app/html" ]] || die "Invalid landing web root."
+  [[ "$remote_state" == "$DEPLOY_ROOT/landing" ]] || die "Invalid landing state directory."
+  [[ "$public_url" == "https://bettercalories.app" ]] || die "Invalid landing public URL."
+  validate_provenance "$commit" "$run_id" "$actor"
+  bash "$DEPLOY_DIR/publish-landing.sh" "$archive" "$release_id" "$remote_root" "$remote_state"
+  trap - EXIT
+  record_deployment "landing-production" "landing:$release_id" "$commit" "$run_id" "$actor"
+}
+
+main() {
+  require_root_and_deploy_user
+  local command="${1:-}"
+  [[ -n "$command" ]] || die "A deployment command is required."
+  shift
+  case "$command" in
+    write-env) write_env "$@" ;;
+    ghcr-login) ghcr_login "$@" ;;
+    deploy-backend) deploy_backend "$@" ;;
+    ghcr-logout) [[ $# -eq 0 ]] || die "ghcr-logout takes no arguments"; docker logout ghcr.io ;;
+    publish-apk) publish_apk "$@" ;;
+    publish-landing) publish_landing "$@" ;;
+    *) die "Unsupported deployment command: $command" ;;
+  esac
+}
+
+main "$@"

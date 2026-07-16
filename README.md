@@ -2,19 +2,24 @@
 
 Aplicacion para registrar y consultar informacion nutricional.
 
+## Toolchain reproducible
+
+El toolchain revisado del repositorio usa Bun `1.3.13`, también declarado en
+`.mise.toml` y `package.json`. Instálalo con `mise install` o usa exactamente esa
+versión si gestionas Bun por otro medio. Las instalaciones de backend deben
+conservar `bun install --frozen-lockfile`; las builds móviles usan
+`flutter pub get --enforce-lockfile`.
+
+Las imágenes base y la política mínima de actualización están documentadas en
+[docs/software-supply-chain-controls.md](docs/software-supply-chain-controls.md).
+
 ## Landing y servidor
 
 Dominio: `https://bettercalories.app`
 
 IP del servidor: `82.223.104.126`
 
-Usuario: `root`
-
-Comando SSH:
-
-```bash
-ssh root@82.223.104.126
-```
+El acceso administrativo objetivo usa una cuenta nominal, clave pública y elevación mediante `sudo`; no se deben documentar usuarios o claves privadas compartidos. La migración segura y sus comprobaciones están descritas en [docs/production-host-access-hardening.md](docs/production-host-access-hardening.md). Los workflows usan una cuenta separada con permisos limitados y host keys fijadas según [docs/trusted-production-deployments.md](docs/trusted-production-deployments.md). Hasta aplicar ambos procedimientos, comprueba el estado real del host y no cierres la vía existente.
 
 El servidor esta preparado con Docker, NGINX y HTTPS mediante Let's Encrypt.
 La landing estatica del producto vive en `apps/landing` y esta preparada para
@@ -38,9 +43,11 @@ A dev-api.bettercalories.app -> 82.223.104.126
 
 Secrets de GitHub necesarios:
 
-- `VPS_HOST`: `82.223.104.126`
-- `VPS_USER`: `root`
+- `VPS_HOST`: `bettercalories.app`
+- `VPS_USER`: `bettercalories-deploy` después del aprovisionamiento coordinado
 - `VPS_SSH_PRIVATE_KEY`
+- `VPS_SSH_KNOWN_HOSTS`
+- `VPS_SSH_HOST_KEY_FINGERPRINTS`
 - `GHCR_USERNAME`
 - `GHCR_READ_TOKEN`
 - `DEPLOY_ENV_FILE`
@@ -56,3 +63,4 @@ BACKEND_IMAGE=ghcr.io/autofactu/cal-tracker-backend:bootstrap
 
 Dev usa el schema Postgres `cal_tracker_dev` y produccion usa `cal_tracker_pro`.
 El despliegue a dev se ejecuta con push a `develop`; produccion se ejecuta con tags `v*`.
+El backend se despliega por digest OCI, no por un tag mutable.

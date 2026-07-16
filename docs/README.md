@@ -17,6 +17,11 @@ Current authoritative files:
 | `food-data-quality-cleanse-findings.md` | Food corpus quality findings, search eligibility meaning, invalid nutrition/duplicate/suspicious row slices, and operational use of `food-quality`. | Runtime ranking strategy, normalized search query plans. |
 | `food-data-quality-normalized-search-plan.md` | Implemented PostgreSQL normalized food search runbook: quality/normalization tables, scripts, env flags, rollout sequence, and runtime search behavior. | General product nutrition-source priority outside normalized PostgreSQL search. |
 | `food-search-benchmark-acceptance-plan.md` | Reusable food search benchmark and primary-position validation commands, metrics, acceptance gates, and profiling workflow. | Data normalization rules and production rollout sequencing. |
+| `production-host-access-hardening.md` | Fail-safe migration from direct root/password SSH to a nominal key-only operator, fail2ban, explicit UFW policy, validation and basic console recovery. | GitHub Actions deployment-user migration, VPN access, or long-term emergency-key custody. |
+| `trusted-production-deployments.md` | Pinned SSH host identity, dedicated deployment account, immutable backend image references and release traceability. | GitHub environment approvals, signed tags, or deployment execution. |
+| `container-runtime-hardening.md` | Backend container privilege, capability and resource policy; isolated runtime smoke and operational tuning. | Read-only filesystems or additional PostgreSQL hardening. |
+| `software-supply-chain-controls.md` | Bun and production base-image versions, frozen lockfile policy and the MVP update procedure. | SBOM, attestations, container signing, new scanners or commit-pinned Actions. |
+| `runtime-dependency-remediation.md` | Runtime dependency security updates, audit evidence and temporary non-applicable development-tool findings. | A general vulnerability-management SLA or automatic dependency updates. |
 
 This split is intentional:
 
@@ -51,7 +56,7 @@ Task-specific reading:
 | Android AppFunctions or iOS App Intents | `app-description.md` -> Mobile OS Agent Integrations, Target Launch Platforms |
 | Database schema/migrations | `db-vector-architecture.md` -> Core Tables, Table Responsibilities, Required Constraints and Indexes |
 | Vector memory/retrieval | `db-vector-architecture.md` -> Retrieval Flow, User-Scoped Vector Query, Retrieval Ranking, Memory Creation and Update Rules |
-| Production deployment | `db-vector-architecture.md` -> Production Deployment, Backup and Restore |
+| Production deployment | `db-vector-architecture.md` -> Production Deployment, Backup and Restore; `trusted-production-deployments.md`; `production-host-access-hardening.md` when changing administrative SSH or host firewall access |
 | Auth/session storage | `app-description.md` -> Authentication decision; `db-vector-architecture.md` -> users, user_credentials, auth_sessions, password_reset_tokens |
 | Food data quality cleanup | `food-data-quality-cleanse-findings.md`; then `food-data-quality-normalized-search-plan.md` -> Operational Commands |
 | Normalized PostgreSQL food search | `food-data-quality-normalized-search-plan.md`; then `db-vector-architecture.md` if migrations or schema ownership are touched |

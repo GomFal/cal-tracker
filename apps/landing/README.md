@@ -31,13 +31,14 @@ del webroot actual y publica en:
 /var/www/bettercalories.app/html
 ```
 
-También instala la configuración versionada de `bettercalories.app` para que
-`www.bettercalories.app` redirija a `https://bettercalories.app`.
+La configuración NGINX versionada se instala durante el aprovisionamiento
+administrativo. El despliegue rutinario solo puede publicar los archivos de la
+landing mediante el dispatcher restringido.
 
 Variables útiles:
 
 ```text
-BETTERCALORIES_LANDING_SSH_HOST=root@bettercalories.app
+BETTERCALORIES_LANDING_SSH_HOST=bettercalories-deploy@bettercalories.app
 BETTERCALORIES_LANDING_REMOTE_ROOT=/var/www/bettercalories.app/html
 BETTERCALORIES_LANDING_STATE_DIR=/srv/cal-tracker/landing
 ```
@@ -55,3 +56,5 @@ https://api.bettercalories.app/apk/latest.apk
 ```
 
 Ese alias se crea al publicar APKs con `scripts/mobile/deploy-server-apks.sh`.
+La preparación de la cuenta y la identidad SSH fijada se documentan en
+[`docs/trusted-production-deployments.md`](../../docs/trusted-production-deployments.md).

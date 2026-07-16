@@ -2,6 +2,7 @@
   "name": "cal-tracker",
   "private": true,
   "type": "module",
+  "packageManager": "bun@1.3.13",
   "workspaces": [
     "apps/backend",
     "packages/contracts"
@@ -32,6 +33,7 @@
     "db:seed": "bun run --cwd apps/backend db:seed",
     "test": "bun run build:contracts && bun run --cwd apps/backend test",
     "test:backend": "bun run build:contracts && bun run --cwd apps/backend test",
+    "security:audit:runtime": "bash scripts/security/validate-runtime-dependency-audit.sh",
     "generate:openapi": "bun run --cwd packages/contracts generate:openapi",
     "generate:flutter-client": "bun run --cwd apps/backend generate:flutter-client",
     "node:test:backend": "npm --workspace apps/backend run test",
@@ -41,5 +43,8 @@
     "@types/node": "^24.10.1",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"
+  },
+  "overrides": {
+    "vite": "8.1.5"
   }
 }

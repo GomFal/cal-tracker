@@ -128,6 +128,16 @@ Signer #1 certificate SHA-256 digest: $fingerprint"
 
 APKSIGNER_BIN="$fake_bin/apksigner" APKSIGNER_REPORT="$release_report" \
   "$APK_VERIFIER" "$FIXTURE/app.apk" "$fingerprint" >/dev/null
+
+fake_android_sdk="$FIXTURE/android-sdk"
+mkdir -p "$fake_android_sdk/build-tools/36.0.0"
+cp "$fake_bin/apksigner" "$fake_android_sdk/build-tools/36.0.0/apksigner"
+env -u APKSIGNER_BIN \
+  PATH=/usr/bin:/bin \
+  ANDROID_SDK_ROOT="$fake_android_sdk" \
+  APKSIGNER_REPORT="$release_report" \
+  "$APK_VERIFIER" "$FIXTURE/app.apk" "$fingerprint" >/dev/null
+
 expect_failure "missing approved fingerprint" \
   env -u ANDROID_RELEASE_CERT_SHA256 \
   APKSIGNER_BIN="$fake_bin/apksigner" APKSIGNER_REPORT="$release_report" \

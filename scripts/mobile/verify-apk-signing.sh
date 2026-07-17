@@ -3,7 +3,6 @@ set -euo pipefail
 
 APK_PATH="${1:-}"
 EXPECTED_FINGERPRINT="${2:-${ANDROID_RELEASE_CERT_SHA256:-}}"
-APKSIGNER_BIN="${APKSIGNER_BIN:-apksigner}"
 
 fail() {
   echo "Android APK signing verification failed: $*" >&2
@@ -11,7 +10,38 @@ fail() {
 }
 
 [[ -n "$APK_PATH" && -f "$APK_PATH" ]] || fail "APK file is required"
-command -v "$APKSIGNER_BIN" >/dev/null 2>&1 || fail "apksigner is not available"
+
+resolve_apksigner() {
+  local configured_bin="${APKSIGNER_BIN:-}"
+  local resolved_bin=""
+
+  if [[ -n "$configured_bin" ]]; then
+    resolved_bin="$(command -v "$configured_bin" 2>/dev/null || true)"
+    [[ -n "$resolved_bin" ]] || fail "configured apksigner is not available"
+    printf '%s\n' "$resolved_bin"
+    return
+  fi
+
+  resolved_bin="$(command -v apksigner 2>/dev/null || true)"
+  if [[ -z "$resolved_bin" ]]; then
+    local android_sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+    if [[ -n "$android_sdk_root" && -d "$android_sdk_root/build-tools" ]]; then
+      resolved_bin="$(
+        find "$android_sdk_root/build-tools" \
+          -path '*/apksigner' \
+          -type f \
+          -perm -u+x \
+          | sort -V \
+          | tail -n 1
+      )"
+    fi
+  fi
+
+  [[ -n "$resolved_bin" ]] || fail "apksigner is not available"
+  printf '%s\n' "$resolved_bin"
+}
+
+APKSIGNER_BIN="$(resolve_apksigner)"
 
 expected="$(printf '%s' "$EXPECTED_FINGERPRINT" | tr -d ':[:space:]' | tr '[:lower:]' '[:upper:]')"
 [[ "$expected" =~ ^[0-9A-F]{64}$ ]] \

@@ -91,18 +91,58 @@ jobs:
           VPS_USER: ${{ secrets.VPS_USER }}
           DEPLOY_ENV_FILE: ${{ secrets.DEPLOY_ENV_FILE }}
           DEV_ENV_FILE: ${{ secrets.DEV_ENV_FILE }}
+          DEV_GOOGLE_OAUTH_CLIENT_IDS: ${{ secrets.DEV_GOOGLE_OAUTH_CLIENT_IDS }}
           PRO_ENV_FILE: ${{ secrets.PRO_ENV_FILE }}
         run: |
           set -euo pipefail
+          umask 077
           write_remote_file() {
             local name="$1"
             local content="$2"
             printf '%s' "$content" \
               | ssh "$VPS_USER@$VPS_HOST" sudo -n /usr/local/sbin/bettercalories-deploy write-env "$name"
           }
+
+          normalized_dev_env="$RUNNER_TEMP/bettercalories-dev.env"
+          DEV_ENV_FILE_CONTENT="$DEV_ENV_FILE" \
+          DEV_GOOGLE_OAUTH_CLIENT_IDS="$DEV_GOOGLE_OAUTH_CLIENT_IDS" \
+          NORMALIZED_DEV_ENV="$normalized_dev_env" \
+          python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          client_ids = [
+              value.strip()
+              for value in os.environ["DEV_GOOGLE_OAUTH_CLIENT_IDS"].split(",")
+              if value.strip()
+          ]
+          if not client_ids or not all(
+              re.fullmatch(r"[A-Za-z0-9._-]+\.apps\.googleusercontent\.com", value)
+              for value in client_ids
+          ):
+              raise SystemExit(
+                  "DEV_GOOGLE_OAUTH_CLIENT_IDS must contain Google OAuth client IDs."
+              )
+
+          legacy_google_line = re.compile(
+              r"^\s*(?:export\s+)?(?:GOOGLE_OAUTH_CLIENT_IDS|OAUTH_GOOGLE_SECRET)\s*="
+          )
+          source_lines = os.environ["DEV_ENV_FILE_CONTENT"].splitlines()
+          normalized_lines = [
+              line for line in source_lines if not legacy_google_line.match(line)
+          ]
+          normalized_lines.append(f"GOOGLE_OAUTH_CLIENT_IDS={','.join(client_ids)}")
+          Path(os.environ["NORMALIZED_DEV_ENV"]).write_text(
+              "\n".join(normalized_lines) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
           write_remote_file deploy.env "$DEPLOY_ENV_FILE"
-          write_remote_file dev.env "$DEV_ENV_FILE"
+          write_remote_file dev.env "$(cat "$normalized_dev_env")"
           write_remote_file pro.env "$PRO_ENV_FILE"
+          rm -f "$normalized_dev_env"
 
       - name: Login GHCR on VPS
         id: ghcr_vps_login

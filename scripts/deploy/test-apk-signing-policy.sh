@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 POLICY_VALIDATOR="$ROOT_DIR/scripts/deploy/validate-apk-signing-policy.sh"
 CONFIG_VALIDATOR="$ROOT_DIR/scripts/mobile/validate-android-release-signing.sh"
+DEV_CONFIG_VALIDATOR="$ROOT_DIR/scripts/mobile/validate-android-dev-signing.sh"
 APK_VERIFIER="$ROOT_DIR/scripts/mobile/verify-apk-signing.sh"
 FIXTURE="$(mktemp -d)"
 trap 'rm -rf "$FIXTURE"' EXIT
@@ -28,6 +29,7 @@ copy_policy_fixture() {
   cp "$ROOT_DIR/scripts/mobile/build-android.sh" "$FIXTURE/policy/scripts/mobile/"
   cp "$ROOT_DIR/scripts/mobile/deploy-server-apks.sh" "$FIXTURE/policy/scripts/mobile/"
   cp "$CONFIG_VALIDATOR" "$FIXTURE/policy/scripts/mobile/"
+  cp "$DEV_CONFIG_VALIDATOR" "$FIXTURE/policy/scripts/mobile/"
   cp "$APK_VERIFIER" "$FIXTURE/policy/scripts/mobile/"
 }
 
@@ -45,14 +47,29 @@ sed -i '/scripts\/mobile\/verify-apk-signing.sh/d' \
 expect_failure "missing CI certificate verification" "$POLICY_VALIDATOR" "$FIXTURE/policy"
 copy_policy_fixture
 
+sed -i 's/bettercalories-dev-\*\.apk/bettercalories-unverified-dev-*.apk/' \
+  "$FIXTURE/policy/.github/workflows/mobile-apk-deploy.yml"
+expect_failure "missing CI development certificate verification" "$POLICY_VALIDATOR" "$FIXTURE/policy"
+copy_policy_fixture
+
 sed -i '/rm -rf.*android-production-signing/d' \
   "$FIXTURE/policy/.github/workflows/mobile-apk-deploy.yml"
 expect_failure "missing temporary key cleanup" "$POLICY_VALIDATOR" "$FIXTURE/policy"
 copy_policy_fixture
 
+sed -i '/rm -rf.*android-development-signing/d' \
+  "$FIXTURE/policy/.github/workflows/mobile-apk-deploy.yml"
+expect_failure "missing temporary development key cleanup" "$POLICY_VALIDATOR" "$FIXTURE/policy"
+copy_policy_fixture
+
 sed -i 's/signingConfigs.findByName("release")?.let { signingConfig = it }/signingConfig = signingConfigs.getByName("debug")/' \
   "$FIXTURE/policy/apps/mobile/android/app/build.gradle.kts"
 expect_failure "prod debug signing config" "$POLICY_VALIDATOR" "$FIXTURE/policy"
+copy_policy_fixture
+
+sed -i 's/signingConfigs.findByName("devRelease")?.let { signingConfig = it }/signingConfig = signingConfigs.getByName("debug")/' \
+  "$FIXTURE/policy/apps/mobile/android/app/build.gradle.kts"
+expect_failure "dev debug signing config" "$POLICY_VALIDATOR" "$FIXTURE/policy"
 
 android_fixture="$FIXTURE/android"
 mkdir -p "$android_fixture"
@@ -78,6 +95,21 @@ export ANDROID_RELEASE_KEY_PASSWORD="test-only"
 export ALLOW_DEBUG_SIGNING=1
 expect_failure "removed debug-signing escape" "$CONFIG_VALIDATOR"
 unset ALLOW_DEBUG_SIGNING
+
+unset \
+  ANDROID_DEV_STORE_FILE \
+  ANDROID_DEV_STORE_PASSWORD \
+  ANDROID_DEV_KEY_ALIAS \
+  ANDROID_DEV_KEY_PASSWORD \
+  ANDROID_DEV_CERT_SHA256
+export ANDROID_DEV_CERT_SHA256="$fingerprint"
+expect_failure "missing development key" "$DEV_CONFIG_VALIDATOR"
+export ANDROID_DEV_STORE_FILE="$FIXTURE/release.jks"
+export ANDROID_DEV_STORE_PASSWORD="test-only"
+expect_failure "partial development-key configuration" "$DEV_CONFIG_VALIDATOR"
+export ANDROID_DEV_KEY_ALIAS="development"
+export ANDROID_DEV_KEY_PASSWORD="test-only"
+"$DEV_CONFIG_VALIDATOR" >/dev/null
 
 fake_bin="$FIXTURE/bin"
 mkdir -p "$fake_bin"

@@ -172,11 +172,17 @@ export function loadConfig(input: NodeJS.ProcessEnv = process.env): AppConfig {
   if (parsed.NODE_ENV === "production" && (!parsed.RESEND_API_KEY.trim() || !parsed.RESEND_FROM_EMAIL.trim())) {
     throw new Error("RESEND_API_KEY and RESEND_FROM_EMAIL must be set in production.");
   }
+  const googleOAuthClientIds = (
+    parsed.GOOGLE_OAUTH_CLIENT_IDS ?? parsed.OAUTH_GOOGLE_SECRET ?? ""
+  ).trim();
+  if (parsed.NODE_ENV === "production" && !googleOAuthClientIds) {
+    throw new Error("GOOGLE_OAUTH_CLIENT_IDS must be set in production.");
+  }
   const databaseUrl = withSearchPath(parsed.DATABASE_URL, parsed.DATABASE_SCHEMA);
   return {
     ...parsed,
     DATABASE_URL: databaseUrl,
-    GOOGLE_OAUTH_CLIENT_IDS: parsed.GOOGLE_OAUTH_CLIENT_IDS ?? parsed.OAUTH_GOOGLE_SECRET ?? "",
+    GOOGLE_OAUTH_CLIENT_IDS: googleOAuthClientIds,
     AGENT_RUN_LOG_ENABLED:
       parsed.AGENT_RUN_LOG_ENABLED ??
       (parsed.NODE_ENV !== "test" && parsed.NODE_ENV !== "production"),

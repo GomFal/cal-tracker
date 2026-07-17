@@ -39,8 +39,11 @@ PROD_API_BASE_URL=https://api.bettercalories.app bun run mobile:build:prod
 ## Android Release Signing
 
 Production release builds require the controlled release key and the approved
-SHA-256 certificate fingerprint. They cannot fall back to the Android debug
-key. Development and local debug builds do not require production material.
+SHA-256 certificate fingerprint. Development release builds use their own
+stable development key so Android updates and Google Sign-in keep the same
+package/certificate identity across CI runs. Neither release channel can fall
+back to the Android debug key. Local debug builds do not require either release
+key.
 
 Create a local keystore and keep it out of git:
 
@@ -116,6 +119,24 @@ Production additionally reconstructs its release keystore temporarily from the
 protected `production` GitHub environment and verifies the publisher
 certificate before upload. Configure the five `ANDROID_RELEASE_*` secrets in
 the signing runbook; do not configure them in the `development` environment.
+
+Development reconstructs a separate stable keystore from these secrets in the
+protected `development` GitHub environment:
+
+- `ANDROID_DEV_KEYSTORE_BASE64`
+- `ANDROID_DEV_STORE_PASSWORD`
+- `ANDROID_DEV_KEY_ALIAS`
+- `ANDROID_DEV_KEY_PASSWORD`
+- `ANDROID_DEV_CERT_SHA256`
+
+Register that certificate's SHA-1 in the Google OAuth Android client for
+package `app.bettercalories.dev`. Never reuse the production keystore for this
+channel.
+
+Current development publisher certificate:
+
+- SHA-1: `E7:80:73:41:A6:11:35:3C:65:16:DE:36:59:C4:D0:61:DF:B9:1D:AF`
+- SHA-256: `3D:BC:B9:55:E4:2D:55:EE:DD:A2:51:CF:B4:9E:BC:7D:54:E5:C3:D8:E0:0C:BB:EA:89:97:9B:12:06:D4:B1:B2`
 
 It then publishes the already-built APK through
 `scripts/mobile/deploy-server-apks.sh`.

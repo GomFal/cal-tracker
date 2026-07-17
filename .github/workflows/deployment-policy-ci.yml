@@ -21,6 +21,7 @@ on:
       - "scripts/mobile/deploy-server-apks.sh"
       - "scripts/mobile/test-update-manifest-policy.sh"
       - "scripts/mobile/validate-api-base-url.sh"
+      - "scripts/mobile/validate-android-dev-signing.sh"
       - "scripts/mobile/validate-update-manifest.py"
       - "scripts/mobile/validate-android-release-signing.sh"
       - "scripts/mobile/verify-update-apk-metadata.sh"
@@ -48,6 +49,7 @@ on:
       - "scripts/mobile/deploy-server-apks.sh"
       - "scripts/mobile/test-update-manifest-policy.sh"
       - "scripts/mobile/validate-api-base-url.sh"
+      - "scripts/mobile/validate-android-dev-signing.sh"
       - "scripts/mobile/validate-update-manifest.py"
       - "scripts/mobile/validate-android-release-signing.sh"
       - "scripts/mobile/verify-update-apk-metadata.sh"
@@ -81,6 +83,7 @@ jobs:
             scripts/mobile/deploy-server-apks.sh \
             scripts/mobile/test-update-manifest-policy.sh \
             scripts/mobile/validate-api-base-url.sh \
+            scripts/mobile/validate-android-dev-signing.sh \
             scripts/mobile/validate-android-release-signing.sh \
             scripts/mobile/verify-apk-signing.sh \
             scripts/mobile/verify-update-apk-metadata.sh \

@@ -57,4 +57,43 @@ describe("config", () => {
       } as NodeJS.ProcessEnv),
     ).toThrow("RESEND_API_KEY and RESEND_FROM_EMAIL must be set in production.");
   });
+
+  it("requires Google OAuth audiences in production", () => {
+    expect(() =>
+      loadConfig({
+        DATABASE_URL: "postgres://cal_tracker:cal_tracker@localhost:5432/cal_tracker",
+        JWT_ACCESS_SECRET: "test-access-secret-with-more-than-32-characters",
+        SESSION_TOKEN_PEPPER: "test-session-pepper-with-more-than-32-characters",
+        OPENROUTER_API_KEY: "test-openrouter-key",
+        OPENROUTER_MODEL: "test-model",
+        STT_API_KEY: "test-stt-key",
+        RESEND_API_KEY: "re_test_key",
+        RESEND_FROM_EMAIL: "BetterCalories <auth@bettercalories.test>",
+        APP_BASE_URL: "https://api.bettercalories.app",
+        CORS_ALLOWED_ORIGINS: "https://api.bettercalories.app",
+        NODE_ENV: "production",
+      } as NodeJS.ProcessEnv),
+    ).toThrow("GOOGLE_OAUTH_CLIENT_IDS must be set in production.");
+  });
+
+  it("keeps the legacy Google OAuth variable as a production fallback", () => {
+    const config = loadConfig({
+      DATABASE_URL: "postgres://cal_tracker:cal_tracker@localhost:5432/cal_tracker",
+      JWT_ACCESS_SECRET: "test-access-secret-with-more-than-32-characters",
+      SESSION_TOKEN_PEPPER: "test-session-pepper-with-more-than-32-characters",
+      OAUTH_GOOGLE_SECRET: "legacy-google-client-id.apps.googleusercontent.com",
+      OPENROUTER_API_KEY: "test-openrouter-key",
+      OPENROUTER_MODEL: "test-model",
+      STT_API_KEY: "test-stt-key",
+      RESEND_API_KEY: "re_test_key",
+      RESEND_FROM_EMAIL: "BetterCalories <auth@bettercalories.test>",
+      APP_BASE_URL: "https://api.bettercalories.app",
+      CORS_ALLOWED_ORIGINS: "https://api.bettercalories.app",
+      NODE_ENV: "production",
+    } as NodeJS.ProcessEnv);
+
+    expect(config.GOOGLE_OAUTH_CLIENT_IDS).toBe(
+      "legacy-google-client-id.apps.googleusercontent.com",
+    );
+  });
 });

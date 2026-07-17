@@ -21,6 +21,8 @@ done
 
 grep -Fq 'steps.build.outputs.digest' "$backend"
 grep -Fq 'deploy-backend' "$backend"
+grep -Fq 'DEV_GOOGLE_OAUTH_CLIENT_IDS' "$backend"
+grep -Fq 'GOOGLE_OAUTH_CLIENT_IDS=' "$backend"
 grep -Fq 'BETTERCALORIES_DEPLOY_SOURCE_COMMIT' "$mobile"
 grep -Fq 'publish-apk' "$ROOT_DIR/scripts/mobile/deploy-server-apks.sh"
 grep -Fq 'NOPASSWD: /usr/local/sbin/bettercalories-deploy' "$ROOT_DIR/infra/deploy/provision-deploy-user.sh"

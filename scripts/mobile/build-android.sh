@@ -23,7 +23,12 @@ Environment variables:
   PROD_API_BASE_URL      Defaults to https://api.bettercalories.app
   MOBILE_CONFIG_DIR      Defaults to apps/mobile/config
   BUILD_MODE             Defaults to release
+  ANDROID_DEV_CERT_SHA256      Approved development certificate SHA-256
   ANDROID_RELEASE_CERT_SHA256  Approved production certificate SHA-256
+
+Development release signing is provided by ANDROID_DEV_STORE_FILE,
+ANDROID_DEV_STORE_PASSWORD, ANDROID_DEV_KEY_ALIAS, and
+ANDROID_DEV_KEY_PASSWORD.
 
 Production signing can be provided by apps/mobile/android/key.properties or by
 ANDROID_RELEASE_STORE_FILE, ANDROID_RELEASE_STORE_PASSWORD,
@@ -46,6 +51,10 @@ esac
 if [[ "$BUILD_MODE" != "release" ]]; then
   echo "Only BUILD_MODE=release is supported for distributable Android APKs." >&2
   exit 1
+fi
+
+if [[ "$ENVIRONMENT" == "dev" || "$ENVIRONMENT" == "all" ]]; then
+  "$ROOT_DIR/scripts/mobile/validate-android-dev-signing.sh"
 fi
 
 if [[ "$ENVIRONMENT" == "prod" || "$ENVIRONMENT" == "all" ]]; then
@@ -87,7 +96,11 @@ build_flavor() {
   local source_apk="$MOBILE_DIR/build/app/outputs/flutter-apk/app-$flavor-release.apk"
   local output_apk="$DIST_DIR/bettercalories-$flavor-$version-$short_sha.apk"
 
-  if [[ "$flavor" == "prod" ]]; then
+  if [[ "$flavor" == "dev" ]]; then
+    "$ROOT_DIR/scripts/mobile/verify-apk-signing.sh" \
+      "$source_apk" \
+      "${ANDROID_DEV_CERT_SHA256:-}"
+  elif [[ "$flavor" == "prod" ]]; then
     "$ROOT_DIR/scripts/mobile/verify-apk-signing.sh" \
       "$source_apk" \
       "${ANDROID_RELEASE_CERT_SHA256:-}"

@@ -2,23 +2,25 @@
 
 Los APK `prod` conservan el canal de publicación directa del MVP, pero solo se
 publican si están firmados por la identidad release aprobada. No existe una
-excepción para firmarlos con la clave Android Debug. Las builds `dev` y `local`
-de depuración no necesitan acceso a la clave de producción.
+excepción para firmarlos con la clave Android Debug. Los APK `devRelease` usan
+una clave de desarrollo estable y separada; las builds `devDebug` y `local` no
+necesitan acceso a ninguna clave de publicación.
 
 ## Contrato ejecutable
 
 La protección se aplica en tres niveles:
 
 1. Gradle vincula `prodRelease` únicamente a la configuración `release` y
-   detiene una invocación directa si falta esa configuración. `devRelease`
-   puede usar la firma debug sin afectar a producción.
-2. `scripts/mobile/build-android.sh prod` exige el keystore y el fingerprint
-   SHA-256 aprobado antes de construir. Después valida la firma del APK con
-   `apksigner` antes de copiarlo a `dist/`.
-3. El workflow manual reconstruye el keystore en el directorio temporal del
-   runner, vuelve a verificar el APK antes de subir el artefacto y elimina el
-   material temporal incluso si la build falla. La ruta que publica un APK ya
-   construido repite la verificación antes de enviarlo al servidor.
+   `devRelease` a su configuración estable `devRelease`. Una invocación directa
+   se detiene si falta la identidad requerida para su canal.
+2. `scripts/mobile/build-android.sh` exige el keystore y el fingerprint SHA-256
+   aprobado para el canal solicitado antes de construir. Después valida la
+   firma del APK con `apksigner` antes de copiarlo a `dist/`.
+3. El workflow manual reconstruye el keystore aislado del canal en el
+   directorio temporal del runner, vuelve a verificar el APK antes de subir el
+   artefacto y elimina el material temporal incluso si la build falla. La ruta
+   que publica un APK ya construido repite la verificación antes de enviarlo al
+   servidor.
 
 La verificación rechaza una firma inválida, un certificado cuyo fingerprint no
 coincida, varios firmantes actuales y cualquier certificado con identidad

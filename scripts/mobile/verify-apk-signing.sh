@@ -37,4 +37,4 @@ mapfile -t actual_fingerprints < <(
 [[ "${actual_fingerprints[0]}" == "$expected" ]] \
   || fail "the signer certificate does not match the approved fingerprint"
 
-echo "Android APK signature verified against the approved production certificate."
+echo "Android APK signature verified against the approved certificate."

@@ -116,6 +116,38 @@ jobs:
             fi
           } >> "$GITHUB_ENV"
 
+      - name: Prepare protected development signing material
+        if: ${{ inputs.environment == 'dev' }}
+        env:
+          ANDROID_DEV_KEYSTORE_BASE64: ${{ secrets.ANDROID_DEV_KEYSTORE_BASE64 }}
+          ANDROID_DEV_STORE_PASSWORD: ${{ secrets.ANDROID_DEV_STORE_PASSWORD }}
+          ANDROID_DEV_KEY_ALIAS: ${{ secrets.ANDROID_DEV_KEY_ALIAS }}
+          ANDROID_DEV_KEY_PASSWORD: ${{ secrets.ANDROID_DEV_KEY_PASSWORD }}
+          ANDROID_DEV_CERT_SHA256: ${{ secrets.ANDROID_DEV_CERT_SHA256 }}
+        run: |
+          set -euo pipefail
+          for required in \
+            ANDROID_DEV_KEYSTORE_BASE64 \
+            ANDROID_DEV_STORE_PASSWORD \
+            ANDROID_DEV_KEY_ALIAS \
+            ANDROID_DEV_KEY_PASSWORD \
+            ANDROID_DEV_CERT_SHA256; do
+            [[ -n "${!required}" ]] || {
+              echo "Missing protected development Android signing secret: $required" >&2
+              exit 1
+            }
+          done
+
+          signing_dir="$RUNNER_TEMP/android-development-signing"
+          umask 077
+          mkdir -p "$signing_dir"
+          printf '%s' "$ANDROID_DEV_KEYSTORE_BASE64" \
+            | base64 --decode > "$signing_dir/dev-keystore.jks"
+          [[ -s "$signing_dir/dev-keystore.jks" ]] || {
+            echo "Decoded development keystore is empty." >&2
+            exit 1
+          }
+
       - name: Prepare protected production signing material
         if: ${{ inputs.environment == 'prod' }}
         env:
@@ -150,6 +182,11 @@ jobs:
 
       - name: Build Android APK
         env:
+          ANDROID_DEV_STORE_FILE: ${{ inputs.environment == 'dev' && format('{0}/android-development-signing/dev-keystore.jks', runner.temp) || '' }}
+          ANDROID_DEV_STORE_PASSWORD: ${{ inputs.environment == 'dev' && secrets.ANDROID_DEV_STORE_PASSWORD || '' }}
+          ANDROID_DEV_KEY_ALIAS: ${{ inputs.environment == 'dev' && secrets.ANDROID_DEV_KEY_ALIAS || '' }}
+          ANDROID_DEV_KEY_PASSWORD: ${{ inputs.environment == 'dev' && secrets.ANDROID_DEV_KEY_PASSWORD || '' }}
+          ANDROID_DEV_CERT_SHA256: ${{ inputs.environment == 'dev' && secrets.ANDROID_DEV_CERT_SHA256 || '' }}
           ANDROID_RELEASE_STORE_FILE: ${{ inputs.environment == 'prod' && format('{0}/android-production-signing/release-keystore.jks', runner.temp) || '' }}
           ANDROID_RELEASE_STORE_PASSWORD: ${{ inputs.environment == 'prod' && secrets.ANDROID_RELEASE_STORE_PASSWORD || '' }}
           ANDROID_RELEASE_KEY_ALIAS: ${{ inputs.environment == 'prod' && secrets.ANDROID_RELEASE_KEY_ALIAS || '' }}
@@ -158,6 +195,20 @@ jobs:
         run: |
           set -euo pipefail
           scripts/mobile/build-android.sh "$MOBILE_FLAVOR"
+
+      - name: Verify development APK publisher certificate
+        if: ${{ inputs.environment == 'dev' }}
+        env:
+          ANDROID_DEV_CERT_SHA256: ${{ secrets.ANDROID_DEV_CERT_SHA256 }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          apks=(dist/mobile/android/bettercalories-dev-*.apk)
+          [[ "${#apks[@]}" -eq 1 ]] || {
+            echo "Expected exactly one development APK to verify." >&2
+            exit 1
+          }
+          scripts/mobile/verify-apk-signing.sh "${apks[0]}" "$ANDROID_DEV_CERT_SHA256"
 
       - name: Verify production APK publisher certificate
         if: ${{ inputs.environment == 'prod' }}
@@ -172,6 +223,12 @@ jobs:
             exit 1
           }
           scripts/mobile/verify-apk-signing.sh "${apks[0]}" "$ANDROID_RELEASE_CERT_SHA256"
+
+      - name: Remove temporary development signing material
+        if: ${{ always() && inputs.environment == 'dev' }}
+        run: |
+          set -euo pipefail
+          rm -rf "$RUNNER_TEMP/android-development-signing"
 
       - name: Remove temporary production signing material
         if: ${{ always() && inputs.environment == 'prod' }}
@@ -210,6 +267,7 @@ jobs:
           BETTERCALORIES_DEPLOY_SOURCE_COMMIT: ${{ github.sha }}
           BETTERCALORIES_DEPLOY_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
           BETTERCALORIES_DEPLOY_ACTOR: ${{ github.actor }}
+          ANDROID_DEV_CERT_SHA256: ${{ inputs.environment == 'dev' && secrets.ANDROID_DEV_CERT_SHA256 || '' }}
           ANDROID_RELEASE_CERT_SHA256: ${{ inputs.environment == 'prod' && secrets.ANDROID_RELEASE_CERT_SHA256 || '' }}
         run: |
           set -euo pipefail

@@ -15,9 +15,12 @@ if (keystorePropertiesFile.exists()) {
     keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
 }
 
-fun signingProperty(propertyName: String, environmentName: String): String? =
+fun environmentSigningProperty(environmentName: String): String? =
     providers.environmentVariable(environmentName).orNull
         ?.takeIf { it.isNotBlank() }
+
+fun signingProperty(propertyName: String, environmentName: String): String? =
+    environmentSigningProperty(environmentName)
         ?: keystoreProperties.getProperty(propertyName)?.takeIf { it.isNotBlank() }
 
 val releaseSigningValues = mapOf(
@@ -27,6 +30,13 @@ val releaseSigningValues = mapOf(
     "storePassword" to signingProperty("storePassword", "ANDROID_RELEASE_STORE_PASSWORD"),
 )
 val hasCompleteReleaseSigning = releaseSigningValues.values.all { it != null }
+val devSigningValues = mapOf(
+    "keyAlias" to environmentSigningProperty("ANDROID_DEV_KEY_ALIAS"),
+    "keyPassword" to environmentSigningProperty("ANDROID_DEV_KEY_PASSWORD"),
+    "storeFile" to environmentSigningProperty("ANDROID_DEV_STORE_FILE"),
+    "storePassword" to environmentSigningProperty("ANDROID_DEV_STORE_PASSWORD"),
+)
+val hasCompleteDevSigning = devSigningValues.values.all { it != null }
 
 android {
     namespace = "com.example.cal_tracker_mobile"
@@ -59,6 +69,14 @@ android {
     }
 
     signingConfigs {
+        if (hasCompleteDevSigning) {
+            create("devRelease") {
+                keyAlias = devSigningValues.getValue("keyAlias")
+                keyPassword = devSigningValues.getValue("keyPassword")
+                storeFile = file(devSigningValues.getValue("storeFile")!!)
+                storePassword = devSigningValues.getValue("storePassword")
+            }
+        }
         if (hasCompleteReleaseSigning) {
             create("release") {
                 keyAlias = releaseSigningValues.getValue("keyAlias")
@@ -81,7 +99,7 @@ android {
             dimension = "env"
             applicationIdSuffix = ".dev"
             resValue("string", "app_name", "dev:BetterCalories")
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfigs.findByName("devRelease")?.let { signingConfig = it }
         }
         create("local") {
             dimension = "env"
@@ -102,11 +120,21 @@ android {
     }
 }
 
-// Keep dev/local builds usable without production material, but make a direct
-// Gradle/Flutter prod release invocation fail before packaging when it is absent.
+// Keep debug builds usable without publication material, but make direct
+// Gradle/Flutter dev/prod release invocations fail before packaging when their
+// channel-specific signing identity is absent.
 gradle.taskGraph.whenReady {
+    val buildsDevRelease = allTasks.any { task ->
+        task.name.contains("DevRelease", ignoreCase = true)
+    }
     val buildsProdRelease = allTasks.any { task ->
         task.name.contains("ProdRelease", ignoreCase = true)
+    }
+    if (buildsDevRelease && !hasCompleteDevSigning) {
+        throw GradleException(
+            "Development release signing is incomplete. Configure the " +
+                "ANDROID_DEV_* environment variables.",
+        )
     }
     if (buildsProdRelease && !hasCompleteReleaseSigning) {
         throw GradleException(

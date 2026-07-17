@@ -27,6 +27,8 @@ Environment variables:
   BETTERCALORIES_DEPLOY_RUN_ID         Numeric deployment/run identifier
   BETTERCALORIES_DEPLOY_ACTOR          Account initiating the deployment
   SKIP_ANDROID_BUILD=1               Publish an already-built APK from dist/mobile/android
+  ANDROID_DEV_CERT_SHA256            Approved development certificate SHA-256
+  ANDROID_RELEASE_CERT_SHA256        Approved production certificate SHA-256
 
 Important:
   The in-app updater only prompts users when latest.json has a greater
@@ -158,7 +160,11 @@ publish_flavor() {
     exit 1
   fi
 
-  if [[ "$flavor" == "prod" ]]; then
+  if [[ "$flavor" == "dev" ]]; then
+    "$ROOT_DIR/scripts/mobile/verify-apk-signing.sh" \
+      "$source_apk" \
+      "${ANDROID_DEV_CERT_SHA256:-}"
+  elif [[ "$flavor" == "prod" ]]; then
     "$ROOT_DIR/scripts/mobile/verify-apk-signing.sh" \
       "$source_apk" \
       "${ANDROID_RELEASE_CERT_SHA256:-}"

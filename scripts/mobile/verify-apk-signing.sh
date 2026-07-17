@@ -55,15 +55,18 @@ if grep -Eiq 'certificate DN:.*CN=Android Debug([,]|$)' <<< "$certificate_report
 fi
 
 mapfile -t actual_fingerprints < <(
-  sed -nE 's/^Signer #[0-9]+ certificate SHA-256 digest:[[:space:]]*([0-9a-fA-F:]+)[[:space:]]*$/\1/p' \
-    <<< "$certificate_report" \
+  sed -nE '/certificate SHA-256 digest:/ {
+    s/.*certificate SHA-256 digest:[[:space:]]*//
+    s/[^0-9a-fA-F:].*$//
+    /^[0-9a-fA-F:]+$/p
+  }' <<< "$certificate_report" \
     | tr -d ':' \
     | tr '[:lower:]' '[:upper:]' \
     | sort -u
 )
 
 [[ "${#actual_fingerprints[@]}" -eq 1 ]] \
-  || fail "expected exactly one current signer certificate"
+  || fail "expected exactly one current signer certificate (found ${#actual_fingerprints[@]})"
 [[ "${actual_fingerprints[0]}" == "$expected" ]] \
   || fail "the signer certificate does not match the approved fingerprint"
 

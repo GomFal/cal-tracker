@@ -135,7 +135,7 @@ cp "$fake_bin/apksigner" "$fake_android_sdk/build-tools/36.0.0/apksigner"
 env -u APKSIGNER_BIN \
   PATH=/usr/bin:/bin \
   ANDROID_SDK_ROOT="$fake_android_sdk" \
-  APKSIGNER_REPORT="$release_report" \
+  APKSIGNER_REPORT="$(printf '  %s\r\n' "$release_report")" \
   "$APK_VERIFIER" "$FIXTURE/app.apk" "$fingerprint" >/dev/null
 
 expect_failure "missing approved fingerprint" \

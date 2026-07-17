@@ -3000,8 +3000,8 @@
     "semantic_hash": ""
   },
   "scripts/deploy/test-apk-signing-policy.sh": {
-    "mtime": 1784290608.1625547,
-    "ast_hash": "747e8fbf72742c9edb3919676af3d336",
+    "mtime": 1784291119.2223904,
+    "ast_hash": "d89c202c0fc98ac60815ed55d5c76397",
     "semantic_hash": ""
   },
   "scripts/deploy/test-container-runtime-policy.sh": {
@@ -3055,8 +3055,8 @@
     "semantic_hash": ""
   },
   "scripts/mobile/verify-apk-signing.sh": {
-    "mtime": 1784290608.1615548,
-    "ast_hash": "e13e43eeff16764166bce99be4a3cf4f",
+    "mtime": 1784291119.2223904,
+    "ast_hash": "516574d8e12bbffecf96a9f7959d36c2",
     "semantic_hash": ""
   },
   "scripts/mobile/verify-update-apk-metadata.sh": {

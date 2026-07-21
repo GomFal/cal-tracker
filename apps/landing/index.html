@@ -205,41 +205,347 @@
         <div class="section-shell">
           <div class="section-heading" data-reveal>
             <p class="eyebrow">Cómo funciona</p>
-            <h2 id="workflow-title">Del plato al historial en tres decisiones claras.</h2>
+            <h2 id="workflow-title">Una comida. Dos formas de registrarla.</h2>
           </div>
 
-          <ol class="workflow-list">
-            <li data-reveal>
-              <span class="step-number">01</span>
-              <div>
-                <h3>Di la comida como hablarías normalmente.</h3>
-                <p>
-                  Voz o texto: "mi desayuno de siempre", "150 gramos de pollo
-                  con arroz" o "un snack del súper".
-                </p>
+          <figure
+            class="flow-comparison"
+            data-flow-comparison
+            aria-labelledby="workflow-title"
+            aria-describedby="flow-comparison-description"
+            data-reveal
+          >
+            <figcaption class="visually-hidden" id="flow-comparison-description">
+              Comparación animada: un diario tradicional exige buscar, esperar
+              resultados, seleccionar y ajustar cada ingrediente; Better
+              Calories permite mantener pulsado, hablar, confirmar y recibir
+              la comida añadida.
+            </figcaption>
+
+            <!-- flow-visual-start -->
+            <div class="flow-stage" data-flow-visual aria-hidden="true">
+              <span class="flow-midline"></span>
+
+              <div class="flow-lane flow-lane-manual">
+                <div class="flow-lane-heading">
+                  <div class="flow-metrics">
+                    <span class="flow-metric">
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="12" cy="12" r="8.5"></circle>
+                        <path d="M12 7.5V12l3 2"></path>
+                      </svg>
+                      <output data-flow-timer="manual" aria-label="Tiempo de la competencia">00:00.0</output>
+                    </span>
+                    <span class="flow-metric">
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="12" cy="12" r="8.5"></circle>
+                        <circle cx="12" cy="12" r="2"></circle>
+                      </svg>
+                      <output data-flow-clicks="manual" aria-label="Clics de la competencia">0</output>
+                      <small>clics</small>
+                    </span>
+                  </div>
+                </div>
+
+                <div class="comparison-phone comparison-phone-manual">
+                  <span class="comparison-phone-speaker"></span>
+                  <div class="comparison-screen manual-screen">
+                    <!-- manual-phone-screen-start -->
+                    <div class="manual-header">
+                      <span class="manual-avatar"></span>
+                      <span class="ui-stroke ui-stroke-wide"></span>
+                      <span class="ui-stroke ui-stroke-short"></span>
+                    </div>
+
+                    <div class="manual-search-shell">
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="10.5" cy="10.5" r="5.5"></circle>
+                        <path d="m15 15 4.5 4.5"></path>
+                      </svg>
+                      <span class="manual-query flow-animated">
+                        <i></i>
+                        <i></i>
+                      </span>
+                      <span class="manual-caret flow-animated"></span>
+                    </div>
+
+                    <div class="manual-result-panel flow-animated">
+                      <span class="manual-result-row manual-result-row-active">
+                        <i class="food-shape food-shape-primary flow-animated"></i>
+                        <i class="ui-stroke ui-stroke-wide"></i>
+                        <i class="result-radio"></i>
+                      </span>
+                      <span class="manual-result-row">
+                        <i class="food-shape food-shape-muted"></i>
+                        <i class="ui-stroke ui-stroke-medium"></i>
+                        <i class="result-radio"></i>
+                      </span>
+                      <span class="manual-result-row">
+                        <i class="food-shape food-shape-muted"></i>
+                        <i class="ui-stroke ui-stroke-short"></i>
+                        <i class="result-radio"></i>
+                      </span>
+                    </div>
+
+                    <div class="manual-loading-panel flow-animated">
+                      <span class="manual-loading-spinner flow-animated"></span>
+                      <span class="manual-loading-row">
+                        <i></i>
+                        <b></b>
+                      </span>
+                      <span class="manual-loading-row">
+                        <i></i>
+                        <b></b>
+                      </span>
+                      <span class="manual-loading-row">
+                        <i></i>
+                        <b></b>
+                      </span>
+                    </div>
+
+                    <div class="manual-amount-panel flow-animated">
+                      <div class="manual-amount-heading">
+                        <span class="food-shape food-shape-amount flow-animated"></span>
+                        <span class="ui-stroke ui-stroke-medium"></span>
+                      </div>
+                      <div class="manual-slider">
+                        <span class="flow-animated"></span>
+                        <i class="flow-animated"></i>
+                      </div>
+                      <div class="manual-stepper">
+                        <span class="stepper-minus"></span>
+                        <span class="stepper-value"></span>
+                        <span class="stepper-plus"></span>
+                      </div>
+                      <span class="manual-add-control">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M12 6v12M6 12h12"></path>
+                        </svg>
+                      </span>
+                    </div>
+
+                    <div class="manual-basket">
+                      <span class="manual-basket-row manual-basket-row-one flow-animated">
+                        <i class="food-shape food-shape-one"></i>
+                        <i class="ui-stroke ui-stroke-wide"></i>
+                        <i class="basket-adjust"></i>
+                      </span>
+                      <span class="manual-basket-row manual-basket-row-two flow-animated">
+                        <i class="food-shape food-shape-two"></i>
+                        <i class="ui-stroke ui-stroke-medium"></i>
+                        <i class="basket-adjust"></i>
+                      </span>
+                      <span class="manual-basket-row manual-basket-row-three flow-animated">
+                        <i class="food-shape food-shape-three"></i>
+                        <i class="ui-stroke ui-stroke-short"></i>
+                        <i class="basket-adjust"></i>
+                      </span>
+                    </div>
+
+                    <span class="manual-final-control flow-animated">
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="m6 12.5 4 4L18.5 8"></path>
+                      </svg>
+                    </span>
+
+                    <div class="manual-keyboard flow-animated">
+                      <span class="manual-keyboard-bar">
+                        <i></i>
+                        <i></i>
+                        <i></i>
+                      </span>
+                      <span class="manual-key-row">
+                        <i></i>
+                        <i></i>
+                        <i></i>
+                        <i></i>
+                        <i></i>
+                        <i></i>
+                        <i></i>
+                        <i></i>
+                      </span>
+                      <span class="manual-key-row">
+                        <i></i>
+                        <i class="manual-key-press-a flow-animated"></i>
+                        <i></i>
+                        <i></i>
+                        <i></i>
+                        <i></i>
+                        <i></i>
+                        <i></i>
+                      </span>
+                      <span class="manual-key-row">
+                        <i></i>
+                        <i></i>
+                        <i></i>
+                        <i></i>
+                        <i class="manual-key-press-b flow-animated"></i>
+                        <i></i>
+                        <i></i>
+                        <i></i>
+                      </span>
+                      <span class="manual-key-row manual-key-row-bottom">
+                        <i></i>
+                        <i class="manual-key-space manual-key-press-c flow-animated"></i>
+                        <i></i>
+                      </span>
+                    </div>
+
+                    <span class="manual-touch manual-touch-one flow-animated"></span>
+                    <span class="manual-touch manual-touch-two flow-animated"></span>
+                    <span class="manual-touch manual-touch-three flow-animated"></span>
+                    <span class="manual-touch manual-touch-four flow-animated"></span>
+                    <span class="manual-touch manual-touch-five flow-animated"></span>
+                    <span class="manual-touch manual-touch-six flow-animated"></span>
+                    <span class="manual-touch manual-touch-seven flow-animated"></span>
+                    <span class="manual-touch manual-touch-eight flow-animated"></span>
+                    <span class="manual-touch manual-touch-nine flow-animated"></span>
+                    <span class="manual-touch manual-touch-ten flow-animated"></span>
+                    <span class="manual-touch manual-touch-eleven flow-animated"></span>
+                    <!-- manual-phone-screen-end -->
+                  </div>
+                </div>
+
+                <div class="effort-track effort-track-manual">
+                  <span class="effort-bead flow-animated"></span>
+                  <span class="effort-bead flow-animated"></span>
+                  <span class="effort-bead flow-animated"></span>
+                  <span class="effort-bead flow-animated"></span>
+                  <span class="effort-bead flow-animated"></span>
+                  <span class="effort-bead flow-animated"></span>
+                  <span class="effort-bead flow-animated"></span>
+                  <span class="effort-bead flow-animated"></span>
+                  <span class="effort-bead flow-animated"></span>
+                  <span class="effort-bead flow-animated"></span>
+                  <span class="effort-bead flow-animated"></span>
+                </div>
+
+                <p class="flow-lane-label flow-lane-label-manual flow-animated">Aplicaciones de la competencia</p>
               </div>
-            </li>
-            <li data-reveal>
-              <span class="step-number">02</span>
-              <div>
-                <h3>Revisa calorías, macros, porciones y fuentes.</h3>
-                <p>
-                  La propuesta se muestra antes de guardar, con ingredientes
-                  separados y valores de proteína, carbohidratos y grasa.
-                </p>
+
+              <div class="flow-lane flow-lane-better">
+                <div class="flow-lane-heading flow-lane-heading-better">
+                  <div class="flow-metrics">
+                    <span class="flow-metric">
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="12" cy="12" r="8.5"></circle>
+                        <path d="M12 7.5V12l3 2"></path>
+                      </svg>
+                      <output data-flow-timer="better" class="flow-animated" aria-label="Tiempo de Better Calories">00:00.0</output>
+                    </span>
+                    <span class="flow-metric">
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="12" cy="12" r="8.5"></circle>
+                        <circle cx="12" cy="12" r="2"></circle>
+                      </svg>
+                      <output data-flow-clicks="better" aria-label="Clics de Better Calories">0</output>
+                      <small>clics</small>
+                    </span>
+                  </div>
+                </div>
+
+                <div class="comparison-phone comparison-phone-better">
+                  <span class="comparison-phone-speaker"></span>
+                  <div class="comparison-screen better-screen">
+                    <!-- better-phone-screen-start -->
+                    <div class="better-home flow-animated">
+                      <div class="better-home-top">
+                        <span class="better-agent-dot"></span>
+                        <span class="ui-stroke ui-stroke-medium"></span>
+                      </div>
+                      <div class="better-summary-shape">
+                        <span class="summary-orbit"><i></i></span>
+                        <span class="summary-lines">
+                          <i></i>
+                          <i></i>
+                          <i></i>
+                        </span>
+                      </div>
+                      <div class="better-home-rows">
+                        <span><i></i><b></b></span>
+                        <span><i></i><b></b></span>
+                        <span><i></i><b></b></span>
+                      </div>
+                    </div>
+
+                    <div class="voice-capture flow-animated">
+                      <span class="voice-hold-ring flow-animated"></span>
+                      <span class="voice-button flow-animated">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <rect x="8.5" y="3.5" width="7" height="11" rx="3.5"></rect>
+                          <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3M8.5 21h7"></path>
+                        </svg>
+                      </span>
+                      <span class="voice-wave flow-animated">
+                        <i></i>
+                        <i></i>
+                        <i></i>
+                        <i></i>
+                        <i></i>
+                      </span>
+                    </div>
+
+                    <div class="better-chat flow-animated">
+                      <div class="voice-message-shape">
+                        <span class="mini-wave">
+                          <i></i>
+                          <i></i>
+                          <i></i>
+                          <i></i>
+                          <i></i>
+                        </span>
+                      </div>
+
+                      <div class="agent-result-shape">
+                        <span class="agent-result-head">
+                          <span class="better-agent-dot"></span>
+                          <i class="ui-stroke ui-stroke-medium"></i>
+                        </span>
+                        <span class="agent-food-row agent-food-row-one flow-animated">
+                          <i class="food-shape food-shape-one"></i>
+                          <i class="agent-food-lines"><b></b><b></b></i>
+                          <i class="agent-macro"></i>
+                        </span>
+                        <span class="agent-food-row agent-food-row-two flow-animated">
+                          <i class="food-shape food-shape-two"></i>
+                          <i class="agent-food-lines"><b></b><b></b></i>
+                          <i class="agent-macro"></i>
+                        </span>
+                        <span class="agent-food-row agent-food-row-three flow-animated">
+                          <i class="food-shape food-shape-three"></i>
+                          <i class="agent-food-lines"><b></b><b></b></i>
+                          <i class="agent-macro"></i>
+                        </span>
+                        <span class="better-confirm flow-animated">
+                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="m6 12.5 4 4L18.5 8"></path>
+                          </svg>
+                        </span>
+                      </div>
+                    </div>
+
+                    <span class="better-touch better-touch-record flow-animated"></span>
+                    <span class="better-touch better-touch-confirm flow-animated"></span>
+                    <span class="better-success flow-animated">
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="12" cy="12" r="9"></circle>
+                        <path d="m7.5 12.5 3 3 6-7"></path>
+                      </svg>
+                    </span>
+                    <!-- better-phone-screen-end -->
+                  </div>
+                </div>
+
+                <div class="effort-track effort-track-better">
+                  <span class="effort-bead effort-bead-hold flow-animated"></span>
+                  <span class="effort-bead effort-bead-tap flow-animated"></span>
+                </div>
+
+                <p class="flow-lane-label flow-lane-label-better flow-animated">Better Calories</p>
               </div>
-            </li>
-            <li data-reveal>
-              <span class="step-number">03</span>
-              <div>
-                <h3>Corrige una vez, reutiliza muchas.</h3>
-                <p>
-                  Edita ingredientes, ajusta cantidades, guarda comidas
-                  habituales y deja que tus alias vuelvan más rápido la próxima vez.
-                </p>
-              </div>
-            </li>
-          </ol>
+            </div>
+            <!-- flow-visual-end -->
+          </figure>
         </div>
       </section>
 

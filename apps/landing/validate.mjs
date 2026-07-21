@@ -23,6 +23,7 @@ for (const file of files) {
 
 const index = read("index.html");
 const styles = read("styles.css");
+const script = read("script.js");
 const robots = read("robots.txt");
 const sitemap = read("sitemap.xml");
 const manifest = JSON.parse(read("site.webmanifest"));
@@ -35,10 +36,32 @@ const requiredSnippets = [
   '<meta property="og:type" content="website">',
   '<meta name="twitter:card" content="summary_large_image">',
   "application/ld+json",
+  'id="como-funciona"',
+  "Una comida. Dos formas de registrarla.",
+  "data-flow-comparison",
+  'aria-describedby="flow-comparison-description"',
+  'data-flow-visual aria-hidden="true"',
+  "Aplicaciones de la competencia",
+  'flow-lane-label-better flow-animated">Better Calories',
+  "better-agent-dot",
+  'data-flow-timer="manual"',
+  'data-flow-clicks="better"',
 ];
 
 for (const snippet of requiredSnippets) {
   if (!index.includes(snippet)) fail(`Missing SEO snippet: ${snippet}`);
+}
+
+if (index.includes('class="better-mark"')) {
+  fail("Ambiguous abstract Better Calories mark must not return");
+}
+
+if (index.includes("better-voice-mark")) {
+  fail("The agent mark must not regress to a microphone-only symbol");
+}
+
+if (index.includes("better-agent-mark") || index.includes("agent-mark-spark")) {
+  fail("The Better Calories marker must remain a plain green circle");
 }
 
 const title = index.match(/<title>(.*?)<\/title>/)?.[1] ?? "";
@@ -57,6 +80,52 @@ const jsonLd = index.match(
 )?.[1];
 if (!jsonLd) fail("Missing JSON-LD");
 JSON.parse(jsonLd);
+
+const flowVisualStart = index.indexOf("<!-- flow-visual-start -->");
+const flowVisualEnd = index.indexOf("<!-- flow-visual-end -->");
+if (flowVisualStart < 0 || flowVisualEnd <= flowVisualStart) {
+  fail("Missing flow comparison visual boundaries");
+}
+
+for (const phone of ["manual", "better"]) {
+  const screenStart = index.indexOf(`<!-- ${phone}-phone-screen-start -->`);
+  const screenEnd = index.indexOf(`<!-- ${phone}-phone-screen-end -->`);
+  if (screenStart < 0 || screenEnd <= screenStart) {
+    fail(`Missing ${phone} phone screen boundaries`);
+  }
+  const screenMarkup = index.slice(screenStart, screenEnd);
+  const screenText = screenMarkup
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/<[^>]+>/g, "")
+    .replace(/\s+/g, "");
+  if (screenText.length > 0) {
+    fail(`${phone} phone screen must not contain visible text`);
+  }
+}
+
+const flowScriptSnippets = [
+  "[data-flow-comparison]",
+  "IntersectionObserver",
+  "visibilitychange",
+  "prefers-reduced-motion: reduce",
+  "flowCycleMs = 16000",
+  "finishMs: 15040",
+  "clicks: [1280, 7360]",
+  "data-flow-timer",
+];
+for (const snippet of flowScriptSnippets) {
+  if (!script.includes(snippet)) {
+    fail(`Missing flow playback behavior: ${snippet}`);
+  }
+}
+
+if (!styles.includes("[data-flow-comparison] .flow-animated")) {
+  fail("Missing reduced-motion-safe flow animation styles");
+}
+
+if (!styles.includes("@keyframes manual-loading")) {
+  fail("Missing the traditional-search loading phase");
+}
 
 const imageTags = [...index.matchAll(/<img\b[^>]*>/g)].map(([tag]) => tag);
 for (const tag of imageTags) {
@@ -104,4 +173,4 @@ if (/font-size\s*:[^;]*vw/i.test(styles)) {
   fail("Font sizes must not scale directly with viewport width");
 }
 
-console.log("Landing SEO and asset validation passed.");
+console.log("Landing SEO, accessibility, animation, and asset validation passed.");

@@ -5,6 +5,7 @@ import 'package:cal_tracker_mobile/app/theme.dart';
 import 'package:cal_tracker_mobile/data/repositories/nutrition_repository.dart';
 import 'package:cal_tracker_mobile/data/services/audio_recorder_service.dart';
 import 'package:cal_tracker_mobile/data/services/nutrition_cache_store.dart';
+import 'package:cal_tracker_mobile/domain/models/nutrition_data_change.dart';
 import 'package:cal_tracker_mobile/domain/models/nutrition_models.dart';
 import 'package:cal_tracker_mobile/generated/api/cal_tracker_api.dart';
 import 'package:cal_tracker_mobile/l10n/generated/app_localizations.dart';
@@ -85,9 +86,43 @@ Map<String, Object?> _confirmedMutationJson({
       ],
     };
 
+Map<String, Object?> _mealCorrectionMutationJson({
+  required String mutationId,
+  required Meal meal,
+}) =>
+    {
+      'version': 1,
+      'mutationId': mutationId,
+      'committedAt': '2026-01-01T12:00:00.000Z',
+      'effects': [
+        {
+          'domain': 'meals',
+          'operation': 'upsert',
+          'date': '2026-01-01',
+          'entityId': meal.id,
+          'revision': '2026-01-01T12:00:00.000Z',
+          'snapshot': meal.toJson(),
+        },
+      ],
+    };
+
 void main() {
   setUpAll(() {
     registerFallbackValue(_summary());
+    registerFallbackValue(
+      ConfirmedNutritionMutation(
+        version: 1,
+        mutationId: '00000000-0000-4000-8000-000000000099',
+        committedAt: DateTime.utc(2026, 1, 1),
+        effects: const [
+          NutritionDataEffect(
+            domain: NutritionDataDomain.dailySummary,
+            operation: NutritionDataOperation.invalidate,
+            date: '2026-01-01',
+          ),
+        ],
+      ),
+    );
   });
 
   const action = AgentChatProposalAction(
@@ -96,6 +131,13 @@ void main() {
     entryId: 'entry-id',
     sourceToolCallId: 'tool-call-id',
     proposalId: 'proposal-id',
+  );
+  const correctionAction = AgentChatMealCorrectionAction(
+    type: AgentChatMealCorrectionActionType.confirm,
+    conversationId: 'conversation-id',
+    entryId: 'correction-entry-id',
+    sourceToolCallId: 'correction-tool-call-id',
+    mealId: '00000000-0000-4000-8000-000000000010',
   );
 
   test('direct save is deduplicated and never streams an agent message',
@@ -672,5 +714,456 @@ void main() {
           conversationId: any(named: 'conversationId'),
           activeProposalId: any(named: 'activeProposalId'),
         ));
+  });
+
+  test('meal correction confirmation deduplicates concurrent taps', () async {
+    final repository = _Repository();
+    final response = Completer<AgentChatMealCorrectionCommitResult>();
+    when(() => repository.commitAgentChatMealCorrection(
+          conversationId: correctionAction.conversationId,
+          mealId: correctionAction.mealId,
+          sourceToolCallId: correctionAction.sourceToolCallId,
+          clientMutationId: any(named: 'clientMutationId'),
+        )).thenAnswer((_) => response.future);
+    final viewModel = AgentChatViewModel(
+      nutritionRepository: repository,
+      audioRecorderService: _Recorder(),
+    );
+    final meal = Meal(
+      id: correctionAction.mealId,
+      title: 'Corrected meal',
+      occurredAt: DateTime.utc(2026, 1, 1),
+      nutrition: _nutrition,
+      items: const [],
+    );
+
+    final first = viewModel.confirmMealCorrection(correctionAction);
+    final second = viewModel.confirmMealCorrection(correctionAction);
+    response.complete(
+      AgentChatMealCorrectionCommitResult(
+        clientMutationId: '11111111-1111-4111-8111-111111111111',
+        reused: false,
+        result: AgentRunResult(
+          kind: 'meal_corrected',
+          message: 'Meal corrected.',
+          meal: meal,
+        ),
+        conversationMessage: AgentConversationMessage(
+          id: 'correction-message-id',
+          conversationId: correctionAction.conversationId,
+          role: 'tool',
+          content: '{}',
+          createdAt: DateTime.utc(2026, 1, 1),
+        ),
+      ),
+    );
+    await Future.wait([first, second]);
+
+    expect(
+      viewModel.mealCorrectionActionState(
+        correctionAction.sourceToolCallId,
+      ),
+      AgentChatMealCorrectionActionState.succeeded,
+    );
+    verify(() => repository.commitAgentChatMealCorrection(
+          conversationId: correctionAction.conversationId,
+          mealId: correctionAction.mealId,
+          sourceToolCallId: correctionAction.sourceToolCallId,
+          clientMutationId: any(named: 'clientMutationId'),
+        )).called(1);
+    verifyNever(() => repository.streamAgentChat(
+          any(),
+          conversationId: any(named: 'conversationId'),
+          activeProposalId: any(named: 'activeProposalId'),
+        ));
+  });
+
+  test('cancelling a meal correction never sends a request', () {
+    final repository = _Repository();
+    final viewModel = AgentChatViewModel(
+      nutritionRepository: repository,
+      audioRecorderService: _Recorder(),
+    );
+
+    viewModel.cancelMealCorrection(
+      const AgentChatMealCorrectionAction(
+        type: AgentChatMealCorrectionActionType.cancel,
+        conversationId: 'conversation-id',
+        entryId: 'correction-entry-id',
+        sourceToolCallId: 'correction-tool-call-id',
+        mealId: '00000000-0000-4000-8000-000000000010',
+      ),
+    );
+
+    expect(
+      viewModel.mealCorrectionActionState('correction-tool-call-id'),
+      AgentChatMealCorrectionActionState.cancelled,
+    );
+    verifyNever(() => repository.commitAgentChatMealCorrection(
+          conversationId: any(named: 'conversationId'),
+          mealId: any(named: 'mealId'),
+          sourceToolCallId: any(named: 'sourceToolCallId'),
+          clientMutationId: any(named: 'clientMutationId'),
+        ));
+  });
+
+  testWidgets('meal correction preview renders details and cancel is local',
+      (tester) async {
+    final repository = _Repository();
+    final corrected = Meal(
+      id: correctionAction.mealId,
+      title: 'Corrected dinner',
+      occurredAt: DateTime.utc(2026, 1, 1),
+      nutrition: _nutrition,
+      items: const [
+        MealItem(
+          name: 'Rice',
+          quantity: 125,
+          unit: 'g',
+          calories: 100,
+          proteinGrams: 2,
+          carbsGrams: 20,
+          fatGrams: 1,
+          source: 'database',
+        ),
+      ],
+    );
+    const toolCall = AgentToolCallFeedback(
+      id: 'correction-tool-call-id',
+      actionId: 'preview_meal_correction',
+      label: 'Preview meal correction',
+      summary: 'Review the correction',
+    );
+    when(() => repository.listAgentConversations())
+        .thenAnswer((_) async => const []);
+    when(() => repository.streamAgentChat(
+          'correct dinner',
+          conversationId: null,
+          activeProposalId: null,
+        )).thenAnswer(
+      (_) => Stream.fromIterable([
+        const AgentChatStreamEvent(
+          type: 'conversation_started',
+          conversationId: 'conversation-id',
+        ),
+        AgentChatStreamEvent(
+          type: 'tool_call_completed',
+          conversationId: 'conversation-id',
+          toolCall: toolCall,
+          result: AgentRunResult(
+            kind: 'meal_correction_preview',
+            message: 'Review this correction.',
+            meal: corrected,
+            requiresConfirmation: true,
+          ),
+        ),
+        const AgentChatStreamEvent(
+          type: 'done',
+          conversationId: 'conversation-id',
+        ),
+      ]),
+    );
+    final viewModel = AgentChatViewModel(
+      nutritionRepository: repository,
+      audioRecorderService: _Recorder(),
+    );
+    await viewModel.sendText('correct dinner');
+    clearInteractions(repository);
+    await tester.pumpWidget(
+      ChangeNotifierProvider<AgentChatViewModel>.value(
+        value: viewModel,
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          theme: buildLightTheme(),
+          home: const AgentChatScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Corrected dinner'), findsOneWidget);
+    expect(find.text('Rice'), findsOneWidget);
+    final cancel = find.byKey(
+      const ValueKey(
+        'agent_chat_meal_correction_cancel_00000000-0000-4000-8000-000000000010',
+      ),
+    );
+    await tester.ensureVisible(cancel);
+    await tester.tap(cancel.hitTestable());
+    await tester.pumpAndSettle();
+
+    expect(find.text('Meal correction cancelled.'), findsOneWidget);
+    verifyNever(() => repository.commitAgentChatMealCorrection(
+          conversationId: any(named: 'conversationId'),
+          mealId: any(named: 'mealId'),
+          sourceToolCallId: any(named: 'sourceToolCallId'),
+          clientMutationId: any(named: 'clientMutationId'),
+        ));
+  });
+
+  test('correction repository writes cache before publishing its event',
+      () async {
+    final apiClient = _ApiClient();
+    final cacheStore = _CacheStore();
+    final original = Meal(
+      id: correctionAction.mealId,
+      title: 'Dinner',
+      occurredAt: DateTime.utc(2026, 1, 1),
+      nutrition: _nutrition,
+      items: const [],
+    );
+    final corrected = Meal(
+      id: original.id,
+      title: 'Corrected dinner',
+      occurredAt: original.occurredAt,
+      nutrition: const NutritionSnapshot(
+        calories: 130,
+        proteinGrams: 3,
+        carbsGrams: 25,
+        fatGrams: 2,
+      ),
+      items: const [],
+    );
+    final order = <String>[];
+    when(() => cacheStore.readDailySummary('2026-01-01')).thenAnswer(
+      (_) async => CachedNutritionValue(
+        value: _summary(meals: [original]),
+        cachedAt: DateTime.utc(2026, 1, 1),
+      ),
+    );
+    when(() => cacheStore.writeDailySummary(any())).thenAnswer((_) async {
+      order.add('cache');
+    });
+    when(() => apiClient.commitAgentChatMealCorrection(
+          conversationId: correctionAction.conversationId,
+          mealId: correctionAction.mealId,
+          sourceToolCallId: correctionAction.sourceToolCallId,
+          clientMutationId: '11111111-1111-4111-8111-111111111111',
+        )).thenAnswer(
+      (_) async => {
+        'actionId': 'correct_meal',
+        'clientMutationId': '11111111-1111-4111-8111-111111111111',
+        'reused': false,
+        'result': {
+          'kind': 'meal_corrected',
+          'meal': corrected.toJson(),
+          'message': 'Meal corrected.',
+          'confirmedMutation': _mealCorrectionMutationJson(
+            mutationId: '11111111-1111-4111-8111-111111111111',
+            meal: corrected,
+          ),
+        },
+        'conversationMessage': AgentConversationMessage(
+          id: 'correction-message-id',
+          conversationId: correctionAction.conversationId,
+          role: 'tool',
+          content: '{}',
+          createdAt: DateTime.utc(2026, 1, 1),
+        ).toJson(),
+      },
+    );
+    final repository = NutritionRepository(
+      apiClient: apiClient,
+      cacheStore: cacheStore,
+    )..activateCacheForUser('user-a');
+    final subscription = repository.dataChanges.listen((_) {
+      order.add('event');
+    });
+    addTearDown(() async {
+      await subscription.cancel();
+      await repository.dispose();
+    });
+
+    await repository.commitAgentChatMealCorrection(
+      conversationId: correctionAction.conversationId,
+      mealId: correctionAction.mealId,
+      sourceToolCallId: correctionAction.sourceToolCallId,
+      clientMutationId: '11111111-1111-4111-8111-111111111111',
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    expect(order, ['cache', 'event']);
+    final written = verify(
+      () => cacheStore.writeDailySummary(captureAny()),
+    ).captured.single as DailySummary;
+    expect(written.meals.single.title, 'Corrected dinner');
+    expect(written.consumed.calories, 130);
+  });
+
+  test('late correction response is ignored after an account switch', () async {
+    final apiClient = _ApiClient();
+    final cacheStore = _CacheStore();
+    final response = Completer<Map<String, Object?>>();
+    final corrected = Meal(
+      id: correctionAction.mealId,
+      title: 'Corrected dinner',
+      occurredAt: DateTime.utc(2026, 1, 1),
+      nutrition: _nutrition,
+      items: const [],
+    );
+    when(() => cacheStore.writeDailySummary(any())).thenAnswer((_) async {});
+    when(() => apiClient.commitAgentChatMealCorrection(
+          conversationId: correctionAction.conversationId,
+          mealId: correctionAction.mealId,
+          sourceToolCallId: correctionAction.sourceToolCallId,
+          clientMutationId: '11111111-1111-4111-8111-111111111111',
+        )).thenAnswer((_) => response.future);
+    final repository = NutritionRepository(
+      apiClient: apiClient,
+      cacheStore: cacheStore,
+    )..activateCacheForUser('user-a');
+    final changes = <NutritionDataChange>[];
+    final subscription = repository.dataChanges.listen(changes.add);
+    addTearDown(() async {
+      await subscription.cancel();
+      await repository.dispose();
+    });
+
+    final pending = repository.commitAgentChatMealCorrection(
+      conversationId: correctionAction.conversationId,
+      mealId: correctionAction.mealId,
+      sourceToolCallId: correctionAction.sourceToolCallId,
+      clientMutationId: '11111111-1111-4111-8111-111111111111',
+    );
+    repository.activateCacheForUser('user-b');
+    response.complete({
+      'actionId': 'correct_meal',
+      'clientMutationId': '11111111-1111-4111-8111-111111111111',
+      'reused': false,
+      'result': {
+        'kind': 'meal_corrected',
+        'meal': corrected.toJson(),
+        'message': 'Meal corrected.',
+        'confirmedMutation': _mealCorrectionMutationJson(
+          mutationId: '11111111-1111-4111-8111-111111111111',
+          meal: corrected,
+        ),
+      },
+      'conversationMessage': AgentConversationMessage(
+        id: 'correction-message-id',
+        conversationId: correctionAction.conversationId,
+        role: 'tool',
+        content: '{}',
+        createdAt: DateTime.utc(2026, 1, 1),
+      ).toJson(),
+    });
+
+    await expectLater(pending, throwsA(isA<StaleNutritionResponseException>()));
+    verifyNever(() => cacheStore.writeDailySummary(any()));
+    expect(changes, isEmpty);
+  });
+
+  test('stale correction conflict is presented without committing', () async {
+    final repository = _Repository();
+    when(() => repository.commitAgentChatMealCorrection(
+          conversationId: correctionAction.conversationId,
+          mealId: correctionAction.mealId,
+          sourceToolCallId: correctionAction.sourceToolCallId,
+          clientMutationId: any(named: 'clientMutationId'),
+        )).thenThrow(
+      const ApiException(
+        409,
+        'Meal changed.',
+        code: 'meal_changed_since_preview',
+      ),
+    );
+    final viewModel = AgentChatViewModel(
+      nutritionRepository: repository,
+      audioRecorderService: _Recorder(),
+    );
+
+    await viewModel.confirmMealCorrection(correctionAction);
+
+    expect(
+      viewModel.mealCorrectionActionState(
+        correctionAction.sourceToolCallId,
+      ),
+      AgentChatMealCorrectionActionState.stale,
+    );
+    expect(viewModel.errorMessage, isNull);
+  });
+
+  test('rehydration keeps preview and direct correction with one tool id',
+      () async {
+    final repository = _Repository();
+    final createdAt = DateTime.utc(2026, 1, 1);
+    final corrected = Meal(
+      id: correctionAction.mealId,
+      title: 'Corrected dinner',
+      occurredAt: createdAt,
+      nutrition: _nutrition,
+      items: const [],
+    );
+    final preview = {
+      'kind': 'meal_correction_preview',
+      'message': 'Review this correction.',
+      'meal': corrected.toJson(),
+      'requiresConfirmation': true,
+    };
+    final committed = {
+      'kind': 'meal_corrected',
+      'message': 'Meal corrected.',
+      'meal': corrected.toJson(),
+    };
+    final detail = AgentConversationDetail(
+      conversation: AgentConversationSummary(
+        id: correctionAction.conversationId,
+        title: 'Correction',
+        createdAt: createdAt,
+        updatedAt: createdAt,
+      ),
+      messages: [
+        AgentConversationMessage(
+          id: 'preview-message',
+          conversationId: correctionAction.conversationId,
+          role: 'tool',
+          content: jsonEncode({
+            'actionId': 'preview_meal_correction',
+            'result': preview,
+          }),
+          toolCallId: correctionAction.sourceToolCallId,
+          createdAt: createdAt,
+        ),
+        AgentConversationMessage(
+          id: 'direct-message',
+          conversationId: correctionAction.conversationId,
+          role: 'tool',
+          content: jsonEncode({
+            'actionId': 'correct_meal',
+            'result': committed,
+          }),
+          toolCallId: correctionAction.sourceToolCallId,
+          source: 'client_direct_action',
+          metadata: {
+            'actionId': 'correct_meal',
+            'source': 'client_direct_action',
+            'sourceToolCallId': correctionAction.sourceToolCallId,
+            'uiResult': committed,
+          },
+          createdAt: createdAt.add(const Duration(seconds: 1)),
+        ),
+      ],
+    );
+    when(() => repository.getAgentConversation(correctionAction.conversationId))
+        .thenAnswer((_) async => detail);
+    final viewModel = AgentChatViewModel(
+      nutritionRepository: repository,
+      audioRecorderService: _Recorder(),
+    );
+
+    await viewModel.loadConversation(correctionAction.conversationId);
+
+    expect(
+      viewModel.entries.map((entry) => entry.result?.kind),
+      containsAll(['meal_correction_preview', 'meal_corrected']),
+    );
+    expect(
+      viewModel.mealCorrectionActionState(
+        correctionAction.sourceToolCallId,
+      ),
+      AgentChatMealCorrectionActionState.succeeded,
+    );
+    verifyNever(() => repository.reconcileConfirmedMutation(any()));
   });
 }

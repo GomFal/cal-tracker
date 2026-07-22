@@ -765,7 +765,9 @@ class _WaterSection extends StatelessWidget {
     final palette = context.freshPalette;
     final textTheme = Theme.of(context).textTheme;
     final l10n = context.l10n;
-    final consumed = roundHydrationLiters(summary?.waterConsumedLiters ?? 0);
+    final consumed = normalizeHydrationConsumptionLiters(
+      summary?.waterConsumedLiters ?? 0,
+    );
     final goal = roundHydrationLiters(summary?.hydrationGoalLiters ?? 0);
     final canDecrease = enabled && consumed > 0;
     final canIncrease = enabled && goal > 0 && consumed < goal;
@@ -813,7 +815,7 @@ class _WaterSection extends StatelessWidget {
                   ),
                   Text(
                     l10n.dashboardWaterProgress(
-                      formatHydrationLiters(consumed),
+                      formatHydrationConsumptionLiters(consumed),
                       formatHydrationLiters(goal),
                     ),
                     key: const ValueKey('dashboard_water_progress'),
@@ -863,7 +865,7 @@ class _WaterSection extends StatelessWidget {
 
   Future<void> _setWater(double next, double goal) async {
     final clamped = next.clamp(0, goal).toDouble();
-    await onUpdate(roundHydrationLiters(clamped));
+    await onUpdate(normalizeHydrationConsumptionLiters(clamped));
   }
 }
 

@@ -179,13 +179,21 @@ class MealHistoryViewModel extends ChangeNotifier {
     var changed = false;
     final summaries = [..._weekSummaries];
     for (final effect in change.effects) {
-      if (effect.domain != NutritionDataDomain.dailySummary) continue;
-      final summary = effect.dailySummary;
-      if (summary == null) continue;
-      final index = summaries.indexWhere((item) => item.date == summary.date);
+      final date = effect.date ?? effect.dailySummary?.date;
+      if (date == null) continue;
+      final index = summaries.indexWhere((item) => item.date == date);
       if (index < 0) continue;
-      summaries[index] = summary;
-      changed = true;
+      if (effect.domain == NutritionDataDomain.dailySummary) {
+        final summary = effect.dailySummary;
+        if (summary == null) continue;
+        summaries[index] = summary;
+        changed = true;
+      } else if (effect.domain == NutritionDataDomain.meals) {
+        final meal = effect.meal;
+        if (meal == null) continue;
+        summaries[index] = replaceMealInSummary(summaries[index], meal);
+        changed = true;
+      }
     }
     if (!changed) return;
     _dataGeneration++;

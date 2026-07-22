@@ -891,5 +891,15 @@
   "agentChatProposalSaved": "Meal saved.",
   "agentChatProposalRetry": "Retry save",
   "agentChatProposalSaveError": "Could not save this meal. Try again.",
-  "agentChatProposalCorrectionHint": "Tell us what to change in this meal proposal"
+  "agentChatProposalCorrectionHint": "Tell us what to change in this meal proposal",
+  "agentChatMealCorrectionPreviewTitle": "Review meal correction",
+  "agentChatMealCorrectionPreviewSubtitle": "Nothing changes until you confirm this preview.",
+  "agentChatMealCorrectionConfirm": "Apply correction",
+  "agentChatMealCorrectionCancel": "Cancel",
+  "agentChatMealCorrectionSaving": "Applying…",
+  "agentChatMealCorrectionRetry": "Retry correction",
+  "agentChatMealCorrectionApplied": "Meal correction applied.",
+  "agentChatMealCorrectionCancelled": "Meal correction cancelled.",
+  "agentChatMealCorrectionStale": "This meal changed after the preview. Ask for a new correction preview.",
+  "agentChatMealCorrectionError": "Could not apply this correction. Try again."
 }

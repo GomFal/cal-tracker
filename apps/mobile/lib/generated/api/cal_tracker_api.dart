@@ -42,6 +42,7 @@ class ApiErrorDetails {
       'authentication_required',
       'rate_limit_exceeded',
       'provider_unavailable',
+      'meal_changed_since_preview',
       'internal_error',
     };
     final rawCode = json['code'] as String?;
@@ -252,6 +253,21 @@ class CalTrackerApiClient {
   }) {
     return _post(
       '/v1/agent/conversations/$conversationId/meal-proposals/$proposalId/commit',
+      {
+        'sourceToolCallId': sourceToolCallId,
+        'clientMutationId': clientMutationId,
+      },
+    );
+  }
+
+  Future<Map<String, Object?>> commitAgentChatMealCorrection({
+    required String conversationId,
+    required String mealId,
+    required String sourceToolCallId,
+    required String clientMutationId,
+  }) {
+    return _post(
+      '/v1/agent/conversations/$conversationId/meal-corrections/$mealId/commit',
       {
         'sourceToolCallId': sourceToolCallId,
         'clientMutationId': clientMutationId,

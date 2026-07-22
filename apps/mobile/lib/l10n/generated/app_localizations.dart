@@ -3464,6 +3464,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Tell us what to change in this meal proposal'**
   String get agentChatProposalCorrectionHint;
+
+  /// No description provided for @agentChatMealCorrectionPreviewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Review meal correction'**
+  String get agentChatMealCorrectionPreviewTitle;
+
+  /// No description provided for @agentChatMealCorrectionPreviewSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing changes until you confirm this preview.'**
+  String get agentChatMealCorrectionPreviewSubtitle;
+
+  /// No description provided for @agentChatMealCorrectionConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply correction'**
+  String get agentChatMealCorrectionConfirm;
+
+  /// No description provided for @agentChatMealCorrectionCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get agentChatMealCorrectionCancel;
+
+  /// No description provided for @agentChatMealCorrectionSaving.
+  ///
+  /// In en, this message translates to:
+  /// **'Applying…'**
+  String get agentChatMealCorrectionSaving;
+
+  /// No description provided for @agentChatMealCorrectionRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry correction'**
+  String get agentChatMealCorrectionRetry;
+
+  /// No description provided for @agentChatMealCorrectionApplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Meal correction applied.'**
+  String get agentChatMealCorrectionApplied;
+
+  /// No description provided for @agentChatMealCorrectionCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Meal correction cancelled.'**
+  String get agentChatMealCorrectionCancelled;
+
+  /// No description provided for @agentChatMealCorrectionStale.
+  ///
+  /// In en, this message translates to:
+  /// **'This meal changed after the preview. Ask for a new correction preview.'**
+  String get agentChatMealCorrectionStale;
+
+  /// No description provided for @agentChatMealCorrectionError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not apply this correction. Try again.'**
+  String get agentChatMealCorrectionError;
 }
 
 class _AppLocalizationsDelegate

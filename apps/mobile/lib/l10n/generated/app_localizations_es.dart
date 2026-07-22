@@ -1902,4 +1902,39 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get agentChatProposalCorrectionHint =>
       'Indica qué quieres cambiar en esta propuesta de comida';
+
+  @override
+  String get agentChatMealCorrectionPreviewTitle =>
+      'Revisar corrección de comida';
+
+  @override
+  String get agentChatMealCorrectionPreviewSubtitle =>
+      'No se cambiará nada hasta que confirmes esta vista previa.';
+
+  @override
+  String get agentChatMealCorrectionConfirm => 'Aplicar corrección';
+
+  @override
+  String get agentChatMealCorrectionCancel => 'Cancelar';
+
+  @override
+  String get agentChatMealCorrectionSaving => 'Aplicando…';
+
+  @override
+  String get agentChatMealCorrectionRetry => 'Reintentar corrección';
+
+  @override
+  String get agentChatMealCorrectionApplied => 'Corrección de comida aplicada.';
+
+  @override
+  String get agentChatMealCorrectionCancelled =>
+      'Corrección de comida cancelada.';
+
+  @override
+  String get agentChatMealCorrectionStale =>
+      'Esta comida cambió después de la vista previa. Pide una nueva vista previa de corrección.';
+
+  @override
+  String get agentChatMealCorrectionError =>
+      'No se pudo aplicar esta corrección. Inténtalo de nuevo.';
 }

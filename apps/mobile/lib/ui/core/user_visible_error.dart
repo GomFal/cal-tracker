@@ -11,6 +11,7 @@ const publicAiErrorCodes = <String>{
   'authentication_required',
   'rate_limit_exceeded',
   'provider_unavailable',
+  'meal_changed_since_preview',
   'internal_error',
 };
 

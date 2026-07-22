@@ -88,6 +88,20 @@ void main() {
       expect(viewModel.error, 'We could not save that change. Try again.');
     });
 
+    test('preserves milliliter precision in optimistic hydration updates',
+        () async {
+      repository.backendDaily['2026-05-10'] = _summary(
+        '2026-05-10',
+        hydrationGoalLiters: 2.5,
+      );
+      await viewModel.load();
+
+      final updated = await viewModel.updateDailyWater(0.123);
+
+      expect(updated, isTrue);
+      expect(viewModel.summary?.waterConsumedLiters, 0.123);
+    });
+
     test('applies a confirmed chat summary without a global reload', () async {
       repository.backendDaily['2026-05-10'] = _summary('2026-05-10');
       repository.activateCacheForUser('user-a');

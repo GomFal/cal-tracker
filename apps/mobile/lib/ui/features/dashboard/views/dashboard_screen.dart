@@ -22,18 +22,18 @@ import 'macro_distribution_sheet.dart';
 class _DashboardMetrics {
   const _DashboardMetrics._();
 
-  static const sectionGap = 12.0;
-  static const headingGap = 9.0;
-  static const compactGap = 6.0;
-  static const avatarSize = 36.0;
-  static const avatarIconSize = 15.0;
-  static const heroValueSize = 33.0;
-  static const heroRingSize = 87.0;
-  static const heroRingStroke = 8.5;
-  static const macroIconSize = 25.0;
-  static const macroRuleHeight = 66.0;
-  static const macroProgressHeight = 3.0;
-  static const emptyMealsIconSize = 36.0;
+  static const sectionGap = 24.0;
+  static const sectionContentGap = 16.0;
+  static const itemGap = 12.0;
+  static const compactGap = 8.0;
+  static const avatarSize = 44.0;
+  static const avatarIconSize = 18.0;
+  static const heroValueSize = 40.0;
+  static const heroRingSize = 104.0;
+  static const heroRingStroke = 10.0;
+  static const macroIconSize = 32.0;
+  static const macroProgressHeight = 4.0;
+  static const emptyMealsIconSize = 40.0;
   static const minimumTapTarget = 48.0;
 }
 
@@ -68,14 +68,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ? user!.displayName
         : l10n.fallbackUserName;
     return ContentFrame(
-      layout: FreshPageLayout.compact,
       title: displayName,
       subtitle: l10n.dashboardGreeting,
       leading: const _Avatar(),
       actions: [
         _DashboardDatePill(
           label: dashboardDayMonthLabel(
-              widget.currentDate ?? DateTime.now(), l10n),
+            widget.currentDate ?? DateTime.now(),
+            l10n,
+          ),
         ),
       ],
       child: Column(
@@ -215,7 +216,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         selection.macroConfig != null) {
       return;
     }
-    final shouldConfigure = await showModalBottomSheet<bool>(
+    final shouldConfigure =
+        await showModalBottomSheet<bool>(
           context: context,
           useSafeArea: true,
           sheetAnimationStyle: freshSheetAnimationStyle(context),
@@ -324,8 +326,9 @@ class _HeroCalorieSection extends StatelessWidget {
     final remaining = (summary?.remaining.calories ?? target - consumed)
         .clamp(0, target)
         .toInt();
-    final progress =
-        target <= 0 ? 0.0 : (consumed / target).clamp(0, 1).toDouble();
+    final progress = target <= 0
+        ? 0.0
+        : (consumed / target).clamp(0, 1).toDouble();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -339,47 +342,38 @@ class _HeroCalorieSection extends StatelessWidget {
             letterSpacing: 1.4,
           ),
         ),
-        const SizedBox(height: _DashboardMetrics.headingGap),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '$remaining',
-                    key: const ValueKey('dashboard_remaining_calories'),
-                    style: textTheme.displayLarge?.copyWith(
-                      fontSize: _DashboardMetrics.heroValueSize,
-                      height: 0.95,
-                      fontWeight: FontWeight.w700,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                      color: palette.lime,
-                    ),
+        const SizedBox(height: _DashboardMetrics.sectionContentGap),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final textScale = MediaQuery.textScalerOf(context).scale(1);
+            final useSideBySide =
+                constraints.maxWidth >= 330 && textScale <= 1.3;
+            final calories = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$remaining',
+                  key: const ValueKey('dashboard_remaining_calories'),
+                  style: textTheme.displayLarge?.copyWith(
+                    fontSize: _DashboardMetrics.heroValueSize,
+                    height: 0.95,
+                    fontWeight: FontWeight.w700,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                    color: palette.lime,
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${l10n.commonKcal} ${l10n.dashboardCaloriesLeft}',
-                    style: textTheme.bodyLarge?.copyWith(
-                      color: palette.ink,
-                      fontWeight: FontWeight.w500,
-                    ),
+                ),
+                const SizedBox(height: _DashboardMetrics.compactGap),
+                Text(
+                  '${l10n.commonKcal} ${l10n.dashboardCaloriesLeft}',
+                  style: textTheme.bodyLarge?.copyWith(
+                    color: palette.ink,
+                    fontWeight: FontWeight.w500,
                   ),
-                  const SizedBox(height: _DashboardMetrics.compactGap),
-                  Text(
-                    _consumedTargetMeta(l10n, consumed, target),
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: palette.inkMuted,
-                      fontWeight: FontWeight.w400,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: _DashboardMetrics.headingGap),
-            FreshProgressRing(
+                ),
+              ],
+            );
+            final ring = FreshProgressRing(
+              key: const ValueKey('dashboard_calorie_progress_ring'),
               progress: progress,
               size: _DashboardMetrics.heroRingSize,
               strokeWidth: _DashboardMetrics.heroRingStroke,
@@ -404,8 +398,38 @@ class _HeroCalorieSection extends StatelessWidget {
                   ),
                 ],
               ),
-            ),
-          ],
+            );
+
+            if (!useSideBySide) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  calories,
+                  const SizedBox(height: _DashboardMetrics.sectionContentGap),
+                  Center(child: ring),
+                ],
+              );
+            }
+
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(child: calories),
+                const SizedBox(width: _DashboardMetrics.sectionContentGap),
+                ring,
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: _DashboardMetrics.itemGap),
+        Text(
+          _consumedTargetMeta(l10n, consumed, target),
+          key: const ValueKey('dashboard_calorie_target_meta'),
+          style: textTheme.bodyMedium?.copyWith(
+            color: palette.inkMuted,
+            fontWeight: FontWeight.w400,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
         ),
       ],
     );
@@ -435,7 +459,7 @@ class _CalorieSetupHero extends StatelessWidget {
         key: const ValueKey('dashboard_progress_card'),
         child: Padding(
           padding: const EdgeInsets.symmetric(
-            vertical: _DashboardMetrics.headingGap,
+            vertical: _DashboardMetrics.sectionContentGap,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -455,7 +479,7 @@ class _CalorieSetupHero extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              const SizedBox(height: _DashboardMetrics.compactGap),
+              const SizedBox(height: _DashboardMetrics.itemGap),
               Text(
                 l10n.calorieSetupHeadlineBadge,
                 style: textTheme.bodyLarge?.copyWith(
@@ -521,7 +545,7 @@ class _MacroSection extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: _DashboardMetrics.headingGap),
+        const SizedBox(height: _DashboardMetrics.sectionContentGap),
         LayoutBuilder(
           builder: (context, constraints) {
             final textScale = MediaQuery.textScalerOf(context).scale(1);
@@ -537,7 +561,7 @@ class _MacroSection extends StatelessWidget {
                     targetGrams: target.carbsGrams,
                     compact: true,
                   ),
-                  Divider(color: palette.rule, height: 13),
+                  Divider(color: palette.rule, height: 1),
                   macro(
                     assetPath: 'assets/images/icons/svg/protein_icon.svg',
                     iconKey: const ValueKey('dashboard_macro_protein_icon'),
@@ -546,7 +570,7 @@ class _MacroSection extends StatelessWidget {
                     targetGrams: target.proteinGrams,
                     compact: true,
                   ),
-                  Divider(color: palette.rule, height: 13),
+                  Divider(color: palette.rule, height: 1),
                   macro(
                     assetPath: 'assets/images/icons/svg/fats_icon.svg',
                     iconKey: const ValueKey('dashboard_macro_fats_icon'),
@@ -559,39 +583,41 @@ class _MacroSection extends StatelessWidget {
               );
             }
 
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: macro(
-                    assetPath: 'assets/images/icons/svg/carbs_icon.svg',
-                    iconKey: const ValueKey('dashboard_macro_carbs_icon'),
-                    label: l10n.commonCarbs,
-                    consumedGrams: consumed.carbsGrams,
-                    targetGrams: target.carbsGrams,
+            return IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: macro(
+                      assetPath: 'assets/images/icons/svg/carbs_icon.svg',
+                      iconKey: const ValueKey('dashboard_macro_carbs_icon'),
+                      label: l10n.commonCarbs,
+                      consumedGrams: consumed.carbsGrams,
+                      targetGrams: target.carbsGrams,
+                    ),
                   ),
-                ),
-                _VerticalRule(color: palette.rule),
-                Expanded(
-                  child: macro(
-                    assetPath: 'assets/images/icons/svg/protein_icon.svg',
-                    iconKey: const ValueKey('dashboard_macro_protein_icon'),
-                    label: l10n.commonProtein,
-                    consumedGrams: consumed.proteinGrams,
-                    targetGrams: target.proteinGrams,
+                  _VerticalRule(color: palette.rule),
+                  Expanded(
+                    child: macro(
+                      assetPath: 'assets/images/icons/svg/protein_icon.svg',
+                      iconKey: const ValueKey('dashboard_macro_protein_icon'),
+                      label: l10n.commonProtein,
+                      consumedGrams: consumed.proteinGrams,
+                      targetGrams: target.proteinGrams,
+                    ),
                   ),
-                ),
-                _VerticalRule(color: palette.rule),
-                Expanded(
-                  child: macro(
-                    assetPath: 'assets/images/icons/svg/fats_icon.svg',
-                    iconKey: const ValueKey('dashboard_macro_fats_icon'),
-                    label: l10n.commonFat,
-                    consumedGrams: consumed.fatGrams,
-                    targetGrams: target.fatGrams,
+                  _VerticalRule(color: palette.rule),
+                  Expanded(
+                    child: macro(
+                      assetPath: 'assets/images/icons/svg/fats_icon.svg',
+                      iconKey: const ValueKey('dashboard_macro_fats_icon'),
+                      label: l10n.commonFat,
+                      consumedGrams: consumed.fatGrams,
+                      targetGrams: target.fatGrams,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             );
           },
         ),
@@ -609,10 +635,7 @@ class _VerticalRule extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: 1,
-      height: _DashboardMetrics.macroRuleHeight,
-      margin: const EdgeInsets.symmetric(
-        horizontal: _DashboardMetrics.compactGap,
-      ),
+      margin: const EdgeInsets.symmetric(horizontal: FreshSpacing.xs),
       color: color,
     );
   }
@@ -653,56 +676,65 @@ class _MacroProgressRow extends StatelessWidget {
     );
 
     if (compact) {
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          icon,
-          const SizedBox(width: _DashboardMetrics.headingGap),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: palette.inkSoft,
-                    fontWeight: FontWeight.w600,
+      return Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: _DashboardMetrics.compactGap,
+          vertical: 10,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            icon,
+            const SizedBox(width: _DashboardMetrics.itemGap),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: palette.inkSoft,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${_formatMacro(consumedGrams)} / '
-                  '${_formatMacro(targetGrams)} g · ${(progress * 100).round()}%',
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: palette.ink,
-                    fontWeight: FontWeight.w700,
-                    fontFeatures: const [FontFeature.tabularFigures()],
+                  const SizedBox(height: FreshSpacing.xs),
+                  Text(
+                    '${_formatMacro(consumedGrams)} / '
+                    '${_formatMacro(targetGrams)} g · ${(progress * 100).round()}%',
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: palette.ink,
+                      fontWeight: FontWeight.w700,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
                   ),
-                ),
-                const SizedBox(height: _DashboardMetrics.compactGap),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(999),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    backgroundColor: palette.rule,
-                    valueColor: AlwaysStoppedAnimation(palette.lime),
-                    minHeight: _DashboardMetrics.macroProgressHeight,
+                  const SizedBox(height: _DashboardMetrics.compactGap),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(999),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      backgroundColor: palette.rule,
+                      valueColor: AlwaysStoppedAnimation(palette.lime),
+                      minHeight: _DashboardMetrics.macroProgressHeight,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       );
     }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 2),
+      padding: const EdgeInsets.symmetric(
+        horizontal: _DashboardMetrics.compactGap,
+        vertical: _DashboardMetrics.compactGap,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           icon,
-          const SizedBox(height: _DashboardMetrics.compactGap),
+          const SizedBox(height: _DashboardMetrics.itemGap),
           Text(
             label,
             maxLines: 1,
@@ -789,64 +821,70 @@ class _WaterSection extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: _DashboardMetrics.headingGap),
-        Row(
-          children: [
-            ExcludeSemantics(
-              child: Icon(
-                Icons.water_drop_outlined,
-                color: palette.lime,
-                size: 18,
+        const SizedBox(height: _DashboardMetrics.sectionContentGap),
+        Padding(
+          key: const ValueKey('dashboard_water_content'),
+          padding: const EdgeInsets.symmetric(
+            vertical: _DashboardMetrics.compactGap,
+          ),
+          child: Row(
+            children: [
+              ExcludeSemantics(
+                child: Icon(
+                  Icons.water_drop_outlined,
+                  color: palette.lime,
+                  size: 22,
+                ),
               ),
-            ),
-            const SizedBox(width: _DashboardMetrics.headingGap),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    l10n.commonWater,
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: palette.ink,
-                      fontWeight: FontWeight.w600,
+              const SizedBox(width: _DashboardMetrics.itemGap),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.commonWater,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: palette.ink,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                  Text(
-                    l10n.dashboardWaterProgress(
-                      formatHydrationLiters(consumed),
-                      formatHydrationLiters(goal),
+                    Text(
+                      l10n.dashboardWaterProgress(
+                        formatHydrationLiters(consumed),
+                        formatHydrationLiters(goal),
+                      ),
+                      key: const ValueKey('dashboard_water_progress'),
+                      style: textTheme.bodyLarge?.copyWith(
+                        color: palette.lime,
+                        fontWeight: FontWeight.w700,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
                     ),
-                    key: const ValueKey('dashboard_water_progress'),
-                    style: textTheme.bodyLarge?.copyWith(
-                      color: palette.lime,
-                      fontWeight: FontWeight.w700,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: _DashboardMetrics.compactGap),
-            _WaterStepButton(
-              key: const ValueKey('dashboard_water_decrease_button'),
-              icon: Icons.remove_rounded,
-              tooltip: l10n.dashboardWaterDecreaseTooltip,
-              enabled: canDecrease,
-              onPressed: () {
-                _setWater(consumed - 0.25, goal);
-              },
-            ),
-            const SizedBox(width: _DashboardMetrics.compactGap),
-            _WaterStepButton(
-              key: const ValueKey('dashboard_water_increase_button'),
-              icon: Icons.add_rounded,
-              tooltip: l10n.dashboardWaterIncreaseTooltip,
-              enabled: canIncrease,
-              onPressed: () {
-                _setWater(consumed + 0.25, goal);
-              },
-            ),
-          ],
+              const SizedBox(width: _DashboardMetrics.itemGap),
+              _WaterStepButton(
+                key: const ValueKey('dashboard_water_decrease_button'),
+                icon: Icons.remove_rounded,
+                tooltip: l10n.dashboardWaterDecreaseTooltip,
+                enabled: canDecrease,
+                onPressed: () {
+                  _setWater(consumed - 0.25, goal);
+                },
+              ),
+              const SizedBox(width: _DashboardMetrics.compactGap),
+              _WaterStepButton(
+                key: const ValueKey('dashboard_water_increase_button'),
+                icon: Icons.add_rounded,
+                tooltip: l10n.dashboardWaterIncreaseTooltip,
+                enabled: canIncrease,
+                onPressed: () {
+                  _setWater(consumed + 0.25, goal);
+                },
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -964,15 +1002,13 @@ class _MealSection extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: _DashboardMetrics.headingGap),
+        const SizedBox(height: _DashboardMetrics.sectionContentGap),
         if (meals.isEmpty)
           const _DashboardEmptyMealsCard()
         else
           for (final meal in meals)
             Padding(
-              padding: const EdgeInsets.only(
-                bottom: _DashboardMetrics.headingGap,
-              ),
+              padding: const EdgeInsets.only(bottom: _DashboardMetrics.itemGap),
               child: _MealRow(meal: meal, onEdit: () => onEditMeal(meal)),
             ),
       ],
@@ -1001,7 +1037,7 @@ class _DashboardEmptyMealsCard extends StatelessWidget {
               color: palette.inkMuted,
             ),
           ),
-          const SizedBox(height: _DashboardMetrics.headingGap),
+          const SizedBox(height: _DashboardMetrics.itemGap),
           Text(
             l10n.dashboardNoMealsLoggedToday,
             textAlign: TextAlign.center,
@@ -1016,7 +1052,7 @@ class _DashboardEmptyMealsCard extends StatelessWidget {
             textAlign: TextAlign.center,
             style: textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
           ),
-          const SizedBox(height: _DashboardMetrics.headingGap),
+          const SizedBox(height: _DashboardMetrics.itemGap),
           ConstrainedBox(
             constraints: const BoxConstraints(
               minHeight: _DashboardMetrics.minimumTapTarget,
@@ -1081,7 +1117,7 @@ class _MealRow extends StatelessWidget {
                   ),
                 ),
                 padding: const EdgeInsets.symmetric(
-                  vertical: _DashboardMetrics.compactGap,
+                  vertical: _DashboardMetrics.itemGap,
                 ),
                 child: Row(
                   children: [

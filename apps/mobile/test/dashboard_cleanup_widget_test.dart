@@ -405,7 +405,12 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(find.byKey(const ValueKey('dashboard_meal_row_meal-1')));
+    final mealRow = find.byKey(
+      const ValueKey('dashboard_meal_row_meal-1'),
+    );
+    await tester.ensureVisible(mealRow);
+    await tester.pumpAndSettle();
+    await tester.tap(mealRow.hitTestable());
     await tester.pumpAndSettle();
 
     expect(find.text('Edit ingredients'), findsOneWidget);
@@ -515,7 +520,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('dashboard_meal_row_meal-1')));
+    final mealRow = find.byKey(
+      const ValueKey('dashboard_meal_row_meal-1'),
+    );
+    await tester.ensureVisible(mealRow);
+    await tester.pumpAndSettle();
+    await tester.tap(mealRow.hitTestable());
     await tester.pumpAndSettle();
     await tester.tap(
       find
@@ -587,7 +597,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('dashboard_meal_row_meal-1')));
+    final mealRow = find.byKey(
+      const ValueKey('dashboard_meal_row_meal-1'),
+    );
+    await tester.ensureVisible(mealRow);
+    await tester.pumpAndSettle();
+    await tester.tap(mealRow.hitTestable());
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('dashboard_item_compact_0')));
     await tester.pumpAndSettle();
@@ -688,7 +703,12 @@ void main() {
       findsNothing,
     );
 
-    await tester.tap(find.byKey(const ValueKey('dashboard_meal_row_meal-1')));
+    final mealRow = find.byKey(
+      const ValueKey('dashboard_meal_row_meal-1'),
+    );
+    await tester.ensureVisible(mealRow);
+    await tester.pumpAndSettle();
+    await tester.tap(mealRow.hitTestable());
     await tester.pumpAndSettle();
     expect(find.text('Edit ingredients'), findsOneWidget);
 
@@ -855,7 +875,7 @@ void main() {
   });
 
   testWidgets(
-    'dashboard compact layout keeps macros, meals, and a first meal in view',
+    'dashboard spacious layout grows key visuals and scrolls to meals',
     (tester) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1;
@@ -872,26 +892,44 @@ void main() {
         ValueKey('dashboard_macro_protein_icon'),
         ValueKey('dashboard_macro_fats_icon'),
       ]) {
-        expect(tester.getSize(find.byKey(key)), const Size.square(25));
+        expect(tester.getSize(find.byKey(key)), const Size.square(32));
       }
 
-      final viewportHeight = tester.view.physicalSize.height;
-      final heroToMeals = tester.getRect(find.text('MEALS')).top -
-          tester
-              .getRect(find.byKey(const ValueKey('dashboard_progress_card')))
-              .top;
-      // Baseline measured at this viewport before compact density: 457 dp.
-      expect(heroToMeals, inInclusiveRange(329, 357));
+      final ring = find.byKey(
+        const ValueKey('dashboard_calorie_progress_ring'),
+      );
+      final targetMeta = find.byKey(
+        const ValueKey('dashboard_calorie_target_meta'),
+      );
+      expect(tester.getSize(ring), const Size.square(104));
       expect(
-        tester.getRect(find.text('MEALS')).bottom,
-        lessThanOrEqualTo(viewportHeight),
+        tester.getRect(targetMeta).top,
+        greaterThan(tester.getRect(ring).bottom),
+      );
+
+      final carbsIcon = find.byKey(
+        const ValueKey('dashboard_macro_carbs_icon'),
       );
       expect(
-        tester
-            .getRect(find.byKey(const ValueKey('dashboard_meal_row_meal-1')))
-            .bottom,
-        lessThanOrEqualTo(viewportHeight),
+        tester.getRect(find.text('Carbs')).top -
+            tester.getRect(carbsIcon).bottom,
+        greaterThanOrEqualTo(12),
       );
+
+      final waterContent = find.byKey(
+        const ValueKey('dashboard_water_content'),
+      );
+      expect(
+        tester.getRect(waterContent).top -
+            tester.getRect(find.text('WATER INTAKE')).bottom,
+        greaterThanOrEqualTo(16),
+      );
+
+      final meal = find.byKey(const ValueKey('dashboard_meal_row_meal-1'));
+      await tester.ensureVisible(meal);
+      await tester.pumpAndSettle();
+      expect(meal.hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
     },
   );
 

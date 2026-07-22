@@ -108,6 +108,142 @@ class AgentToolCallFeedback {
   }
 }
 
+class AgentToolExecutionSnapshot {
+  const AgentToolExecutionSnapshot({
+    required this.schemaVersion,
+    required this.conversationId,
+    required this.turnId,
+    required this.assistantMessageId,
+    required this.toolCallId,
+    required this.iteration,
+    required this.toolCallIndex,
+    required this.toolCall,
+    required this.status,
+    required this.startedAt,
+    this.completedAt,
+    this.result,
+    this.resultJson,
+    this.widget,
+    this.error,
+  });
+
+  final int schemaVersion;
+  final String conversationId;
+  final String turnId;
+  final String assistantMessageId;
+  final String toolCallId;
+  final int iteration;
+  final int toolCallIndex;
+  final AgentToolCallFeedback toolCall;
+  final String status;
+  final DateTime startedAt;
+  final DateTime? completedAt;
+  final AgentRunResult? result;
+  final Map<String, Object?>? resultJson;
+  final Object? widget;
+  final ApiErrorDetails? error;
+
+  static AgentToolExecutionSnapshot? tryFromJson(Object? value) {
+    if (value is! Map) return null;
+    final json = value.map(
+      (key, nested) => MapEntry(key.toString(), nested),
+    );
+    final schemaVersion = json['schemaVersion'];
+    if (schemaVersion is! num ||
+        json['conversationId'] is! String ||
+        json['turnId'] is! String ||
+        json['assistantMessageId'] is! String ||
+        json['toolCallId'] is! String ||
+        json['iteration'] is! num ||
+        json['toolCallIndex'] is! num ||
+        json['toolCall'] is! Map ||
+        json['startedAt'] is! String) {
+      return null;
+    }
+    final startedAt = DateTime.tryParse(json['startedAt'] as String);
+    if (startedAt == null) return null;
+    const supportedStatuses = {'started', 'completed', 'failed', 'interrupted'};
+    final rawStatus = json['status'];
+    // A newer server schema remains a visible generic card rather than taking
+    // down the entire cached conversation. Its unknown result is intentionally
+    // not interpreted by this client.
+    final status = rawStatus is String && supportedStatuses.contains(rawStatus)
+        ? rawStatus
+        : 'interrupted';
+    final resultValue = json['result'];
+    final resultJson = resultValue is Map
+        ? resultValue.map((key, nested) => MapEntry(key.toString(), nested))
+        : null;
+    AgentRunResult? result;
+    if (schemaVersion == 1 && resultJson != null) {
+      try {
+        result = agentRunResultFromJson(resultJson);
+      } on Object {
+        // Keep the card and raw result for a future compatible client.
+      }
+    }
+    ApiErrorDetails? error;
+    final errorValue = json['error'];
+    if (errorValue is Map) {
+      try {
+        error = ApiErrorDetails.fromJson(
+          errorValue.map((key, nested) => MapEntry(key.toString(), nested)),
+        );
+      } on Object {
+        // A malformed error must not hide a valid persisted execution.
+      }
+    }
+    return AgentToolExecutionSnapshot(
+      schemaVersion: schemaVersion.toInt(),
+      conversationId: json['conversationId'] as String,
+      turnId: json['turnId'] as String,
+      assistantMessageId: json['assistantMessageId'] as String,
+      toolCallId: json['toolCallId'] as String,
+      iteration: (json['iteration'] as num).toInt(),
+      toolCallIndex: (json['toolCallIndex'] as num).toInt(),
+      toolCall: AgentToolCallFeedback.fromJson(
+        (json['toolCall'] as Map).map(
+          (key, nested) => MapEntry(key.toString(), nested),
+        ),
+      ),
+      status: status,
+      startedAt: startedAt,
+      completedAt: json['completedAt'] is String
+          ? DateTime.tryParse(json['completedAt'] as String)
+          : null,
+      result: result,
+      resultJson: resultJson,
+      widget: json['widget'],
+      error: error,
+    );
+  }
+
+  Map<String, Object?> toJson() => {
+        'schemaVersion': schemaVersion,
+        'conversationId': conversationId,
+        'turnId': turnId,
+        'assistantMessageId': assistantMessageId,
+        'toolCallId': toolCallId,
+        'iteration': iteration,
+        'toolCallIndex': toolCallIndex,
+        'toolCall': {
+          'id': toolCall.id,
+          'actionId': toolCall.actionId,
+          'label': toolCall.label,
+          'summary': toolCall.summary,
+          'input': toolCall.input,
+        },
+        'status': status,
+        'startedAt': startedAt.toUtc().toIso8601String(),
+        if (completedAt != null)
+          'completedAt': completedAt!.toUtc().toIso8601String(),
+        if (resultJson != null) 'result': resultJson,
+        if (widget != null) 'widget': widget,
+        if (error != null)
+          'error': {'code': error!.code, 'message': error!.message},
+      };
+}
+
 class AgentChatStreamEvent {
   const AgentChatStreamEvent({
     required this.type,
@@ -118,6 +254,8 @@ class AgentChatStreamEvent {
     this.error,
     this.toolCall,
     this.result,
+    this.widget,
+    this.execution,
     this.suggestions = const [],
   });
 
@@ -129,6 +267,8 @@ class AgentChatStreamEvent {
   final ApiErrorDetails? error;
   final AgentToolCallFeedback? toolCall;
   final AgentRunResult? result;
+  final Object? widget;
+  final AgentToolExecutionSnapshot? execution;
   final List<AgentChatSuggestion> suggestions;
 }
 
@@ -201,12 +341,32 @@ class AgentConversationMessage {
   final Object? metadata;
 
   factory AgentConversationMessage.fromJson(Map<String, Object?> json) {
+    final message = tryFromJson(json);
+    if (message == null) throw const FormatException('Invalid chat message');
+    return message;
+  }
+
+  static AgentConversationMessage? tryFromJson(Object? value) {
+    if (value is! Map) return null;
+    final json = value.map((key, nested) => MapEntry(key.toString(), nested));
+    final id = json['id'];
+    final conversationId = json['conversationId'];
+    final role = json['role'];
+    final createdAtRaw = json['createdAt'];
+    if (id is! String ||
+        conversationId is! String ||
+        role is! String ||
+        createdAtRaw is! String) {
+      return null;
+    }
+    final createdAt = DateTime.tryParse(createdAtRaw);
+    if (createdAt == null) return null;
     return AgentConversationMessage(
-      id: json['id'] as String,
-      conversationId: json['conversationId'] as String,
-      role: json['role'] as String,
+      id: id,
+      conversationId: conversationId,
+      role: role,
       content: json['content'] as String? ?? '',
-      createdAt: DateTime.parse(json['createdAt'] as String),
+      createdAt: createdAt,
       toolCalls: json['toolCalls'],
       toolCallId: json['toolCallId'] as String?,
       traceId: json['traceId'] as String?,
@@ -239,14 +399,18 @@ class AgentConversationDetail {
   const AgentConversationDetail({
     required this.conversation,
     required this.messages,
+    this.toolExecutions = const [],
   });
 
   final AgentConversationSummary conversation;
   final List<AgentConversationMessage> messages;
+  final List<AgentToolExecutionSnapshot> toolExecutions;
 
   Map<String, Object?> toJson() => {
         'conversation': conversation.toJson(),
         'messages': messages.map((message) => message.toJson()).toList(),
+        'toolExecutions':
+            toolExecutions.map((execution) => execution.toJson()).toList(),
       };
 }
 
@@ -610,21 +774,32 @@ class NutritionRepository {
     final toolCallJson = json['toolCall'];
     final resultJson = json['result'];
     final suggestionsJson = json['suggestions'];
+    final execution = AgentToolExecutionSnapshot.tryFromJson(json['execution']);
+    AgentRunResult? directResult;
+    if (resultJson is Map<String, Object?>) {
+      try {
+        directResult = agentRunResultFromJson(resultJson);
+      } on Object {
+        directResult = null;
+      }
+    }
     return AgentChatStreamEvent(
       type: json['type'] as String? ?? 'unknown',
       conversationId: json['conversationId'] as String?,
       message: json['message'] as String?,
       delta: json['delta'] as String?,
       transcript: json['transcript'] as String?,
-      error: json['error'] is Map<String, Object?>
-          ? ApiErrorDetails.fromJson(json['error'] as Map<String, Object?>)
-          : null,
-      toolCall: toolCallJson is Map<String, Object?>
-          ? AgentToolCallFeedback.fromJson(toolCallJson)
-          : null,
-      result: resultJson is Map<String, Object?>
-          ? agentRunResultFromJson(resultJson)
-          : null,
+      error: execution?.error ??
+          (json['error'] is Map<String, Object?>
+              ? ApiErrorDetails.fromJson(json['error'] as Map<String, Object?>)
+              : null),
+      toolCall: execution?.toolCall ??
+          (toolCallJson is Map<String, Object?>
+              ? AgentToolCallFeedback.fromJson(toolCallJson)
+              : null),
+      result: execution?.result ?? directResult,
+      widget: execution?.widget ?? json['widget'],
+      execution: execution,
       suggestions: suggestionsJson is List<Object?>
           ? suggestionsJson
               .whereType<Map<String, Object?>>()
@@ -1135,20 +1310,37 @@ Map<String, Object?> _responseOutput(Map<String, Object?> json) {
   return json['output'] as Map<String, Object?>? ?? json;
 }
 
+List<Object?> _jsonList(Object? value) => value is List ? value : const [];
+
 AgentConversationDetail _parseAgentConversationDetail(
   Map<String, Object?> json, {
   required String conversationId,
 }) {
-  final messages = (json['messages'] as List<Object?>? ?? const [])
-      .cast<Map<String, Object?>>()
-      .map(AgentConversationMessage.fromJson)
+  final messages = _jsonList(json['messages'])
+      .map(AgentConversationMessage.tryFromJson)
+      .whereType<AgentConversationMessage>()
+      .toList();
+  final toolExecutions = _jsonList(json['toolExecutions'])
+      .map(AgentToolExecutionSnapshot.tryFromJson)
+      .whereType<AgentToolExecutionSnapshot>()
       .toList();
   final conversationJson = json['conversation'];
-  final conversation = conversationJson is Map<String, Object?>
-      ? AgentConversationSummary.fromJson(conversationJson)
-      : _fallbackConversationSummary(conversationId, messages);
+  AgentConversationSummary? conversation;
+  if (conversationJson is Map) {
+    try {
+      conversation = AgentConversationSummary.fromJson(
+        conversationJson.map((key, value) => MapEntry(key.toString(), value)),
+      );
+    } on Object {
+      // Fall back to the requested ID and valid message subset.
+    }
+  }
+  conversation ??= _fallbackConversationSummary(conversationId, messages);
   return AgentConversationDetail(
-      conversation: conversation, messages: messages);
+    conversation: conversation,
+    messages: messages,
+    toolExecutions: toolExecutions,
+  );
 }
 
 AgentConversationSummary _fallbackConversationSummary(

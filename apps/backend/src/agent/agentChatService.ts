@@ -19,6 +19,7 @@ import {
 import type {
   AgentConversationMessageRecord,
   AgentConversationRecord,
+  AgentToolExecutionSnapshot,
   AppRepository,
 } from "../repository/types.js";
 import {
@@ -183,6 +184,16 @@ export type AgentToolFeedback = {
   input: unknown;
 };
 
+export type AgentChatToolExecutionSnapshot = Omit<
+  AgentToolExecutionSnapshot,
+  "result" | "widget" | "error" | "toolCall"
+> & {
+  toolCall: AgentToolFeedback;
+  result?: AgentChatMappedResult;
+  widget?: AgentWidgetPayload;
+  error?: PublicAiError;
+};
+
 export type AgentWidgetPayload = {
   kind: AgentChatResultKind;
   title: string;
@@ -207,6 +218,7 @@ export type AgentChatEvent =
       type: "tool_call_started";
       conversationId: string;
       toolCall: AgentToolFeedback;
+      execution?: AgentChatToolExecutionSnapshot;
     }
   | {
       type: "tool_call_completed";
@@ -214,12 +226,14 @@ export type AgentChatEvent =
       toolCall: AgentToolFeedback;
       result: AgentChatMappedResult;
       widget?: AgentWidgetPayload;
+      execution?: AgentChatToolExecutionSnapshot;
     }
   | {
       type: "tool_call_failed";
       conversationId: string;
       toolCall: AgentToolFeedback;
       error: PublicAiError;
+      execution?: AgentChatToolExecutionSnapshot;
     }
   | { type: "done"; conversationId: string }
   | { type: "error"; conversationId?: string; error: PublicAiError };
@@ -344,7 +358,9 @@ export class AgentChatService {
     let accumulatedActionMs = 0;
 
     while (iteration < MAX_CHAT_ITERATIONS) {
-      if (await this.repository.isAgentConversationSuppressed(conversation.id)) {
+      if (
+        await this.repository.isAgentConversationSuppressed(conversation.id)
+      ) {
         yield {
           type: "error",
           conversationId: conversation.id,
@@ -404,7 +420,9 @@ export class AgentChatService {
       // A deletion may arrive while the provider request is in flight. Stop
       // before telemetry, tool execution, persistence, or another user-visible
       // delta can recreate content for the tombstoned conversation.
-      if (await this.repository.isAgentConversationSuppressed(conversation.id)) {
+      if (
+        await this.repository.isAgentConversationSuppressed(conversation.id)
+      ) {
         yield {
           type: "error",
           conversationId: conversation.id,
@@ -526,7 +544,8 @@ export class AgentChatService {
           toolCallCount,
           status: "failure",
           errorCode: "tool_call_limit",
-          errorMessage: "The assistant reached the tool-call limit for this turn.",
+          errorMessage:
+            "The assistant reached the tool-call limit for this turn.",
           totalMs: Date.now() - runStarted,
         });
         yield {
@@ -543,22 +562,23 @@ export class AgentChatService {
         toolCalls,
       };
       messages.push(assistantToolMessage);
-      await this.repository.addAgentConversationMessage(
-        input.context.actorUserId,
-        conversation.id,
-        {
-          role: "assistant",
-          content: assistantText,
-          toolCalls,
-          ...messageCorrelation(correlation, {
-            providerRouting: decision.providerRouting,
-            iteration,
-            toolCallCount: toolCalls.length,
-          }),
-        },
-      );
+      const assistantToolMessageRecord =
+        await this.repository.addAgentConversationMessage(
+          input.context.actorUserId,
+          conversation.id,
+          {
+            role: "assistant",
+            content: assistantText,
+            toolCalls,
+            ...messageCorrelation(correlation, {
+              providerRouting: decision.providerRouting,
+              iteration,
+              toolCallCount: toolCalls.length,
+            }),
+          },
+        );
 
-      for (const toolCall of toolCalls) {
+      for (const [toolCallIndex, toolCall] of toolCalls.entries()) {
         toolCallCount++;
         const actionId = toolCall.function.name;
 
@@ -568,12 +588,22 @@ export class AgentChatService {
         } catch {
           const feedback = describeToolCall(toolCall, undefined);
           const error = "The assistant sent invalid tool arguments.";
-          yield {
-            type: "tool_call_failed",
+          const publicError = createPublicAiError(
+            "validation_error",
+            correlation.traceId,
+          );
+          const execution = await this.persistToolExecution({
+            userId: input.context.actorUserId,
             conversationId: conversation.id,
-            toolCall: feedback,
-            error: createPublicAiError("validation_error", correlation.traceId),
-          };
+            correlation,
+            assistantMessageId: assistantToolMessageRecord.id,
+            toolCall,
+            feedback,
+            iteration,
+            toolCallIndex: toolCallIndex + 1,
+            status: "failed",
+            error: publicError,
+          });
           await this.addToolErrorMessage(
             input.context.actorUserId,
             conversation.id,
@@ -584,6 +614,13 @@ export class AgentChatService {
             correlation,
             { iteration, errorCode: "invalid_tool_arguments" },
           );
+          yield {
+            type: "tool_call_failed",
+            conversationId: conversation.id,
+            toolCall: feedback,
+            error: publicError,
+            execution,
+          };
           await this.recordToolCallTelemetry({
             correlation,
             userId: input.context.actorUserId,
@@ -592,7 +629,7 @@ export class AgentChatService {
             status: "failed",
             errorMessage: error,
             iteration,
-            toolCallIndex: toolCallCount,
+            toolCallIndex: toolCallIndex + 1,
           });
           continue;
         }
@@ -602,12 +639,22 @@ export class AgentChatService {
           if (!quickReply) {
             const feedback = describeToolCall(toolCall, parsedInput);
             const error = "The assistant sent invalid chat options.";
-            yield {
-              type: "tool_call_failed",
+            const publicError = createPublicAiError(
+              "validation_error",
+              correlation.traceId,
+            );
+            const execution = await this.persistToolExecution({
+              userId: input.context.actorUserId,
               conversationId: conversation.id,
-              toolCall: feedback,
-              error: createPublicAiError("validation_error", correlation.traceId),
-            };
+              correlation,
+              assistantMessageId: assistantToolMessageRecord.id,
+              toolCall,
+              feedback,
+              iteration,
+              toolCallIndex: toolCallIndex + 1,
+              status: "failed",
+              error: publicError,
+            });
             await this.addToolErrorMessage(
               input.context.actorUserId,
               conversation.id,
@@ -618,6 +665,13 @@ export class AgentChatService {
               correlation,
               { iteration, errorCode: "invalid_chat_options" },
             );
+            yield {
+              type: "tool_call_failed",
+              conversationId: conversation.id,
+              toolCall: feedback,
+              error: publicError,
+              execution,
+            };
             await this.recordToolCallTelemetry({
               correlation,
               userId: input.context.actorUserId,
@@ -627,7 +681,7 @@ export class AgentChatService {
               status: "failed",
               errorMessage: error,
               iteration,
-              toolCallIndex: toolCallCount,
+              toolCallIndex: toolCallIndex + 1,
             });
             continue;
           }
@@ -645,6 +699,17 @@ export class AgentChatService {
               }),
             },
           );
+          await this.persistToolExecution({
+            userId: input.context.actorUserId,
+            conversationId: conversation.id,
+            correlation,
+            assistantMessageId: assistantToolMessageRecord.id,
+            toolCall,
+            feedback: describeToolCall(toolCall, parsedInput),
+            iteration,
+            toolCallIndex: toolCallIndex + 1,
+            status: "completed",
+          });
           yield {
             type: "assistant_delta",
             conversationId: conversation.id,
@@ -678,7 +743,7 @@ export class AgentChatService {
             resultSummary: quickReply,
             status: "completed",
             iteration,
-            toolCallIndex: toolCallCount,
+            toolCallIndex: toolCallIndex + 1,
           });
           await this.recordTurnTelemetry({
             correlation,
@@ -713,93 +778,211 @@ export class AgentChatService {
 
         if (actionId === RESOLVE_CANDIDATE_REFERENCE_TOOL_NAME) {
           const feedback = describeToolCall(toolCall, parsedInput);
-          yield {
-            type: "tool_call_started",
-            conversationId: conversation.id,
-            toolCall: feedback,
-          };
-          const resolved = await this.resolveCandidateSelection(
-            input.context.actorUserId,
-            conversation.id,
-            parsedInput as AgentChatCandidateSelection,
-          );
-          const contentValue = resolved
-            ? selectedCandidateContent({
-                selection: parsedInput as AgentChatCandidateSelection,
-                resolved,
-              })
-            : {
-                actionId,
-                input: parsedInput,
-                error: "candidate_reference_not_found",
-              };
-          const toolContent = safeToolContent(JSON.stringify(contentValue));
-          const toolMessage: AgentMessage = {
-            role: "tool",
-            toolCallId: toolCall.id,
-            content: toolContent,
-          };
-          messages.push(toolMessage);
-          await this.repository.addAgentConversationMessage(
-            input.context.actorUserId,
-            conversation.id,
-            {
-              role: "tool",
-              content: toolContent,
-              toolCallId: toolCall.id,
-              ...messageCorrelation(correlation, {
-                actionId,
-                resultKind: resolved ? "candidate_reference" : "error",
-                iteration,
-                toolCallIndex: toolCallCount,
-              }),
-            },
-          );
-          if (resolved) {
-            yield {
-              type: "tool_call_completed",
-              conversationId: conversation.id,
-              toolCall: feedback,
-              result: {
-                kind: "nutrition_search",
-                items: [resolved.item],
-                message: "Selected nutrition candidate resolved.",
-              },
-            };
-          } else {
-            yield {
-              type: "tool_call_failed",
-              conversationId: conversation.id,
-              toolCall: feedback,
-              error: createPublicAiError("validation_error", correlation.traceId),
-            };
-          }
-          await this.recordToolCallTelemetry({
-            correlation,
+          const startedAt = new Date().toISOString();
+          const startedExecution = await this.persistToolExecution({
             userId: input.context.actorUserId,
+            conversationId: conversation.id,
+            correlation,
+            assistantMessageId: assistantToolMessageRecord.id,
             toolCall,
-            actionId,
-            arguments: parsedInput,
-            resultSummary: resolved
-              ? { candidateRef: resolved.candidateRef }
-              : undefined,
-            status: resolved ? "completed" : "failed",
-            errorMessage: resolved ? undefined : "candidate_reference_not_found",
+            feedback,
             iteration,
-            toolCallIndex: toolCallCount,
+            toolCallIndex: toolCallIndex + 1,
+            status: "started",
+            startedAt,
           });
+          let terminal = startedExecution.status !== "started";
+          try {
+            yield {
+              type: "tool_call_started",
+              conversationId: conversation.id,
+              toolCall: feedback,
+              execution: startedExecution,
+            };
+            if (terminal) {
+              yield* terminalToolExecutionEvent({
+                conversationId: conversation.id,
+                toolCall: feedback,
+                execution: startedExecution,
+                traceId: correlation.traceId,
+              });
+              continue;
+            }
+            try {
+              const resolved = await this.resolveCandidateSelection(
+                input.context.actorUserId,
+                conversation.id,
+                parsedInput as AgentChatCandidateSelection,
+              );
+              const contentValue = resolved
+                ? selectedCandidateContent({
+                    selection: parsedInput as AgentChatCandidateSelection,
+                    resolved,
+                  })
+                : {
+                    actionId,
+                    input: parsedInput,
+                    error: "candidate_reference_not_found",
+                  };
+              const toolContent = safeToolContent(JSON.stringify(contentValue));
+              const mappedResult: AgentChatMappedResult | undefined = resolved
+                ? {
+                    kind: "nutrition_search",
+                    items: [resolved.item],
+                    message: "Selected nutrition candidate resolved.",
+                  }
+                : undefined;
+              const publicError = resolved
+                ? undefined
+                : createPublicAiError("validation_error", correlation.traceId);
+              const execution = await this.persistToolExecution({
+                userId: input.context.actorUserId,
+                conversationId: conversation.id,
+                correlation,
+                assistantMessageId: assistantToolMessageRecord.id,
+                toolCall,
+                feedback,
+                iteration,
+                toolCallIndex: toolCallIndex + 1,
+                status: resolved ? "completed" : "failed",
+                startedAt,
+                result: mappedResult,
+                widget: mappedResult
+                  ? widgetForResult(mappedResult)
+                  : undefined,
+                error: publicError,
+              });
+              terminal = execution.status !== "started";
+              const toolMessage: AgentMessage = {
+                role: "tool",
+                toolCallId: toolCall.id,
+                content: toolContent,
+              };
+              messages.push(toolMessage);
+              await this.repository.addAgentConversationMessage(
+                input.context.actorUserId,
+                conversation.id,
+                {
+                  role: "tool",
+                  content: toolContent,
+                  toolCallId: toolCall.id,
+                  ...messageCorrelation(correlation, {
+                    actionId,
+                    resultKind: resolved ? "candidate_reference" : "error",
+                    iteration,
+                    toolCallIndex: toolCallIndex + 1,
+                  }),
+                },
+              );
+              if (resolved && mappedResult) {
+                yield {
+                  type: "tool_call_completed",
+                  conversationId: conversation.id,
+                  toolCall: feedback,
+                  result: execution.result ?? mappedResult,
+                  widget: execution.widget,
+                  execution,
+                };
+              } else if (publicError) {
+                yield {
+                  type: "tool_call_failed",
+                  conversationId: conversation.id,
+                  toolCall: feedback,
+                  error: execution.error ?? publicError,
+                  execution,
+                };
+              }
+              await this.recordToolCallTelemetry({
+                correlation,
+                userId: input.context.actorUserId,
+                toolCall,
+                actionId,
+                arguments: parsedInput,
+                resultSummary: resolved
+                  ? { candidateRef: resolved.candidateRef }
+                  : undefined,
+                status: resolved ? "completed" : "failed",
+                errorMessage: resolved
+                  ? undefined
+                  : "candidate_reference_not_found",
+                iteration,
+                toolCallIndex: toolCallIndex + 1,
+              });
+            } catch (error) {
+              const errorText = safeToolFailureForModel(error);
+              const publicError = createPublicAiError(
+                classifyPublicAiError(error, "internal_error"),
+                correlation.traceId,
+              );
+              const execution = await this.persistToolExecution({
+                userId: input.context.actorUserId,
+                conversationId: conversation.id,
+                correlation,
+                assistantMessageId: assistantToolMessageRecord.id,
+                toolCall,
+                feedback,
+                iteration,
+                toolCallIndex: toolCallIndex + 1,
+                status: "failed",
+                startedAt,
+                error: publicError,
+              });
+              terminal = execution.status !== "started";
+              await this.addToolErrorMessage(
+                input.context.actorUserId,
+                conversation.id,
+                messages,
+                toolCall,
+                actionId,
+                errorText,
+                correlation,
+                { iteration, toolCallIndex: toolCallIndex + 1 },
+              );
+              yield {
+                type: "tool_call_failed",
+                conversationId: conversation.id,
+                toolCall: feedback,
+                error: execution.error ?? publicError,
+                execution,
+              };
+            }
+          } finally {
+            if (!terminal) {
+              await this.persistInterruptedToolExecution({
+                userId: input.context.actorUserId,
+                conversationId: conversation.id,
+                correlation,
+                assistantMessageId: assistantToolMessageRecord.id,
+                toolCall,
+                feedback,
+                iteration,
+                toolCallIndex: toolCallIndex + 1,
+                startedAt,
+              });
+            }
+          }
           continue;
         }
 
         if (!allowedActions.some((action) => action.id === actionId)) {
           const feedback = describeToolCall(toolCall, parsedInput);
           const error = `This action is not available: ${actionId}`;
-          yield {
-            type: "tool_call_failed",
+          const publicError = createPublicAiError(
+            "validation_error",
+            correlation.traceId,
+          );
+          const execution = await this.persistToolExecution({
+            userId: input.context.actorUserId,
             conversationId: conversation.id,
-            toolCall: feedback,
-            error: createPublicAiError("validation_error", correlation.traceId),
-          };
+            correlation,
+            assistantMessageId: assistantToolMessageRecord.id,
+            toolCall,
+            feedback,
+            iteration,
+            toolCallIndex: toolCallIndex + 1,
+            status: "failed",
+            error: publicError,
+          });
           await this.addToolErrorMessage(
             input.context.actorUserId,
             conversation.id,
@@ -810,6 +993,13 @@ export class AgentChatService {
             correlation,
             { iteration, errorCode: "disallowed_tool" },
           );
+          yield {
+            type: "tool_call_failed",
+            conversationId: conversation.id,
+            toolCall: feedback,
+            error: publicError,
+            execution,
+          };
           await this.recordToolCallTelemetry({
             correlation,
             userId: input.context.actorUserId,
@@ -819,7 +1009,7 @@ export class AgentChatService {
             status: "failed",
             errorMessage: error,
             iteration,
-            toolCallIndex: toolCallCount,
+            toolCallIndex: toolCallIndex + 1,
           });
           continue;
         }
@@ -842,12 +1032,22 @@ export class AgentChatService {
         const feedback = describeToolCall(toolCall, parsedInput);
         if (executedSignatures.has(signature)) {
           const error = "Skipped a repeated tool call with the same arguments.";
-          yield {
-            type: "tool_call_failed",
+          const publicError = createPublicAiError(
+            "internal_error",
+            correlation.traceId,
+          );
+          const execution = await this.persistToolExecution({
+            userId: input.context.actorUserId,
             conversationId: conversation.id,
-            toolCall: feedback,
-            error: createPublicAiError("internal_error", correlation.traceId),
-          };
+            correlation,
+            assistantMessageId: assistantToolMessageRecord.id,
+            toolCall,
+            feedback,
+            iteration,
+            toolCallIndex: toolCallIndex + 1,
+            status: "failed",
+            error: publicError,
+          });
           await this.addToolErrorMessage(
             input.context.actorUserId,
             conversation.id,
@@ -858,6 +1058,13 @@ export class AgentChatService {
             correlation,
             { iteration, errorCode: "repeated_tool_call" },
           );
+          yield {
+            type: "tool_call_failed",
+            conversationId: conversation.id,
+            toolCall: feedback,
+            error: publicError,
+            execution,
+          };
           await this.recordToolCallTelemetry({
             correlation,
             userId: input.context.actorUserId,
@@ -867,190 +1074,261 @@ export class AgentChatService {
             status: "skipped",
             errorMessage: error,
             iteration,
-            toolCallIndex: toolCallCount,
+            toolCallIndex: toolCallIndex + 1,
           });
           continue;
         }
         executedSignatures.add(signature);
-        yield {
-          type: "tool_call_started",
-          conversationId: conversation.id,
-          toolCall: feedback,
-        };
-
         const actionStarted = Date.now();
+        const startedExecution = await this.persistToolExecution({
+          userId: input.context.actorUserId,
+          conversationId: conversation.id,
+          correlation,
+          assistantMessageId: assistantToolMessageRecord.id,
+          toolCall,
+          feedback,
+          iteration,
+          toolCallIndex: toolCallIndex + 1,
+          status: "started",
+          startedAt: new Date(actionStarted).toISOString(),
+        });
+        let terminal = startedExecution.status !== "started";
         try {
-          const result = await this.actionExecutor.execute(
-            actionId,
-            parsedInput,
-            {
-              ...input.context,
-              source: "internal_agent",
-            },
-          );
-          if (await this.repository.isAgentConversationSuppressed(conversation.id)) {
-            yield {
-              type: "error",
-              conversationId: conversation.id,
-              error: createPublicAiError("validation_error", correlation.traceId),
-            };
-            return;
-          }
-          const mapped = mapActionResult(actionId, result, text);
-          const actionMs = Date.now() - actionStarted;
-          accumulatedActionMs += actionMs;
-          latestResultKind = mapped.kind;
-          if ("proposal" in mapped && mapped.proposal) {
-            currentActiveProposal = mapped.proposal;
-          }
-          if (
-            mapped.kind === "meal_committed" ||
-            mapped.kind === "meal_deleted"
-          ) {
-            currentActiveProposal = undefined;
-          }
-          const modelToolContent = buildToolContentForModel({
-            actionId,
-            actionCallId: result.actionCallId,
-            toolInput: parsedInput,
-            mappedResult: mapped as Record<string, unknown>,
-            rawOutput: result.output,
-            threshold: this.selectionConfidenceThreshold,
-          });
-          const mappedForUi = withSelectionState(
-            mapped,
-            modelToolContent.selectionState,
-          );
-          const widget = widgetForResult(mappedForUi);
           yield {
-            type: "tool_call_completed",
+            type: "tool_call_started",
             conversationId: conversation.id,
             toolCall: feedback,
-            result: mappedForUi,
-            widget,
+            execution: startedExecution,
           };
+          if (terminal) {
+            yield* terminalToolExecutionEvent({
+              conversationId: conversation.id,
+              toolCall: feedback,
+              execution: startedExecution,
+              traceId: correlation.traceId,
+            });
+            continue;
+          }
 
-          const toolContent = safeToolContent(modelToolContent.modelContent);
-          const toolMessage: AgentMessage = {
-            role: "tool",
-            toolCallId: toolCall.id,
-            content: toolContent,
-          };
-          messages.push(toolMessage);
-          const candidateRegistry = modelToolContent.candidateRegistry;
-          const storedToolMessage = await this.repository.addAgentConversationMessage(
-            input.context.actorUserId,
-            conversation.id,
-            {
-              role: "tool",
-              content: toolContent,
-              toolCallId: toolCall.id,
-              ...messageCorrelation(correlation, {
-                actionId,
-                actionCallId: result.actionCallId,
-                iteration,
-                toolCallIndex: toolCallCount,
-                resultKind: mapped.kind,
-                ...(candidateRegistry
-                  ? {
-                      candidateRegistryRef: candidateRegistry.searchRef,
-                      searchRef: candidateRegistry.searchRef,
-                      candidateCount: candidateRegistry.candidateCount,
-                      groupCount: candidateRegistry.groupCount,
-                    }
-                  : {}),
-                selectionState: modelToolContent.selectionState,
-                toolContentCompacted: true,
-                serializerVersion: modelToolContent.serializerVersion,
-                modelFacingRepresentation: modelToolContent.representation,
-                rawToolContentChars: modelToolContent.rawContentChars,
-                rawToolContentApproxTokens:
-                  modelToolContent.rawContentApproxTokens,
-                modelToolContentChars: modelToolContent.modelContentChars,
-                modelToolContentApproxTokens:
-                  modelToolContent.modelContentApproxTokens,
-                compressionRatio: modelToolContent.compressionRatio,
-                omittedPaths: modelToolContent.omittedPaths,
-                preservedPaths: modelToolContent.preservedPaths,
-                tonTables: modelToolContent.tonTables,
-              }),
-            },
-          );
-          if (candidateRegistry) {
-            await this.repository.saveAgentCandidateRegistry({
+          try {
+            const result = await this.actionExecutor.execute(
+              actionId,
+              parsedInput,
+              {
+                ...input.context,
+                source: "internal_agent",
+              },
+            );
+            if (
+              await this.repository.isAgentConversationSuppressed(
+                conversation.id,
+              )
+            ) {
+              return;
+            }
+            const mapped = mapActionResult(actionId, result, text);
+            const actionMs = Date.now() - actionStarted;
+            accumulatedActionMs += actionMs;
+            latestResultKind = mapped.kind;
+            if ("proposal" in mapped && mapped.proposal) {
+              currentActiveProposal = mapped.proposal;
+            }
+            if (
+              mapped.kind === "meal_committed" ||
+              mapped.kind === "meal_deleted"
+            ) {
+              currentActiveProposal = undefined;
+            }
+            const modelToolContent = buildToolContentForModel({
+              actionId,
+              actionCallId: result.actionCallId,
+              toolInput: parsedInput,
+              mappedResult: mapped as Record<string, unknown>,
+              rawOutput: result.output,
+              threshold: this.selectionConfidenceThreshold,
+            });
+            const mappedForUi = withSelectionState(
+              mapped,
+              modelToolContent.selectionState,
+            );
+            const widget = widgetForResult(mappedForUi);
+            const execution = await this.persistToolExecution({
               userId: input.context.actorUserId,
               conversationId: conversation.id,
-              messageId: storedToolMessage.id,
-              traceId: correlation.traceId,
-              turnId: correlation.turnId,
-              actionCallId: result.actionCallId,
-              searchRef: candidateRegistry.searchRef,
-              actionId,
-              candidateCount: candidateRegistry.candidateCount,
-              groupCount: candidateRegistry.groupCount,
-              threshold: candidateRegistry.threshold,
-              registry: candidateRegistry,
+              correlation,
+              assistantMessageId: assistantToolMessageRecord.id,
+              toolCall,
+              feedback,
+              iteration,
+              toolCallIndex: toolCallIndex + 1,
+              status: "completed",
+              startedAt: new Date(actionStarted).toISOString(),
+              result: mappedForUi,
+              widget,
             });
-          }
-          await this.recordToolCallTelemetry({
-            correlation,
-            userId: input.context.actorUserId,
-            toolCall,
-            actionId,
-            actionCallId: result.actionCallId,
-            arguments: parsedInput,
-            resultSummary: mapped,
-            status: "completed",
-            iteration,
-            toolCallIndex: toolCallCount,
-            durationMs: actionMs,
-          });
-        } catch (error) {
-          const errorText = safeToolFailureForModel(error);
-          yield {
-            type: "tool_call_failed",
-            conversationId: conversation.id,
-            toolCall: feedback,
-            error: createPublicAiError(
+            terminal = execution.status !== "started";
+
+            const toolContent = safeToolContent(modelToolContent.modelContent);
+            const toolMessage: AgentMessage = {
+              role: "tool",
+              toolCallId: toolCall.id,
+              content: toolContent,
+            };
+            messages.push(toolMessage);
+            const candidateRegistry = modelToolContent.candidateRegistry;
+            const storedToolMessage =
+              await this.repository.addAgentConversationMessage(
+                input.context.actorUserId,
+                conversation.id,
+                {
+                  role: "tool",
+                  content: toolContent,
+                  toolCallId: toolCall.id,
+                  ...messageCorrelation(correlation, {
+                    actionId,
+                    actionCallId: result.actionCallId,
+                    iteration,
+                    toolCallIndex: toolCallIndex + 1,
+                    resultKind: mapped.kind,
+                    ...(candidateRegistry
+                      ? {
+                          candidateRegistryRef: candidateRegistry.searchRef,
+                          searchRef: candidateRegistry.searchRef,
+                          candidateCount: candidateRegistry.candidateCount,
+                          groupCount: candidateRegistry.groupCount,
+                        }
+                      : {}),
+                    selectionState: modelToolContent.selectionState,
+                    toolContentCompacted: true,
+                    serializerVersion: modelToolContent.serializerVersion,
+                    modelFacingRepresentation: modelToolContent.representation,
+                    rawToolContentChars: modelToolContent.rawContentChars,
+                    rawToolContentApproxTokens:
+                      modelToolContent.rawContentApproxTokens,
+                    modelToolContentChars: modelToolContent.modelContentChars,
+                    modelToolContentApproxTokens:
+                      modelToolContent.modelContentApproxTokens,
+                    compressionRatio: modelToolContent.compressionRatio,
+                    omittedPaths: modelToolContent.omittedPaths,
+                    preservedPaths: modelToolContent.preservedPaths,
+                    tonTables: modelToolContent.tonTables,
+                  }),
+                },
+              );
+            if (candidateRegistry) {
+              await this.repository.saveAgentCandidateRegistry({
+                userId: input.context.actorUserId,
+                conversationId: conversation.id,
+                messageId: storedToolMessage.id,
+                traceId: correlation.traceId,
+                turnId: correlation.turnId,
+                actionCallId: result.actionCallId,
+                searchRef: candidateRegistry.searchRef,
+                actionId,
+                candidateCount: candidateRegistry.candidateCount,
+                groupCount: candidateRegistry.groupCount,
+                threshold: candidateRegistry.threshold,
+                registry: candidateRegistry,
+              });
+            }
+            yield {
+              type: "tool_call_completed",
+              conversationId: conversation.id,
+              toolCall: feedback,
+              result: execution.result ?? mappedForUi,
+              widget: execution.widget,
+              execution,
+            };
+            await this.recordToolCallTelemetry({
+              correlation,
+              userId: input.context.actorUserId,
+              toolCall,
+              actionId,
+              actionCallId: result.actionCallId,
+              arguments: parsedInput,
+              resultSummary: mapped,
+              status: "completed",
+              iteration,
+              toolCallIndex: toolCallIndex + 1,
+              durationMs: actionMs,
+            });
+          } catch (error) {
+            const errorText = safeToolFailureForModel(error);
+            const publicError = createPublicAiError(
               classifyPublicAiError(error, "internal_error"),
               correlation.traceId,
-            ),
-          };
-          const toolMessage: AgentMessage = {
-            role: "tool",
-            toolCallId: toolCall.id,
-            content: JSON.stringify({ actionId, error: errorText }),
-          };
-          messages.push(toolMessage);
-          await this.repository.addAgentConversationMessage(
-            input.context.actorUserId,
-            conversation.id,
-            {
+            );
+            const execution = await this.persistToolExecution({
+              userId: input.context.actorUserId,
+              conversationId: conversation.id,
+              correlation,
+              assistantMessageId: assistantToolMessageRecord.id,
+              toolCall,
+              feedback,
+              iteration,
+              toolCallIndex: toolCallIndex + 1,
+              status: "failed",
+              startedAt: new Date(actionStarted).toISOString(),
+              error: publicError,
+            });
+            terminal = execution.status !== "started";
+            const toolMessage: AgentMessage = {
               role: "tool",
-              content: toolMessage.content,
               toolCallId: toolCall.id,
-              ...messageCorrelation(correlation, {
-                actionId,
-                error: errorText,
-                iteration,
-                toolCallIndex: toolCallCount,
-              }),
-            },
-          );
-          const actionMs = Date.now() - actionStarted;
-          accumulatedActionMs += actionMs;
-          await this.recordToolCallTelemetry({
-            correlation,
-            userId: input.context.actorUserId,
-            toolCall,
-            actionId,
-            arguments: parsedInput,
-            status: "failed",
-            errorMessage: safeErrorDiagnosticMessage(error),
-            iteration,
-            toolCallIndex: toolCallCount,
-            durationMs: actionMs,
-          });
+              content: JSON.stringify({ actionId, error: errorText }),
+            };
+            messages.push(toolMessage);
+            await this.repository.addAgentConversationMessage(
+              input.context.actorUserId,
+              conversation.id,
+              {
+                role: "tool",
+                content: toolMessage.content,
+                toolCallId: toolCall.id,
+                ...messageCorrelation(correlation, {
+                  actionId,
+                  error: errorText,
+                  iteration,
+                  toolCallIndex: toolCallIndex + 1,
+                }),
+              },
+            );
+            const actionMs = Date.now() - actionStarted;
+            accumulatedActionMs += actionMs;
+            yield {
+              type: "tool_call_failed",
+              conversationId: conversation.id,
+              toolCall: feedback,
+              error: publicError,
+              execution,
+            };
+            await this.recordToolCallTelemetry({
+              correlation,
+              userId: input.context.actorUserId,
+              toolCall,
+              actionId,
+              arguments: parsedInput,
+              status: "failed",
+              errorMessage: safeErrorDiagnosticMessage(error),
+              iteration,
+              toolCallIndex: toolCallIndex + 1,
+              durationMs: actionMs,
+            });
+          }
+        } finally {
+          if (!terminal) {
+            await this.persistInterruptedToolExecution({
+              userId: input.context.actorUserId,
+              conversationId: conversation.id,
+              correlation,
+              assistantMessageId: assistantToolMessageRecord.id,
+              toolCall,
+              feedback,
+              iteration,
+              toolCallIndex: toolCallIndex + 1,
+              startedAt: new Date(actionStarted).toISOString(),
+            });
+          }
         }
       }
     }
@@ -1107,6 +1385,82 @@ export class AgentChatService {
     );
     if (!existing) throw new Error("agent_conversation_not_found");
     return existing;
+  }
+
+  private async persistToolExecution(input: {
+    userId: string;
+    conversationId: string;
+    correlation: ChatTurnCorrelation;
+    assistantMessageId: string;
+    toolCall: AgentToolCall;
+    feedback: AgentToolFeedback;
+    iteration: number;
+    toolCallIndex: number;
+    status: AgentChatToolExecutionSnapshot["status"];
+    startedAt?: string;
+    result?: AgentChatMappedResult;
+    widget?: AgentWidgetPayload;
+    error?: PublicAiError;
+  }): Promise<AgentChatToolExecutionSnapshot> {
+    const terminal = input.status !== "started";
+    const snapshot: AgentChatToolExecutionSnapshot = {
+      schemaVersion: 1,
+      conversationId: input.conversationId,
+      turnId: input.correlation.turnId,
+      assistantMessageId: input.assistantMessageId,
+      toolCallId: input.toolCall.id,
+      iteration: input.iteration,
+      toolCallIndex: input.toolCallIndex,
+      toolCall: input.feedback,
+      status: input.status,
+      ...(input.result ? { result: input.result } : {}),
+      ...(input.widget ? { widget: input.widget } : {}),
+      ...(input.error ? { error: input.error } : {}),
+      startedAt: input.startedAt ?? new Date().toISOString(),
+      ...(terminal ? { completedAt: new Date().toISOString() } : {}),
+    };
+    const stored = await this.repository.saveAgentToolExecution({
+      userId: input.userId,
+      conversationId: input.conversationId,
+      assistantMessageId: input.assistantMessageId,
+      turnId: input.correlation.turnId,
+      toolCallId: input.toolCall.id,
+      actionId: input.feedback.actionId,
+      iteration: input.iteration,
+      toolCallIndex: input.toolCallIndex,
+      status: input.status,
+      snapshot,
+    });
+    return stored.snapshot as AgentChatToolExecutionSnapshot;
+  }
+
+  private async persistInterruptedToolExecution(input: {
+    userId: string;
+    conversationId: string;
+    correlation: ChatTurnCorrelation;
+    assistantMessageId: string;
+    toolCall: AgentToolCall;
+    feedback: AgentToolFeedback;
+    iteration: number;
+    toolCallIndex: number;
+    startedAt: string;
+  }): Promise<void> {
+    try {
+      await this.persistToolExecution({ ...input, status: "interrupted" });
+    } catch (error) {
+      // A privacy tombstone can win the race while a cancelled stream unwinds.
+      // Do not revive or leak a suppressed conversation just to record a card.
+      if (
+        !(await this.repository.isAgentConversationSuppressed(
+          input.conversationId,
+        ))
+      ) {
+        console.warn(
+          "agent.chat_interrupt_persistence.failed",
+          summarizeError(error),
+        );
+      }
+    }
   }
 
   private async addToolErrorMessage(
@@ -1189,7 +1543,12 @@ export class AgentChatService {
     tokenMetrics: ReturnType<typeof extractLlmTokenMetrics>;
   }): Promise<void> {
     try {
-      if (await this.repository.isAgentConversationSuppressed(input.correlation.conversationId)) return;
+      if (
+        await this.repository.isAgentConversationSuppressed(
+          input.correlation.conversationId,
+        )
+      )
+        return;
       await this.telemetryService.recordLlmProviderCall({
         traceId: input.correlation.traceId,
         userId: input.userId,
@@ -1255,7 +1614,10 @@ export class AgentChatService {
         metadata: { iteration: input.iteration },
       });
     } catch (error) {
-      console.warn("agent.chat_provider_telemetry.failed", summarizeError(error));
+      console.warn(
+        "agent.chat_provider_telemetry.failed",
+        summarizeError(error),
+      );
     }
   }
 
@@ -1274,7 +1636,12 @@ export class AgentChatService {
     durationMs?: number;
   }): Promise<void> {
     try {
-      if (await this.repository.isAgentConversationSuppressed(input.correlation.conversationId)) return;
+      if (
+        await this.repository.isAgentConversationSuppressed(
+          input.correlation.conversationId,
+        )
+      )
+        return;
       const completedAt =
         input.status === "started" ? undefined : new Date().toISOString();
       await this.telemetryService.recordAgentToolCall({
@@ -1285,7 +1652,8 @@ export class AgentChatService {
         toolCallId: input.toolCall.id,
         actionCallId: input.actionCallId,
         actionId: input.actionId,
-        arguments: input.arguments ?? safeParseJson(input.toolCall.function.arguments),
+        arguments:
+          input.arguments ?? safeParseJson(input.toolCall.function.arguments),
         resultSummary: input.resultSummary,
         status: input.status,
         errorMessage: input.errorMessage,
@@ -1332,7 +1700,12 @@ export class AgentChatService {
     errorMessage?: string;
   }): Promise<void> {
     try {
-      if (await this.repository.isAgentConversationSuppressed(input.correlation.conversationId)) return;
+      if (
+        await this.repository.isAgentConversationSuppressed(
+          input.correlation.conversationId,
+        )
+      )
+        return;
       await this.telemetryService.recordAgentTurn({
         traceId: input.correlation.traceId,
         turnId: input.correlation.turnId,
@@ -1383,18 +1756,75 @@ export class AgentChatService {
   }
 }
 
+async function* terminalToolExecutionEvent(input: {
+  conversationId: string;
+  toolCall: AgentToolFeedback;
+  execution: AgentChatToolExecutionSnapshot;
+  traceId: string;
+}): AsyncGenerator<AgentChatEvent> {
+  if (input.execution.status === "completed" && input.execution.result) {
+    yield {
+      type: "tool_call_completed",
+      conversationId: input.conversationId,
+      toolCall: input.toolCall,
+      result: input.execution.result,
+      widget: input.execution.widget,
+      execution: input.execution,
+    };
+    return;
+  }
+  if (input.execution.status !== "started") {
+    yield {
+      type: "tool_call_failed",
+      conversationId: input.conversationId,
+      toolCall: input.toolCall,
+      error:
+        input.execution.error ??
+        createPublicAiError("internal_error", input.traceId),
+      execution: input.execution,
+    };
+  }
+}
+
 function storedMessagesForModel(
   messages: AgentConversationMessageRecord[],
 ): AgentMessage[] {
   const recentTurnIds = lastTurnIds(messages, 2);
-  return messages.map((message) =>
-    storedMessageToAgentMessage(message, {
-      compactToolContent:
-        message.role === "tool" &&
-        message.turnId !== undefined &&
-        !recentTurnIds.has(message.turnId),
-    }),
+  const terminalToolCallIds = new Set(
+    messages.flatMap((message) =>
+      message.role === "tool" && message.toolCallId ? [message.toolCallId] : [],
+    ),
   );
+  return messages.flatMap((message) => {
+    if (message.role === "assistant" && Array.isArray(message.toolCalls)) {
+      // Provider transcripts require every assistant tool call to have a tool
+      // response. Interrupted work has a persisted UI snapshot but no model
+      // result, so omit only those dangling calls from the replay transcript.
+      const toolCalls = (message.toolCalls as AgentToolCall[]).filter(
+        (toolCall) => terminalToolCallIds.has(toolCall.id),
+      );
+      if (toolCalls.length === 0 && message.content.trim() === "") {
+        return [];
+      }
+      return [
+        storedMessageToAgentMessage(
+          {
+            ...message,
+            toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+          },
+          { compactToolContent: false },
+        ),
+      ];
+    }
+    return [
+      storedMessageToAgentMessage(message, {
+        compactToolContent:
+          message.role === "tool" &&
+          message.turnId !== undefined &&
+          !recentTurnIds.has(message.turnId),
+      }),
+    ];
+  });
 }
 
 function storedMessageToAgentMessage(
@@ -1465,9 +1895,7 @@ function withSelectionState<T extends AgentChatMappedResult>(
   mapped: T,
   selectionState: AgentCandidateSelectionState | undefined,
 ): T {
-  return selectionState
-    ? ({ ...mapped, selectionState } as T)
-    : mapped;
+  return selectionState ? ({ ...mapped, selectionState } as T) : mapped;
 }
 
 function extractLlmTokenMetrics(rawResponse: unknown): {
@@ -1487,7 +1915,9 @@ function extractLlmTokenMetrics(rawResponse: unknown): {
 }
 
 function asNumber(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+  return typeof value === "number" && Number.isFinite(value)
+    ? value
+    : undefined;
 }
 
 function zeroAsUndefined(value: number): number | undefined {
@@ -1503,10 +1933,7 @@ function maxOptional(
   return Math.max(left, right);
 }
 
-function mergeCostSource(
-  existing: string | undefined,
-  next: string,
-): string {
+function mergeCostSource(existing: string | undefined, next: string): string {
   if (!existing) return next;
   if (existing === next) return existing;
   if (existing === "provider" && next === "estimate") return "mixed";
@@ -1905,9 +2332,10 @@ function safeToolContent(content: string): string {
 
 function safeToolFailureForModel(error: unknown): string {
   const rawCode = isRecord(error) ? error.code : undefined;
-  const code = typeof rawCode === "string" && /^[a-z0-9_.-]{1,80}$/i.test(rawCode)
-    ? rawCode
-    : classifyPublicAiError(error, "internal_error");
+  const code =
+    typeof rawCode === "string" && /^[a-z0-9_.-]{1,80}$/i.test(rawCode)
+      ? rawCode
+      : classifyPublicAiError(error, "internal_error");
   return JSON.stringify({ code });
 }
 
@@ -1923,7 +2351,12 @@ function messageCorrelation(
   metadata: Record<string, unknown> = {},
 ): Pick<
   AgentConversationMessageRecord,
-  "traceId" | "turnId" | "inputMode" | "source" | "activeProposalId" | "metadata"
+  | "traceId"
+  | "turnId"
+  | "inputMode"
+  | "source"
+  | "activeProposalId"
+  | "metadata"
 > {
   const activeProposalId = correlation.activeProposalId;
   return {

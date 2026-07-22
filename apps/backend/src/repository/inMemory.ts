@@ -24,6 +24,7 @@ import type {
   AdminConversationFilter,
   AgentToolCallTelemetryFilter,
   AgentToolCallTelemetryRecord,
+  AgentToolExecutionRecord,
   AgentTurnTelemetryFilter,
   AgentTurnTelemetryRecord,
   AgentCandidateRegistryRecord,
@@ -128,7 +129,11 @@ export class InMemoryRepository implements AppRepository {
     string,
     AgentConversationMessageRecord[]
   >();
-  private agentCandidateRegistries = new Map<string, AgentCandidateRegistryRecord>();
+  private agentToolExecutions = new Map<string, AgentToolExecutionRecord>();
+  private agentCandidateRegistries = new Map<
+    string,
+    AgentCandidateRegistryRecord
+  >();
   private privacyDeletions = new Map<string, PrivacyDeletionRequest>();
 
   static seeded(): InMemoryRepository {
@@ -1123,6 +1128,67 @@ export class InMemoryRepository implements AppRepository {
     return [...(this.agentConversationMessages.get(conversationId) ?? [])];
   }
 
+  async saveAgentToolExecution(
+    input: Omit<AgentToolExecutionRecord, "id" | "createdAt" | "updatedAt">,
+  ): Promise<AgentToolExecutionRecord> {
+    const conversation = await this.getAgentConversation(
+      input.userId,
+      input.conversationId,
+    );
+    if (!conversation || this.privacyDeletions.has(input.conversationId)) {
+      throw new Error("agent_conversation_not_found");
+    }
+    const key = `${input.conversationId}:${input.toolCallId}`;
+    const existing = this.agentToolExecutions.get(key);
+    // PostgreSQL's conflict handler preserves the first `started` snapshot and
+    // only permits its first terminal transition. Keep the in-memory test
+    // repository identical so retries never mutate correlation or ordering.
+    if (existing && input.status === "started") return existing;
+    if (existing && existing.status !== "started") return existing;
+    const now = new Date().toISOString();
+    const execution: AgentToolExecutionRecord = {
+      ...input,
+      id: existing?.id ?? newId(),
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    };
+    this.agentToolExecutions.set(key, execution);
+    return execution;
+  }
+
+  async listAgentToolExecutions(
+    userId: string,
+    conversationId: string,
+  ): Promise<AgentToolExecutionRecord[]> {
+    const conversation = await this.getAgentConversation(
+      userId,
+      conversationId,
+    );
+    if (!conversation) return [];
+    const assistantCreatedAt = new Map(
+      (this.agentConversationMessages.get(conversationId) ?? []).map(
+        (message) => [message.id, message.createdAt] as const,
+      ),
+    );
+    return [...this.agentToolExecutions.values()]
+      .filter(
+        (execution) =>
+          execution.userId === userId &&
+          execution.conversationId === conversationId,
+      )
+      .sort(
+        (left, right) =>
+          (
+            assistantCreatedAt.get(left.assistantMessageId) ?? left.createdAt
+          ).localeCompare(
+            assistantCreatedAt.get(right.assistantMessageId) ?? right.createdAt,
+          ) ||
+          left.iteration - right.iteration ||
+          left.toolCallIndex - right.toolCallIndex ||
+          left.createdAt.localeCompare(right.createdAt),
+      );
+  }
+
   async saveAgentCandidateRegistry(
     input: Omit<AgentCandidateRegistryRecord, "id" | "createdAt">,
   ): Promise<AgentCandidateRegistryRecord> {
@@ -1199,7 +1265,9 @@ export class InMemoryRepository implements AppRepository {
       subjectUserId: userId,
       conversationId,
       requestedAt,
-      purgeDueAt: new Date(Date.parse(requestedAt) + 24 * 60 * 60 * 1000).toISOString(),
+      purgeDueAt: new Date(
+        Date.parse(requestedAt) + 24 * 60 * 60 * 1000,
+      ).toISOString(),
       status: "pending",
       attemptCount: 0,
     };
@@ -1220,22 +1288,29 @@ export class InMemoryRepository implements AppRepository {
     return request?.subjectUserId === userId ? request : undefined;
   }
 
-  async isAgentConversationSuppressed(conversationId: string): Promise<boolean> {
+  async isAgentConversationSuppressed(
+    conversationId: string,
+  ): Promise<boolean> {
     return this.privacyDeletions.has(conversationId);
   }
 
-  async runPrivacyLifecycle(input: {
-    now?: string;
-    batchSize?: number;
-    reapplyBefore?: string;
-  } = {}): Promise<PrivacyLifecycleResult> {
+  async runPrivacyLifecycle(
+    input: {
+      now?: string;
+      batchSize?: number;
+      reapplyBefore?: string;
+    } = {},
+  ): Promise<PrivacyLifecycleResult> {
     const now = input.now ?? new Date().toISOString();
     const batchSize = Math.max(1, Math.min(100, input.batchSize ?? 25));
     const pending = [...this.privacyDeletions.values()]
-      .filter((request) =>
-        request.status !== "purged" ||
-        (input.reapplyBefore !== undefined &&
-          (request.lastAttemptAt === undefined || request.lastAttemptAt < input.reapplyBefore)))
+      .filter(
+        (request) =>
+          request.status !== "purged" ||
+          (input.reapplyBefore !== undefined &&
+            (request.lastAttemptAt === undefined ||
+              request.lastAttemptAt < input.reapplyBefore)),
+      )
       .sort((a, b) => a.requestedAt.localeCompare(b.requestedAt))
       .slice(0, batchSize);
     let purged = 0;
@@ -1254,27 +1329,65 @@ export class InMemoryRepository implements AppRepository {
         failed++;
         continue;
       }
-      const messages = this.agentConversationMessages.get(request.conversationId) ?? [];
-      const traceIds = new Set(messages.flatMap((message) => message.traceId ? [message.traceId] : []));
-      const turnIds = new Set(messages.flatMap((message) => message.turnId ? [message.turnId] : []));
+      const messages =
+        this.agentConversationMessages.get(request.conversationId) ?? [];
+      const traceIds = new Set(
+        messages.flatMap((message) =>
+          message.traceId ? [message.traceId] : [],
+        ),
+      );
+      const turnIds = new Set(
+        messages.flatMap((message) => (message.turnId ? [message.turnId] : [])),
+      );
       this.agentConversationMessages.delete(request.conversationId);
       this.agentConversations.delete(request.conversationId);
-      for (const [key, registry] of this.agentCandidateRegistries) {
-        if (registry.conversationId === request.conversationId) this.agentCandidateRegistries.delete(key);
+      for (const [key, execution] of this.agentToolExecutions) {
+        if (execution.conversationId === request.conversationId) {
+          this.agentToolExecutions.delete(key);
+        }
       }
-      this.transcriptionRecords = this.transcriptionRecords.filter((record) =>
-        record.conversationId !== request.conversationId && !traceIds.has(record.traceId));
-      this.agentTurns = this.agentTurns.filter((record) =>
-        record.conversationId !== request.conversationId && !traceIds.has(record.traceId) && !turnIds.has(record.turnId));
-      this.agentToolCalls = this.agentToolCalls.filter((record) =>
-        record.conversationId !== request.conversationId && !traceIds.has(record.traceId) && !(record.turnId && turnIds.has(record.turnId)));
-      this.llmProviderCalls = this.llmProviderCalls.filter((record) =>
-        record.conversationId !== request.conversationId && !traceIds.has(record.traceId) && !(record.turnId && turnIds.has(record.turnId)));
-      this.llmRuns = this.llmRuns.filter((record) =>
-        record.conversationId !== request.conversationId && !traceIds.has(record.traceId) && !(record.turnId && turnIds.has(record.turnId)));
-      this.telemetryEvents = this.telemetryEvents.filter((record) => !traceIds.has(record.traceId));
-      this.foodSearchEvents = this.foodSearchEvents.filter((record) => !traceIds.has(record.traceId));
-      this.actionCalls = this.actionCalls.filter((record) => !traceIds.has(record.traceId));
+      for (const [key, registry] of this.agentCandidateRegistries) {
+        if (registry.conversationId === request.conversationId)
+          this.agentCandidateRegistries.delete(key);
+      }
+      this.transcriptionRecords = this.transcriptionRecords.filter(
+        (record) =>
+          record.conversationId !== request.conversationId &&
+          !traceIds.has(record.traceId),
+      );
+      this.agentTurns = this.agentTurns.filter(
+        (record) =>
+          record.conversationId !== request.conversationId &&
+          !traceIds.has(record.traceId) &&
+          !turnIds.has(record.turnId),
+      );
+      this.agentToolCalls = this.agentToolCalls.filter(
+        (record) =>
+          record.conversationId !== request.conversationId &&
+          !traceIds.has(record.traceId) &&
+          !(record.turnId && turnIds.has(record.turnId)),
+      );
+      this.llmProviderCalls = this.llmProviderCalls.filter(
+        (record) =>
+          record.conversationId !== request.conversationId &&
+          !traceIds.has(record.traceId) &&
+          !(record.turnId && turnIds.has(record.turnId)),
+      );
+      this.llmRuns = this.llmRuns.filter(
+        (record) =>
+          record.conversationId !== request.conversationId &&
+          !traceIds.has(record.traceId) &&
+          !(record.turnId && turnIds.has(record.turnId)),
+      );
+      this.telemetryEvents = this.telemetryEvents.filter(
+        (record) => !traceIds.has(record.traceId),
+      );
+      this.foodSearchEvents = this.foodSearchEvents.filter(
+        (record) => !traceIds.has(record.traceId),
+      );
+      this.actionCalls = this.actionCalls.filter(
+        (record) => !traceIds.has(record.traceId),
+      );
       this.privacyDeletions.set(request.conversationId, {
         ...request,
         status: "purged",
@@ -1286,20 +1399,31 @@ export class InMemoryRepository implements AppRepository {
       purged++;
     }
 
-    const retentionCutoff = new Date(Date.parse(now) - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const retentionCutoff = new Date(
+      Date.parse(now) - 30 * 24 * 60 * 60 * 1000,
+    ).toISOString();
     let rawTelemetryExpired = 0;
     this.transcriptionRecords = this.transcriptionRecords.map((record) => {
-      if (record.createdAt >= retentionCutoff || record.transcriptText === undefined) return record;
+      if (
+        record.createdAt >= retentionCutoff ||
+        record.transcriptText === undefined
+      )
+        return record;
       rawTelemetryExpired++;
       return { ...record, transcriptText: undefined };
     });
     this.agentTurns = this.agentTurns.map((record) => {
-      if (record.createdAt >= retentionCutoff || (record.inputText === undefined && record.assistantText === undefined)) return record;
+      if (
+        record.createdAt >= retentionCutoff ||
+        (record.inputText === undefined && record.assistantText === undefined)
+      )
+        return record;
       rawTelemetryExpired++;
       return { ...record, inputText: undefined, assistantText: undefined };
     });
     this.foodSearchEvents = this.foodSearchEvents.map((record) => {
-      if (record.createdAt >= retentionCutoff || record.queryText === undefined) return record;
+      if (record.createdAt >= retentionCutoff || record.queryText === undefined)
+        return record;
       rawTelemetryExpired++;
       return { ...record, queryText: undefined };
     });
@@ -1383,23 +1507,30 @@ export class InMemoryRepository implements AppRepository {
         }
       }
     }
-    const rows = [...this.agentConversations.values()].filter((conversation) => {
-      if (this.privacyDeletions.has(conversation.id)) return false;
-      if (!filter.includeHidden && conversation.hiddenFromUserAt) return false;
-      if (filter.userId && conversation.userId !== filter.userId) return false;
-      if (filter.conversationId && conversation.id !== filter.conversationId) {
-        return false;
-      }
-      if (
-        (filter.traceId || filter.turnId) &&
-        !matchingMessageConversationIds.has(conversation.id)
-      ) {
-        return false;
-      }
-      if (filter.from && conversation.updatedAt < filter.from) return false;
-      if (filter.to && conversation.updatedAt > filter.to) return false;
-      return true;
-    });
+    const rows = [...this.agentConversations.values()].filter(
+      (conversation) => {
+        if (this.privacyDeletions.has(conversation.id)) return false;
+        if (!filter.includeHidden && conversation.hiddenFromUserAt)
+          return false;
+        if (filter.userId && conversation.userId !== filter.userId)
+          return false;
+        if (
+          filter.conversationId &&
+          conversation.id !== filter.conversationId
+        ) {
+          return false;
+        }
+        if (
+          (filter.traceId || filter.turnId) &&
+          !matchingMessageConversationIds.has(conversation.id)
+        ) {
+          return false;
+        }
+        if (filter.from && conversation.updatedAt < filter.from) return false;
+        if (filter.to && conversation.updatedAt > filter.to) return false;
+        return true;
+      },
+    );
     return newestFirst(rows, filter.limit, "updatedAt");
   }
 
@@ -1513,7 +1644,10 @@ export class InMemoryRepository implements AppRepository {
   ): Promise<AgentTurnTelemetryRecord[]> {
     const rows = this.agentTurns.filter((turn) => {
       if (filter.userId && turn.userId !== filter.userId) return false;
-      if (filter.conversationId && turn.conversationId !== filter.conversationId)
+      if (
+        filter.conversationId &&
+        turn.conversationId !== filter.conversationId
+      )
         return false;
       if (filter.traceId && turn.traceId !== filter.traceId) return false;
       if (filter.turnId && turn.turnId !== filter.turnId) return false;
@@ -1544,7 +1678,10 @@ export class InMemoryRepository implements AppRepository {
   ): Promise<AgentToolCallTelemetryRecord[]> {
     const rows = this.agentToolCalls.filter((call) => {
       if (filter.userId && call.userId !== filter.userId) return false;
-      if (filter.conversationId && call.conversationId !== filter.conversationId)
+      if (
+        filter.conversationId &&
+        call.conversationId !== filter.conversationId
+      )
         return false;
       if (filter.traceId && call.traceId !== filter.traceId) return false;
       if (filter.turnId && call.turnId !== filter.turnId) return false;
@@ -1575,7 +1712,10 @@ export class InMemoryRepository implements AppRepository {
   ): Promise<LlmProviderCallRecord[]> {
     const rows = this.llmProviderCalls.filter((call) => {
       if (filter.userId && call.userId !== filter.userId) return false;
-      if (filter.conversationId && call.conversationId !== filter.conversationId)
+      if (
+        filter.conversationId &&
+        call.conversationId !== filter.conversationId
+      )
         return false;
       if (filter.traceId && call.traceId !== filter.traceId) return false;
       if (filter.turnId && call.turnId !== filter.turnId) return false;
@@ -1637,7 +1777,10 @@ export class InMemoryRepository implements AppRepository {
         return false;
       }
       if (filter.userId && call.userId !== filter.userId) return false;
-      if (filter.conversationId && call.conversationId !== filter.conversationId)
+      if (
+        filter.conversationId &&
+        call.conversationId !== filter.conversationId
+      )
         return false;
       if (filter.traceId && call.traceId !== filter.traceId) return false;
       return true;
@@ -1930,7 +2073,9 @@ function buildCostOverview(
     totalCostAmount: providerCost + estimatedCost,
     unknownCostCount: calls.filter((call) => call.costSource === "unknown")
       .length,
-    totalPromptTokens: sumOptionalNumber(calls.map((call) => call.promptTokens)),
+    totalPromptTokens: sumOptionalNumber(
+      calls.map((call) => call.promptTokens),
+    ),
     totalCompletionTokens: sumOptionalNumber(
       calls.map((call) => call.completionTokens),
     ),

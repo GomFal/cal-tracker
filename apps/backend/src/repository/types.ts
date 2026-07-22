@@ -152,11 +152,7 @@ export type FoodSearchCandidate = FoodItemRecord & {
 };
 
 export type FoodFeedbackAction =
-  | "selected"
-  | "logged"
-  | "corrected"
-  | "dismissed"
-  | "rejected";
+  "selected" | "logged" | "corrected" | "dismissed" | "rejected";
 
 export type FoodFeedbackRecord = {
   userId: string;
@@ -668,6 +664,51 @@ export type AgentConversationMessageRecord = {
   createdAt: string;
 };
 
+// This mirrors the versioned public contract in packages/contracts. The
+// backend resolves that workspace through the deployed package artifact, so
+// repository types remain local until all consumers pick up the new export.
+export type AgentToolExecutionStatus =
+  "started" | "completed" | "failed" | "interrupted";
+
+export type AgentToolExecutionSnapshot = {
+  schemaVersion: 1;
+  conversationId: string;
+  turnId: string;
+  assistantMessageId: string;
+  toolCallId: string;
+  iteration: number;
+  toolCallIndex: number;
+  toolCall: {
+    id: string;
+    actionId: string;
+    label: string;
+    summary: string;
+    input: unknown;
+  };
+  status: AgentToolExecutionStatus;
+  result?: unknown;
+  widget?: unknown;
+  error?: unknown;
+  startedAt: string;
+  completedAt?: string;
+};
+
+export type AgentToolExecutionRecord = {
+  id: string;
+  userId: string;
+  conversationId: string;
+  assistantMessageId: string;
+  turnId: string;
+  toolCallId: string;
+  actionId: string;
+  iteration: number;
+  toolCallIndex: number;
+  status: AgentToolExecutionStatus;
+  snapshot: AgentToolExecutionSnapshot;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type AgentCandidateRegistryRecord = {
   id: string;
   userId: string;
@@ -703,8 +744,12 @@ export interface AppRepository {
     tokenHash: string;
     expiresAt: string;
   }): Promise<PendingRegistrationRecord>;
-  findPendingRegistrationByEmail(email: string): Promise<PendingRegistrationRecord | undefined>;
-  consumePendingRegistration(tokenHash: string): Promise<PendingRegistrationRecord | undefined>;
+  findPendingRegistrationByEmail(
+    email: string,
+  ): Promise<PendingRegistrationRecord | undefined>;
+  consumePendingRegistration(
+    tokenHash: string,
+  ): Promise<PendingRegistrationRecord | undefined>;
   findAuthIdentity(
     provider: AuthIdentityProvider,
     providerUserId: string,
@@ -843,6 +888,13 @@ export interface AppRepository {
     userId: string,
     conversationId: string,
   ): Promise<AgentConversationMessageRecord[]>;
+  saveAgentToolExecution(
+    input: Omit<AgentToolExecutionRecord, "id" | "createdAt" | "updatedAt">,
+  ): Promise<AgentToolExecutionRecord>;
+  listAgentToolExecutions(
+    userId: string,
+    conversationId: string,
+  ): Promise<AgentToolExecutionRecord[]>;
   saveAgentCandidateRegistry(
     input: Omit<AgentCandidateRegistryRecord, "id" | "createdAt">,
   ): Promise<AgentCandidateRegistryRecord>;

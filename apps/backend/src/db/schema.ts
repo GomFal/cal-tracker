@@ -1311,7 +1311,9 @@ export const privacyDeletionRequests = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     subjectUserId: uuid("subject_user_id").notNull(),
     conversationId: uuid("conversation_id").notNull(),
-    requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().defaultNow(),
+    requestedAt: timestamp("requested_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
     purgeDueAt: timestamp("purge_due_at", { withTimezone: true }).notNull(),
     status: text("status").notNull().default("pending"),
     purgedAt: timestamp("purged_at", { withTimezone: true }),
@@ -1320,10 +1322,18 @@ export const privacyDeletionRequests = pgTable(
     resultCode: text("result_code"),
   },
   (table) => [
-    uniqueIndex("privacy_deletion_requests_conversation_unique").on(table.conversationId),
-    index("privacy_deletion_requests_status_requested_idx").on(table.status, table.requestedAt),
+    uniqueIndex("privacy_deletion_requests_conversation_unique").on(
+      table.conversationId,
+    ),
+    index("privacy_deletion_requests_status_requested_idx").on(
+      table.status,
+      table.requestedAt,
+    ),
     index("privacy_deletion_requests_subject_idx").on(table.subjectUserId),
-    check("privacy_deletion_requests_status_check", sql`${table.status} IN ('pending','purged','failed')`),
+    check(
+      "privacy_deletion_requests_status_check",
+      sql`${table.status} IN ('pending','purged','failed')`,
+    ),
   ],
 );
 
@@ -1367,6 +1377,72 @@ export const agentMessages = pgTable(
     check(
       "agent_messages_role_check",
       sql`${table.role} IN ('user','assistant','tool')`,
+    ),
+  ],
+);
+
+export const agentToolExecutions = pgTable(
+  "agent_tool_executions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => agentConversations.id, { onDelete: "cascade" }),
+    assistantMessageId: uuid("assistant_message_id")
+      .notNull()
+      .references(() => agentMessages.id, { onDelete: "cascade" }),
+    turnId: uuid("turn_id").notNull(),
+    toolCallId: text("tool_call_id").notNull(),
+    actionId: text("action_id").notNull(),
+    iteration: integer("iteration").notNull(),
+    toolCallIndex: integer("tool_call_index").notNull(),
+    status: text("status").notNull(),
+    snapshotJson: jsonb("snapshot_json").$type<JsonObject>().notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("agent_tool_executions_conversation_call_unique").on(
+      table.conversationId,
+      table.toolCallId,
+    ),
+    index("agent_tool_executions_conversation_order_idx").on(
+      table.conversationId,
+      table.turnId,
+      table.iteration,
+      table.toolCallIndex,
+    ),
+    index("agent_tool_executions_user_created_idx").on(
+      table.userId,
+      table.createdAt,
+    ),
+    check(
+      "agent_tool_executions_status_check",
+      sql`${table.status} IN ('started','completed','failed','interrupted')`,
+    ),
+    check(
+      "agent_tool_executions_snapshot_status_check",
+      sql`${table.snapshotJson}->>'status' = ${table.status}`,
+    ),
+    check(
+      "agent_tool_executions_terminal_timestamp_check",
+      sql`(
+        (${table.status} = 'started' AND ${table.completedAt} IS NULL
+          AND NOT (${table.snapshotJson} ? 'completedAt'))
+        OR
+        (${table.status} IN ('completed','failed','interrupted')
+          AND ${table.completedAt} IS NOT NULL
+          AND ${table.snapshotJson} ? 'completedAt')
+      )`,
     ),
   ],
 );
@@ -1495,10 +1571,9 @@ export const agentToolCallTelemetry = pgTable(
   "agent_tool_call_telemetry",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    agentTurnId: uuid("agent_turn_id").references(
-      () => agentTurnTelemetry.id,
-      { onDelete: "set null" },
-    ),
+    agentTurnId: uuid("agent_turn_id").references(() => agentTurnTelemetry.id, {
+      onDelete: "set null",
+    }),
     conversationId: uuid("conversation_id").references(
       () => agentConversations.id,
       { onDelete: "set null" },
@@ -1556,10 +1631,9 @@ export const llmProviderCalls = pgTable(
       () => agentConversations.id,
       { onDelete: "set null" },
     ),
-    agentTurnId: uuid("agent_turn_id").references(
-      () => agentTurnTelemetry.id,
-      { onDelete: "set null" },
-    ),
+    agentTurnId: uuid("agent_turn_id").references(() => agentTurnTelemetry.id, {
+      onDelete: "set null",
+    }),
     turnId: uuid("turn_id"),
     actionCallId: uuid("action_call_id"),
     featureSurface: text("feature_surface").notNull(),
@@ -1629,9 +1703,7 @@ export const llmProviderCalls = pgTable(
       .defaultNow(),
   },
   (table) => [
-    index("llm_provider_calls_created_at_idx").on(
-      sql`${table.createdAt} DESC`,
-    ),
+    index("llm_provider_calls_created_at_idx").on(sql`${table.createdAt} DESC`),
     index("llm_provider_calls_trace_id_idx").on(table.traceId),
     index("llm_provider_calls_user_created_at_idx").on(
       table.userId,

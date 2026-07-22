@@ -92,8 +92,8 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
                             onPressed: viewModel.isBusy || viewModel.isRecording
                                 ? null
                                 : () => unawaited(
-                                    viewModel.startNewConversation(),
-                                  ),
+                                      viewModel.startNewConversation(),
+                                    ),
                           ),
                           FreshIconButton(
                             key: const ValueKey('agent_chat_history_button'),
@@ -275,7 +275,9 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
                         Expanded(
                           child: Text(
                             context.l10n.agentChatHistoryTitle,
-                            style: Theme.of(context).textTheme.titleLarge
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleLarge
                                 ?.copyWith(fontWeight: FontWeight.w700),
                           ),
                         ),
@@ -490,9 +492,9 @@ class _UserBubble extends StatelessWidget {
             text,
             textAlign: TextAlign.right,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: palette.ink,
-              fontWeight: FontWeight.w600,
-            ),
+                  color: palette.ink,
+                  fontWeight: FontWeight.w600,
+                ),
           ),
         ),
       ),
@@ -660,11 +662,13 @@ class _ToolCallCard extends StatelessWidget {
       AgentChatToolStatus.running => Icons.sync_rounded,
       AgentChatToolStatus.completed => Icons.check_circle_rounded,
       AgentChatToolStatus.failed => Icons.error_outline_rounded,
+      AgentChatToolStatus.interrupted => Icons.pause_circle_outline_rounded,
     };
     final color = switch (status) {
       AgentChatToolStatus.running => palette.water,
       AgentChatToolStatus.completed => palette.limeDeep,
       AgentChatToolStatus.failed => palette.coral,
+      AgentChatToolStatus.interrupted => palette.orange,
     };
     return DecoratedBox(
       key: ValueKey('agent_tool_${toolCall?.id ?? entry.id}'),
@@ -690,7 +694,9 @@ class _ToolCallCard extends StatelessWidget {
                     children: [
                       Text(
                         toolCall?.label ?? context.l10n.agentChatToolFallback,
-                        style: Theme.of(context).textTheme.titleMedium
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
                             ?.copyWith(fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(height: FreshSpacing.xs),
@@ -701,8 +707,8 @@ class _ToolCallCard extends StatelessWidget {
                           fallback: entry.error ?? toolCall?.summary ?? '',
                         ),
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: palette.inkSoft,
-                        ),
+                              color: palette.inkSoft,
+                            ),
                       ),
                     ],
                   ),
@@ -836,9 +842,9 @@ class _UsualFoodDraftReview extends StatelessWidget {
           Text(
             l10n.agentChatDraftMissingFields(missing),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: palette.orange,
-              fontWeight: FontWeight.w600,
-            ),
+                  color: palette.orange,
+                  fontWeight: FontWeight.w600,
+                ),
           ),
         ],
         const SizedBox(height: FreshSpacing.md),
@@ -899,9 +905,8 @@ class _UsualMealDraftReview extends StatelessWidget {
     final missing = missingFields
         .map((field) => _usualMealDraftFieldLabel(context, field))
         .join(', ');
-    final nutrition = draft.items.isEmpty
-        ? null
-        : _sumMealItemNutrition(draft.items);
+    final nutrition =
+        draft.items.isEmpty ? null : _sumMealItemNutrition(draft.items);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -929,9 +934,9 @@ class _UsualMealDraftReview extends StatelessWidget {
           Text(
             l10n.agentChatDraftMissingFields(missing),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: palette.orange,
-              fontWeight: FontWeight.w600,
-            ),
+                  color: palette.orange,
+                  fontWeight: FontWeight.w600,
+                ),
           ),
         ],
         const SizedBox(height: FreshSpacing.md),
@@ -1190,9 +1195,9 @@ class _MetricPill extends StatelessWidget {
       child: Text(
         '$value $label',
         style: Theme.of(context).textTheme.labelLarge?.copyWith(
-          color: color,
-          fontWeight: FontWeight.w700,
-        ),
+              color: color,
+              fontWeight: FontWeight.w700,
+            ),
       ),
     );
   }
@@ -1232,8 +1237,7 @@ class _MealList extends StatelessWidget {
         for (final meal in meals.take(6))
           _CompactRow(
             title: meal.title,
-            subtitle:
-                meal.mealLabel?.label ??
+            subtitle: meal.mealLabel?.label ??
                 meal.occurredAt.toLocal().toString().substring(0, 16),
             trailing: '${meal.nutrition.calories} ${context.l10n.commonKcal}',
           ),
@@ -1255,8 +1259,7 @@ class _UsualFoodList extends StatelessWidget {
         for (final food in foods.take(6))
           _CompactRow(
             title: food.name,
-            subtitle:
-                food.brand ??
+            subtitle: food.brand ??
                 context.l10n.usualFoodsPerServing(_grams(food.servingGrams)),
             trailing: '${food.nutrition.calories} ${context.l10n.commonKcal}',
           ),

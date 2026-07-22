@@ -155,6 +155,13 @@
       "when": 1784196000000,
       "tag": "0021_chat_transcript_lifecycle",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1784200000000,
+      "tag": "0022_agent_tool_executions",
+      "breakpoints": true
     }
   ]
 }

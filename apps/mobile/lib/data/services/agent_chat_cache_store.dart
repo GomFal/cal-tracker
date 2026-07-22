@@ -8,9 +8,9 @@ class AgentChatCacheStore {
     required StringKeyValueStorage storage,
     DateTime Function()? now,
     Duration maxEntryAge = const Duration(days: 7),
-  }) : _storage = storage,
-       _now = now ?? DateTime.now,
-       _maxEntryAge = maxEntryAge;
+  })  : _storage = storage,
+        _now = now ?? DateTime.now,
+        _maxEntryAge = maxEntryAge;
 
   static const _schemaVersion = 1;
   static const _keyPrefix = 'agent_chat_cache:v1';
@@ -85,6 +85,10 @@ class AgentChatCacheStore {
         messages: _objectList(
           object['messages'],
         ).map(AgentConversationMessage.fromJson).toList(),
+        toolExecutions: _objectListOrEmpty(object['toolExecutions'])
+            .map(AgentToolExecutionSnapshot.tryFromJson)
+            .whereType<AgentToolExecutionSnapshot>()
+            .toList(),
       );
     });
   }
@@ -100,6 +104,32 @@ class AgentChatCacheStore {
     if (_deletedFor(context).contains(id) || !_isCurrent(context)) {
       await _storage.remove(_storageKey(context, 'detail:$id'));
     }
+  }
+
+  /// Writes a terminal stream snapshot through to an already cached detail.
+  /// The message list remains server-authoritative; this only prevents a rich
+  /// tool result from disappearing before the next stale-while-revalidate read.
+  Future<void> mergeToolExecution(
+    AgentToolExecutionSnapshot execution,
+  ) async {
+    final detail = await readConversationDetail(execution.conversationId);
+    if (detail == null) return;
+    final executions = [...detail.toolExecutions];
+    final index = executions.indexWhere(
+      (item) => item.toolCallId == execution.toolCallId,
+    );
+    if (index < 0) {
+      executions.add(execution);
+    } else {
+      executions[index] = execution;
+    }
+    await writeConversationDetail(
+      AgentConversationDetail(
+        conversation: detail.conversation,
+        messages: detail.messages,
+        toolExecutions: executions,
+      ),
+    );
   }
 
   Future<void> removeConversation(String conversationId) async {
@@ -302,3 +332,6 @@ List<Map<String, Object?>> _objectList(Object? value) {
   }
   return value.map(_objectMap).toList();
 }
+
+List<Map<String, Object?>> _objectListOrEmpty(Object? value) =>
+    value is List ? value.map(_objectMap).toList() : const [];

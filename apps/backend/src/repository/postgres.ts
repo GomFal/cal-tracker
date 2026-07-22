@@ -29,6 +29,7 @@ import type {
   AdminConversationFilter,
   AgentToolCallTelemetryFilter,
   AgentToolCallTelemetryRecord,
+  AgentToolExecutionRecord,
   AgentTurnTelemetryFilter,
   AgentTurnTelemetryRecord,
   AgentCandidateRegistryRecord,
@@ -131,7 +132,8 @@ export class PostgresRepository implements AppRepository {
     this.db = this.client.db;
     this.normalizedSearchEnabled = Boolean(options.normalizedSearchEnabled);
     this.normalizedSearchScope = options.normalizedSearchScope ?? "sample";
-    this.normalizedSearchSampleSet = options.normalizedSearchSampleSet ?? "normalized_search_v1";
+    this.normalizedSearchSampleSet =
+      options.normalizedSearchSampleSet ?? "normalized_search_v1";
   }
 
   async close(): Promise<void> {
@@ -456,12 +458,14 @@ export class PostgresRepository implements AppRepository {
     const cached = this.getCachedFoodSearch(cacheKey);
     if (cached) return cached.map(cloneFoodSearchCandidate);
 
-    const candidateRows = new Map<
-      string,
-      FoodSearchRowCandidate
-    >();
+    const candidateRows = new Map<string, FoodSearchRowCandidate>();
     if (this.normalizedSearchEnabled) {
-      const rows = await this.searchNormalizedFoodDocuments(userId, input, normalized, limit);
+      const rows = await this.searchNormalizedFoodDocuments(
+        userId,
+        input,
+        normalized,
+        limit,
+      );
       for (const row of rows) {
         mergeFoodSearchRowCandidate(candidateRows, {
           row,
@@ -470,7 +474,15 @@ export class PostgresRepository implements AppRepository {
         });
       }
       if (candidateRows.size > 0) {
-        return this.rankFoodSearchRows(userId, input, normalized, limit, candidateRows, cacheKey, true);
+        return this.rankFoodSearchRows(
+          userId,
+          input,
+          normalized,
+          limit,
+          candidateRows,
+          cacheKey,
+          true,
+        );
       }
       // Fall through to legacy search path when normalized search finds nothing
       // This ensures user-custom foods (usual foods) in food_search_documents are found
@@ -548,7 +560,15 @@ export class PostgresRepository implements AppRepository {
       this.setCachedFoodSearch(cacheKey, []);
       return [];
     }
-    return this.rankFoodSearchRows(userId, input, normalized, limit, candidateRows, cacheKey, false);
+    return this.rankFoodSearchRows(
+      userId,
+      input,
+      normalized,
+      limit,
+      candidateRows,
+      cacheKey,
+      false,
+    );
   }
 
   private async rankFoodSearchRows(
@@ -591,10 +611,10 @@ export class PostgresRepository implements AppRepository {
                 ? lexicalFoodScore(food, normalized)
                 : 0;
             const rawLexicalScore = useStoredLexicalScore
-              ? scores?.lexicalScore ?? computedLexicalScore
+              ? (scores?.lexicalScore ?? computedLexicalScore)
               : computedLexicalScore > 0
                 ? computedLexicalScore
-                : scores?.lexicalScore ?? 0;
+                : (scores?.lexicalScore ?? 0);
             const lexicalScore = clampScore(rawLexicalScore);
             const vectorScore =
               scores?.vectorScore == null
@@ -648,7 +668,8 @@ export class PostgresRepository implements AppRepository {
       const rows = await withSpan(
         "PostgresRepository.searchFoodsHybrid.normalizedBarcodeQuery",
         { limit, sampleSet: this.normalizedSearchSampleSet },
-        () => this.execute(dbSql`
+        () =>
+          this.execute(dbSql`
           SELECT food_items.*,
                  food_normalized_search_documents.display_name AS search_display_name,
                  food_normalized_search_documents.display_name AS search_normalized_display_name,
@@ -695,7 +716,8 @@ export class PostgresRepository implements AppRepository {
         locales: profile.locales,
         sampleSet: this.normalizedSearchSampleSet,
       },
-      () => this.queryNormalizedFoodDocuments(userId, normalized, profile, limit),
+      () =>
+        this.queryNormalizedFoodDocuments(userId, normalized, profile, limit),
     );
   }
 
@@ -706,12 +728,35 @@ export class PostgresRepository implements AppRepository {
     limit: number,
   ): Promise<Record<string, unknown>[]> {
     const queryIdentityKey = normalizedIdentityTokenKeys([normalized])[0];
-    const strongRows = await this.queryNormalizedFoodDocumentsStrongIdentity(userId, normalized, queryIdentityKey, profile, limit);
-    if (normalizedStrongIdentityCanShortCircuit(strongRows, limit)) return strongRows;
-    const textRows = await this.queryNormalizedFoodDocumentsText(userId, normalized, queryIdentityKey, profile, limit);
-    const mergedRows = mergeNormalizedFoodDocumentRows(limit * 2, strongRows, textRows);
+    const strongRows = await this.queryNormalizedFoodDocumentsStrongIdentity(
+      userId,
+      normalized,
+      queryIdentityKey,
+      profile,
+      limit,
+    );
+    if (normalizedStrongIdentityCanShortCircuit(strongRows, limit))
+      return strongRows;
+    const textRows = await this.queryNormalizedFoodDocumentsText(
+      userId,
+      normalized,
+      queryIdentityKey,
+      profile,
+      limit,
+    );
+    const mergedRows = mergeNormalizedFoodDocumentRows(
+      limit * 2,
+      strongRows,
+      textRows,
+    );
     if (mergedRows.length > 0) return mergedRows;
-    const fuzzyRows = await this.queryNormalizedFoodDocumentsFuzzy(userId, normalized, queryIdentityKey, profile, limit);
+    const fuzzyRows = await this.queryNormalizedFoodDocumentsFuzzy(
+      userId,
+      normalized,
+      queryIdentityKey,
+      profile,
+      limit,
+    );
     return fuzzyRows;
   }
 
@@ -737,15 +782,16 @@ export class PostgresRepository implements AppRepository {
   ): Promise<Record<string, unknown>[]> {
     const tokenRows = queryIdentityKey
       ? await this.queryNormalizedFoodDocumentsStrongIdentityRows(
-        userId,
-        normalized,
-        queryIdentityKey,
-        profile,
-        limit,
-        normalizedFoodIdentityTokenKeyPredicateSql(queryIdentityKey),
-      )
+          userId,
+          normalized,
+          queryIdentityKey,
+          profile,
+          limit,
+          normalizedFoodIdentityTokenKeyPredicateSql(queryIdentityKey),
+        )
       : [];
-    if (normalizedStrongIdentityCanShortCircuit(tokenRows, limit)) return tokenRows;
+    if (normalizedStrongIdentityCanShortCircuit(tokenRows, limit))
+      return tokenRows;
     const broadRows = await this.queryNormalizedFoodDocumentsStrongIdentityRows(
       userId,
       normalized,
@@ -766,7 +812,10 @@ export class PostgresRepository implements AppRepository {
     predicate: SQL,
   ): Promise<Record<string, unknown>[]> {
     const searchLimit = normalizedFoodSearchLimit(limit);
-    const searchScore = normalizedFoodTextSearchScoreSql(normalized, queryIdentityKey);
+    const searchScore = normalizedFoodTextSearchScoreSql(
+      normalized,
+      queryIdentityKey,
+    );
     const locale0 = profile.locales[0] ?? "any";
     const locale1 = profile.locales[1] ?? locale0;
     const locale2 = profile.locales[2] ?? locale1;
@@ -866,7 +915,10 @@ export class PostgresRepository implements AppRepository {
     limit: number,
   ): Promise<Record<string, unknown>[]> {
     const searchLimit = normalizedFoodSearchLimit(limit);
-    const searchScore = normalizedFoodTextSearchScoreSql(normalized, queryIdentityKey);
+    const searchScore = normalizedFoodTextSearchScoreSql(
+      normalized,
+      queryIdentityKey,
+    );
     const locale0 = profile.locales[0] ?? "any";
     const locale1 = profile.locales[1] ?? locale0;
     const locale2 = profile.locales[2] ?? locale1;
@@ -1083,13 +1135,7 @@ export class PostgresRepository implements AppRepository {
           scope: profile.scope,
           locales: profile.locales,
         },
-        () =>
-          this.queryFoodSearchDocuments(
-            userId,
-            normalized,
-            profile,
-            limit,
-          ),
+        () => this.queryFoodSearchDocuments(userId, normalized, profile, limit),
       );
       for (const row of profileRows) {
         const id = row.id as string;
@@ -2172,6 +2218,81 @@ export class PostgresRepository implements AppRepository {
     return rows.map(mapAgentConversationMessage);
   }
 
+  async saveAgentToolExecution(
+    input: Omit<AgentToolExecutionRecord, "id" | "createdAt" | "updatedAt">,
+  ): Promise<AgentToolExecutionRecord> {
+    const [row] = await this.execute(dbSql`
+      INSERT INTO agent_tool_executions (
+        user_id, conversation_id, assistant_message_id, turn_id, tool_call_id,
+        action_id, iteration, tool_call_index, status, snapshot_json,
+        started_at, completed_at
+      )
+      SELECT
+        ${input.userId}, ${input.conversationId}, ${input.assistantMessageId},
+        ${input.turnId}, ${input.toolCallId}, ${input.actionId},
+        ${input.iteration}, ${input.toolCallIndex}, ${input.status},
+        ${jsonb(input.snapshot)}, ${input.snapshot.startedAt},
+        ${input.snapshot.completedAt ?? null}
+      WHERE EXISTS (
+        SELECT 1 FROM agent_conversations
+        WHERE id = ${input.conversationId} AND user_id = ${input.userId}
+          AND hidden_from_user_at IS NULL
+      )
+      ON CONFLICT (conversation_id, tool_call_id)
+      DO UPDATE SET
+        snapshot_json = CASE
+          WHEN agent_tool_executions.status = 'started'
+            AND EXCLUDED.status <> 'started'
+          THEN EXCLUDED.snapshot_json
+          ELSE agent_tool_executions.snapshot_json
+        END,
+        status = CASE
+          WHEN agent_tool_executions.status = 'started'
+            AND EXCLUDED.status <> 'started'
+          THEN EXCLUDED.status
+          ELSE agent_tool_executions.status
+        END,
+        completed_at = CASE
+          WHEN agent_tool_executions.status = 'started'
+            AND EXCLUDED.status <> 'started'
+          THEN EXCLUDED.completed_at
+          ELSE agent_tool_executions.completed_at
+        END,
+        updated_at = CASE
+          WHEN agent_tool_executions.status = 'started'
+            AND EXCLUDED.status <> 'started'
+          THEN now()
+          ELSE agent_tool_executions.updated_at
+        END
+      RETURNING *
+    `);
+    if (!row) throw new Error("agent_conversation_not_found");
+    return mapAgentToolExecution(row);
+  }
+
+  async listAgentToolExecutions(
+    userId: string,
+    conversationId: string,
+  ): Promise<AgentToolExecutionRecord[]> {
+    const rows = await this.execute(dbSql`
+      SELECT execution.*
+      FROM agent_tool_executions execution
+      JOIN agent_conversations conversation
+        ON conversation.id = execution.conversation_id
+      JOIN agent_messages assistant_message
+        ON assistant_message.id = execution.assistant_message_id
+      WHERE execution.conversation_id = ${conversationId}
+        AND execution.user_id = ${userId}
+        AND conversation.user_id = ${userId}
+        AND conversation.hidden_from_user_at IS NULL
+      -- The assistant message anchors the chronological turn. Within that
+      -- turn, provider iteration and tool position are the semantic order.
+      ORDER BY assistant_message.created_at, execution.iteration,
+        execution.tool_call_index, execution.created_at
+    `);
+    return rows.map(mapAgentToolExecution);
+  }
+
   async saveAgentCandidateRegistry(
     input: Omit<AgentCandidateRegistryRecord, "id" | "createdAt">,
   ): Promise<AgentCandidateRegistryRecord> {
@@ -2341,25 +2462,36 @@ export class PostgresRepository implements AppRepository {
     conversationId: string,
   ): Promise<PrivacyDeletionRequest | undefined> {
     return this.db.transaction(async (tx) => {
-      await executeRows(tx, dbSql`
+      await executeRows(
+        tx,
+        dbSql`
         SELECT pg_advisory_xact_lock(hashtext(${conversationId}))
-      `);
-      const existing = await executeRows(tx, dbSql`
+      `,
+      );
+      const existing = await executeRows(
+        tx,
+        dbSql`
         SELECT * FROM privacy_deletion_requests
         WHERE conversation_id = ${conversationId}
           AND subject_user_id = ${userId}
         LIMIT 1
-      `);
+      `,
+      );
       if (existing[0]) return mapPrivacyDeletionRequest(existing[0]);
 
-      const owned = await executeRows(tx, dbSql`
+      const owned = await executeRows(
+        tx,
+        dbSql`
         SELECT id FROM agent_conversations
         WHERE id = ${conversationId} AND user_id = ${userId}
         FOR UPDATE
-      `);
+      `,
+      );
       if (!owned[0]) return undefined;
 
-      const rows = await executeRows(tx, dbSql`
+      const rows = await executeRows(
+        tx,
+        dbSql`
         INSERT INTO privacy_deletion_requests (
           subject_user_id, conversation_id, purge_due_at
         ) VALUES (
@@ -2367,20 +2499,31 @@ export class PostgresRepository implements AppRepository {
         )
         ON CONFLICT (conversation_id) DO NOTHING
         RETURNING *
-      `);
-      const request = rows[0] ?? (await executeRows(tx, dbSql`
+      `,
+      );
+      const request =
+        rows[0] ??
+        (
+          await executeRows(
+            tx,
+            dbSql`
         SELECT * FROM privacy_deletion_requests
         WHERE conversation_id = ${conversationId}
           AND subject_user_id = ${userId}
         LIMIT 1
-      `))[0];
+      `,
+          )
+        )[0];
       if (!request) return undefined;
-      await executeRows(tx, dbSql`
+      await executeRows(
+        tx,
+        dbSql`
         UPDATE agent_conversations
         SET hidden_from_user_at = COALESCE(hidden_from_user_at, now()),
             updated_at = now()
         WHERE id = ${conversationId} AND user_id = ${userId}
-      `);
+      `,
+      );
       return mapPrivacyDeletionRequest(request);
     });
   }
@@ -2398,7 +2541,9 @@ export class PostgresRepository implements AppRepository {
     return row ? mapPrivacyDeletionRequest(row) : undefined;
   }
 
-  async isAgentConversationSuppressed(conversationId: string): Promise<boolean> {
+  async isAgentConversationSuppressed(
+    conversationId: string,
+  ): Promise<boolean> {
     const [row] = await this.execute(dbSql`
       SELECT 1 AS suppressed FROM privacy_deletion_requests
       WHERE conversation_id = ${conversationId}
@@ -2407,21 +2552,37 @@ export class PostgresRepository implements AppRepository {
     return Boolean(row);
   }
 
-  async runPrivacyLifecycle(input: {
-    now?: string;
-    batchSize?: number;
-    reapplyBefore?: string;
-  } = {}): Promise<PrivacyLifecycleResult> {
-    const batchSize = Math.max(1, Math.min(100, Math.floor(input.batchSize ?? 25)));
+  async runPrivacyLifecycle(
+    input: {
+      now?: string;
+      batchSize?: number;
+      reapplyBefore?: string;
+    } = {},
+  ): Promise<PrivacyLifecycleResult> {
+    const batchSize = Math.max(
+      1,
+      Math.min(100, Math.floor(input.batchSize ?? 25)),
+    );
     const effectiveNow = input.now ?? new Date().toISOString();
     return this.db.transaction(async (tx) => {
-      const [lock] = await executeRows(tx, dbSql`
+      const [lock] = await executeRows(
+        tx,
+        dbSql`
         SELECT pg_try_advisory_xact_lock(hashtext('bettercalories-privacy-lifecycle-v1')) AS acquired
-      `);
+      `,
+      );
       if (!lock?.acquired) {
-        return { lockAcquired: false, processed: 0, purged: 0, failed: 0, rawTelemetryExpired: 0 };
+        return {
+          lockAcquired: false,
+          processed: 0,
+          purged: 0,
+          failed: 0,
+          rawTelemetryExpired: 0,
+        };
       }
-      const requests = await executeRows(tx, dbSql`
+      const requests = await executeRows(
+        tx,
+        dbSql`
         SELECT * FROM privacy_deletion_requests
         WHERE status IN ('pending', 'failed')
           OR (
@@ -2432,35 +2593,47 @@ export class PostgresRepository implements AppRepository {
         ORDER BY requested_at
         LIMIT ${batchSize}
         FOR UPDATE SKIP LOCKED
-      `);
+      `,
+      );
       let purged = 0;
       let failed = 0;
       for (const row of requests) {
         try {
           await tx.transaction(async (savepoint) => {
-            await purgeConversationContent(savepoint, row.conversation_id as string);
-            await executeRows(savepoint, dbSql`
+            await purgeConversationContent(
+              savepoint,
+              row.conversation_id as string,
+            );
+            await executeRows(
+              savepoint,
+              dbSql`
               UPDATE privacy_deletion_requests
               SET status = 'purged', purged_at = COALESCE(purged_at, ${effectiveNow}),
                   last_attempt_at = ${effectiveNow}, attempt_count = attempt_count + 1,
                   result_code = 'active_content_purged'
               WHERE id = ${row.id as string}
-            `);
+            `,
+            );
           });
           purged++;
         } catch {
-          await executeRows(tx, dbSql`
+          await executeRows(
+            tx,
+            dbSql`
             UPDATE privacy_deletion_requests
             SET status = 'failed', last_attempt_at = ${effectiveNow},
                 attempt_count = attempt_count + 1,
                 result_code = 'purge_retry_required'
             WHERE id = ${row.id as string}
-          `);
+          `,
+          );
           failed++;
         }
       }
 
-      const cutoff = new Date(Date.parse(effectiveNow) - 30 * 24 * 60 * 60 * 1000).toISOString();
+      const cutoff = new Date(
+        Date.parse(effectiveNow) - 30 * 24 * 60 * 60 * 1000,
+      ).toISOString();
       let rawTelemetryExpired = 0;
       const scrubQueries = [
         dbSql`UPDATE telemetry_events SET error_message = NULL, metadata_json = '{}'::jsonb WHERE created_at < ${cutoff} AND (error_message IS NOT NULL OR metadata_json <> '{}'::jsonb) RETURNING id`,
@@ -2557,7 +2730,11 @@ export class PostgresRepository implements AppRepository {
   ): Promise<TelemetryEventRecord> {
     const [row] = await withSpan(
       "PostgresRepository.createTelemetryEvent",
-      { eventType: input.eventType, surface: input.surface, severity: input.severity },
+      {
+        eventType: input.eventType,
+        surface: input.surface,
+        severity: input.severity,
+      },
       () =>
         this.execute(dbSql`
           INSERT INTO telemetry_events (
@@ -2582,7 +2759,14 @@ export class PostgresRepository implements AppRepository {
     const limit = filter.limit ?? 100;
     const rows = await withSpan(
       "PostgresRepository.listTelemetryEvents",
-      { limit, severity: filter.severity, eventType: filter.eventType, surface: filter.surface, traceId: filter.traceId, userId: filter.userId },
+      {
+        limit,
+        severity: filter.severity,
+        eventType: filter.eventType,
+        surface: filter.surface,
+        traceId: filter.traceId,
+        userId: filter.userId,
+      },
       () =>
         this.execute(dbSql`
           SELECT * FROM telemetry_events
@@ -2605,7 +2789,11 @@ export class PostgresRepository implements AppRepository {
   ): Promise<LlmRunRecord> {
     const [row] = await withSpan(
       "PostgresRepository.createLlmRun",
-      { model: input.model, resultKind: input.resultKind, selectedTool: input.selectedTool },
+      {
+        model: input.model,
+        resultKind: input.resultKind,
+        selectedTool: input.selectedTool,
+      },
       () =>
         this.execute(dbSql`
           INSERT INTO llm_runs (
@@ -2640,13 +2828,17 @@ export class PostgresRepository implements AppRepository {
     return mapLlmRun(row);
   }
 
-  async listLlmRuns(
-    filter: LlmRunFilter,
-  ): Promise<LlmRunRecord[]> {
+  async listLlmRuns(filter: LlmRunFilter): Promise<LlmRunRecord[]> {
     const limit = filter.limit ?? 100;
     const rows = await withSpan(
       "PostgresRepository.listLlmRuns",
-      { limit, resultKind: filter.resultKind, selectedTool: filter.selectedTool, traceId: filter.traceId, userId: filter.userId },
+      {
+        limit,
+        resultKind: filter.resultKind,
+        selectedTool: filter.selectedTool,
+        traceId: filter.traceId,
+        userId: filter.userId,
+      },
       () =>
         this.execute(dbSql`
           SELECT * FROM llm_runs
@@ -2910,7 +3102,11 @@ export class PostgresRepository implements AppRepository {
   ): Promise<FoodSearchEventRecord> {
     const [row] = await withSpan(
       "PostgresRepository.createFoodSearchEvent",
-      { zeroResults: input.zeroResults, lowConfidence: input.lowConfidence, path: input.path },
+      {
+        zeroResults: input.zeroResults,
+        lowConfidence: input.lowConfidence,
+        path: input.path,
+      },
       () =>
         this.execute(dbSql`
           INSERT INTO food_search_events (
@@ -2937,7 +3133,14 @@ export class PostgresRepository implements AppRepository {
     const limit = filter.limit ?? 100;
     const rows = await withSpan(
       "PostgresRepository.listFoodSearchEvents",
-      { limit, zeroResults: filter.zeroResults, lowConfidence: filter.lowConfidence, path: filter.path, traceId: filter.traceId, userId: filter.userId },
+      {
+        limit,
+        zeroResults: filter.zeroResults,
+        lowConfidence: filter.lowConfidence,
+        path: filter.path,
+        traceId: filter.traceId,
+        userId: filter.userId,
+      },
       () =>
         this.execute(dbSql`
           SELECT * FROM food_search_events
@@ -2955,7 +3158,10 @@ export class PostgresRepository implements AppRepository {
     return rows.map(mapFoodSearchEvent);
   }
 
-  async getTelemetryOverview(input: { from: string; to: string }): Promise<TelemetryOverview> {
+  async getTelemetryOverview(input: {
+    from: string;
+    to: string;
+  }): Promise<TelemetryOverview> {
     const overviewRows = await withSpan(
       "PostgresRepository.getTelemetryOverview",
       { from: input.from, to: input.to },
@@ -3022,7 +3228,9 @@ export class PostgresRepository implements AppRepository {
     const overview = overviewRows[0] ?? {};
     const totalEvents = Number(overview.total_events ?? 0);
     const totalLlmRuns = Number(overview.total_llm_runs ?? 0);
-    const totalFoodSearchEvents = Number(overview.total_food_search_events ?? 0);
+    const totalFoodSearchEvents = Number(
+      overview.total_food_search_events ?? 0,
+    );
     const totalConversations = Number(overview.total_conversations ?? 0);
     const totalAgentTurns = Number(overview.total_agent_turns ?? 0);
     const totalProviderCalls = Number(overview.total_provider_calls ?? 0);
@@ -3094,9 +3302,16 @@ export class PostgresRepository implements AppRepository {
       eventsBySeverity,
       eventsBySurface,
       recentResultKinds,
-      zeroResultRate: totalFoodSearchEvents === 0 ? 0 : zeroResultsCount / totalFoodSearchEvents,
-      lowConfidenceRate: totalFoodSearchEvents === 0 ? 0 : lowConfidenceCount / totalFoodSearchEvents,
-      providerErrorRate: totalLlmRuns === 0 ? 0 : providerErrorCount / totalLlmRuns
+      zeroResultRate:
+        totalFoodSearchEvents === 0
+          ? 0
+          : zeroResultsCount / totalFoodSearchEvents,
+      lowConfidenceRate:
+        totalFoodSearchEvents === 0
+          ? 0
+          : lowConfidenceCount / totalFoodSearchEvents,
+      providerErrorRate:
+        totalLlmRuns === 0 ? 0 : providerErrorCount / totalLlmRuns,
     };
   }
 
@@ -3320,7 +3535,9 @@ export class PostgresRepository implements AppRepository {
       email: row.email as string,
       displayName: row.display_name as string,
       trustedModeEnabled: Boolean(row.trusted_mode_enabled),
-      emailVerifiedAt: row.email_verified_at ? toIso(row.email_verified_at) : undefined,
+      emailVerifiedAt: row.email_verified_at
+        ? toIso(row.email_verified_at)
+        : undefined,
       createdAt: toIso(row.created_at),
       ...(passwordHash ? { passwordHash } : {}),
       scopes,
@@ -3355,7 +3572,9 @@ function mapPrivacyDeletionRequest(
     purgeDueAt: toIso(row.purge_due_at),
     status: row.status as PrivacyDeletionRequest["status"],
     ...(row.purged_at ? { purgedAt: toIso(row.purged_at) } : {}),
-    ...(row.last_attempt_at ? { lastAttemptAt: toIso(row.last_attempt_at) } : {}),
+    ...(row.last_attempt_at
+      ? { lastAttemptAt: toIso(row.last_attempt_at) }
+      : {}),
     attemptCount: Number(row.attempt_count ?? 0),
     ...(row.result_code ? { resultCode: row.result_code as string } : {}),
   };
@@ -3367,7 +3586,9 @@ async function purgeConversationContent(
 ): Promise<void> {
   // Capture correlation keys before deleting messages. These keys propagate
   // deletion to telemetry and derived operational rows without retaining text.
-  const traceRows = await executeRows(dbClient, dbSql`
+  const traceRows = await executeRows(
+    dbClient,
+    dbSql`
     SELECT DISTINCT trace_id FROM (
       SELECT trace_id FROM agent_messages WHERE conversation_id = ${conversationId}
       UNION ALL SELECT trace_id FROM agent_turn_telemetry WHERE conversation_id = ${conversationId}
@@ -3376,8 +3597,11 @@ async function purgeConversationContent(
       UNION ALL SELECT trace_id FROM transcription_records WHERE conversation_id = ${conversationId}
       UNION ALL SELECT trace_id FROM llm_runs WHERE conversation_id = ${conversationId}
     ) correlated WHERE trace_id IS NOT NULL
-  `);
-  const turnRows = await executeRows(dbClient, dbSql`
+  `,
+  );
+  const turnRows = await executeRows(
+    dbClient,
+    dbSql`
     SELECT DISTINCT turn_id FROM (
       SELECT turn_id FROM agent_messages WHERE conversation_id = ${conversationId}
       UNION ALL SELECT turn_id FROM agent_turn_telemetry WHERE conversation_id = ${conversationId}
@@ -3386,47 +3610,81 @@ async function purgeConversationContent(
       UNION ALL SELECT turn_id FROM transcription_records WHERE conversation_id = ${conversationId}
       UNION ALL SELECT turn_id FROM llm_runs WHERE conversation_id = ${conversationId}
     ) correlated WHERE turn_id IS NOT NULL
-  `);
+  `,
+  );
   const traceIds = traceRows.map((row) => row.trace_id as string);
   const turnIds = turnRows.map((row) => row.turn_id as string);
 
   if (traceIds.length > 0) {
-    await executeRows(dbClient, dbSql`DELETE FROM action_calls WHERE trace_id IN ${sqlList(traceIds)}`);
-    await executeRows(dbClient, dbSql`DELETE FROM telemetry_events WHERE trace_id IN ${sqlList(traceIds)}`);
-    await executeRows(dbClient, dbSql`DELETE FROM food_search_events WHERE trace_id IN ${sqlList(traceIds)}`);
+    await executeRows(
+      dbClient,
+      dbSql`DELETE FROM action_calls WHERE trace_id IN ${sqlList(traceIds)}`,
+    );
+    await executeRows(
+      dbClient,
+      dbSql`DELETE FROM telemetry_events WHERE trace_id IN ${sqlList(traceIds)}`,
+    );
+    await executeRows(
+      dbClient,
+      dbSql`DELETE FROM food_search_events WHERE trace_id IN ${sqlList(traceIds)}`,
+    );
   }
-  await executeRows(dbClient, dbSql`
+  await executeRows(
+    dbClient,
+    dbSql`
     DELETE FROM transcription_records
     WHERE conversation_id = ${conversationId}
-      OR (${traceIds.length > 0}::boolean AND trace_id IN ${sqlList(traceIds.length > 0 ? traceIds : ["00000000-privacy-empty"] )})
-  `);
-  await executeRows(dbClient, dbSql`
+      OR (${traceIds.length > 0}::boolean AND trace_id IN ${sqlList(traceIds.length > 0 ? traceIds : ["00000000-privacy-empty"])})
+  `,
+  );
+  await executeRows(
+    dbClient,
+    dbSql`
     DELETE FROM agent_tool_call_telemetry
     WHERE conversation_id = ${conversationId}
       OR (${traceIds.length > 0}::boolean AND trace_id IN ${sqlList(traceIds.length > 0 ? traceIds : ["00000000-privacy-empty"])})
       OR (${turnIds.length > 0}::boolean AND turn_id IN ${sqlList(turnIds.length > 0 ? turnIds : ["00000000-0000-0000-0000-000000000000"])})
-  `);
-  await executeRows(dbClient, dbSql`
+  `,
+  );
+  await executeRows(
+    dbClient,
+    dbSql`
     DELETE FROM llm_provider_calls
     WHERE conversation_id = ${conversationId}
       OR (${traceIds.length > 0}::boolean AND trace_id IN ${sqlList(traceIds.length > 0 ? traceIds : ["00000000-privacy-empty"])})
       OR (${turnIds.length > 0}::boolean AND turn_id IN ${sqlList(turnIds.length > 0 ? turnIds : ["00000000-0000-0000-0000-000000000000"])})
-  `);
-  await executeRows(dbClient, dbSql`
+  `,
+  );
+  await executeRows(
+    dbClient,
+    dbSql`
     DELETE FROM agent_turn_telemetry
     WHERE conversation_id = ${conversationId}
       OR (${traceIds.length > 0}::boolean AND trace_id IN ${sqlList(traceIds.length > 0 ? traceIds : ["00000000-privacy-empty"])})
       OR (${turnIds.length > 0}::boolean AND turn_id IN ${sqlList(turnIds.length > 0 ? turnIds : ["00000000-0000-0000-0000-000000000000"])})
-  `);
-  await executeRows(dbClient, dbSql`
+  `,
+  );
+  await executeRows(
+    dbClient,
+    dbSql`
     DELETE FROM llm_runs
     WHERE conversation_id = ${conversationId}
       OR (${traceIds.length > 0}::boolean AND trace_id IN ${sqlList(traceIds.length > 0 ? traceIds : ["00000000-privacy-empty"])})
       OR (${turnIds.length > 0}::boolean AND turn_id IN ${sqlList(turnIds.length > 0 ? turnIds : ["00000000-0000-0000-0000-000000000000"])})
-  `);
-  await executeRows(dbClient, dbSql`DELETE FROM agent_candidate_registries WHERE conversation_id = ${conversationId}`);
-  await executeRows(dbClient, dbSql`DELETE FROM agent_messages WHERE conversation_id = ${conversationId}`);
-  await executeRows(dbClient, dbSql`DELETE FROM agent_conversations WHERE id = ${conversationId}`);
+  `,
+  );
+  await executeRows(
+    dbClient,
+    dbSql`DELETE FROM agent_candidate_registries WHERE conversation_id = ${conversationId}`,
+  );
+  await executeRows(
+    dbClient,
+    dbSql`DELETE FROM agent_messages WHERE conversation_id = ${conversationId}`,
+  );
+  await executeRows(
+    dbClient,
+    dbSql`DELETE FROM agent_conversations WHERE id = ${conversationId}`,
+  );
 }
 
 function mapAuthIdentity(row: Record<string, unknown>): AuthIdentityRecord {
@@ -3505,15 +3763,29 @@ async function insertTemplateItem(
 }
 
 function mapFood(row: Record<string, unknown>): FoodItemRecord {
-  const normalizedDisplayName = optionalString(row.search_normalized_display_name);
+  const normalizedDisplayName = optionalString(
+    row.search_normalized_display_name,
+  );
   const normalizedBaseName = optionalString(row.search_normalized_base_name);
-  const normalizedVariantName = optionalString(row.search_normalized_variant_name);
-  const normalizedResultType = optionalString(row.search_normalized_result_type);
-  const normalizedBrandDisplay = optionalString(row.search_normalized_brand_display);
+  const normalizedVariantName = optionalString(
+    row.search_normalized_variant_name,
+  );
+  const normalizedResultType = optionalString(
+    row.search_normalized_result_type,
+  );
+  const normalizedBrandDisplay = optionalString(
+    row.search_normalized_brand_display,
+  );
   const primaryEntityName = optionalString(row.search_primary_entity_name);
-  const primaryEntityAliases = arrayOfStrings(row.search_primary_entity_aliases);
-  const secondaryEntityAliases = arrayOfStrings(row.search_secondary_entity_aliases);
-  const primaryEntityCategory = optionalString(row.search_primary_entity_category);
+  const primaryEntityAliases = arrayOfStrings(
+    row.search_primary_entity_aliases,
+  );
+  const secondaryEntityAliases = arrayOfStrings(
+    row.search_secondary_entity_aliases,
+  );
+  const primaryEntityCategory = optionalString(
+    row.search_primary_entity_category,
+  );
   const primaryEntityCategoryCoherence =
     row.search_primary_entity_category_coherence == null
       ? undefined
@@ -3572,12 +3844,17 @@ function mapFood(row: Record<string, unknown>): FoodItemRecord {
   };
 }
 
-function normalizedFoodDisplayDetails(row: Record<string, unknown>): string[] | undefined {
-  const metadata = isRecord(row.search_normalized_metadata) ? row.search_normalized_metadata : undefined;
-  const displayText = normalizeText([
-    row.search_normalized_display_name,
-    row.search_normalized_base_name,
-  ].filter((value): value is string => typeof value === "string").join(" "));
+function normalizedFoodDisplayDetails(
+  row: Record<string, unknown>,
+): string[] | undefined {
+  const metadata = isRecord(row.search_normalized_metadata)
+    ? row.search_normalized_metadata
+    : undefined;
+  const displayText = normalizeText(
+    [row.search_normalized_display_name, row.search_normalized_base_name]
+      .filter((value): value is string => typeof value === "string")
+      .join(" "),
+  );
   const values = [
     ...arrayOfStrings(metadata?.retainedDescriptors),
     ...arrayOfStrings(metadata?.hiddenDescriptors),
@@ -3589,7 +3866,8 @@ function normalizedFoodDisplayDetails(row: Record<string, unknown>): string[] | 
     const trimmed = value?.trim();
     if (!trimmed) continue;
     const key = normalizeText(trimmed);
-    if (!key || seen.has(key) || tokenPhraseContained(displayText, key)) continue;
+    if (!key || seen.has(key) || tokenPhraseContained(displayText, key))
+      continue;
     seen.add(key);
     details.push(titleCaseDisplay(trimmed));
   }
@@ -3829,6 +4107,26 @@ function mapAgentConversationMessage(
   };
 }
 
+function mapAgentToolExecution(
+  row: Record<string, unknown>,
+): AgentToolExecutionRecord {
+  return {
+    id: row.id as string,
+    userId: row.user_id as string,
+    conversationId: row.conversation_id as string,
+    assistantMessageId: row.assistant_message_id as string,
+    turnId: row.turn_id as string,
+    toolCallId: row.tool_call_id as string,
+    actionId: row.action_id as string,
+    iteration: Number(row.iteration),
+    toolCallIndex: Number(row.tool_call_index),
+    status: row.status as AgentToolExecutionRecord["status"],
+    snapshot: row.snapshot_json as AgentToolExecutionRecord["snapshot"],
+    createdAt: toIso(row.created_at),
+    updatedAt: toIso(row.updated_at),
+  };
+}
+
 function mapAgentCandidateRegistry(
   row: Record<string, unknown>,
 ): AgentCandidateRegistryRecord {
@@ -3997,8 +4295,7 @@ function mapAgentTurnTelemetry(
     errorCode: optionalString(row.error_code),
     errorMessage: optionalString(row.error_message),
     metadata: isRecord(row.metadata_json) ? row.metadata_json : {},
-    completedAt:
-      row.completed_at == null ? undefined : toIso(row.completed_at),
+    completedAt: row.completed_at == null ? undefined : toIso(row.completed_at),
     createdAt: toIso(row.created_at),
   };
 }
@@ -4021,15 +4318,16 @@ function mapAgentToolCallTelemetry(
     status: row.status as string,
     errorMessage: optionalString(row.error_message),
     startedAt: toIso(row.started_at),
-    completedAt:
-      row.completed_at == null ? undefined : toIso(row.completed_at),
+    completedAt: row.completed_at == null ? undefined : toIso(row.completed_at),
     durationMs: optionalNumber(row.duration_ms),
     metadata: isRecord(row.metadata_json) ? row.metadata_json : {},
     createdAt: toIso(row.created_at),
   };
 }
 
-function mapLlmProviderCall(row: Record<string, unknown>): LlmProviderCallRecord {
+function mapLlmProviderCall(
+  row: Record<string, unknown>,
+): LlmProviderCallRecord {
   return {
     id: row.id as string,
     traceId: row.trace_id as string,
@@ -4080,7 +4378,9 @@ function mapLlmProviderCall(row: Record<string, unknown>): LlmProviderCallRecord
   };
 }
 
-function mapTranscriptionRecord(row: Record<string, unknown>): TranscriptionRecord {
+function mapTranscriptionRecord(
+  row: Record<string, unknown>,
+): TranscriptionRecord {
   return {
     id: row.id as string,
     traceId: row.trace_id as string,
@@ -4106,7 +4406,9 @@ function mapTranscriptionRecord(row: Record<string, unknown>): TranscriptionReco
   };
 }
 
-function mapFoodSearchEvent(row: Record<string, unknown>): FoodSearchEventRecord {
+function mapFoodSearchEvent(
+  row: Record<string, unknown>,
+): FoodSearchEventRecord {
   return {
     id: row.id as string,
     traceId: row.trace_id as string,
@@ -4116,7 +4418,10 @@ function mapFoodSearchEvent(row: Record<string, unknown>): FoodSearchEventRecord
     queryLength: Number(row.query_length ?? 0),
     locale: row.locale as string | undefined,
     barcodePresent: Boolean(row.barcode_present),
-    normalizedSearchEnabled: row.normalized_search_enabled == null ? undefined : Boolean(row.normalized_search_enabled),
+    normalizedSearchEnabled:
+      row.normalized_search_enabled == null
+        ? undefined
+        : Boolean(row.normalized_search_enabled),
     normalizedScope: row.normalized_scope as string | undefined,
     path: row.path as string | undefined,
     resultCount: Number(row.result_count ?? 0),
@@ -4176,7 +4481,9 @@ function buildPostgresCostOverview(
     totalCostAmount: providerCost + estimatedCost,
     unknownCostCount: calls.filter((call) => call.costSource === "unknown")
       .length,
-    totalPromptTokens: sumOptionalNumber(calls.map((call) => call.promptTokens)),
+    totalPromptTokens: sumOptionalNumber(
+      calls.map((call) => call.promptTokens),
+    ),
     totalCompletionTokens: sumOptionalNumber(
       calls.map((call) => call.completionTokens),
     ),
@@ -4230,7 +4537,9 @@ function sumOptionalNumber(values: Array<number | undefined>): number {
 }
 
 function arrayOfStrings(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -4245,7 +4554,10 @@ function tokenPhraseContained(text: string, phrase: string): boolean {
 function titleCaseDisplay(value: string): string {
   return value
     .toLowerCase()
-    .replace(/\b[\p{L}\p{N}][\p{L}\p{N}'%-]*/gu, (word) => `${word[0]?.toUpperCase() ?? ""}${word.slice(1)}`);
+    .replace(
+      /\b[\p{L}\p{N}][\p{L}\p{N}'%-]*/gu,
+      (word) => `${word[0]?.toUpperCase() ?? ""}${word.slice(1)}`,
+    );
 }
 
 function previousDatesInWeek(date: string): string[] {
@@ -4308,7 +4620,10 @@ function mergeFoodSearchRowCandidate(
   }
   if (nextRank === existingRank) {
     existing.lexicalScore = Math.max(existing.lexicalScore, next.lexicalScore);
-    existing.vectorScore = maxOptionalScore(existing.vectorScore, next.vectorScore);
+    existing.vectorScore = maxOptionalScore(
+      existing.vectorScore,
+      next.vectorScore,
+    );
   }
 }
 
@@ -4321,7 +4636,9 @@ function maxOptionalScore(
   return Math.max(a, b);
 }
 
-function foodSearchScopeRankFromRow(row: Record<string, unknown>): number | undefined {
+function foodSearchScopeRankFromRow(
+  row: Record<string, unknown>,
+): number | undefined {
   const value = row.search_scope_rank;
   if (typeof value === "number" && Number.isFinite(value)) return value;
   const resultTypeRank = row.search_result_type_rank;
@@ -4366,7 +4683,8 @@ function mergeNormalizedFoodDocumentRows(
     for (const row of rows) {
       const foodId = optionalString(row.id);
       if (!foodId || seenFoodIds.has(foodId)) continue;
-      const displayName = optionalString(row.search_display_name) ?? optionalString(row.name);
+      const displayName =
+        optionalString(row.search_display_name) ?? optionalString(row.name);
       const displayKey = displayName?.trim().toLowerCase();
       if (displayKey && seenDisplayNames.has(displayKey)) continue;
       seenFoodIds.add(foodId);
@@ -4379,14 +4697,24 @@ function mergeNormalizedFoodDocumentRows(
   return merged;
 }
 
-function normalizedStrongIdentityCanShortCircuit(rows: Record<string, unknown>[], limit: number): boolean {
+function normalizedStrongIdentityCanShortCircuit(
+  rows: Record<string, unknown>[],
+  limit: number,
+): boolean {
   const searchLimit = normalizedFoodSearchLimit(limit);
   if (rows.length < searchLimit) return false;
   const resultRows = rows.slice(0, searchLimit);
-  const genericRows = resultRows.filter((row) => row.search_normalized_result_type === "generic_food").length;
-  const productRows = resultRows.filter((row) => row.search_normalized_result_type === "product").length;
+  const genericRows = resultRows.filter(
+    (row) => row.search_normalized_result_type === "generic_food",
+  ).length;
+  const productRows = resultRows.filter(
+    (row) => row.search_normalized_result_type === "product",
+  ).length;
   const topResultType = resultRows[0]?.search_normalized_result_type;
-  return genericRows >= productRows || (topResultType === "generic_food" && genericRows > 0);
+  return (
+    genericRows >= productRows ||
+    (topResultType === "generic_food" && genericRows > 0)
+  );
 }
 
 function foodSearchCacheKey(
@@ -4468,7 +4796,10 @@ function normalizedFoodTextSearchPredicateSql(normalized: string): SQL {
   `;
 }
 
-function normalizedFoodStrongIdentityPredicateSql(normalized: string, queryIdentityKey: string | undefined): SQL {
+function normalizedFoodStrongIdentityPredicateSql(
+  normalized: string,
+  queryIdentityKey: string | undefined,
+): SQL {
   const identityPredicate = queryIdentityKey
     ? dbSql`OR ${normalizedFoodIdentityTokenKeyPredicateSql(queryIdentityKey)}`
     : dbSql``;
@@ -4481,11 +4812,16 @@ function normalizedFoodStrongIdentityPredicateSql(normalized: string, queryIdent
   `;
 }
 
-function normalizedFoodIdentityTokenKeyPredicateSql(queryIdentityKey: string): SQL {
+function normalizedFoodIdentityTokenKeyPredicateSql(
+  queryIdentityKey: string,
+): SQL {
   return dbSql`food_normalized_search_documents.identity_token_keys @> ARRAY[${queryIdentityKey}]::text[]`;
 }
 
-function normalizedFoodTextSearchScoreSql(normalized: string, queryIdentityKey: string | undefined): SQL {
+function normalizedFoodTextSearchScoreSql(
+  normalized: string,
+  queryIdentityKey: string | undefined,
+): SQL {
   const prefixQuery = foodSearchPrefixTsQuery(normalized);
   const usePrefixQuery = normalized.split(/\s+/).filter(Boolean).length > 1;
   return dbSql`
@@ -4594,7 +4930,10 @@ function foodSearchScoreSql(normalized: string): SQL {
   `;
 }
 
-function normalizedFoodSearchScoreSql(normalized: string, queryIdentityKey: string | undefined): SQL {
+function normalizedFoodSearchScoreSql(
+  normalized: string,
+  queryIdentityKey: string | undefined,
+): SQL {
   const prefix = `${normalized}%`;
   const tokenPrefix = `${normalized} %`;
   const tokenContainsMiddle = `% ${normalized} %`;
@@ -4620,18 +4959,36 @@ function normalizedFoodSearchScoreSql(normalized: string, queryIdentityKey: stri
   const primaryEntityRepresentativeness = dbSql`
     COALESCE(food_normalized_search_documents.primary_entity_representativeness, 0)::float
   `;
-  const primaryAliasScore = normalizedFoodEntityAliasScoreSql(primaryAliases, normalized, queryTokenCount, {
-    exact: 0.92,
-    prefix: 0.89,
-    queryStartsAlias: 0.82,
-  });
-  const secondaryAliasScore = normalizedFoodEntityAliasScoreSql(secondaryAliases, normalized, queryTokenCount, {
-    exact: 0.82,
-    prefix: 0.72,
-    queryStartsAlias: 0.64,
-  });
-  const baseNamePenalty = compactnessPenaltySql(baseName, normalized, queryTokenCount);
-  const displayNamePenalty = compactnessPenaltySql(displayName, normalized, queryTokenCount);
+  const primaryAliasScore = normalizedFoodEntityAliasScoreSql(
+    primaryAliases,
+    normalized,
+    queryTokenCount,
+    {
+      exact: 0.92,
+      prefix: 0.89,
+      queryStartsAlias: 0.82,
+    },
+  );
+  const secondaryAliasScore = normalizedFoodEntityAliasScoreSql(
+    secondaryAliases,
+    normalized,
+    queryTokenCount,
+    {
+      exact: 0.82,
+      prefix: 0.72,
+      queryStartsAlias: 0.64,
+    },
+  );
+  const baseNamePenalty = compactnessPenaltySql(
+    baseName,
+    normalized,
+    queryTokenCount,
+  );
+  const displayNamePenalty = compactnessPenaltySql(
+    displayName,
+    normalized,
+    queryTokenCount,
+  );
   const structuralTieScore = normalizedFoodStructuralTieScoreSql(
     normalized,
     baseName,
@@ -4943,7 +5300,9 @@ function compactnessPenaltySql(
   `;
 }
 
-function normalizedFoodSearchProfile(input: FoodHybridSearchInput): NormalizedFoodSearchProfile {
+function normalizedFoodSearchProfile(
+  input: FoodHybridSearchInput,
+): NormalizedFoodSearchProfile {
   const locale = normalizeSearchLocale(input.locale);
   if (locale === "es") return { locales: ["es", "any", "en"] };
   if (locale === "en") return { locales: ["en", "any", "es"] };
@@ -4973,7 +5332,9 @@ function foodSearchProfiles(input: FoodHybridSearchInput): FoodSearchProfile[] {
   ];
 }
 
-function genericFoodSearchProfiles(locale: "es" | "en" | undefined): FoodSearchProfile[] {
+function genericFoodSearchProfiles(
+  locale: "es" | "en" | undefined,
+): FoodSearchProfile[] {
   if (locale === "es") {
     return [
       { scope: "generic", locales: ["es", "any"], scopeRank: 0 },
@@ -4999,9 +5360,7 @@ export const postgresFoodSearchTesting = {
   compareFoodSearchRankedCandidates,
 };
 
-function foodSearchDocumentForFood(
-  food: FoodItemRecord,
-):
+function foodSearchDocumentForFood(food: FoodItemRecord):
   | {
       locale: string;
       scope: "generic" | "market";

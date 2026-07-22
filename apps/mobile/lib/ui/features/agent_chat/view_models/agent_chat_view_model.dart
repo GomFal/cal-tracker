@@ -10,7 +10,7 @@ import '../../../../data/services/agent_chat_session_store.dart';
 import '../../../../data/services/audio_recorder_service.dart';
 import '../../../core/user_visible_error.dart';
 
-enum AgentChatToolStatus { running, completed, failed }
+enum AgentChatToolStatus { running, completed, failed, interrupted }
 
 enum AgentChatEntryKind { user, assistant, tool }
 
@@ -22,6 +22,7 @@ class AgentChatEntry {
     this.toolCall,
     this.toolStatus,
     this.result,
+    this.execution,
     this.error,
     this.errorCode,
     this.suggestions = const [],
@@ -34,6 +35,7 @@ class AgentChatEntry {
   final AgentToolCallFeedback? toolCall;
   final AgentChatToolStatus? toolStatus;
   final AgentRunResult? result;
+  final AgentToolExecutionSnapshot? execution;
   final String? error;
   final String? errorCode;
   final List<AgentChatSuggestion> suggestions;
@@ -44,6 +46,7 @@ class AgentChatEntry {
     AgentToolCallFeedback? toolCall,
     AgentChatToolStatus? toolStatus,
     AgentRunResult? result,
+    AgentToolExecutionSnapshot? execution,
     String? error,
     String? errorCode,
     List<AgentChatSuggestion>? suggestions,
@@ -56,6 +59,7 @@ class AgentChatEntry {
       toolCall: toolCall ?? this.toolCall,
       toolStatus: toolStatus ?? this.toolStatus,
       result: result ?? this.result,
+      execution: execution ?? this.execution,
       error: error ?? this.error,
       errorCode: errorCode ?? this.errorCode,
       suggestions: suggestions ?? this.suggestions,
@@ -458,29 +462,27 @@ class AgentChatViewModel extends ChangeNotifier {
         }
         break;
       case 'tool_call_started':
-        final toolCall = event.toolCall;
-        if (toolCall != null) {
-          _entries.add(
-            AgentChatEntry(
-              id: 'tool_${toolCall.id}',
-              kind: AgentChatEntryKind.tool,
-              toolCall: toolCall,
-              toolStatus: AgentChatToolStatus.running,
-            ),
-          );
-        }
-        break;
       case 'tool_call_completed':
-        _updateToolEntry(
-          event.toolCall,
-          status: AgentChatToolStatus.completed,
-          result: event.result,
-        );
-        break;
       case 'tool_call_failed':
+        final execution = event.execution;
+        if (execution != null) {
+          _applyToolExecutionSnapshot(execution);
+          final cacheStore = _cacheStore;
+          if (cacheStore != null && execution.status != 'started') {
+            unawaited(cacheStore.mergeToolExecution(execution));
+          }
+          break;
+        }
+        final toolCall = event.toolCall;
+        if (toolCall == null) break;
         _updateToolEntry(
-          event.toolCall,
-          status: AgentChatToolStatus.failed,
+          toolCall,
+          status: event.type == 'tool_call_started'
+              ? AgentChatToolStatus.running
+              : event.type == 'tool_call_completed'
+                  ? AgentChatToolStatus.completed
+                  : AgentChatToolStatus.failed,
+          result: event.result,
           error: event.error?.message,
           errorCode: event.error?.code,
         );
@@ -570,10 +572,32 @@ class AgentChatViewModel extends ChangeNotifier {
     );
   }
 
+  void _applyToolExecutionSnapshot(
+    AgentToolExecutionSnapshot execution, {
+    bool rehydrated = false,
+  }) {
+    final status = switch (execution.status) {
+      'completed' => AgentChatToolStatus.completed,
+      'failed' => AgentChatToolStatus.failed,
+      'interrupted' => AgentChatToolStatus.interrupted,
+      _ when rehydrated => AgentChatToolStatus.interrupted,
+      _ => AgentChatToolStatus.running,
+    };
+    _updateToolEntry(
+      execution.toolCall,
+      status: status,
+      result: execution.result,
+      error: execution.error?.message,
+      errorCode: execution.error?.code,
+      execution: execution,
+    );
+  }
+
   void _updateToolEntry(
     AgentToolCallFeedback? toolCall, {
     required AgentChatToolStatus status,
     AgentRunResult? result,
+    AgentToolExecutionSnapshot? execution,
     String? error,
     String? errorCode,
   }) {
@@ -589,6 +613,7 @@ class AgentChatViewModel extends ChangeNotifier {
           toolCall: toolCall,
           toolStatus: status,
           result: result,
+          execution: execution,
           error: error,
           errorCode: errorCode,
         ),
@@ -599,6 +624,7 @@ class AgentChatViewModel extends ChangeNotifier {
       toolCall: toolCall,
       toolStatus: status,
       result: result,
+      execution: execution,
       error: error,
       errorCode: errorCode,
     );
@@ -691,7 +717,9 @@ class AgentChatViewModel extends ChangeNotifier {
     conversationId = detail.conversation.id;
     _entries
       ..clear()
-      ..addAll(_entriesFromStoredMessages(detail.messages));
+      ..addAll(
+        _entriesFromStoredMessages(detail.messages, detail.toolExecutions),
+      );
     _entryCounter = _entries.length;
     errorMessage = null;
     errorCode = null;
@@ -706,7 +734,11 @@ class AgentChatViewModel extends ChangeNotifier {
 
   List<AgentChatEntry> _entriesFromStoredMessages(
     List<AgentConversationMessage> messages,
+    List<AgentToolExecutionSnapshot> executions,
   ) {
+    final executionsByToolCall = {
+      for (final execution in executions) execution.toolCallId: execution,
+    };
     final entries = <AgentChatEntry>[];
     for (final message in messages) {
       switch (message.role) {
@@ -734,27 +766,86 @@ class AgentChatViewModel extends ChangeNotifier {
           );
           break;
         case 'tool':
-          final toolCall = _toolFeedbackFromStoredMessage(message);
+          final execution = message.toolCallId == null
+              ? null
+              : executionsByToolCall[message.toolCallId];
+          final toolCall =
+              execution?.toolCall ?? _toolFeedbackFromStoredMessage(message);
+          final status = execution == null
+              ? (message.metadata is Map &&
+                      (message.metadata as Map)['error'] != null
+                  ? AgentChatToolStatus.failed
+                  : AgentChatToolStatus.completed)
+              : _statusForExecution(execution, rehydrated: true);
           entries.add(
             AgentChatEntry(
               id: 'tool_${message.toolCallId ?? message.id}',
               kind: AgentChatEntryKind.tool,
               toolCall: toolCall,
-              toolStatus: message.metadata is Map &&
-                      (message.metadata as Map)['error'] != null
-                  ? AgentChatToolStatus.failed
-                  : AgentChatToolStatus.completed,
-              result: _resultFromStoredToolMessage(message),
-              error: message.metadata is Map
-                  ? (message.metadata as Map)['error'] as String?
-                  : null,
+              toolStatus: status,
+              result:
+                  execution?.result ?? _resultFromStoredToolMessage(message),
+              execution: execution,
+              error: execution?.error?.message ??
+                  (message.metadata is Map
+                      ? (message.metadata as Map)['error'] as String?
+                      : null),
+              errorCode: execution?.error?.code,
             ),
           );
           break;
       }
     }
+    final insertionOffsets = <String, int>{};
+    for (final execution in executions) {
+      if (entries.any((entry) => entry.id == 'tool_${execution.toolCallId}') ||
+          _isPresentationlessCompletedExecution(execution)) {
+        continue;
+      }
+      // A stream can stop after `started` was persisted but before its compact
+      // tool transcript is written. Keep it visible without a perpetual loader.
+      final assistantIndex = entries.indexWhere(
+        (entry) => entry.id == execution.assistantMessageId,
+      );
+      final offset = insertionOffsets[execution.assistantMessageId] ?? 0;
+      final index =
+          assistantIndex < 0 ? entries.length : assistantIndex + 1 + offset;
+      entries.insert(
+        index,
+        AgentChatEntry(
+          id: 'tool_${execution.toolCallId}',
+          kind: AgentChatEntryKind.tool,
+          toolCall: execution.toolCall,
+          toolStatus: _statusForExecution(execution, rehydrated: true),
+          result: execution.result,
+          execution: execution,
+          error: execution.error?.message,
+          errorCode: execution.error?.code,
+        ),
+      );
+      insertionOffsets[execution.assistantMessageId] = offset + 1;
+    }
     return entries;
   }
+
+  bool _isPresentationlessCompletedExecution(
+    AgentToolExecutionSnapshot execution,
+  ) =>
+      execution.status == 'completed' &&
+      execution.result == null &&
+      execution.error == null;
+
+  AgentChatToolStatus _statusForExecution(
+    AgentToolExecutionSnapshot execution, {
+    required bool rehydrated,
+  }) =>
+      switch (execution.status) {
+        'completed' => AgentChatToolStatus.completed,
+        'failed' => AgentChatToolStatus.failed,
+        'interrupted' => AgentChatToolStatus.interrupted,
+        _ when rehydrated => AgentChatToolStatus.interrupted,
+        _ => AgentChatToolStatus.running,
+      };
 
   AgentToolCallFeedback _toolFeedbackFromStoredMessage(
     AgentConversationMessage message,

@@ -4,8 +4,9 @@ import type {
   AgentToolDecision,
   ChatAgentProvider,
 } from "../agent/chatAgentProvider.js";
+import { AgentChatService } from "../agent/agentChatService.js";
 import { buildToolContentForModel } from "../agent/toolContent.js";
-import type { MealItem } from "@cal-tracker/contracts";
+import { defaultUserScopes, type MealItem } from "@cal-tracker/contracts";
 import {
   buildTestApp,
   FakeSpeechToTextProvider,
@@ -116,6 +117,14 @@ describe("agent chat streaming", () => {
     expect(persisted.status).toBe(200);
     const body = (await persisted.json()) as {
       conversation: { id: string; title: string };
+      toolExecutions: Array<{
+        schemaVersion: number;
+        conversationId: string;
+        toolCallId: string;
+        status: string;
+        result?: { kind: string };
+        widget?: { kind: string };
+      }>;
       messages: Array<{
         role: string;
         content: string;
@@ -133,6 +142,19 @@ describe("agent chat streaming", () => {
         title: "How am I doing today?",
       }),
     );
+    const completedEvent = events.find(
+      (event) => event.type === "tool_call_completed",
+    );
+    expect(body.toolExecutions).toEqual([
+      expect.objectContaining({
+        schemaVersion: 1,
+        conversationId,
+        toolCallId: "call_summary",
+        status: "completed",
+        result: completedEvent?.result,
+        widget: completedEvent?.widget,
+      }),
+    ]);
     expect(body.messages.map((message) => message.role)).toEqual([
       "user",
       "assistant",
@@ -226,6 +248,69 @@ describe("agent chat streaming", () => {
     });
   });
 
+  it("marks a persisted started call interrupted when its stream is cancelled", async () => {
+    const agentProvider = new QueueChatAgentProvider([
+      {
+        toolCalls: [
+          {
+            id: "call_cancelled_summary",
+            type: "function",
+            function: { name: "get_daily_summary", arguments: "{}" },
+          },
+        ],
+        rawResponse: {},
+        interaction: { messages: [], streamEvents: [] },
+      },
+    ]);
+    const { request, repository, actionExecutor, config } = buildTestApp({
+      agentProvider,
+    });
+    const { user } = await registerAndAuth(request);
+    const service = new AgentChatService(
+      agentProvider,
+      actionExecutor,
+      repository,
+      config.OPENROUTER_MODEL,
+    );
+    const stream = service.chat({
+      text: "Show my summary",
+      context: {
+        actorUserId: user.id,
+        actorType: "user",
+        source: "flutter",
+        scopes: defaultUserScopes,
+        timezone: "UTC",
+        locale: "en",
+        trustedModeEnabled: false,
+        traceId: "trace-cancelled-tool",
+      },
+    });
+
+    let conversationId: string | undefined;
+    for (;;) {
+      const next = await stream.next();
+      expect(next.done).toBe(false);
+      if (next.value?.type === "conversation_started") {
+        conversationId = next.value.conversationId;
+      }
+      if (next.value?.type === "tool_call_started") break;
+    }
+    await stream.return(undefined);
+
+    expect(conversationId).toBeDefined();
+    await expect(
+      repository.listAgentToolExecutions(user.id, conversationId!),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        status: "interrupted",
+        snapshot: expect.objectContaining({
+          status: "interrupted",
+          completedAt: expect.any(String),
+        }),
+      }),
+    ]);
+  });
+
   it("lets the LLM resolve a compact candidate preview by reference", async () => {
     const agentProvider = new QueueChatAgentProvider([
       {
@@ -275,18 +360,22 @@ describe("agent chat streaming", () => {
       rawOutput: { items: candidates, candidateGroups: [{ candidates }] },
       threshold: 0.75,
     });
-    const storedToolMessage = await repository.addAgentConversationMessage(user.id, conversation.id, {
-      role: "tool",
-      content: toolContent.modelContent,
-      toolCallId: "call_search",
-      metadata: {
-        candidateRegistryRef: toolContent.candidateRegistry?.searchRef,
-        searchRef: toolContent.candidateRegistry?.searchRef,
-        candidateCount: toolContent.candidateRegistry?.candidateCount,
-        groupCount: toolContent.candidateRegistry?.groupCount,
-        serializerVersion: toolContent.serializerVersion,
+    const storedToolMessage = await repository.addAgentConversationMessage(
+      user.id,
+      conversation.id,
+      {
+        role: "tool",
+        content: toolContent.modelContent,
+        toolCallId: "call_search",
+        metadata: {
+          candidateRegistryRef: toolContent.candidateRegistry?.searchRef,
+          searchRef: toolContent.candidateRegistry?.searchRef,
+          candidateCount: toolContent.candidateRegistry?.candidateCount,
+          groupCount: toolContent.candidateRegistry?.groupCount,
+          serializerVersion: toolContent.serializerVersion,
+        },
       },
-    });
+    );
     expect(storedToolMessage.metadata).not.toHaveProperty("candidateRegistry");
     expect(toolContent.candidateRegistry).toBeDefined();
     await repository.saveAgentCandidateRegistry({
@@ -329,7 +418,9 @@ describe("agent chat streaming", () => {
     const selectedToolMessage = [...secondModelMessages]
       .reverse()
       .find((message) => message.role === "tool");
-    expect(selectedToolMessage?.content).toContain("Selected nutrition candidate resolved");
+    expect(selectedToolMessage?.content).toContain(
+      "Selected nutrition candidate resolved",
+    );
     expect(selectedToolMessage?.content).toContain("Candidate 6");
   });
 
@@ -438,9 +529,8 @@ describe("agent chat streaming", () => {
     const conversationId = events.find(
       (event) => event.type === "conversation_started",
     )?.conversationId as string;
-    const turnId = events.find(
-      (event) => event.type === "conversation_started",
-    )?.turnId as string;
+    const turnId = events.find((event) => event.type === "conversation_started")
+      ?.turnId as string;
     const transcriptions = await telemetry.listTranscriptionRecords({
       conversationId,
       limit: 10,
@@ -499,9 +589,12 @@ describe("agent chat streaming", () => {
       status: "pending",
     });
 
-    const listResponse = await request("http://localhost/v1/agent/conversations", {
-      headers: authHeader,
-    });
+    const listResponse = await request(
+      "http://localhost/v1/agent/conversations",
+      {
+        headers: authHeader,
+      },
+    );
     expect(listResponse.status).toBe(200);
     await expect(listResponse.json()).resolves.toEqual({ conversations: [] });
 
@@ -575,9 +668,7 @@ describe("agent chat streaming", () => {
     expect(JSON.stringify(localEvents)).not.toContain("provider.invalid");
     expect(JSON.stringify(localEvents)).not.toContain("reflectedsecret");
     expect(localEvents).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ traceId }),
-      ]),
+      expect.arrayContaining([expect.objectContaining({ traceId })]),
     );
   });
 

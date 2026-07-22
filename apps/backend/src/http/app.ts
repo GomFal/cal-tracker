@@ -55,6 +55,7 @@ import {
   AgentChatService,
   type AgentChatEvent,
 } from "../agent/agentChatService.js";
+import { agentConversationHistoryDto } from "../agent/agentConversationDto.js";
 import { AgentService, type AgentRunResult } from "../agent/agentService.js";
 import type { ChatAgentProvider } from "../agent/chatAgentProvider.js";
 import { RemoteChatAgentProvider } from "../agent/chatAgentProvider.js";
@@ -155,7 +156,8 @@ export function createApp(input: {
     input.telemetryService ?? telemetry,
   );
   const adminAuthService = new AdminAuthService(config);
-  const abuseProtection = input.abuseProtection ?? new InMemoryAbuseProtection(config);
+  const abuseProtection =
+    input.abuseProtection ?? new InMemoryAbuseProtection(config);
   const costOperationStates = new WeakMap<
     Context,
     { lease: CostOperationLease; managedByStream: boolean }
@@ -406,12 +408,13 @@ export function createApp(input: {
     await authService.logout(body.refreshToken);
     return c.json({ ok: true });
   });
-  app.get("/auth/email/confirm", (c) => c.html(emailConfirmationFallbackHtml()));
+  app.get("/auth/email/confirm", (c) =>
+    c.html(emailConfirmationFallbackHtml()),
+  );
   app.get("/auth/password-reset/confirm", (c) =>
-    c.html(passwordResetFormHtml(
-      c.req.query("token") ?? "",
-      c.req.query("lang"),
-    )),
+    c.html(
+      passwordResetFormHtml(c.req.query("token") ?? "", c.req.query("lang")),
+    ),
   );
   app.post("/auth/password-reset/confirm", async (c) => {
     const form = await c.req.parseBody();
@@ -420,22 +423,25 @@ export function createApp(input: {
       newPassword: form.newPassword,
     });
     const matches = form.confirmPassword === body.newPassword;
-    const ok = matches && await authService.confirmPasswordReset(
-      body.token,
-      body.newPassword,
-    );
+    const ok =
+      matches &&
+      (await authService.confirmPasswordReset(body.token, body.newPassword));
     return c.html(passwordResetResultHtml(ok, String(form.lang ?? "")));
   });
-  app.get("/.well-known/assetlinks.json", (c) => c.json(androidAssetLinks(config)));
+  app.get("/.well-known/assetlinks.json", (c) =>
+    c.json(androidAssetLinks(config)),
+  );
   app.get("/.well-known/apple-app-site-association", (c) =>
     c.json(appleAppSiteAssociation(config)),
   );
   app.post("/v1/auth/password-reset/request", async (c) => {
     const body = passwordResetRequestSchema.parse(await c.req.json());
-    return c.json(await authService.requestPasswordReset(
-      body.email,
-      c.req.header("accept-language")?.split(",")[0],
-    ));
+    return c.json(
+      await authService.requestPasswordReset(
+        body.email,
+        c.req.header("accept-language")?.split(",")[0],
+      ),
+    );
   });
   app.post("/v1/auth/password-reset/confirm", async (c) => {
     const body = passwordResetConfirmSchema.parse(await c.req.json());
@@ -730,7 +736,10 @@ export function createApp(input: {
               status: "failed",
               errorCode: "stt_provider_failed",
               errorMessage: safeErrorDiagnosticMessage(error),
-              metadata: { filename: upload.filename, source: upload.source ?? "flutter" },
+              metadata: {
+                filename: upload.filename,
+                source: upload.source ?? "flutter",
+              },
             },
           });
           yield {
@@ -770,7 +779,10 @@ export function createApp(input: {
                 transcriptLength: transcription.text.length,
                 durationMs: Date.now() - routeStarted,
                 status: "completed",
-                metadata: { filename: upload.filename, source: upload.source ?? "flutter" },
+                metadata: {
+                  filename: upload.filename,
+                  source: upload.source ?? "flutter",
+                },
               },
             });
           }
@@ -800,13 +812,13 @@ export function createApp(input: {
         message: "agent_conversation_not_found",
       });
     }
-    return c.json({
-      conversation,
-      messages: await repository.listAgentConversationMessages(
-        user.id,
-        conversationId,
-      ),
-    });
+    const [messages, toolExecutions] = await Promise.all([
+      repository.listAgentConversationMessages(user.id, conversationId),
+      repository.listAgentToolExecutions(user.id, conversationId),
+    ]);
+    return c.json(
+      agentConversationHistoryDto({ conversation, messages, toolExecutions }),
+    );
   });
 
   app.delete("/v1/agent/conversations/:id", async (c) => {
@@ -1087,7 +1099,10 @@ export function createApp(input: {
           status: "failed",
           errorCode: "stt_provider_failed",
           errorMessage: safeErrorDiagnosticMessage(error),
-          metadata: { filename: upload.filename, source: upload.source ?? "flutter" },
+          metadata: {
+            filename: upload.filename,
+            source: upload.source ?? "flutter",
+          },
         },
       });
       throw new PublicAiErrorException(
@@ -1176,7 +1191,10 @@ export function createApp(input: {
         durationMs: sttMs,
         status: "completed",
         downstreamResultKind: mealInput.result.kind,
-        metadata: { filename: upload.filename, source: upload.source ?? "flutter" },
+        metadata: {
+          filename: upload.filename,
+          source: upload.source ?? "flutter",
+        },
       },
     });
 
@@ -1545,7 +1563,10 @@ function streamAgentChat(
 
 function costLeaseForStream(
   c: Context,
-  states: WeakMap<Context, { lease: CostOperationLease; managedByStream: boolean }>,
+  states: WeakMap<
+    Context,
+    { lease: CostOperationLease; managedByStream: boolean }
+  >,
 ): CostOperationLease | undefined {
   const state = states.get(c);
   if (!state) return undefined;
@@ -1553,12 +1574,16 @@ function costLeaseForStream(
   return state.lease;
 }
 
-async function readEmailFromJsonRequest(c: Context): Promise<string | undefined> {
-  if (!c.req.header("content-type")?.toLowerCase().includes("application/json")) {
+async function readEmailFromJsonRequest(
+  c: Context,
+): Promise<string | undefined> {
+  if (
+    !c.req.header("content-type")?.toLowerCase().includes("application/json")
+  ) {
     return undefined;
   }
   try {
-    const body = await c.req.raw.clone().json() as { email?: unknown };
+    const body = (await c.req.raw.clone().json()) as { email?: unknown };
     return typeof body.email === "string" && body.email.trim().length > 0
       ? body.email
       : undefined;
@@ -1590,11 +1615,13 @@ function normalizeIp(value: string | undefined): string | undefined {
 function isCostRateLimitedPath(path: string): boolean {
   if (COST_RATE_LIMITED_PATHS.has(path)) return true;
   const segments = path.split("/");
-  return segments.length === 5 &&
+  return (
+    segments.length === 5 &&
     segments[1] === "v1" &&
     segments[2] === "actions" &&
     COST_RATE_LIMITED_ACTIONS.has(segments[3] ?? "") &&
-    segments[4] === "execute";
+    segments[4] === "execute"
+  );
 }
 
 function parseMultipartActionSource(value: unknown): ActionSource | null {
@@ -1742,21 +1769,25 @@ function emailConfirmationFallbackHtml(): string {
 </html>`;
 }
 
-function passwordResetFormHtml(token: string, requestedLocale?: string): string {
+function passwordResetFormHtml(
+  token: string,
+  requestedLocale?: string,
+): string {
   const locale = requestedLocale === "es" ? "es" : "en";
-  const copy = locale === "es"
-    ? {
-        title: "Restablece tu contraseña",
-        password: "Contraseña nueva",
-        confirm: "Repite la contraseña",
-        submit: "Guardar contraseña",
-      }
-    : {
-        title: "Reset your password",
-        password: "New password",
-        confirm: "Repeat password",
-        submit: "Save password",
-      };
+  const copy =
+    locale === "es"
+      ? {
+          title: "Restablece tu contraseña",
+          password: "Contraseña nueva",
+          confirm: "Repite la contraseña",
+          submit: "Guardar contraseña",
+        }
+      : {
+          title: "Reset your password",
+          password: "New password",
+          confirm: "Repeat password",
+          submit: "Save password",
+        };
   return `<!doctype html>
 <html lang="${locale}">
   <head>
@@ -1777,14 +1808,25 @@ function passwordResetFormHtml(token: string, requestedLocale?: string): string 
 </html>`;
 }
 
-function passwordResetResultHtml(ok: boolean, requestedLocale?: string): string {
+function passwordResetResultHtml(
+  ok: boolean,
+  requestedLocale?: string,
+): string {
   const locale = requestedLocale === "es" ? "es" : "en";
   const title = ok
-    ? (locale === "es" ? "Contraseña actualizada" : "Password updated")
-    : (locale === "es" ? "No se pudo actualizar" : "Could not update password");
+    ? locale === "es"
+      ? "Contraseña actualizada"
+      : "Password updated"
+    : locale === "es"
+      ? "No se pudo actualizar"
+      : "Could not update password";
   const message = ok
-    ? (locale === "es" ? "Ya puedes volver a BetterCalories e iniciar sesión." : "You can return to BetterCalories and sign in now.")
-    : (locale === "es" ? "El enlace no es válido, ha caducado o las contraseñas no coinciden." : "The link is invalid, expired, or the passwords do not match.");
+    ? locale === "es"
+      ? "Ya puedes volver a BetterCalories e iniciar sesión."
+      : "You can return to BetterCalories and sign in now."
+    : locale === "es"
+      ? "El enlace no es válido, ha caducado o las contraseñas no coinciden."
+      : "The link is invalid, expired, or the passwords do not match.";
   return `<!doctype html>
 <html lang="${locale}">
   <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title} · BetterCalories</title></head>

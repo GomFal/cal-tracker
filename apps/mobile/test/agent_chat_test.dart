@@ -152,6 +152,33 @@ void main() {
     },
   );
 
+  test('AgentToolExecutionSnapshot keeps newer payloads as generic cards', () {
+    final snapshot = AgentToolExecutionSnapshot.tryFromJson({
+      'schemaVersion': 2,
+      'conversationId': '11111111-1111-1111-1111-111111111111',
+      'turnId': '22222222-2222-2222-2222-222222222222',
+      'assistantMessageId': 'assistant-message',
+      'toolCallId': 'future-call',
+      'iteration': 1,
+      'toolCallIndex': 1,
+      'toolCall': {
+        'id': 'future-call',
+        'actionId': 'future_action',
+        'label': 'Future action',
+        'summary': 'Waiting for a compatible app',
+      },
+      'status': 'future_status',
+      'startedAt': '2026-06-20T12:00:00.000Z',
+      'result': {'kind': 'future_result'},
+    });
+
+    expect(snapshot, isNotNull);
+    expect(snapshot!.schemaVersion, 2);
+    expect(snapshot.status, 'interrupted');
+    expect(snapshot.result, isNull);
+    expect(snapshot.toolCall.label, 'Future action');
+  });
+
   test('ApiErrorDetails rejects unknown server categories', () {
     final error = ApiErrorDetails.fromJson({
       'code': 'provider_raw_secret_category',
@@ -161,6 +188,37 @@ void main() {
 
     expect(error.code, 'internal_error');
     expect(error.traceId, 'trace-unknown');
+  });
+
+  test('AgentChatCacheStore reads legacy detail without toolExecutions',
+      () async {
+    final storage = _MemoryPreferencesStorage();
+    final cache = AgentChatCacheStore(storage: storage);
+    cache.activateUser('user-a');
+    const conversationId = '11111111-1111-1111-1111-111111111111';
+    storage.values['agent_chat_cache:v1:dXNlci1h:detail:$conversationId'] =
+        jsonEncode({
+      'schemaVersion': 1,
+      'cachedAt': DateTime.now().toUtc().toIso8601String(),
+      'payload': {
+        'conversation': _conversationSummary(conversationId).toJson(),
+        'messages': [
+          AgentConversationMessage(
+            id: 'legacy-user-message',
+            conversationId: conversationId,
+            role: 'user',
+            content: 'Show my summary',
+            createdAt: DateTime.utc(2026, 6, 20, 12),
+          ).toJson(),
+        ],
+      },
+    });
+
+    final detail = await cache.readConversationDetail(conversationId);
+
+    expect(detail, isNotNull);
+    expect(detail!.messages, hasLength(1));
+    expect(detail.toolExecutions, isEmpty);
   });
 
   test(
@@ -503,6 +561,37 @@ void main() {
             content: 'finish this meal',
             createdAt: DateTime.utc(2026, 6, 19, 12),
           ),
+          AgentConversationMessage(
+            id: 'assistant-tool-1',
+            conversationId: conversationId,
+            role: 'assistant',
+            content: '',
+            createdAt: DateTime.utc(2026, 6, 19, 12, 1),
+          ),
+        ],
+        toolExecutions: [
+          AgentToolExecutionSnapshot(
+            schemaVersion: 1,
+            conversationId: conversationId,
+            turnId: '22222222-2222-2222-2222-222222222222',
+            assistantMessageId: 'assistant-tool-1',
+            toolCallId: 'call_summary_history',
+            iteration: 1,
+            toolCallIndex: 1,
+            toolCall: const AgentToolCallFeedback(
+              id: 'call_summary_history',
+              actionId: 'get_daily_summary',
+              label: 'Daily summary',
+              summary: 'Reading today',
+            ),
+            status: 'completed',
+            startedAt: DateTime.utc(2026, 6, 19, 12, 1),
+            result: AgentRunResult(
+              kind: 'summary',
+              message: 'Persisted summary',
+              summary: _summary(),
+            ),
+          ),
         ],
       ),
     );
@@ -517,7 +606,12 @@ void main() {
     await viewModel.prepareForEntry();
 
     expect(viewModel.conversationId, conversationId);
-    expect(viewModel.entries.single.text, 'finish this meal');
+    expect(viewModel.entries.first.text, 'finish this meal');
+    final restoredTool = viewModel.entries.singleWhere(
+      (entry) => entry.id == 'tool_call_summary_history',
+    );
+    expect(restoredTool.toolStatus, AgentChatToolStatus.completed);
+    expect(restoredTool.result?.summary?.consumed.calories, 420);
   });
 
   test(

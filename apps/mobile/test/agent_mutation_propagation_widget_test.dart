@@ -139,22 +139,44 @@ void main() {
             'output': {'summary': harness.initial.toJson()}
           });
       when(
-        () => harness.apiClient.commitProposal(
-          'proposal-1',
-          mealLabel: any(named: 'mealLabel'),
+        () => harness.apiClient.commitAgentChatProposal(
+          conversationId: 'conversation-1',
+          proposalId: 'proposal-1',
+          sourceToolCallId: 'proposal-call-1',
+          clientMutationId: '00000000-0000-4000-8000-000000000003',
         ),
       ).thenAnswer(
         (_) async => {
-          'output': {'meal': directMeal.toJson()},
-          'confirmedMutation': _mutationJson(
-            id: '00000000-0000-4000-8000-000000000003',
-            summary: updatedSummary,
-          ),
+          'actionId': 'commit_meal',
+          'clientMutationId': '00000000-0000-4000-8000-000000000003',
+          'reused': false,
+          'result': {
+            'kind': 'meal_committed',
+            'sourceProposalId': 'proposal-1',
+            'meal': directMeal.toJson(),
+            'message': 'Meal logged.',
+            'confirmedMutation': _mutationJson(
+              id: '00000000-0000-4000-8000-000000000003',
+              summary: updatedSummary,
+            ),
+          },
+          'conversationMessage': {
+            'id': 'commit-message-1',
+            'conversationId': 'conversation-1',
+            'role': 'tool',
+            'content': '{}',
+            'createdAt': DateTime.now().toUtc().toIso8601String(),
+          },
         },
       );
 
       await harness.pumpDashboard(tester);
-      await harness.repository.commitProposal('proposal-1');
+      await harness.repository.commitAgentChatProposal(
+        conversationId: 'conversation-1',
+        proposalId: 'proposal-1',
+        sourceToolCallId: 'proposal-call-1',
+        clientMutationId: '00000000-0000-4000-8000-000000000003',
+      );
       await tester.pumpAndSettle();
 
       expect(find.byKey(const ValueKey('dashboard_meal_row_direct-meal')),

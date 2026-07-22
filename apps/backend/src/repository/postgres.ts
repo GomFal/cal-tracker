@@ -2435,6 +2435,9 @@ export class PostgresRepository implements AppRepository {
         reused: false,
         meal,
         conversationMessage: mapAgentConversationMessage(messageRow),
+        result: agentResultFromConversationMessage(
+          mapAgentConversationMessage(messageRow),
+        ),
       };
     });
   }
@@ -2474,7 +2477,44 @@ export class PostgresRepository implements AppRepository {
       clientMutationId: action.client_mutation_id as string,
       meal: await this.mapMeal(mealRow, tx),
       conversationMessage: mapAgentConversationMessage(messageRow),
+      result: agentResultFromConversationMessage(
+        mapAgentConversationMessage(messageRow),
+      ),
     };
+  }
+
+  async persistAgentChatProposalCommitResult(
+    userId: string,
+    input: {
+      conversationId: string;
+      messageId: string;
+      result: unknown;
+    },
+  ): Promise<AgentConversationMessageRecord> {
+    const content = JSON.stringify({
+      actionId: "commit_meal",
+      result: input.result,
+    });
+    const [row] = await this.execute(dbSql`
+      UPDATE agent_messages
+      SET
+        content = CASE
+          WHEN COALESCE(metadata_json, '{}'::jsonb) ? 'uiResult'
+          THEN content
+          ELSE ${content}
+        END,
+        metadata_json = CASE
+          WHEN COALESCE(metadata_json, '{}'::jsonb) ? 'uiResult'
+          THEN metadata_json
+          ELSE COALESCE(metadata_json, '{}'::jsonb) || ${jsonb({ uiResult: input.result })}
+        END
+      WHERE id = ${input.messageId}
+        AND conversation_id = ${input.conversationId}
+        AND user_id = ${userId}
+      RETURNING *
+    `);
+    if (!row) throw new Error("agent_direct_action_message_not_found");
+    return mapAgentConversationMessage(row);
   }
 
   async saveAgentCandidateRegistry(
@@ -4289,6 +4329,22 @@ function mapAgentConversationMessage(
     metadata: row.metadata_json ?? undefined,
     createdAt: toIso(row.created_at),
   };
+}
+
+function agentResultFromConversationMessage(
+  message: AgentConversationMessageRecord,
+): unknown {
+  const metadata =
+    message.metadata && typeof message.metadata === "object"
+      ? (message.metadata as Record<string, unknown>)
+      : undefined;
+  if (metadata?.uiResult !== undefined) return metadata.uiResult;
+  try {
+    const content = JSON.parse(message.content) as { result?: unknown };
+    return content.result;
+  } catch {
+    return undefined;
+  }
 }
 
 function mapAgentToolExecution(

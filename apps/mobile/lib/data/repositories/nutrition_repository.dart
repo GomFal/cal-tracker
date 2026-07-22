@@ -431,16 +431,23 @@ class AgentChatProposalCommitResult {
   const AgentChatProposalCommitResult({
     required this.clientMutationId,
     required this.reused,
-    required this.sourceProposalId,
-    required this.meal,
+    required this.result,
     required this.conversationMessage,
   });
 
   final String clientMutationId;
   final bool reused;
-  final String sourceProposalId;
-  final Meal meal;
+  final AgentRunResult result;
   final AgentConversationMessage conversationMessage;
+
+  String get sourceProposalId => result.sourceProposalId!;
+  Meal get meal => result.meal!;
+}
+
+/// The response belongs to an authenticated cache owner that is no longer
+/// active. Callers must silently discard it rather than mutating current UI.
+class StaleNutritionResponseException implements Exception {
+  const StaleNutritionResponseException();
 }
 
 class NutritionRepository {
@@ -467,7 +474,7 @@ class NutritionRepository {
   final Map<String, Future<DailySummary>> _dailySummaryRefreshes = {};
   final Map<String, DateTime> _dailySummaryRefreshStartedAt = {};
   final Map<String, Future<AgentChatProposalCommitResult>>
-  _agentProposalCommits = {};
+      _agentProposalCommits = {};
   final Set<String> _pendingDailySummaryRefreshes = {};
   Future<List<MealTemplate>>? _templatesRefresh;
   Future<List<UsualFood>>? _usualFoodsRefresh;
@@ -817,18 +824,22 @@ class NutritionRepository {
     required String sourceToolCallId,
     required String clientMutationId,
   }) {
-    final existing = _agentProposalCommits[proposalId];
+    final scope = _captureScope();
+    final operationKey =
+        '${scope.userId ?? '<signed-out>'}:$proposalId:$clientMutationId';
+    final existing = _agentProposalCommits[operationKey];
     if (existing != null) return existing;
     final request = _commitAgentChatProposal(
       conversationId: conversationId,
       proposalId: proposalId,
       sourceToolCallId: sourceToolCallId,
       clientMutationId: clientMutationId,
+      expectedScope: scope,
     );
     late final Future<AgentChatProposalCommitResult> future;
     void removeIfCurrent() {
-      if (identical(_agentProposalCommits[proposalId], future)) {
-        _agentProposalCommits.remove(proposalId);
+      if (identical(_agentProposalCommits[operationKey], future)) {
+        _agentProposalCommits.remove(operationKey);
       }
     }
 
@@ -842,7 +853,7 @@ class NutritionRepository {
         return Future<AgentChatProposalCommitResult>.error(error, stackTrace);
       },
     );
-    _agentProposalCommits[proposalId] = future;
+    _agentProposalCommits[operationKey] = future;
     return future;
   }
 
@@ -851,6 +862,7 @@ class NutritionRepository {
     required String proposalId,
     required String sourceToolCallId,
     required String clientMutationId,
+    required _RepositoryScope expectedScope,
   }) async {
     final json = await _apiClient.commitAgentChatProposal(
       conversationId: conversationId,
@@ -859,14 +871,28 @@ class NutritionRepository {
       clientMutationId: clientMutationId,
     );
     _healthMonitor.recordSuccess();
-    final result = json['result'] as Map<String, Object?>;
-    final meal = Meal.fromJson(result['meal'] as Map<String, Object?>);
-    await _mergeMealIntoCachedSummary(meal);
+    if (!_isScopeCurrent(expectedScope)) {
+      throw const StaleNutritionResponseException();
+    }
+    final result = agentRunResultFromJson(
+      json['result'] as Map<String, Object?>,
+    );
+    if (result.kind != 'meal_committed' ||
+        result.meal == null ||
+        result.sourceProposalId == null ||
+        result.confirmedMutation == null) {
+      throw const ApiException(502, 'Invalid direct commit response.');
+    }
+    // Reconciliation writes the authoritative snapshot through the active
+    // user's cache before publishing the granular data-change event.
+    await reconcileConfirmedMutation(result.confirmedMutation!);
+    if (!_isScopeCurrent(expectedScope)) {
+      throw const StaleNutritionResponseException();
+    }
     return AgentChatProposalCommitResult(
       clientMutationId: json['clientMutationId'] as String? ?? clientMutationId,
       reused: json['reused'] as bool? ?? false,
-      sourceProposalId: result['sourceProposalId'] as String? ?? proposalId,
-      meal: meal,
+      result: result,
       conversationMessage: AgentConversationMessage.fromJson(
         json['conversationMessage'] as Map<String, Object?>,
       ),

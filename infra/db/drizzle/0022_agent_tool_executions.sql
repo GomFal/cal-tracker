@@ -1,8 +1,8 @@
 CREATE TABLE IF NOT EXISTS agent_tool_executions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  conversation_id uuid NOT NULL REFERENCES agent_conversations(id) ON DELETE CASCADE,
-  assistant_message_id uuid NOT NULL REFERENCES agent_messages(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL,
+  conversation_id uuid NOT NULL,
+  assistant_message_id uuid NOT NULL,
   turn_id uuid NOT NULL,
   tool_call_id text NOT NULL,
   action_id text NOT NULL,
@@ -26,11 +26,18 @@ CREATE TABLE IF NOT EXISTS agent_tool_executions (
       (status IN ('completed', 'failed', 'interrupted')
         AND completed_at IS NOT NULL
         AND snapshot_json ? 'completedAt')
-    ),
-  CONSTRAINT agent_tool_executions_conversation_call_unique
-    UNIQUE (conversation_id, tool_call_id)
+    )
 );
 
+ALTER TABLE agent_tool_executions ADD CONSTRAINT agent_tool_executions_user_id_users_id_fk
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+ALTER TABLE agent_tool_executions ADD CONSTRAINT agent_tool_executions_conversation_id_agent_conversations_id_fk
+  FOREIGN KEY (conversation_id) REFERENCES agent_conversations(id) ON DELETE CASCADE;
+ALTER TABLE agent_tool_executions ADD CONSTRAINT agent_tool_executions_assistant_message_id_agent_messages_id_fk
+  FOREIGN KEY (assistant_message_id) REFERENCES agent_messages(id) ON DELETE CASCADE;
+
+CREATE UNIQUE INDEX IF NOT EXISTS agent_tool_executions_conversation_call_unique
+  ON agent_tool_executions(conversation_id, tool_call_id);
 CREATE INDEX IF NOT EXISTS agent_tool_executions_conversation_order_idx
   ON agent_tool_executions(conversation_id, turn_id, iteration, tool_call_index);
 CREATE INDEX IF NOT EXISTS agent_tool_executions_user_created_idx

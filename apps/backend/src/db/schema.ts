@@ -838,6 +838,9 @@ export const meals = pgTable(
       .defaultNow(),
   },
   (table) => [
+    uniqueIndex("meals_proposal_id_unique")
+      .on(table.proposalId)
+      .where(sql`${table.proposalId} IS NOT NULL`),
     index("meals_user_occurred_at_idx")
       .on(table.userId, table.occurredAt)
       .where(sql`${table.deletedAt} IS NULL`),
@@ -1474,6 +1477,10 @@ export const agentDirectActions = pgTable(
       .defaultNow(),
   },
   (table) => [
+    check(
+      "agent_direct_actions_action_id_check",
+      sql`${table.actionId} = 'commit_meal'`,
+    ),
     uniqueIndex("agent_direct_actions_user_mutation_unique").on(
       table.userId,
       table.actionId,

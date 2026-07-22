@@ -174,6 +174,9 @@ void main() {
 
 void _stubNutritionRepository(_MockNutritionRepository nutritionRepository) {
   when(
+    () => nutritionRepository.dataChanges,
+  ).thenAnswer((_) => const Stream.empty());
+  when(
     () => nutritionRepository.cachedDailySummary(date: any(named: 'date')),
   ).thenAnswer((_) async => null);
   when(

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:cal_tracker_mobile/app/theme.dart';
@@ -56,6 +57,34 @@ DailySummary _summary({List<Meal> meals = const []}) => DailySummary(
       meals: meals,
     );
 
+AgentRunResult _committedResult(Meal meal,
+        {String proposalId = 'proposal-id'}) =>
+    AgentRunResult(
+      kind: 'meal_committed',
+      message: 'Meal logged.',
+      sourceProposalId: proposalId,
+      meal: meal,
+    );
+
+Map<String, Object?> _confirmedMutationJson({
+  required String mutationId,
+  required DailySummary summary,
+}) =>
+    {
+      'version': 1,
+      'mutationId': mutationId,
+      'committedAt': '2026-01-01T12:00:00.000Z',
+      'effects': [
+        {
+          'domain': 'daily_summary',
+          'operation': 'replace',
+          'date': summary.date,
+          'revision': '2026-01-01T12:00:00.000Z',
+          'snapshot': summary.toJson(),
+        },
+      ],
+    };
+
 void main() {
   setUpAll(() {
     registerFallbackValue(_summary());
@@ -88,8 +117,7 @@ void main() {
         )).thenAnswer((_) async => AgentChatProposalCommitResult(
           clientMutationId: '11111111-1111-4111-8111-111111111111',
           reused: false,
-          sourceProposalId: action.proposalId,
-          meal: meal,
+          result: _committedResult(meal),
           conversationMessage: AgentConversationMessage(
             id: 'message-id',
             conversationId: action.conversationId,
@@ -188,8 +216,7 @@ void main() {
       (_) async => AgentChatProposalCommitResult(
         clientMutationId: '11111111-1111-4111-8111-111111111111',
         reused: false,
-        sourceProposalId: proposal.id,
-        meal: meal,
+        result: _committedResult(meal),
         conversationMessage: AgentConversationMessage(
           id: 'message-id',
           conversationId: 'conversation-id',
@@ -287,8 +314,7 @@ void main() {
       return AgentChatProposalCommitResult(
         clientMutationId: mutationIds.first,
         reused: false,
-        sourceProposalId: action.proposalId,
-        meal: meal,
+        result: _committedResult(meal),
         conversationMessage: AgentConversationMessage(
           id: 'message-id',
           conversationId: action.conversationId,
@@ -342,6 +368,7 @@ void main() {
       ),
     );
     when(() => cacheStore.writeDailySummary(any())).thenAnswer((_) async {});
+    final authoritativeSummary = _summary(meals: [meal]);
     when(() => apiClient.commitAgentChatProposal(
           conversationId: action.conversationId,
           proposalId: action.proposalId,
@@ -357,6 +384,10 @@ void main() {
           'sourceProposalId': action.proposalId,
           'meal': meal.toJson(),
           'message': 'Meal logged.',
+          'confirmedMutation': _confirmedMutationJson(
+            mutationId: '11111111-1111-4111-8111-111111111111',
+            summary: authoritativeSummary,
+          ),
         },
         'conversationMessage': conversationMessage.toJson(),
       },
@@ -364,7 +395,13 @@ void main() {
     final repository = NutritionRepository(
       apiClient: apiClient,
       cacheStore: cacheStore,
-    );
+    )..activateCacheForUser('user-a');
+    final changes = <Object>[];
+    final subscription = repository.dataChanges.listen(changes.add);
+    addTearDown(() async {
+      await subscription.cancel();
+      await repository.dispose();
+    });
 
     final result = await repository.commitAgentChatProposal(
       conversationId: action.conversationId,
@@ -372,12 +409,28 @@ void main() {
       sourceToolCallId: action.sourceToolCallId,
       clientMutationId: '11111111-1111-4111-8111-111111111111',
     );
+    final retry = await repository.commitAgentChatProposal(
+      conversationId: action.conversationId,
+      proposalId: action.proposalId,
+      sourceToolCallId: action.sourceToolCallId,
+      clientMutationId: '11111111-1111-4111-8111-111111111111',
+    );
+    await Future<void>.delayed(Duration.zero);
 
     expect(result.meal.id, meal.id);
+    expect(retry.result.confirmedMutation?.mutationId,
+        result.result.confirmedMutation?.mutationId);
+    expect(changes, hasLength(1));
     final written = verify(
       () => cacheStore.writeDailySummary(captureAny()),
     ).captured.single as DailySummary;
     expect(written.meals.map((item) => item.id), [meal.id]);
+    verify(() => apiClient.commitAgentChatProposal(
+          conversationId: action.conversationId,
+          proposalId: action.proposalId,
+          sourceToolCallId: action.sourceToolCallId,
+          clientMutationId: '11111111-1111-4111-8111-111111111111',
+        )).called(2);
   });
 
   test('repository failure leaves cached summaries untouched and retryable',
@@ -394,6 +447,8 @@ void main() {
     var attempts = 0;
     when(() => cacheStore.readDailySummary('2026-01-01'))
         .thenAnswer((_) async => null);
+    when(() => cacheStore.writeDailySummary(any())).thenAnswer((_) async {});
+    final authoritativeSummary = _summary(meals: [meal]);
     when(() => apiClient.commitAgentChatProposal(
           conversationId: action.conversationId,
           proposalId: action.proposalId,
@@ -410,6 +465,10 @@ void main() {
           'sourceProposalId': action.proposalId,
           'meal': meal.toJson(),
           'message': 'Meal logged.',
+          'confirmedMutation': _confirmedMutationJson(
+            mutationId: '11111111-1111-4111-8111-111111111111',
+            summary: authoritativeSummary,
+          ),
         },
         'conversationMessage': AgentConversationMessage(
           id: 'message-id',
@@ -423,7 +482,7 @@ void main() {
     final repository = NutritionRepository(
       apiClient: apiClient,
       cacheStore: cacheStore,
-    );
+    )..activateCacheForUser('user-a');
 
     await expectLater(
       repository.commitAgentChatProposal(
@@ -434,6 +493,7 @@ void main() {
       ),
       throwsException,
     );
+    verifyNever(() => cacheStore.writeDailySummary(any()));
     final retry = await repository.commitAgentChatProposal(
       conversationId: action.conversationId,
       proposalId: action.proposalId,
@@ -448,7 +508,75 @@ void main() {
           sourceToolCallId: action.sourceToolCallId,
           clientMutationId: '11111111-1111-4111-8111-111111111111',
         )).called(2);
+    final written = verify(
+      () => cacheStore.writeDailySummary(captureAny()),
+    ).captured.single as DailySummary;
+    expect(written.meals.map((item) => item.id), [meal.id]);
+  });
+
+  test('late direct-commit response is ignored after an account switch',
+      () async {
+    final apiClient = _ApiClient();
+    final cacheStore = _CacheStore();
+    final response = Completer<Map<String, Object?>>();
+    final meal = Meal(
+      id: 'late-meal',
+      title: 'Bread',
+      occurredAt: DateTime.utc(2026, 1, 1),
+      nutrition: _nutrition,
+      items: const [],
+    );
+    when(() => cacheStore.writeDailySummary(any())).thenAnswer((_) async {});
+    when(() => apiClient.commitAgentChatProposal(
+          conversationId: action.conversationId,
+          proposalId: action.proposalId,
+          sourceToolCallId: action.sourceToolCallId,
+          clientMutationId: '11111111-1111-4111-8111-111111111111',
+        )).thenAnswer((_) => response.future);
+    final repository = NutritionRepository(
+      apiClient: apiClient,
+      cacheStore: cacheStore,
+    )..activateCacheForUser('user-a');
+    final changes = <Object>[];
+    final subscription = repository.dataChanges.listen(changes.add);
+    addTearDown(() async {
+      await subscription.cancel();
+      await repository.dispose();
+    });
+
+    final pending = repository.commitAgentChatProposal(
+      conversationId: action.conversationId,
+      proposalId: action.proposalId,
+      sourceToolCallId: action.sourceToolCallId,
+      clientMutationId: '11111111-1111-4111-8111-111111111111',
+    );
+    repository.activateCacheForUser('user-b');
+    response.complete({
+      'actionId': 'commit_meal',
+      'clientMutationId': '11111111-1111-4111-8111-111111111111',
+      'reused': false,
+      'result': {
+        'kind': 'meal_committed',
+        'sourceProposalId': action.proposalId,
+        'meal': meal.toJson(),
+        'message': 'Meal logged.',
+        'confirmedMutation': _confirmedMutationJson(
+          mutationId: '11111111-1111-4111-8111-111111111111',
+          summary: _summary(meals: [meal]),
+        ),
+      },
+      'conversationMessage': AgentConversationMessage(
+        id: 'late-message',
+        conversationId: action.conversationId,
+        role: 'tool',
+        content: '{}',
+        createdAt: DateTime.utc(2026, 1, 1),
+      ).toJson(),
+    });
+
+    await expectLater(pending, throwsA(isA<StaleNutritionResponseException>()));
     verifyNever(() => cacheStore.writeDailySummary(any()));
+    expect(changes, isEmpty);
   });
 
   test('rehydration marks a committed proposal as saved and inactive',

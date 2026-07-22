@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { commitAgentChatProposalResponseSchema } from "@cal-tracker/contracts";
 import type {
   AgentMessage,
   AgentToolDecision,
@@ -93,13 +94,20 @@ describe("direct agent-chat meal proposal commit", () => {
       { method: "POST", headers: authHeader, body: JSON.stringify(body) },
     );
     expect(first.status).toBe(200);
-    expect((await first.clone().json()).reused).toBe(false);
+    const firstBody = await first.clone().json();
+    expect(() => commitAgentChatProposalResponseSchema.parse(firstBody)).not.toThrow();
+    expect(firstBody.reused).toBe(false);
+    expect(firstBody.result.confirmedMutation.mutationId).toBe(
+      body.clientMutationId,
+    );
     const retry = await request(
       `http://localhost/v1/agent/conversations/${conversationId}/meal-proposals/${proposal.id}/commit`,
       { method: "POST", headers: authHeader, body: JSON.stringify(body) },
     );
     expect(retry.status).toBe(200);
-    expect((await retry.json()).reused).toBe(true);
+    const retryBody = await retry.json();
+    expect(retryBody.reused).toBe(true);
+    expect(retryBody.result).toEqual(firstBody.result);
     expect(provider.calls).toBe(callsBeforeCommit);
     const history = await request(
       `http://localhost/v1/agent/conversations/${conversationId}`,
@@ -108,14 +116,17 @@ describe("direct agent-chat meal proposal commit", () => {
     const persisted = (await history.json()) as {
       messages: Array<{
         content: string;
-        metadata?: { sourceProposalId?: string };
+        metadata?: { sourceProposalId?: string; uiResult?: unknown };
       }>;
     };
+    const persistedCommits = persisted.messages.filter(
+      (message) => message.metadata?.sourceProposalId === proposal.id,
+    );
+    expect(persistedCommits).toHaveLength(1);
+    expect(persistedCommits[0]?.metadata?.uiResult).toEqual(firstBody.result);
     expect(
-      persisted.messages.filter(
-        (message) => message.metadata?.sourceProposalId === proposal.id,
-      ),
-    ).toHaveLength(1);
+      JSON.parse(persistedCommits[0]?.content ?? "{}").result,
+    ).toEqual(firstBody.result);
   });
 
   it("serializes concurrent commits with distinct retry keys", async () => {
@@ -179,6 +190,11 @@ describe("direct agent-chat meal proposal commit", () => {
     const bodies = await Promise.all(responses.map((response) => response.json()));
     expect(bodies.filter((body) => body.reused === false)).toHaveLength(1);
     expect(bodies.filter((body) => body.reused === true)).toHaveLength(1);
+    expect(bodies[0].clientMutationId).toBe(bodies[1].clientMutationId);
+    expect(bodies[0].result).toEqual(bodies[1].result);
+    expect(bodies[0].result.confirmedMutation.mutationId).toBe(
+      bodies[0].clientMutationId,
+    );
     expect(await repository.listMeals(user.id)).toHaveLength(1);
     const messages = await repository.listAgentConversationMessages(
       user.id,

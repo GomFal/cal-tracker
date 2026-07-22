@@ -715,6 +715,8 @@ export type AgentChatProposalCommit = {
   reused: boolean;
   meal: Meal;
   conversationMessage: AgentConversationMessageRecord;
+  /** Persisted canonical AgentChatMappedResult, if completion has occurred. */
+  result?: unknown;
 };
 
 export type AgentCandidateRegistryRecord = {
@@ -913,6 +915,14 @@ export interface AppRepository {
       traceId: string;
     },
   ): Promise<AgentChatProposalCommit>;
+  persistAgentChatProposalCommitResult(
+    userId: string,
+    input: {
+      conversationId: string;
+      messageId: string;
+      result: unknown;
+    },
+  ): Promise<AgentConversationMessageRecord>;
   saveAgentCandidateRegistry(
     input: Omit<AgentCandidateRegistryRecord, "id" | "createdAt">,
   ): Promise<AgentCandidateRegistryRecord>;

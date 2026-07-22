@@ -117,6 +117,7 @@ type AgentChatMappedResultCore =
       kind: "meal_committed";
       meal: Meal;
       message: string;
+      sourceProposalId?: string;
       options?: unknown[];
       candidateGroups?: unknown[];
       selectionState?: AgentCandidateSelectionState;
@@ -262,7 +263,7 @@ export class AgentChatService {
     proposalId: string;
     sourceToolCallId: string;
     clientMutationId: string;
-  }): Promise<AgentChatProposalCommit> {
+  }): Promise<AgentChatProposalCommit & { result: AgentChatMappedResult }> {
     const conversation = await this.repository.getAgentConversation(
       input.context.actorUserId,
       input.conversationId,
@@ -284,13 +285,64 @@ export class AgentChatService {
         storedToolMessageReferencesProposal(message, input.proposalId),
     );
     if (!source) throw new Error("agent_proposal_source_not_found");
-    return this.repository.commitAgentChatProposal(input.context.actorUserId, {
-      conversationId: input.conversationId,
-      proposalId: input.proposalId,
-      sourceToolCallId: input.sourceToolCallId,
-      clientMutationId: input.clientMutationId,
-      traceId: input.context.traceId,
-    });
+
+    const committed = await this.repository.commitAgentChatProposal(
+      input.context.actorUserId,
+      {
+        conversationId: input.conversationId,
+        proposalId: input.proposalId,
+        sourceToolCallId: input.sourceToolCallId,
+        clientMutationId: input.clientMutationId,
+        traceId: input.context.traceId,
+      },
+    );
+    const persisted = persistedDirectCommitResult(committed.result);
+    if (persisted?.confirmedMutation != null) {
+      return { ...committed, result: persisted };
+    }
+
+    const date = committed.meal.occurredAt.slice(0, 10);
+    const committedAt = new Date().toISOString();
+    const summary = await this.repository.getDailySummary(
+      input.context.actorUserId,
+      date,
+    );
+    const result: AgentChatMappedResult = {
+      kind: "meal_committed",
+      sourceProposalId: input.proposalId,
+      meal: committed.meal,
+      message: "Meal logged.",
+      confirmedMutation: {
+        version: 1,
+        mutationId: committed.clientMutationId,
+        committedAt,
+        effects: [
+          {
+            domain: "daily_summary",
+            operation: "replace",
+            date,
+            revision: committedAt,
+            snapshot: summary,
+          },
+        ],
+      },
+    };
+    const conversationMessage =
+      await this.repository.persistAgentChatProposalCommitResult(
+        input.context.actorUserId,
+        {
+          conversationId: input.conversationId,
+          messageId: committed.conversationMessage.id,
+          result,
+        },
+      );
+    const canonicalResult = persistedDirectCommitResult(
+      agentResultFromConversationMessage(conversationMessage),
+    );
+    if (canonicalResult?.confirmedMutation == null) {
+      throw new Error("agent_direct_action_result_not_persisted");
+    }
+    return { ...committed, conversationMessage, result: canonicalResult };
   }
 
   async *chat(input: {
@@ -2399,6 +2451,32 @@ function safeToolFailureForModel(error: unknown): string {
       ? rawCode
       : classifyPublicAiError(error, "internal_error");
   return JSON.stringify({ code });
+}
+
+function persistedDirectCommitResult(
+  value: unknown,
+): AgentChatMappedResult | undefined {
+  if (
+    !isRecord(value) ||
+    value.kind !== "meal_committed" ||
+    !isRecord(value.meal)
+  ) {
+    return undefined;
+  }
+  return value as AgentChatMappedResult;
+}
+
+function agentResultFromConversationMessage(
+  message: AgentConversationMessageRecord,
+): unknown {
+  const metadata = isRecord(message.metadata) ? message.metadata : undefined;
+  if (metadata?.uiResult !== undefined) return metadata.uiResult;
+  try {
+    const content = JSON.parse(message.content) as { result?: unknown };
+    return content.result;
+  } catch {
+    return undefined;
+  }
 }
 
 function storedToolMessageReferencesProposal(

@@ -813,12 +813,7 @@ export function createApp(input: {
           actionId: committed.actionId,
           clientMutationId: committed.clientMutationId,
           reused: committed.reused,
-          result: {
-            kind: "meal_committed",
-            sourceProposalId: c.req.param("proposalId"),
-            meal: committed.meal,
-            message: "Meal logged.",
-          },
+          result: committed.result,
           conversationMessage: committed.conversationMessage,
         });
       } catch (error) {

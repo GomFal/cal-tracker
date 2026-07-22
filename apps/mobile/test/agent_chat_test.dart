@@ -949,6 +949,9 @@ void main() {
       when(() => repository.cachedTemplates()).thenAnswer((_) async => null);
       when(() => repository.cachedUsualFoods()).thenAnswer((_) async => null);
       when(
+        () => repository.dataChanges,
+      ).thenAnswer((_) => const Stream.empty());
+      when(
         () => repository.refreshTemplates(force: any(named: 'force')),
       ).thenAnswer((_) async => const <MealTemplate>[]);
       when(

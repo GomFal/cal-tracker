@@ -147,6 +147,7 @@ void main() {
       // Arrange: fake repository + draft to be returned by OCR/LLM.
       // -----------------------------------------------------------------
       final repo = _FakeRepo();
+      when(() => repo.dataChanges).thenAnswer((_) => const Stream.empty());
       const draft = UsualFoodDraft(
         name: 'Greek Yogurt Fage',
         brand: 'Fage',

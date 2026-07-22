@@ -1301,6 +1301,53 @@ export class InMemoryRepository implements AppRepository {
     return committed;
   }
 
+  async persistAgentChatProposalCommitResult(
+    userId: string,
+    input: {
+      conversationId: string;
+      messageId: string;
+      result: unknown;
+    },
+  ): Promise<AgentConversationMessageRecord> {
+    const conversation = await this.getAgentConversation(
+      userId,
+      input.conversationId,
+    );
+    if (!conversation) throw new Error("agent_direct_action_message_not_found");
+    const messages =
+      this.agentConversationMessages.get(input.conversationId) ?? [];
+    for (var index = 0; index < messages.length; index++) {
+      const message = messages[index];
+      if (!message || message.id !== input.messageId || message.userId !== userId) {
+        continue;
+      }
+      const metadata =
+        message.metadata && typeof message.metadata === "object"
+          ? (message.metadata as Record<string, unknown>)
+          : {};
+      const updated =
+        metadata.uiResult !== undefined
+          ? message
+          : {
+              ...message,
+              content: JSON.stringify({
+                actionId: "commit_meal",
+                result: input.result,
+              }),
+              metadata: { ...metadata, uiResult: input.result },
+            };
+      messages[index] = updated;
+      for (const commit of this.agentDirectCommits.values()) {
+        if (commit.conversationMessage.id === updated.id) {
+          commit.conversationMessage = updated;
+          commit.result = agentResultFromConversationMessage(updated);
+        }
+      }
+      return updated;
+    }
+    throw new Error("agent_direct_action_message_not_found");
+  }
+
   async saveAgentCandidateRegistry(
     input: Omit<AgentCandidateRegistryRecord, "id" | "createdAt">,
   ): Promise<AgentCandidateRegistryRecord> {
@@ -2069,6 +2116,22 @@ function stripUserId<T extends { userId: string }>(
 ): Omit<T, "userId"> {
   const { userId: _userId, ...rest } = value;
   return rest;
+}
+
+function agentResultFromConversationMessage(
+  message: AgentConversationMessageRecord,
+): unknown {
+  const metadata =
+    message.metadata && typeof message.metadata === "object"
+      ? (message.metadata as Record<string, unknown>)
+      : undefined;
+  if (metadata?.uiResult !== undefined) return metadata.uiResult;
+  try {
+    const content = JSON.parse(message.content) as { result?: unknown };
+    return content.result;
+  } catch {
+    return undefined;
+  }
 }
 
 function dailyGoalKey(userId: string, date: string) {

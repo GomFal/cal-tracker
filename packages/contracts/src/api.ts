@@ -21,6 +21,7 @@ import {
   usualFoodSchema,
   uuidSchema,
 } from "./common.js";
+import { confirmedNutritionMutationSchema } from "./mutationEffects.js";
 
 export const errorResponseSchema = z.object({
   error: z.object({
@@ -95,6 +96,7 @@ export const commitAgentChatProposalResponseSchema = z.object({
     sourceProposalId: uuidSchema,
     meal: mealSchema,
     message: z.string(),
+    confirmedMutation: confirmedNutritionMutationSchema,
   }),
   conversationMessage: z.unknown(),
 });

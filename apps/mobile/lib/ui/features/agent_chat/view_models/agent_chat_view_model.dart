@@ -128,6 +128,7 @@ class AgentChatViewModel extends ChangeNotifier {
   String? statusMessage;
   final List<AgentConversationSummary> _conversations = [];
   int _entryCounter = 0;
+  int _lifecycleGeneration = 0;
   String? _activeAssistantEntryId;
   Timer? _typingTimer;
   String _pendingAssistantText = '';
@@ -182,6 +183,7 @@ class AgentChatViewModel extends ChangeNotifier {
   }
 
   void reset() {
+    _lifecycleGeneration++;
     final shouldCancelRecording = isRecording || isStoppingRecording;
     _typingTimer?.cancel();
     _typingTimer = null;
@@ -399,6 +401,7 @@ class AgentChatViewModel extends ChangeNotifier {
       action.proposalId,
       _newClientMutationId,
     );
+    final lifecycleGeneration = _lifecycleGeneration;
     try {
       final committed = await _nutritionRepository.commitAgentChatProposal(
         conversationId: action.conversationId,
@@ -406,16 +409,12 @@ class AgentChatViewModel extends ChangeNotifier {
         sourceToolCallId: action.sourceToolCallId,
         clientMutationId: clientMutationId,
       );
+      if (lifecycleGeneration != _lifecycleGeneration) return;
       _committedProposalIds.add(committed.sourceProposalId);
       _proposalActionStates[action.proposalId] =
           AgentChatProposalActionState.succeeded;
       _correctionProposalId = null;
-      final result = AgentRunResult(
-        kind: 'meal_committed',
-        message: 'Meal logged.',
-        meal: committed.meal,
-        sourceProposalId: committed.sourceProposalId,
-      );
+      final result = committed.result;
       if (!_entries.any(
         (entry) => entry.id == committed.conversationMessage.id,
       )) {
@@ -450,12 +449,17 @@ class AgentChatViewModel extends ChangeNotifier {
         );
       }
       await _saveActiveSession(unfinished: false);
+    } on StaleNutritionResponseException {
+      return;
     } catch (error) {
+      if (lifecycleGeneration != _lifecycleGeneration) return;
       _proposalActionStates[action.proposalId] =
           AgentChatProposalActionState.failed;
       _captureError(error, context: UserErrorContext.voiceCommit);
     } finally {
-      notifyListeners();
+      if (lifecycleGeneration == _lifecycleGeneration) {
+        notifyListeners();
+      }
     }
   }
 

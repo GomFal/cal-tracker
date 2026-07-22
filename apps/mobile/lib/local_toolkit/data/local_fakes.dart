@@ -199,8 +199,12 @@ class LocalNutritionRepository extends NutritionRepository {
     return AgentChatProposalCommitResult(
       clientMutationId: clientMutationId,
       reused: false,
-      sourceProposalId: proposalId,
-      meal: meal,
+      result: AgentRunResult(
+        kind: 'meal_committed',
+        message: 'Meal logged.',
+        sourceProposalId: proposalId,
+        meal: meal,
+      ),
       conversationMessage: AgentConversationMessage(
         id: 'local-direct-$proposalId',
         conversationId: conversationId,

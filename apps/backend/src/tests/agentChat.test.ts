@@ -21,7 +21,7 @@ class QueueChatAgentProvider implements ChatAgentProvider {
   async runWithTools(input: {
     messages: AgentMessage[];
   }): Promise<AgentToolDecision> {
-    this.inputs.push({ messages: input.messages });
+    this.inputs.push({ messages: structuredClone(input.messages) });
     const decision = this.decisions.shift();
     if (!decision) throw new Error("missing_fake_agent_decision");
     return decision;
@@ -246,6 +246,476 @@ describe("agent chat streaming", () => {
       actionId: "get_daily_summary",
       status: "completed",
     });
+  });
+
+  it("retries an empty assistant response instead of finishing silently", async () => {
+    const agentProvider = new QueueChatAgentProvider([
+      {
+        toolCalls: [],
+        rawResponse: { id: "gen_empty" },
+        interaction: { messages: [], streamEvents: [] },
+      },
+      {
+        toolCalls: [],
+        rawResponse: { id: "gen_recovered" },
+        interaction: {
+          messages: [],
+          assistantContent:
+            "I could not find enough information to complete that request.",
+          streamEvents: [],
+        },
+      },
+    ]);
+    const { request, telemetry } = buildTestApp({ agentProvider });
+    const { authHeader } = await registerAndAuth(request);
+
+    const response = await request("http://localhost/v1/agent/chat", {
+      method: "POST",
+      headers: authHeader,
+      body: JSON.stringify({
+        message: "Handle this request",
+        source: "flutter",
+      }),
+    });
+
+    const events = parseSse(await response.text());
+    expect(response.status).toBe(200);
+    expect(agentProvider.inputs).toHaveLength(2);
+    expect(
+      agentProvider.inputs[1]!.messages.some(
+        (message) =>
+          message.role === "system" &&
+          message.content.includes("Do not finish the turn without"),
+      ),
+    ).toBe(true);
+    expect(
+      events
+        .filter((event) => event.type === "assistant_delta")
+        .map((event) => event.delta),
+    ).toEqual([
+      "I could not find enough information to complete that request.",
+    ]);
+    expect(events.some((event) => event.type === "done")).toBe(true);
+    expect(JSON.stringify(events)).not.toContain('"delta":"Done."');
+
+    const conversationId = events.find(
+      (event) => event.type === "conversation_started",
+    )?.conversationId as string;
+    const turns = await telemetry.listAgentTurns({ conversationId, limit: 10 });
+    expect(turns).toEqual([
+      expect.objectContaining({
+        status: "success",
+        stopReason: "assistant_message",
+        iterationCount: 2,
+        toolCallCount: 0,
+      }),
+    ]);
+  });
+
+  it("fails with a user-facing error after repeated empty assistant responses", async () => {
+    const emptyDecision = (id: string): AgentToolDecision => ({
+      toolCalls: [],
+      rawResponse: { id },
+      interaction: { messages: [], streamEvents: [] },
+    });
+    const agentProvider = new QueueChatAgentProvider([
+      emptyDecision("gen_empty_1"),
+      emptyDecision("gen_empty_2"),
+      emptyDecision("gen_empty_3"),
+    ]);
+    const { request, telemetry } = buildTestApp({ agentProvider });
+    const { authHeader } = await registerAndAuth(request);
+
+    const response = await request("http://localhost/v1/agent/chat", {
+      method: "POST",
+      headers: authHeader,
+      body: JSON.stringify({
+        message: "Handle this request",
+        source: "flutter",
+      }),
+    });
+
+    const events = parseSse(await response.text());
+    const terminalError = events.find((event) => event.type === "error");
+    expect(agentProvider.inputs).toHaveLength(3);
+    expect(events.some((event) => event.type === "done")).toBe(false);
+    const failureMessage = events.find(
+      (event) => event.type === "assistant_delta",
+    )?.delta;
+    expect(typeof failureMessage).toBe("string");
+    expect(String(failureMessage).trim().length).toBeGreaterThan(0);
+    expect(terminalError?.error).toEqual(
+      expect.objectContaining({
+        code: "internal_error",
+        message: expect.any(String),
+      }),
+    );
+    expect(
+      (terminalError?.error as { message: string }).message.trim().length,
+    ).toBeGreaterThan(0);
+    expect(failureMessage).toBe(
+      (terminalError?.error as { message: string }).message,
+    );
+
+    const conversationId = events.find(
+      (event) => event.type === "conversation_started",
+    )?.conversationId as string;
+    const turns = await telemetry.listAgentTurns({ conversationId, limit: 10 });
+    expect(turns).toEqual([
+      expect.objectContaining({
+        status: "failure",
+        stopReason: "empty_assistant_response",
+        errorCode: "empty_assistant_response",
+        iterationCount: 3,
+      }),
+    ]);
+  });
+
+  it("executes more than the former eight-tool budget and then answers", async () => {
+    const toolCalls = Array.from({ length: 10 }, (_, index) => ({
+      id: `call_summary_${index + 1}`,
+      type: "function" as const,
+      function: {
+        name: "get_daily_summary",
+        arguments: JSON.stringify({
+          date: `2026-07-${String(index + 1).padStart(2, "0")}`,
+        }),
+      },
+    }));
+    const agentProvider = new QueueChatAgentProvider([
+      {
+        toolCalls,
+        rawResponse: { id: "gen_ten_tools" },
+        interaction: { messages: [], streamEvents: [] },
+      },
+      {
+        toolCalls: [],
+        rawResponse: { id: "gen_ten_tools_final" },
+        interaction: {
+          messages: [],
+          assistantContent: "I checked all ten requested days.",
+          streamEvents: [],
+        },
+      },
+    ]);
+    const { request } = buildTestApp({ agentProvider });
+    const { authHeader } = await registerAndAuth(request);
+
+    const response = await request("http://localhost/v1/agent/chat", {
+      method: "POST",
+      headers: authHeader,
+      body: JSON.stringify({
+        message: "Check these ten days",
+        source: "flutter",
+      }),
+    });
+
+    const events = parseSse(await response.text());
+    expect(
+      events.filter((event) => event.type === "tool_call_completed"),
+    ).toHaveLength(10);
+    expect(
+      events.find((event) => event.type === "assistant_delta")?.delta,
+    ).toBe("I checked all ten requested days.");
+    expect(events.at(-1)?.type).toBe("done");
+    expect(agentProvider.inputs).toHaveLength(2);
+  });
+
+  it("ends the exact tool-call limit with a persisted user-facing message", async () => {
+    const toolCalls = Array.from({ length: 20 }, (_, index) => ({
+      id: `call_limit_summary_${index + 1}`,
+      type: "function" as const,
+      function: {
+        name: "get_daily_summary",
+        arguments: JSON.stringify({
+          date: `2026-06-${String(index + 1).padStart(2, "0")}`,
+        }),
+      },
+    }));
+    const agentProvider = new QueueChatAgentProvider([
+      {
+        toolCalls,
+        rawResponse: { id: "gen_tool_limit" },
+        interaction: { messages: [], streamEvents: [] },
+      },
+      {
+        toolCalls: [
+          {
+            id: "call_over_tool_limit",
+            type: "function",
+            function: {
+              name: "get_remaining_targets",
+              arguments: "{}",
+            },
+          },
+        ],
+        rawResponse: { id: "gen_over_tool_limit" },
+        interaction: { messages: [], streamEvents: [] },
+      },
+    ]);
+    const { request, telemetry } = buildTestApp({ agentProvider });
+    const { authHeader } = await registerAndAuth(request);
+
+    const response = await request("http://localhost/v1/agent/chat", {
+      method: "POST",
+      headers: authHeader,
+      body: JSON.stringify({
+        message: "Check many days and keep going",
+        source: "flutter",
+      }),
+    });
+
+    const events = parseSse(await response.text());
+    const failureMessage = events.find(
+      (event) => event.type === "assistant_delta",
+    )?.delta;
+    const terminalError = events.find((event) => event.type === "error");
+    expect(
+      events.filter((event) => event.type === "tool_call_completed"),
+    ).toHaveLength(20);
+    expect(String(failureMessage).trim().length).toBeGreaterThan(0);
+    expect(failureMessage).toBe(
+      (terminalError?.error as { message: string }).message,
+    );
+    expect(events.some((event) => event.type === "done")).toBe(false);
+
+    const conversationId = events.find(
+      (event) => event.type === "conversation_started",
+    )?.conversationId as string;
+    const turns = await telemetry.listAgentTurns({ conversationId, limit: 10 });
+    expect(turns).toEqual([
+      expect.objectContaining({
+        status: "failure",
+        resultKind: "assistant_error",
+        stopReason: "tool_call_limit",
+        toolCallCount: 20,
+      }),
+    ]);
+  });
+
+  it("ends the exact iteration limit with a persisted user-facing message", async () => {
+    const decisions = Array.from(
+      { length: 12 },
+      (_, index): AgentToolDecision => ({
+        toolCalls: [
+          {
+            id: `call_iteration_${index + 1}`,
+            type: "function",
+            function: {
+              name: "get_daily_summary",
+              arguments: JSON.stringify({
+                date: `2026-05-${String(index + 1).padStart(2, "0")}`,
+              }),
+            },
+          },
+        ],
+        rawResponse: { id: `gen_iteration_${index + 1}` },
+        interaction: { messages: [], streamEvents: [] },
+      }),
+    );
+    const agentProvider = new QueueChatAgentProvider(decisions);
+    const { request, telemetry } = buildTestApp({ agentProvider });
+    const { authHeader } = await registerAndAuth(request);
+
+    const response = await request("http://localhost/v1/agent/chat", {
+      method: "POST",
+      headers: authHeader,
+      body: JSON.stringify({
+        message: "Keep checking until the step budget is exhausted",
+        source: "flutter",
+      }),
+    });
+
+    const events = parseSse(await response.text());
+    const failureMessage = events.find(
+      (event) => event.type === "assistant_delta",
+    )?.delta;
+    const terminalError = events.find((event) => event.type === "error");
+    expect(agentProvider.inputs).toHaveLength(12);
+    expect(
+      events.filter((event) => event.type === "tool_call_completed"),
+    ).toHaveLength(12);
+    expect(String(failureMessage).trim().length).toBeGreaterThan(0);
+    expect(failureMessage).toBe(
+      (terminalError?.error as { message: string }).message,
+    );
+
+    const conversationId = events.find(
+      (event) => event.type === "conversation_started",
+    )?.conversationId as string;
+    const turns = await telemetry.listAgentTurns({ conversationId, limit: 10 });
+    expect(turns).toEqual([
+      expect.objectContaining({
+        status: "failure",
+        resultKind: "assistant_error",
+        stopReason: "max_iterations",
+        iterationCount: 12,
+        toolCallCount: 12,
+      }),
+    ]);
+  });
+
+  it("does not let chat options terminate a mixed tool batch", async () => {
+    const agentProvider = new QueueChatAgentProvider([
+      {
+        toolCalls: [
+          {
+            id: "call_mixed_options",
+            type: "function",
+            function: {
+              name: "show_chat_options",
+              arguments: JSON.stringify({
+                message: "Continue?",
+                options: [
+                  { label: "Yes", value: "Continue" },
+                  { label: "No", value: "Stop" },
+                ],
+              }),
+            },
+          },
+          {
+            id: "call_mixed_summary",
+            type: "function",
+            function: {
+              name: "get_daily_summary",
+              arguments: "{}",
+            },
+          },
+        ],
+        rawResponse: { id: "gen_mixed_tools" },
+        interaction: { messages: [], streamEvents: [] },
+      },
+      {
+        toolCalls: [],
+        rawResponse: { id: "gen_mixed_tools_final" },
+        interaction: {
+          messages: [],
+          assistantContent: "I finished checking your summary.",
+          streamEvents: [],
+        },
+      },
+    ]);
+    const { request } = buildTestApp({ agentProvider });
+    const { authHeader } = await registerAndAuth(request);
+
+    const response = await request("http://localhost/v1/agent/chat", {
+      method: "POST",
+      headers: authHeader,
+      body: JSON.stringify({
+        message: "Check my summary and then ask me what to do",
+        source: "flutter",
+      }),
+    });
+
+    const events = parseSse(await response.text());
+    expect(
+      events.find(
+        (event) =>
+          event.type === "tool_call_failed" &&
+          (event.toolCall as { id?: string } | undefined)?.id ===
+            "call_mixed_options",
+      ),
+    ).toBeDefined();
+    expect(
+      events.find(
+        (event) =>
+          event.type === "tool_call_completed" &&
+          (event.toolCall as { id?: string } | undefined)?.id ===
+            "call_mixed_summary",
+      ),
+    ).toBeDefined();
+    expect(
+      events.find((event) => event.type === "assistant_delta")?.delta,
+    ).toBe("I finished checking your summary.");
+    expect(events.at(-1)?.type).toBe("done");
+    expect(agentProvider.inputs).toHaveLength(2);
+  });
+
+  it("does not accept mixed chat options after the tool budget truncates the batch", async () => {
+    const firstBatch = Array.from({ length: 19 }, (_, index) => ({
+      id: `call_budget_summary_${index + 1}`,
+      type: "function" as const,
+      function: {
+        name: "get_daily_summary",
+        arguments: JSON.stringify({
+          date: `2026-04-${String(index + 1).padStart(2, "0")}`,
+        }),
+      },
+    }));
+    const agentProvider = new QueueChatAgentProvider([
+      {
+        toolCalls: firstBatch,
+        rawResponse: { id: "gen_budget_prelude" },
+        interaction: { messages: [], streamEvents: [] },
+      },
+      {
+        toolCalls: [
+          {
+            id: "call_budget_options",
+            type: "function",
+            function: {
+              name: "show_chat_options",
+              arguments: JSON.stringify({
+                message: "Continue?",
+                options: [
+                  { label: "Yes", value: "Continue" },
+                  { label: "No", value: "Stop" },
+                ],
+              }),
+            },
+          },
+          {
+            id: "call_budget_remaining",
+            type: "function",
+            function: {
+              name: "get_remaining_targets",
+              arguments: "{}",
+            },
+          },
+        ],
+        rawResponse: { id: "gen_budget_mixed" },
+        interaction: { messages: [], streamEvents: [] },
+      },
+      {
+        toolCalls: [],
+        rawResponse: { id: "gen_budget_final" },
+        interaction: {
+          messages: [],
+          assistantContent:
+            "I could not run the remaining step within this turn.",
+          streamEvents: [],
+        },
+      },
+    ]);
+    const { request } = buildTestApp({ agentProvider });
+    const { authHeader } = await registerAndAuth(request);
+
+    const response = await request("http://localhost/v1/agent/chat", {
+      method: "POST",
+      headers: authHeader,
+      body: JSON.stringify({
+        message: "Run many checks and then ask me",
+        source: "flutter",
+      }),
+    });
+
+    const events = parseSse(await response.text());
+    expect(agentProvider.inputs).toHaveLength(3);
+    expect(
+      events.find(
+        (event) =>
+          event.type === "tool_call_failed" &&
+          (event.toolCall as { id?: string } | undefined)?.id ===
+            "call_budget_options",
+      ),
+    ).toBeDefined();
+    expect(events.some((event) => event.type === "assistant_suggestions")).toBe(
+      false,
+    );
+    expect(
+      events.find((event) => event.type === "assistant_delta")?.delta,
+    ).toBe("I could not run the remaining step within this turn.");
+    expect(events.at(-1)?.type).toBe("done");
   });
 
   it("marks a persisted started call interrupted when its stream is cancelled", async () => {

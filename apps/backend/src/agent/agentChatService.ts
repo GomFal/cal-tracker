@@ -64,8 +64,9 @@ import {
   type CandidateRegistryMetadata,
 } from "./toolContent.js";
 
-const MAX_CHAT_ITERATIONS = 6;
-const MAX_TOOL_CALLS_PER_TURN = 8;
+const MAX_CHAT_ITERATIONS = 12;
+const MAX_TOOL_CALLS_PER_TURN = 20;
+const MAX_EMPTY_ASSISTANT_RETRIES = 2;
 const STORED_TOOL_RESULT_MAX_CHARS = 12000;
 const MAX_CONVERSATION_TITLE_CHARS = 64;
 const CHAT_OPTIONS_TOOL_NAME = "show_chat_options";
@@ -452,6 +453,7 @@ export class AgentChatService {
     let largestStreamGapMs: number | undefined;
     let accumulatedLlmMs = 0;
     let accumulatedActionMs = 0;
+    let emptyAssistantRetryCount = 0;
 
     while (iteration < MAX_CHAT_ITERATIONS) {
       if (
@@ -480,6 +482,18 @@ export class AgentChatService {
           traceId: input.context.traceId,
         });
       } catch (error) {
+        const publicError = createPublicAiError(
+          "provider_unavailable",
+          correlation.traceId,
+        );
+        const failureMessage = await this.persistTerminalFailureMessage({
+          userId: input.context.actorUserId,
+          conversationId: conversation.id,
+          correlation,
+          iteration,
+          stopReason: "provider_error",
+          error: publicError,
+        });
         await this.logRun({
           type: "agent.chat",
           traceId: input.context.traceId,
@@ -494,7 +508,10 @@ export class AgentChatService {
           correlation,
           userId: input.context.actorUserId,
           text,
+          assistantText: failureMessage,
           model: this.model,
+          resultKind: "assistant_error",
+          stopReason: "provider_error",
           iterationCount: iteration,
           toolCallCount,
           status: "failure",
@@ -503,12 +520,14 @@ export class AgentChatService {
           totalMs: Date.now() - runStarted,
         });
         yield {
+          type: "assistant_delta",
+          conversationId: conversation.id,
+          delta: failureMessage,
+        };
+        yield {
           type: "error",
           conversationId: conversation.id,
-          error: createPublicAiError(
-            "provider_unavailable",
-            correlation.traceId,
-          ),
+          error: publicError,
         };
         return;
       }
@@ -561,7 +580,92 @@ export class AgentChatService {
         tokenMetrics,
       });
       if (decision.toolCalls.length === 0) {
-        const finalText = assistantText || "Done.";
+        if (!assistantText) {
+          if (
+            emptyAssistantRetryCount < MAX_EMPTY_ASSISTANT_RETRIES &&
+            iteration < MAX_CHAT_ITERATIONS
+          ) {
+            emptyAssistantRetryCount++;
+            messages.push({
+              role: "system",
+              content: emptyAssistantRecoveryInstruction(
+                emptyAssistantRetryCount,
+              ),
+            });
+            continue;
+          }
+
+          const publicError = createPublicAiError(
+            "internal_error",
+            correlation.traceId,
+          );
+          latestStopReason = "empty_assistant_response";
+          const failureMessage = await this.persistTerminalFailureMessage({
+            userId: input.context.actorUserId,
+            conversationId: conversation.id,
+            correlation,
+            iteration,
+            stopReason: latestStopReason,
+            error: publicError,
+          });
+          await this.logRun({
+            type: "agent.chat",
+            traceId: input.context.traceId,
+            userId: input.context.actorUserId,
+            conversationId: conversation.id,
+            inputText: text,
+            inputMode,
+            toolCallCount,
+            errorStage: "empty_assistant_response",
+            errorDiagnostic:
+              "The assistant returned no tool calls and no user-facing message.",
+            timingsMs: { total: Date.now() - runStarted },
+          });
+          await this.recordTurnTelemetry({
+            correlation,
+            userId: input.context.actorUserId,
+            text,
+            assistantText: failureMessage,
+            model: this.model,
+            resultKind: "assistant_error",
+            stopReason: latestStopReason,
+            iterationCount: iteration,
+            toolCallCount,
+            promptTokens: zeroAsUndefined(accumulatedPromptTokens),
+            completionTokens: zeroAsUndefined(accumulatedCompletionTokens),
+            totalTokens: zeroAsUndefined(accumulatedTotalTokens),
+            reasoningTokens: zeroAsUndefined(accumulatedReasoningTokens),
+            providerCostAmount: zeroAsUndefined(accumulatedProviderCost),
+            estimatedCostAmount: zeroAsUndefined(accumulatedEstimatedCost),
+            costCurrency,
+            costSource,
+            pricingSnapshot: lastPricingSnapshot,
+            firstByteMs,
+            firstToolCallMs,
+            largestStreamGapMs,
+            llmMs: zeroAsUndefined(accumulatedLlmMs),
+            actionMs: zeroAsUndefined(accumulatedActionMs),
+            totalMs: Date.now() - runStarted,
+            status: "failure",
+            errorCode: "empty_assistant_response",
+            errorMessage:
+              "The assistant returned no tool calls and no user-facing message.",
+            metadata: { emptyAssistantRetryCount },
+          });
+          yield {
+            type: "assistant_delta",
+            conversationId: conversation.id,
+            delta: failureMessage,
+          };
+          yield {
+            type: "error",
+            conversationId: conversation.id,
+            error: publicError,
+          };
+          return;
+        }
+
+        const finalText = assistantText;
         latestAssistantText = finalText;
         latestResultKind = "assistant_message";
         latestStopReason = "assistant_message";
@@ -620,22 +724,41 @@ export class AgentChatService {
           actionMs: zeroAsUndefined(accumulatedActionMs),
           totalMs: Date.now() - runStarted,
           status: "success",
+          metadata:
+            emptyAssistantRetryCount > 0
+              ? { emptyAssistantRetryCount }
+              : undefined,
         });
         yield { type: "done", conversationId: conversation.id };
         return;
       }
 
+      emptyAssistantRetryCount = 0;
       const toolCalls = decision.toolCalls.slice(
         0,
         MAX_TOOL_CALLS_PER_TURN - toolCallCount,
       );
       if (toolCalls.length === 0) {
+        const publicError = createPublicAiError(
+          "internal_error",
+          correlation.traceId,
+        );
+        const failureMessage = await this.persistTerminalFailureMessage({
+          userId: input.context.actorUserId,
+          conversationId: conversation.id,
+          correlation,
+          iteration,
+          stopReason: "tool_call_limit",
+          error: publicError,
+        });
         await this.recordTurnTelemetry({
           correlation,
           userId: input.context.actorUserId,
           text,
-          assistantText: latestAssistantText,
+          assistantText: failureMessage,
           model: this.model,
+          resultKind: "assistant_error",
+          stopReason: "tool_call_limit",
           iterationCount: iteration,
           toolCallCount,
           status: "failure",
@@ -645,9 +768,14 @@ export class AgentChatService {
           totalMs: Date.now() - runStarted,
         });
         yield {
+          type: "assistant_delta",
+          conversationId: conversation.id,
+          delta: failureMessage,
+        };
+        yield {
           type: "error",
           conversationId: conversation.id,
-          error: createPublicAiError("internal_error", correlation.traceId),
+          error: publicError,
         };
         return;
       }
@@ -731,10 +859,16 @@ export class AgentChatService {
         }
 
         if (actionId === CHAT_OPTIONS_TOOL_NAME) {
-          const quickReply = normalizeChatOptions(parsedInput, assistantText);
+          const quickReply =
+            decision.toolCalls.length === 1
+              ? normalizeChatOptions(parsedInput, assistantText)
+              : undefined;
           if (!quickReply) {
             const feedback = describeToolCall(toolCall, parsedInput);
-            const error = "The assistant sent invalid chat options.";
+            const mixedToolBatch = decision.toolCalls.length > 1;
+            const error = mixedToolBatch
+              ? "Chat options must be requested in a separate assistant step after all other tools finish."
+              : "The assistant sent invalid chat options.";
             const publicError = createPublicAiError(
               "validation_error",
               correlation.traceId,
@@ -759,7 +893,12 @@ export class AgentChatService {
               actionId,
               error,
               correlation,
-              { iteration, errorCode: "invalid_chat_options" },
+              {
+                iteration,
+                errorCode: mixedToolBatch
+                  ? "mixed_terminal_tool_call"
+                  : "invalid_chat_options",
+              },
             );
             yield {
               type: "tool_call_failed",
@@ -1438,18 +1577,25 @@ export class AgentChatService {
       }
     }
 
-    yield {
-      type: "error",
+    const publicError = createPublicAiError(
+      "internal_error",
+      correlation.traceId,
+    );
+    const failureMessage = await this.persistTerminalFailureMessage({
+      userId: input.context.actorUserId,
       conversationId: conversation.id,
-      error: createPublicAiError("internal_error", correlation.traceId),
-    };
+      correlation,
+      iteration,
+      stopReason: "max_iterations",
+      error: publicError,
+    });
     await this.recordTurnTelemetry({
       correlation,
       userId: input.context.actorUserId,
       text,
-      assistantText: latestAssistantText,
+      assistantText: failureMessage,
       model: this.model,
-      resultKind: latestResultKind,
+      resultKind: "assistant_error",
       stopReason: "max_iterations",
       iterationCount: iteration,
       toolCallCount,
@@ -1472,6 +1618,42 @@ export class AgentChatService {
       errorCode: "max_iterations",
       errorMessage: "The assistant stopped after the maximum number of steps.",
     });
+    yield {
+      type: "assistant_delta",
+      conversationId: conversation.id,
+      delta: failureMessage,
+    };
+    yield {
+      type: "error",
+      conversationId: conversation.id,
+      error: publicError,
+    };
+  }
+
+  private async persistTerminalFailureMessage(input: {
+    userId: string;
+    conversationId: string;
+    correlation: ChatTurnCorrelation;
+    iteration: number;
+    stopReason: string;
+    error: PublicAiError;
+  }): Promise<string> {
+    const message = input.error.message.trim();
+    await this.repository.addAgentConversationMessage(
+      input.userId,
+      input.conversationId,
+      {
+        role: "assistant",
+        content: message,
+        ...messageCorrelation(input.correlation, {
+          iteration: input.iteration,
+          resultKind: "assistant_error",
+          stopReason: input.stopReason,
+          errorCode: input.error.code,
+        }),
+      },
+    );
+    return message;
   }
 
   private async resolveConversation(
@@ -1686,6 +1868,9 @@ export class AgentChatService {
           iteration: input.iteration,
           toolCallCount: input.decision.toolCalls.length,
           streamEventCount: input.decision.timingsMs?.streamEventCount,
+          emptyAssistantResponse:
+            input.decision.toolCalls.length === 0 &&
+            !input.decision.interaction?.assistantContent?.trim(),
         },
       });
       await this.telemetryService.recordLlmRun({
@@ -1716,7 +1901,12 @@ export class AgentChatService {
         costCurrency: input.cost.costCurrency,
         costSource: input.cost.costSource,
         pricingSnapshot: input.cost.pricingSnapshot,
-        metadata: { iteration: input.iteration },
+        metadata: {
+          iteration: input.iteration,
+          emptyAssistantResponse:
+            input.decision.toolCalls.length === 0 &&
+            !input.decision.interaction?.assistantContent?.trim(),
+        },
       });
     } catch (error) {
       console.warn(
@@ -1803,6 +1993,7 @@ export class AgentChatService {
     status: "success" | "failure" | "partial";
     errorCode?: string;
     errorMessage?: string;
+    metadata?: Record<string, unknown>;
   }): Promise<void> {
     try {
       if (
@@ -1845,7 +2036,7 @@ export class AgentChatService {
         errorCode: input.errorCode,
         errorMessage: input.errorMessage,
         completedAt: new Date().toISOString(),
-        metadata: {},
+        metadata: input.metadata ?? {},
       });
     } catch (error) {
       console.warn("agent.chat_turn_telemetry.failed", summarizeError(error));
@@ -2047,6 +2238,15 @@ function mergeCostSource(existing: string | undefined, next: string): string {
   if (existing === "unknown") return next;
   if (next === "unknown") return existing;
   return "mixed";
+}
+
+function emptyAssistantRecoveryInstruction(retry: number): string {
+  return [
+    `Your previous response was empty (recovery attempt ${retry}).`,
+    "Do not finish the turn without a user-facing message.",
+    "Continue with one or more tools when additional work is required.",
+    "Otherwise provide a concise, non-empty final response that says what was completed or why the request could not be completed.",
+  ].join(" ");
 }
 
 function safeParseJson(value: string): unknown {

@@ -38,8 +38,8 @@ import 'router.dart';
 import 'theme.dart';
 import 'theme_mode_view_model.dart';
 
-typedef CalTrackerAppWrapperBuilder =
-    Widget Function(BuildContext context, Widget child, GoRouter router);
+typedef CalTrackerAppWrapperBuilder = Widget Function(
+    BuildContext context, Widget child, GoRouter router);
 
 class CalTrackerBootstrap extends StatefulWidget {
   const CalTrackerBootstrap({
@@ -220,6 +220,7 @@ class _CalTrackerComposition {
     required this.preferencesRepository,
     required this.authRepository,
     required this.nutritionRepository,
+    required bool ownsNutritionRepository,
     required this.agentChatSessionStore,
     required this.agentChatCacheStore,
     required this.mobileUpdateService,
@@ -228,18 +229,17 @@ class _CalTrackerComposition {
     required this.telemetryService,
     required this.metadataProvider,
     required bool ownsTelemetryService,
-  }) : _ownsTelemetryService = ownsTelemetryService;
+  })  : _ownsNutritionRepository = ownsNutritionRepository,
+        _ownsTelemetryService = ownsTelemetryService;
 
   factory _CalTrackerComposition.create(CalTrackerBootstrap widget) {
     final tokenStorage = widget.tokenStorage ?? const SecureTokenStorage();
-    final preferencesRepository =
-        widget.preferencesRepository ??
+    final preferencesRepository = widget.preferencesRepository ??
         AppPreferencesRepository(storage: AppPreferencesStorage());
     final metadataProvider =
         widget.clientMetadataProvider ?? ClientMetadataProvider();
     final ownsTelemetryService = widget.clientTelemetryService == null;
-    final telemetryService =
-        widget.clientTelemetryService ??
+    final telemetryService = widget.clientTelemetryService ??
         ClientTelemetryService(
           apiConfig: widget.apiConfig,
           tokenStorage: tokenStorage,
@@ -258,14 +258,13 @@ class _CalTrackerComposition {
       metadataProvider: metadataProvider,
       telemetryService: telemetryService,
     );
-    final authRepository =
-        widget.authRepository ??
+    final authRepository = widget.authRepository ??
         AuthRepository(apiClient: apiClient, tokenStorage: tokenStorage);
     final privateCacheStorage = PrivateCacheStorage(
       legacyStorage: AppPreferencesStorage(),
     );
-    final nutritionRepository =
-        widget.nutritionRepository ??
+    final ownsNutritionRepository = widget.nutritionRepository == null;
+    final nutritionRepository = widget.nutritionRepository ??
         NutritionRepository(
           apiClient: apiClient,
           cacheStore: NutritionCacheStore(storage: privateCacheStorage),
@@ -283,10 +282,10 @@ class _CalTrackerComposition {
       preferencesRepository: preferencesRepository,
       authRepository: authRepository,
       nutritionRepository: nutritionRepository,
+      ownsNutritionRepository: ownsNutritionRepository,
       agentChatSessionStore: agentChatSessionStore,
       agentChatCacheStore: agentChatCacheStore,
-      mobileUpdateService:
-          widget.mobileUpdateService ??
+      mobileUpdateService: widget.mobileUpdateService ??
           MobileUpdateService(apiConfig: widget.apiConfig),
       audioRecorderService:
           widget.audioRecorderService ?? AudioRecorderService(),
@@ -300,6 +299,7 @@ class _CalTrackerComposition {
   final AppPreferencesRepository preferencesRepository;
   final AuthRepository authRepository;
   final NutritionRepository nutritionRepository;
+  final bool _ownsNutritionRepository;
   final AgentChatSessionStore agentChatSessionStore;
   final AgentChatCacheStore agentChatCacheStore;
   final MobileUpdateService mobileUpdateService;
@@ -310,6 +310,9 @@ class _CalTrackerComposition {
   final bool _ownsTelemetryService;
 
   Future<void> dispose() async {
+    if (_ownsNutritionRepository) {
+      await nutritionRepository.dispose();
+    }
     if (_ownsTelemetryService) {
       await telemetryService.dispose();
     }
@@ -378,7 +381,7 @@ class _CalTrackerAppState extends State<_CalTrackerApp> {
         final preloadedApp = _AuthenticatedDataPreloader(child: app);
         final wrappedApp =
             widget.appWrapperBuilder?.call(context, preloadedApp, _router!) ??
-            preloadedApp;
+                preloadedApp;
         return PerformanceOverlayHost(child: wrappedApp);
       },
     );

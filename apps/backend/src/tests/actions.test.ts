@@ -452,6 +452,7 @@ describe("action loop", () => {
         options: Array<{ mention: { canonicalEnglishName: string } }>;
         candidateGroups: Array<{ mention: { canonicalEnglishName: string } }>;
       };
+      confirmedMutation?: unknown;
     };
     expect(proposalEnvelope.output.proposal.title).toBe(
       "Chicken breast and rice",
@@ -470,6 +471,8 @@ describe("action loop", () => {
         }),
       ]),
     );
+    // A proposal is not a data mutation, so it must not notify cache clients.
+    expect(proposalEnvelope.confirmedMutation).toBeUndefined();
 
     const commitResponse = await request(
       `http://localhost/v1/meals/proposals/${proposalEnvelope.output.proposal.id}/commit`,
@@ -482,8 +485,30 @@ describe("action loop", () => {
     expect(commitResponse.status).toBe(200);
     const committed = (await commitResponse.json()) as {
       output: { meal: { id: string; nutrition: { calories: number } } };
+      confirmedMutation?: {
+        mutationId: string;
+        effects: Array<{
+          domain: string;
+          operation: string;
+          date: string;
+          snapshot: { meals: unknown[] };
+        }>;
+      };
     };
     expect(committed.output.meal.nutrition.calories).toBeGreaterThan(250);
+    expect(committed.confirmedMutation).toEqual(
+      expect.objectContaining({
+        mutationId: expect.any(String),
+        effects: [
+          expect.objectContaining({
+            domain: "daily_summary",
+            operation: "replace",
+            date: new Date().toISOString().slice(0, 10),
+            snapshot: expect.objectContaining({ meals: expect.any(Array) }),
+          }),
+        ],
+      }),
+    );
     expect(recordFoodFeedback).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: auth.user.id,

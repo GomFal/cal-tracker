@@ -23,12 +23,15 @@ import {
   updateMealTemplateInputSchema,
   updateUsualFoodInputSchema,
   type ActionContext,
+  type ConfirmedNutritionMutation,
   type FoodCandidateGroup,
   type FoodMention,
   type Meal,
   type MealItem,
   type MealLabel,
   type MealProposal,
+  type MealTemplate,
+  type UsualFood,
   type DraftUsualFoodProviderOutput,
   type DraftUsualMealProviderOutput,
   type UsualFoodDraft,
@@ -59,6 +62,8 @@ export type ExecuteActionResult = {
   actionCallId: string;
   confirmationRequired: boolean;
   output: unknown;
+  /** Present only after a mutating action has completed successfully. */
+  confirmedMutation?: ConfirmedNutritionMutation;
   instrumentation?: Record<string, unknown>;
 };
 
@@ -205,10 +210,19 @@ export class ActionExecutor {
           }),
         );
       }
+      const confirmedMutation = await this.confirmedMutationForAction({
+        actionId,
+        actionCallId,
+        output,
+        userId: context.actorUserId,
+      });
       return {
         actionCallId,
         confirmationRequired: definition.confirmationPolicy === "required",
         output,
+        ...(confirmedMutation == null
+            ? {}
+            : { confirmedMutation }),
         instrumentation: actionInstrumentation(output),
       };
     } catch (error) {
@@ -230,6 +244,110 @@ export class ActionExecutor {
         error instanceof Error ? error : new Error("action_failed"),
         { actionCallId: call.id },
       );
+    }
+  }
+
+  private async confirmedMutationForAction(input: {
+    actionId: string;
+    actionCallId: string;
+    output: unknown;
+    userId: string;
+  }): Promise<ConfirmedNutritionMutation | undefined> {
+    const output = isRecord(input.output) ? input.output : {};
+    const committedAt = new Date().toISOString();
+    const revision = committedAt;
+    const mutation = (effects: ConfirmedNutritionMutation["effects"]) =>
+      effects.length === 0
+        ? undefined
+        : {
+            version: 1 as const,
+            mutationId: input.actionCallId,
+            committedAt,
+            effects,
+          };
+    const dailySummaryEffectForMeal = async (meal: Meal | undefined) => {
+      if (!meal) return [];
+      const date = meal.occurredAt.slice(0, 10);
+      const summary = await this.repository.getDailySummary(input.userId, date);
+      return [{
+        domain: "daily_summary" as const,
+        operation: "replace" as const,
+        date,
+        revision,
+        snapshot: summary,
+      }];
+    };
+
+    switch (input.actionId) {
+      case "commit_meal":
+      case "correct_meal":
+        return mutation(await dailySummaryEffectForMeal(output.meal as Meal | undefined));
+      case "propose_meal_log":
+        return mutation(
+          await dailySummaryEffectForMeal(output.autoCommittedMeal as Meal | undefined),
+        );
+      case "delete_meal": {
+        if (output.deleted !== true || typeof output.affectedDate !== "string") {
+          return undefined;
+        }
+        const summary = await this.repository.getDailySummary(
+          input.userId,
+          output.affectedDate,
+        );
+        return mutation([{
+          domain: "daily_summary",
+          operation: "replace",
+          date: output.affectedDate,
+          revision,
+          snapshot: summary,
+        }]);
+      }
+      case "create_meal_template":
+      case "update_meal_template": {
+        const template = output.template;
+        return isRecord(template) && typeof template.id === "string"
+          ? mutation([{
+              domain: "meal_templates",
+              operation: "upsert",
+              entityId: template.id,
+              revision,
+              snapshot: template as MealTemplate,
+            }])
+          : undefined;
+      }
+      case "delete_meal_template":
+        return output.deleted === true && typeof output.templateId === "string"
+          ? mutation([{
+              domain: "meal_templates",
+              operation: "delete",
+              entityId: output.templateId,
+              revision,
+            }])
+          : undefined;
+      case "create_usual_food":
+      case "update_usual_food": {
+        const usualFood = output.usualFood;
+        return isRecord(usualFood) && typeof usualFood.id === "string"
+          ? mutation([{
+              domain: "usual_foods",
+              operation: "upsert",
+              entityId: usualFood.id,
+              revision,
+              snapshot: usualFood as UsualFood,
+            }])
+          : undefined;
+      }
+      case "delete_usual_food":
+        return output.deleted === true && typeof output.usualFoodId === "string"
+          ? mutation([{
+              domain: "usual_foods",
+              operation: "delete",
+              entityId: output.usualFoodId,
+              revision,
+            }])
+          : undefined;
+      default:
+        return undefined;
     }
   }
 
@@ -306,13 +424,23 @@ export class ActionExecutor {
         if (parsed.confirmationToken !== "DELETE") {
           return { deleted: false, confirmationRequired: true };
         }
-        return {
-          deleted: await this.repository.softDeleteMeal(
-            context.actorUserId,
-            parsed.mealId,
-          ),
-          confirmationRequired: false,
-        };
+        // Capture the affected date before deletion so the post-commit effect
+        // can reconcile exactly one summary rather than refreshing history.
+        const meal = await this.repository.getMeal(context.actorUserId, parsed.mealId);
+        const deleted = await this.repository.softDeleteMeal(
+          context.actorUserId,
+          parsed.mealId,
+        );
+        {
+          const result = { deleted, confirmationRequired: false };
+          if (deleted && meal) {
+            Object.defineProperty(result, "affectedDate", {
+              value: meal.occurredAt.slice(0, 10),
+              enumerable: false,
+            });
+          }
+          return result;
+        }
       }
       case "get_daily_summary": {
         const parsed = getDailySummaryInputSchema.parse(input);
@@ -369,12 +497,18 @@ export class ActionExecutor {
       }
       case "delete_usual_food": {
         const parsed = deleteUsualFoodInputSchema.parse(input);
-        return {
-          deleted: await this.repository.deleteUsualFood(
-            context.actorUserId,
-            parsed.usualFoodId,
-          ),
-        };
+        const deleted = await this.repository.deleteUsualFood(
+          context.actorUserId,
+          parsed.usualFoodId,
+        );
+        const result = { deleted };
+        if (deleted) {
+          Object.defineProperty(result, "usualFoodId", {
+            value: parsed.usualFoodId,
+            enumerable: false,
+          });
+        }
+        return result;
       }
       case "create_meal_template": {
         const parsed = createMealTemplateInputSchema.parse(input);
@@ -413,12 +547,18 @@ export class ActionExecutor {
       }
       case "delete_meal_template": {
         const parsed = deleteMealTemplateInputSchema.parse(input);
-        return {
-          deleted: await this.repository.deleteTemplate(
-            context.actorUserId,
-            parsed.templateId,
-          ),
-        };
+        const deleted = await this.repository.deleteTemplate(
+          context.actorUserId,
+          parsed.templateId,
+        );
+        const result = { deleted };
+        if (deleted) {
+          Object.defineProperty(result, "templateId", {
+            value: parsed.templateId,
+            enumerable: false,
+          });
+        }
+        return result;
       }
       case "draft_usual_food":
         return this.draftUsualFood(input, context);
@@ -1117,6 +1257,10 @@ export class ActionExecutor {
       vectorUnavailable: true,
     };
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function hasMealMentionResolution(

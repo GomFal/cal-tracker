@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 import '../../../../data/repositories/nutrition_repository.dart';
+import '../../../../domain/models/nutrition_data_change.dart';
 import '../../../../domain/models/nutrition_models.dart';
 import '../../../../domain/models/nutrition_summary_updates.dart';
 import '../../../core/user_visible_error.dart';
@@ -13,7 +14,11 @@ class MealTemplatesViewModel extends ChangeNotifier {
     required NutritionRepository nutritionRepository,
     DateTime Function()? now,
   })  : _nutritionRepository = nutritionRepository,
-        _now = now ?? DateTime.now;
+        _now = now ?? DateTime.now {
+    _dataChangeSubscription = _nutritionRepository.dataChanges.listen(
+      _applyDataChange,
+    );
+  }
 
   final NutritionRepository _nutritionRepository;
   final DateTime Function() _now;
@@ -25,6 +30,8 @@ class MealTemplatesViewModel extends ChangeNotifier {
   bool _hasLoaded = false;
   Future<void>? _loadOperation;
   String? _error;
+  late final StreamSubscription<NutritionDataChange> _dataChangeSubscription;
+  int _dataGeneration = 0;
 
   List<MealTemplate> get templates => _templates;
   List<UsualFood> get usualFoods => _usualFoods;
@@ -50,6 +57,7 @@ class MealTemplatesViewModel extends ChangeNotifier {
   }
 
   Future<void> _load({required bool forceRefresh}) async {
+    final dataGeneration = _dataGeneration;
     if (!forceRefresh) {
       final cachedTemplates = await _nutritionRepository.cachedTemplates();
       final cachedUsualFoods = await _nutritionRepository.cachedUsualFoods();
@@ -76,10 +84,12 @@ class MealTemplatesViewModel extends ChangeNotifier {
         _nutritionRepository.refreshTemplates(force: forceRefresh),
         _nutritionRepository.refreshUsualFoods(force: forceRefresh),
       ]);
-      _templates = results[0] as List<MealTemplate>;
-      _usualFoods = results[1] as List<UsualFood>;
-      _hasLoaded = true;
-      _error = null;
+      if (dataGeneration == _dataGeneration) {
+        _templates = results[0] as List<MealTemplate>;
+        _usualFoods = results[1] as List<UsualFood>;
+        _hasLoaded = true;
+        _error = null;
+      }
     } catch (error) {
       if (!hadVisibleData) {
         _error = userVisibleErrorMessage(
@@ -371,6 +381,64 @@ class MealTemplatesViewModel extends ChangeNotifier {
       _isSaving = false;
       notifyListeners();
     }
+  }
+
+  void _applyDataChange(NutritionDataChange change) {
+    if (!_hasLoaded) return;
+    var templates = _templates;
+    var foods = _usualFoods;
+    var changed = false;
+    for (final effect in change.effects) {
+      switch (effect.domain) {
+        case NutritionDataDomain.mealTemplates:
+          final id = effect.entityId;
+          if (id == null) continue;
+          if (effect.operation == NutritionDataOperation.delete) {
+            templates = templates.where((item) => item.id != id).toList();
+            changed = true;
+          } else {
+            final template = effect.mealTemplate;
+            if (template == null) continue;
+            final exists = templates.any((item) => item.id == template.id);
+            templates = exists
+                ? templates
+                    .map((item) => item.id == template.id ? template : item)
+                    .toList()
+                : [...templates, template];
+            changed = true;
+          }
+        case NutritionDataDomain.usualFoods:
+          final id = effect.entityId;
+          if (id == null) continue;
+          if (effect.operation == NutritionDataOperation.delete) {
+            foods = foods.where((item) => item.id != id).toList();
+            changed = true;
+          } else {
+            final food = effect.usualFood;
+            if (food == null) continue;
+            final exists = foods.any((item) => item.id == food.id);
+            foods = exists
+                ? foods.map((item) => item.id == food.id ? food : item).toList()
+                : [...foods, food];
+            changed = true;
+          }
+        case NutritionDataDomain.dailySummary:
+        case NutritionDataDomain.dailyGoals:
+          break;
+      }
+    }
+    if (!changed) return;
+    _dataGeneration++;
+    _templates = templates;
+    _usualFoods = foods;
+    _error = null;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _dataChangeSubscription.cancel();
+    super.dispose();
   }
 
   void reset() {

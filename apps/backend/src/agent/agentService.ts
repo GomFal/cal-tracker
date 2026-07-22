@@ -1,5 +1,6 @@
 import {
   type ActionContext,
+  type ConfirmedNutritionMutation,
   type DailySummary,
   type Meal,
   type MealItem,
@@ -47,7 +48,7 @@ export class AgentProviderUnavailableError extends Error {
   }
 }
 
-export type AgentRunResult =
+type AgentRunResultCore =
   | {
       kind: "proposal";
       proposal: MealProposal;
@@ -113,6 +114,10 @@ export type AgentRunResult =
       candidateGroups?: unknown[];
       resolvedItems?: MealItem[];
     };
+
+export type AgentRunResult = AgentRunResultCore & {
+  confirmedMutation?: ConfirmedNutritionMutation;
+};
 
 export class AgentService {
   constructor(
@@ -544,6 +549,26 @@ export class AgentService {
   }
 
   private mapResult(
+    actionId: string,
+    result: ExecuteActionResult,
+    originalText: string,
+  ): AgentRunResult {
+    return this.withConfirmedMutation(
+      this.mapResultCore(actionId, result, originalText),
+      result.confirmedMutation,
+    );
+  }
+
+  private withConfirmedMutation(
+    result: AgentRunResult,
+    confirmedMutation: ConfirmedNutritionMutation | undefined,
+  ): AgentRunResult {
+    return confirmedMutation == null
+      ? result
+      : { ...result, confirmedMutation };
+  }
+
+  private mapResultCore(
     actionId: string,
     result: ExecuteActionResult,
     originalText: string,

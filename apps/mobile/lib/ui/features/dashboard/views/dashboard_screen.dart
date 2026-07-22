@@ -14,8 +14,6 @@ import '../../../core/motion.dart';
 import '../../../shared/meal_item_editor_sheet.dart';
 import '../../auth/view_models/auth_view_model.dart';
 import '../../hydration/hydration_format.dart';
-import '../../meal_history/view_models/meal_history_view_model.dart';
-import '../../settings/view_models/settings_view_model.dart';
 import '../dashboard_time_labels.dart';
 import '../view_models/dashboard_view_model.dart';
 import 'calorie_target_sheet.dart';
@@ -156,7 +154,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
       return false;
     }
-    await context.read<MealHistoryViewModel>().load(forceRefresh: true);
     return true;
   }
 
@@ -188,18 +185,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
       return;
     }
-    if (!context.mounted) return;
-    await Future.wait([
-      context.read<MealHistoryViewModel>().load(),
-      context.read<SettingsViewModel>().load(),
-    ]);
     if (!context.mounted ||
         selection.source != 'manual' ||
         selection.macroConfig != null) {
       return;
     }
-    final shouldConfigure =
-        await showModalBottomSheet<bool>(
+    final shouldConfigure = await showModalBottomSheet<bool>(
           context: context,
           useSafeArea: true,
           sheetAnimationStyle: freshSheetAnimationStyle(context),
@@ -229,10 +220,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
       return;
     }
-    await Future.wait([
-      context.read<MealHistoryViewModel>().load(),
-      context.read<SettingsViewModel>().load(),
-    ]);
   }
 }
 
@@ -300,9 +287,8 @@ class _HeroCalorieSection extends StatelessWidget {
     final remaining = (summary?.remaining.calories ?? target - consumed)
         .clamp(0, target)
         .toInt();
-    final progress = target <= 0
-        ? 0.0
-        : (consumed / target).clamp(0, 1).toDouble();
+    final progress =
+        target <= 0 ? 0.0 : (consumed / target).clamp(0, 1).toDouble();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cal_tracker_mobile/data/repositories/auth_repository.dart';
 import 'package:cal_tracker_mobile/data/repositories/nutrition_repository.dart';
 import 'package:cal_tracker_mobile/data/services/nutrition_cache_store.dart';
+import 'package:cal_tracker_mobile/domain/models/nutrition_data_change.dart';
 import 'package:cal_tracker_mobile/domain/models/nutrition_models.dart';
 import 'package:cal_tracker_mobile/domain/models/nutrition_summary_updates.dart';
 import 'package:cal_tracker_mobile/generated/api/cal_tracker_api.dart';
@@ -85,6 +86,35 @@ void main() {
       expect(await update, isFalse);
       expect(viewModel.summary?.waterConsumedLiters, 0);
       expect(viewModel.error, 'We could not save that change. Try again.');
+    });
+
+    test('applies a confirmed chat summary without a global reload', () async {
+      repository.backendDaily['2026-05-10'] = _summary('2026-05-10');
+      repository.activateCacheForUser('user-a');
+      await viewModel.load();
+
+      await repository.reconcileConfirmedMutation(
+        ConfirmedNutritionMutation(
+          version: 1,
+          mutationId: 'chat-summary-1',
+          committedAt: DateTime.utc(2026, 5, 10, 12),
+          effects: [
+            NutritionDataEffect(
+              domain: NutritionDataDomain.dailySummary,
+              operation: NutritionDataOperation.replace,
+              date: '2026-05-10',
+              snapshot: _summary(
+                '2026-05-10',
+                meals: [_meal('chat-meal')],
+              ).toJson(),
+            ),
+          ],
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(viewModel.summary?.meals.single.id, 'chat-meal');
+      expect(repository.dailyRefreshCalls, 1);
     });
 
     test('rolls back optimistic delete when backend fails', () async {
@@ -181,6 +211,47 @@ void main() {
       expect(viewModel.isRefreshing, isFalse);
       expect(viewModel.templates.single.id, 'template-fresh');
       expect(viewModel.usualFoods.single.id, 'food-fresh');
+    });
+
+    test('applies template and usual-food upserts from the repository bus',
+        () async {
+      final repository = _FakeNutritionRepository()
+        ..backendTemplates = [_template('template-1')]
+        ..backendUsualFoods = [_usualFood('food-1')];
+      repository.activateCacheForUser('user-a');
+      final viewModel = MealTemplatesViewModel(
+        nutritionRepository: repository,
+        now: () => DateTime(2026, 5, 10, 10),
+      );
+      await viewModel.load();
+
+      await repository.reconcileConfirmedMutation(
+        ConfirmedNutritionMutation(
+          version: 1,
+          mutationId: 'chat-template-1',
+          committedAt: DateTime.utc(2026, 5, 10, 12),
+          effects: [
+            NutritionDataEffect(
+              domain: NutritionDataDomain.mealTemplates,
+              operation: NutritionDataOperation.upsert,
+              entityId: 'template-chat',
+              snapshot: _template('template-chat').toJson(),
+            ),
+            NutritionDataEffect(
+              domain: NutritionDataDomain.usualFoods,
+              operation: NutritionDataOperation.upsert,
+              entityId: 'food-chat',
+              snapshot: _usualFood('food-chat').toJson(),
+            ),
+          ],
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(viewModel.templates.map((item) => item.id),
+          contains('template-chat'));
+      expect(
+          viewModel.usualFoods.map((item) => item.id), contains('food-chat'));
     });
 
     test('rolls back optimistic template delete when backend fails', () async {

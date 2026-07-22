@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   actionDefinitions,
   type ActionContext,
+  type ConfirmedNutritionMutation,
   type DailySummary,
   type DraftUsualFoodOutput,
   type DraftUsualMealOutput,
@@ -103,7 +104,7 @@ export type AgentChatResultKind =
   | "meal_deleted"
   | "clarification_required";
 
-export type AgentChatMappedResult =
+type AgentChatMappedResultCore =
   | {
       kind: "proposal";
       proposal: MealProposal;
@@ -176,6 +177,11 @@ export type AgentChatMappedResult =
       resolvedItems?: MealItem[];
       selectionState?: AgentCandidateSelectionState;
     };
+
+export type AgentChatMappedResult = AgentChatMappedResultCore & {
+  /** Server-derived effects, emitted only for a committed mutation. */
+  confirmedMutation?: ConfirmedNutritionMutation;
+};
 
 export type AgentToolFeedback = {
   id: string;
@@ -1164,7 +1170,10 @@ export class AgentChatService {
             ) {
               return;
             }
-            const mapped = mapActionResult(actionId, result, text);
+            const mapped = withConfirmedMutation(
+              mapActionResult(actionId, result, text),
+              result.confirmedMutation,
+            );
             const actionMs = Date.now() - actionStarted;
             accumulatedActionMs += actionMs;
             latestResultKind = mapped.kind;
@@ -1228,6 +1237,9 @@ export class AgentChatService {
                     iteration,
                     toolCallIndex: toolCallIndex + 1,
                     resultKind: mapped.kind,
+                    // The compact transcript is model-facing; snapshots and
+                    // this legacy fallback retain the canonical UI result.
+                    uiResult: mappedForUi,
                     ...("proposal" in mapped && mapped.proposal
                       ? { proposalId: mapped.proposal.id }
                       : {}),
@@ -2341,6 +2353,15 @@ function mapActionResult(
         message: "Action completed but I don't know how to display the result.",
       };
   }
+}
+
+function withConfirmedMutation(
+  result: AgentChatMappedResult,
+  confirmedMutation: ConfirmedNutritionMutation | undefined,
+): AgentChatMappedResult {
+  return confirmedMutation == null
+    ? result
+    : { ...result, confirmedMutation };
 }
 
 function widgetForResult(result: AgentChatMappedResult): AgentWidgetPayload {

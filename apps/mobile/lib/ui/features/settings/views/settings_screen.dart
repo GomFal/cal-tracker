@@ -16,7 +16,6 @@ import '../../auth/view_models/auth_view_model.dart';
 import '../../dashboard/view_models/dashboard_view_model.dart';
 import '../../dashboard/views/calorie_target_sheet.dart';
 import '../../dashboard/views/macro_distribution_sheet.dart';
-import '../../meal_history/view_models/meal_history_view_model.dart';
 import '../view_models/settings_view_model.dart';
 import 'hydration_goal_sheet.dart';
 
@@ -168,10 +167,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     if (!context.mounted || value == null) return;
     final updated = await context.read<SettingsViewModel>().updateGoals(
-      hydrationGoalLiters: value,
-    );
+          hydrationGoalLiters: value,
+        );
     if (!context.mounted || updated == null) return;
-    await _refreshGoalConsumers(context, forceDashboardRefresh: true);
   }
 
   Future<void> _showCalorieTargetSheet(
@@ -189,20 +187,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     if (!context.mounted || selection == null) return;
     final updated = await context.read<SettingsViewModel>().updateGoals(
-      calories: selection.calories,
-      calorieTargetSource: selection.source,
-      macroConfig: selection.macroConfig,
-      macroCalorieTarget: selection.calories,
-    );
+          calories: selection.calories,
+          calorieTargetSource: selection.source,
+          macroConfig: selection.macroConfig,
+          macroCalorieTarget: selection.calories,
+        );
     if (!context.mounted || updated == null) return;
-    await _refreshGoalConsumers(context, forceDashboardRefresh: true);
     if (!context.mounted ||
         selection.source != 'manual' ||
         selection.macroConfig != null) {
       return;
     }
-    final shouldConfigure =
-        await showModalBottomSheet<bool>(
+    final shouldConfigure = await showModalBottomSheet<bool>(
           context: context,
           useSafeArea: true,
           builder: (context) =>
@@ -225,8 +221,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await _showMacroDistributionSheet(context, goals);
       return;
     }
-    final shouldSetCalories =
-        await showModalBottomSheet<bool>(
+    final shouldSetCalories = await showModalBottomSheet<bool>(
           context: context,
           useSafeArea: true,
           builder: (context) => const _MacroRequiresCaloriesSheet(),
@@ -251,24 +246,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     if (!context.mounted || macroConfig == null) return;
     final updated = await context.read<SettingsViewModel>().updateGoals(
-      macroConfig: macroConfig,
-      macroCalorieTarget: calories,
-    );
+          macroConfig: macroConfig,
+          macroCalorieTarget: calories,
+        );
     if (!context.mounted || updated == null) return;
-    await _refreshGoalConsumers(context, forceDashboardRefresh: true);
-  }
-
-  Future<void> _refreshGoalConsumers(
-    BuildContext context, {
-    bool forceDashboardRefresh = false,
-  }) {
-    return Future.wait([
-      context.read<DashboardViewModel>().load(
-        forceRefresh: forceDashboardRefresh,
-      ),
-      context.read<SettingsViewModel>().load(),
-      context.read<MealHistoryViewModel>().load(),
-    ]);
   }
 
   String _macroDistributionSubtitle(AppLocalizations l10n, DailyGoals? goals) {

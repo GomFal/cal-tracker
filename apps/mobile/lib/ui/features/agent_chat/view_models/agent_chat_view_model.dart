@@ -1040,11 +1040,18 @@ class AgentChatViewModel extends ChangeNotifier {
   AgentRunResult? _resultFromStoredToolMessage(
     AgentConversationMessage message,
   ) {
+    final metadata = message.metadata;
+    // Rehydration is presentation-only. It deliberately does not call the
+    // repository reconciler, so opening an old conversation cannot replay a
+    // historical mutation into currently visible data.
+    final persisted = metadata is Map ? metadata['uiResult'] : null;
     final content = _jsonObjectOrNull(message.content);
-    final result = content?['result'];
-    if (result is Map<String, Object?>) {
+    final result = persisted ?? content?['result'];
+    if (result is Map) {
       try {
-        return agentRunResultFromJson(result);
+        return agentRunResultFromJson(
+          result.map((key, value) => MapEntry(key.toString(), value)),
+        );
       } on Object {
         return null;
       }

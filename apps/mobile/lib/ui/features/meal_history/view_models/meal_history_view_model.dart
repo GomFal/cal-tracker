@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../../data/repositories/nutrition_repository.dart';
 import '../../../../data/services/nutrition_cache_store.dart';
+import '../../../../domain/models/nutrition_data_change.dart';
 import '../../../../domain/models/nutrition_models.dart';
 import '../../../../domain/models/nutrition_summary_updates.dart';
 import '../../../core/user_visible_error.dart';
@@ -14,7 +15,11 @@ class MealHistoryViewModel extends ChangeNotifier {
     DateTime Function()? now,
   })  : _nutritionRepository = nutritionRepository,
         _now = now ?? DateTime.now,
-        _selectedDate = _formatDateOnly((now ?? DateTime.now)());
+        _selectedDate = _formatDateOnly((now ?? DateTime.now)()) {
+    _dataChangeSubscription = _nutritionRepository.dataChanges.listen(
+      _applyDataChange,
+    );
+  }
 
   final NutritionRepository _nutritionRepository;
   final DateTime Function() _now;
@@ -26,6 +31,8 @@ class MealHistoryViewModel extends ChangeNotifier {
   bool _isSaving = false;
   Future<void>? _loadOperation;
   String? _error;
+  late final StreamSubscription<NutritionDataChange> _dataChangeSubscription;
+  int _dataGeneration = 0;
 
   List<DailySummary> get weekSummaries => _weekSummaries;
   String get selectedDate => _selectedDate;
@@ -52,6 +59,7 @@ class MealHistoryViewModel extends ChangeNotifier {
   }
 
   Future<void> _load({required bool forceRefresh}) async {
+    final dataGeneration = _dataGeneration;
     if (!forceRefresh) {
       final cached = await _cachedWeekSummaries();
       if (cached.isNotEmpty) {
@@ -75,12 +83,15 @@ class MealHistoryViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _weekSummaries = await _loadWeekSummaries(force: forceRefresh);
-      if (!_weekSummaries.any((summary) => summary.date == _selectedDate)) {
-        _selectedDate = _formatDateOnly(_now());
+      final refreshed = await _loadWeekSummaries(force: forceRefresh);
+      if (dataGeneration == _dataGeneration) {
+        _weekSummaries = refreshed;
+        if (!_weekSummaries.any((summary) => summary.date == _selectedDate)) {
+          _selectedDate = _formatDateOnly(_now());
+        }
+        _hasLoaded = true;
+        _error = null;
       }
-      _hasLoaded = true;
-      _error = null;
     } catch (error) {
       if (!hadVisibleData) {
         _error = userVisibleErrorMessage(
@@ -161,6 +172,32 @@ class MealHistoryViewModel extends ChangeNotifier {
       _isSaving = false;
       notifyListeners();
     }
+  }
+
+  void _applyDataChange(NutritionDataChange change) {
+    if (!_hasLoaded) return;
+    var changed = false;
+    final summaries = [..._weekSummaries];
+    for (final effect in change.effects) {
+      if (effect.domain != NutritionDataDomain.dailySummary) continue;
+      final summary = effect.dailySummary;
+      if (summary == null) continue;
+      final index = summaries.indexWhere((item) => item.date == summary.date);
+      if (index < 0) continue;
+      summaries[index] = summary;
+      changed = true;
+    }
+    if (!changed) return;
+    _dataGeneration++;
+    _weekSummaries = summaries;
+    _error = null;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _dataChangeSubscription.cancel();
+    super.dispose();
   }
 
   void reset() {

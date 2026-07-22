@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../../../data/repositories/nutrition_repository.dart';
+import '../../../../domain/models/nutrition_data_change.dart';
 import '../../../../domain/models/macro_distribution.dart';
 import '../../../../domain/models/nutrition_models.dart';
 import '../../../../domain/models/nutrition_summary_updates.dart';
@@ -13,8 +14,12 @@ class DashboardViewModel extends ChangeNotifier {
   DashboardViewModel({
     required NutritionRepository nutritionRepository,
     DateTime Function()? now,
-  }) : _nutritionRepository = nutritionRepository,
-       _now = now ?? DateTime.now;
+  })  : _nutritionRepository = nutritionRepository,
+        _now = now ?? DateTime.now {
+    _dataChangeSubscription = _nutritionRepository.dataChanges.listen(
+      _applyDataChange,
+    );
+  }
 
   final NutritionRepository _nutritionRepository;
   final DateTime Function() _now;
@@ -28,6 +33,8 @@ class DashboardViewModel extends ChangeNotifier {
   DailySummary? _confirmedWaterSummary;
   double? _pendingWaterLiters;
   String? _error;
+  late final StreamSubscription<NutritionDataChange> _dataChangeSubscription;
+  int _dataGeneration = 0;
 
   DailySummary? get summary => _summary;
   bool get hasVisibleData => _summary != null;
@@ -46,6 +53,7 @@ class DashboardViewModel extends ChangeNotifier {
 
   Future<void> _load({required bool forceRefresh}) async {
     final date = _today;
+    final dataGeneration = _dataGeneration;
     if (!forceRefresh) {
       final cached = await _nutritionRepository.cachedDailySummary(date: date);
       if (cached != null) {
@@ -65,11 +73,14 @@ class DashboardViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _summary = await _nutritionRepository.refreshDailySummary(
+      final refreshed = await _nutritionRepository.refreshDailySummary(
         date: date,
         force: forceRefresh,
       );
-      _error = null;
+      if (dataGeneration == _dataGeneration) {
+        _summary = refreshed;
+        _error = null;
+      }
     } catch (error) {
       if (!hadVisibleData) {
         _error = userVisibleErrorMessage(
@@ -261,6 +272,42 @@ class DashboardViewModel extends ChangeNotifier {
       _isSavingWater = false;
       notifyListeners();
     }
+  }
+
+  void _applyDataChange(NutritionDataChange change) {
+    var next = _summary;
+    var changed = false;
+    for (final effect in change.effects) {
+      if (effect.date != _today) continue;
+      switch (effect.domain) {
+        case NutritionDataDomain.dailySummary:
+          final summary = effect.dailySummary;
+          if (summary != null) {
+            next = summary;
+            changed = true;
+          }
+        case NutritionDataDomain.dailyGoals:
+          final goals = effect.dailyGoals;
+          if (goals != null && next != null) {
+            next = dailySummaryWithGoals(next, goals);
+            changed = true;
+          }
+        case NutritionDataDomain.mealTemplates:
+        case NutritionDataDomain.usualFoods:
+          break;
+      }
+    }
+    if (!changed) return;
+    _dataGeneration++;
+    _summary = next;
+    _error = null;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _dataChangeSubscription.cancel();
+    super.dispose();
   }
 
   void reset() {

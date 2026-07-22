@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../../data/repositories/auth_repository.dart';
 import '../../../../data/repositories/nutrition_repository.dart';
+import '../../../../domain/models/nutrition_data_change.dart';
 import '../../../../domain/models/auth_models.dart';
 import '../../../../domain/models/macro_distribution.dart';
 import '../../../../domain/models/nutrition_models.dart';
@@ -15,9 +16,13 @@ class SettingsViewModel extends ChangeNotifier {
     required AuthRepository authRepository,
     required NutritionRepository nutritionRepository,
     DateTime Function()? now,
-  }) : _authRepository = authRepository,
-       _nutritionRepository = nutritionRepository,
-       _now = now ?? DateTime.now;
+  })  : _authRepository = authRepository,
+        _nutritionRepository = nutritionRepository,
+        _now = now ?? DateTime.now {
+    _dataChangeSubscription = _nutritionRepository.dataChanges.listen(
+      _applyDataChange,
+    );
+  }
 
   final AuthRepository _authRepository;
   final NutritionRepository _nutritionRepository;
@@ -27,6 +32,8 @@ class SettingsViewModel extends ChangeNotifier {
   bool _isRefreshing = false;
   bool _isSaving = false;
   String? _error;
+  late final StreamSubscription<NutritionDataChange> _dataChangeSubscription;
+  int _dataGeneration = 0;
 
   DailyGoals? get goals => _goals;
   bool get hasVisibleData => _goals != null;
@@ -36,6 +43,7 @@ class SettingsViewModel extends ChangeNotifier {
   String? get error => _error;
 
   Future<void> load({bool forceRefresh = false}) async {
+    final dataGeneration = _dataGeneration;
     if (!forceRefresh) {
       final cached = await _nutritionRepository.cachedDailySummary(
         date: _today,
@@ -61,8 +69,10 @@ class SettingsViewModel extends ChangeNotifier {
         date: _today,
         force: forceRefresh,
       );
-      _goals = goalsFromSummary(summary);
-      _error = null;
+      if (dataGeneration == _dataGeneration) {
+        _goals = goalsFromSummary(summary);
+        _error = null;
+      }
     } catch (error) {
       if (!hadVisibleData) {
         _error = userVisibleErrorMessage(
@@ -145,6 +155,30 @@ class SettingsViewModel extends ChangeNotifier {
       _isSaving = false;
       notifyListeners();
     }
+  }
+
+  void _applyDataChange(NutritionDataChange change) {
+    DailyGoals? next;
+    for (final effect in change.effects) {
+      if (effect.date != _today && effect.dailyGoals?.date != _today) continue;
+      if (effect.domain == NutritionDataDomain.dailySummary) {
+        final summary = effect.dailySummary;
+        if (summary != null) next = goalsFromSummary(summary);
+      } else if (effect.domain == NutritionDataDomain.dailyGoals) {
+        next = effect.dailyGoals;
+      }
+    }
+    if (next == null) return;
+    _dataGeneration++;
+    _goals = next;
+    _error = null;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _dataChangeSubscription.cancel();
+    super.dispose();
   }
 
   void reset() {

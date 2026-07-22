@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:cal_tracker_mobile/data/repositories/nutrition_repository.dart';
 import 'package:cal_tracker_mobile/data/services/app_preferences_storage.dart';
 import 'package:cal_tracker_mobile/data/services/nutrition_cache_store.dart';
+import 'package:cal_tracker_mobile/domain/models/nutrition_data_change.dart';
 import 'package:cal_tracker_mobile/domain/models/macro_distribution.dart';
 import 'package:cal_tracker_mobile/domain/models/nutrition_models.dart';
 import 'package:cal_tracker_mobile/generated/api/cal_tracker_api.dart';
@@ -510,6 +511,63 @@ void main() {
       );
     });
 
+    test(
+      'writes a confirmed mutation before publishing, dedupes it, and ignores it after logout',
+      () async {
+        final cacheStore = NutritionCacheStore(
+          storage: _MemoryPreferencesStorage(),
+        );
+        final repository = NutritionRepository(
+          apiClient: MockCalTrackerApiClient(),
+          cacheStore: cacheStore,
+        )..activateCacheForUser('user-a');
+        final oldSummary = _dailySummary('2026-05-18', calories: 100);
+        final freshSummary = _dailySummary('2026-05-18', calories: 420);
+        await repository.putCachedDailySummary(oldSummary);
+        final changes = <NutritionDataChange>[];
+        final subscription = repository.dataChanges.listen(changes.add);
+        final mutation = ConfirmedNutritionMutation(
+          version: 1,
+          mutationId: 'mutation-1',
+          committedAt: DateTime.utc(2026, 5, 18, 12),
+          effects: [
+            NutritionDataEffect(
+              domain: NutritionDataDomain.dailySummary,
+              operation: NutritionDataOperation.replace,
+              date: freshSummary.date,
+              snapshot: freshSummary.toJson(),
+            ),
+          ],
+        );
+
+        await repository.reconcileConfirmedMutation(mutation);
+        expect(
+          (await repository.cachedDailySummary(date: freshSummary.date))
+              ?.value
+              .consumed
+              .calories,
+          420,
+        );
+        expect(changes, hasLength(1));
+
+        await repository.reconcileConfirmedMutation(mutation);
+        expect(changes, hasLength(1));
+
+        repository.deactivateCache();
+        await repository.reconcileConfirmedMutation(
+          ConfirmedNutritionMutation(
+            version: 1,
+            mutationId: 'mutation-after-logout',
+            committedAt: DateTime.utc(2026, 5, 18, 12, 1),
+            effects: mutation.effects,
+          ),
+        );
+        expect(changes, hasLength(1));
+        await subscription.cancel();
+        await repository.dispose();
+      },
+    );
+
     test('updates daily hydration and parses the returned summary', () async {
       final apiClient = MockCalTrackerApiClient();
       final repository = NutritionRepository(apiClient: apiClient);
@@ -583,6 +641,36 @@ class _MemoryPreferencesStorage implements AppPreferencesStorage {
   Future<void> removeWhere(bool Function(String key) test) async {
     values.removeWhere((key, value) => test(key));
   }
+}
+
+DailySummary _dailySummary(String date, {required int calories}) {
+  final consumed = NutritionSnapshot(
+    calories: calories,
+    proteinGrams: 10,
+    carbsGrams: 20,
+    fatGrams: 5,
+  );
+  return DailySummary(
+    date: date,
+    consumed: consumed,
+    target: const NutritionSnapshot(
+      calories: 2000,
+      proteinGrams: 100,
+      carbsGrams: 200,
+      fatGrams: 60,
+    ),
+    remaining: const NutritionSnapshot(
+      calories: 2000,
+      proteinGrams: 100,
+      carbsGrams: 200,
+      fatGrams: 60,
+    ),
+    hydrationGoalLiters: 2,
+    waterConsumedLiters: 0,
+    calorieTargetConfigured: true,
+    calorieTargetSource: 'manual',
+    meals: const [],
+  );
 }
 
 Map<String, Object?> _usualFoodJson(String id, {required String name}) {

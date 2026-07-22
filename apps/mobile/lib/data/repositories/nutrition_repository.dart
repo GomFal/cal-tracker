@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:io';
 
 import '../../domain/models/macro_distribution.dart';
+import '../../domain/models/nutrition_data_change.dart';
 import '../../domain/models/nutrition_models.dart';
 import '../../domain/models/nutrition_summary_updates.dart';
 import '../../generated/api/cal_tracker_api.dart';
@@ -31,6 +33,7 @@ class AgentRunResult {
     this.usualFoodDraft,
     this.usualMealDraft,
     this.sourceProposalId,
+    this.confirmedMutation,
   });
 
   final String kind;
@@ -53,6 +56,7 @@ class AgentRunResult {
   final UsualFoodDraft? usualFoodDraft;
   final UsualMealDraft? usualMealDraft;
   final String? sourceProposalId;
+  final ConfirmedNutritionMutation? confirmedMutation;
 }
 
 class VoiceMealRunResult {
@@ -464,19 +468,53 @@ class NutritionRepository {
   final Map<String, DateTime> _dailySummaryRefreshStartedAt = {};
   final Map<String, Future<AgentChatProposalCommitResult>>
   _agentProposalCommits = {};
+  final Set<String> _pendingDailySummaryRefreshes = {};
   Future<List<MealTemplate>>? _templatesRefresh;
   Future<List<UsualFood>>? _usualFoodsRefresh;
   DateTime? _templatesRefreshStartedAt;
   DateTime? _usualFoodsRefreshStartedAt;
+  bool _pendingTemplatesRefresh = false;
+  bool _pendingUsualFoodsRefresh = false;
+  final StreamController<NutritionDataChange> _dataChanges =
+      StreamController<NutritionDataChange>.broadcast();
+  final LinkedHashSet<String> _seenMutationIds = LinkedHashSet<String>();
+  final Map<String, Future<void>> _cacheMutationQueues = {};
+  final Map<String, int> _cacheGenerations = {};
+  String? _activeUserId;
+  int _userEpoch = 0;
+  int _localMutationCounter = 0;
+  bool _isDisposed = false;
 
   bool get isBackendLikelyHealthy => _healthMonitor.isLikelyHealthy;
+  Stream<NutritionDataChange> get dataChanges => _dataChanges.stream;
 
   void activateCacheForUser(String userId) {
+    if (_activeUserId != userId) {
+      _activeUserId = userId;
+      _userEpoch++;
+      _seenMutationIds.clear();
+      _cacheMutationQueues.clear();
+      _cacheGenerations.clear();
+      _clearRefreshState();
+    }
     _cacheStore?.activateUser(userId);
   }
 
   void deactivateCache() {
+    _activeUserId = null;
+    _userEpoch++;
+    _seenMutationIds.clear();
+    _cacheMutationQueues.clear();
+    _cacheGenerations.clear();
+    _clearRefreshState();
     _cacheStore?.deactivateUser();
+  }
+
+  Future<void> dispose() async {
+    if (_isDisposed) return;
+    _isDisposed = true;
+    _clearRefreshState();
+    await _dataChanges.close();
   }
 
   Future<void> clearActiveUserCache() async {
@@ -522,7 +560,10 @@ class NutritionRepository {
     }
 
     final existing = _dailySummaryRefreshes[normalizedDate];
-    if (existing != null) return existing;
+    if (existing != null) {
+      if (force) _pendingDailySummaryRefreshes.add(normalizedDate);
+      return existing;
+    }
 
     final startedAt = _dailySummaryRefreshStartedAt[normalizedDate];
     if (!force && startedAt != null) {
@@ -531,17 +572,28 @@ class NutritionRepository {
       if (isCoolingDown) {
         return cachedDailySummary(date: normalizedDate).then(
           (cached) =>
-              cached?.value ?? _refreshDailySummaryFromBackend(normalizedDate),
+              cached?.value ??
+              _refreshDailySummaryFromBackend(
+                normalizedDate,
+                generation:
+                    _cacheGenerations['daily_summary:$normalizedDate'] ?? 0,
+                scope: _captureScope(),
+              ),
         );
       }
     }
 
-    final refresh = _refreshDailySummaryFromBackend(normalizedDate);
+    final refresh = _refreshDailySummaryFromBackend(
+      normalizedDate,
+      generation: _cacheGenerations['daily_summary:$normalizedDate'] ?? 0,
+      scope: _captureScope(),
+    );
     _dailySummaryRefreshStartedAt[normalizedDate] = _now();
     _dailySummaryRefreshes[normalizedDate] = refresh;
-    refresh.whenComplete(() {
-      _dailySummaryRefreshes.remove(normalizedDate);
-    });
+    refresh.then<void>(
+      (_) => _finishDailySummaryRefresh(normalizedDate, refresh),
+      onError: (_, __) => _finishDailySummaryRefresh(normalizedDate, refresh),
+    );
     return refresh;
   }
 
@@ -570,24 +622,36 @@ class NutritionRepository {
     if (cacheStore == null) return getTemplates();
 
     final existing = _templatesRefresh;
-    if (existing != null) return existing;
+    if (existing != null) {
+      if (force) _pendingTemplatesRefresh = true;
+      return existing;
+    }
     final startedAt = _templatesRefreshStartedAt;
     if (!force && startedAt != null) {
       final isCoolingDown =
           _now().difference(startedAt) < _backgroundRefreshCooldown;
       if (isCoolingDown) {
         return cachedTemplates().then(
-          (cached) => cached?.value ?? _refreshTemplatesFromBackend(),
+          (cached) =>
+              cached?.value ??
+              _refreshTemplatesFromBackend(
+                generation: _cacheGenerations['meal_templates'] ?? 0,
+                scope: _captureScope(),
+              ),
         );
       }
     }
 
-    final refresh = _refreshTemplatesFromBackend();
+    final refresh = _refreshTemplatesFromBackend(
+      generation: _cacheGenerations['meal_templates'] ?? 0,
+      scope: _captureScope(),
+    );
     _templatesRefreshStartedAt = _now();
     _templatesRefresh = refresh;
-    refresh.whenComplete(() {
-      _templatesRefresh = null;
-    });
+    refresh.then<void>(
+      (_) => _finishTemplatesRefresh(refresh),
+      onError: (_, __) => _finishTemplatesRefresh(refresh),
+    );
     return refresh;
   }
 
@@ -616,24 +680,36 @@ class NutritionRepository {
     if (cacheStore == null) return getUsualFoods();
 
     final existing = _usualFoodsRefresh;
-    if (existing != null) return existing;
+    if (existing != null) {
+      if (force) _pendingUsualFoodsRefresh = true;
+      return existing;
+    }
     final startedAt = _usualFoodsRefreshStartedAt;
     if (!force && startedAt != null) {
       final isCoolingDown =
           _now().difference(startedAt) < _backgroundRefreshCooldown;
       if (isCoolingDown) {
         return cachedUsualFoods().then(
-          (cached) => cached?.value ?? _refreshUsualFoodsFromBackend(),
+          (cached) =>
+              cached?.value ??
+              _refreshUsualFoodsFromBackend(
+                generation: _cacheGenerations['usual_foods'] ?? 0,
+                scope: _captureScope(),
+              ),
         );
       }
     }
 
-    final refresh = _refreshUsualFoodsFromBackend();
+    final refresh = _refreshUsualFoodsFromBackend(
+      generation: _cacheGenerations['usual_foods'] ?? 0,
+      scope: _captureScope(),
+    );
     _usualFoodsRefreshStartedAt = _now();
     _usualFoodsRefresh = refresh;
-    refresh.whenComplete(() {
-      _usualFoodsRefresh = null;
-    });
+    refresh.then<void>(
+      (_) => _finishUsualFoodsRefresh(refresh),
+      onError: (_, __) => _finishUsualFoodsRefresh(refresh),
+    );
     return refresh;
   }
 
@@ -641,12 +717,13 @@ class NutritionRepository {
     String text, {
     String? activeProposalId,
   }) async {
+    final scope = _captureScope();
     final json = activeProposalId == null
         ? await _apiClient.runAgent(text)
         : await _apiClient.runAgent(text, activeProposalId: activeProposalId);
     _healthMonitor.recordSuccess();
     final result = agentRunResultFromJson(json);
-    await _cacheAgentResult(result);
+    await _cacheAgentResult(result, expectedScope: scope);
     return result;
   }
 
@@ -654,6 +731,7 @@ class NutritionRepository {
     File audioFile, {
     String? activeProposalId,
   }) async {
+    final scope = _captureScope();
     final json = activeProposalId == null
         ? await _apiClient.runVoiceMeal(audioFile, source: 'flutter')
         : await _apiClient.runVoiceMeal(
@@ -664,7 +742,7 @@ class NutritionRepository {
     _healthMonitor.recordSuccess();
     final result =
         agentRunResultFromJson(json['result'] as Map<String, Object?>);
-    await _cacheAgentResult(result);
+    await _cacheAgentResult(result, expectedScope: scope);
     return VoiceMealRunResult(
       transcript: json['transcript'] as String,
       provider: json['provider'] as String,
@@ -679,6 +757,7 @@ class NutritionRepository {
     String? conversationId,
     String? activeProposalId,
   }) async* {
+    final scope = _captureScope();
     await for (final json in _apiClient.streamAgentChat(
       message,
       conversationId: conversationId,
@@ -686,7 +765,9 @@ class NutritionRepository {
     )) {
       final event = _parseAgentChatStreamEvent(json);
       final result = event.result;
-      if (result != null) await _cacheAgentResult(result);
+      if (result != null) {
+        await _cacheAgentResult(result, expectedScope: scope);
+      }
       yield event;
     }
     _healthMonitor.recordSuccess();
@@ -697,6 +778,7 @@ class NutritionRepository {
     String? conversationId,
     String? activeProposalId,
   }) async* {
+    final scope = _captureScope();
     await for (final json in _apiClient.streamAgentChatAudio(
       audioFile,
       conversationId: conversationId,
@@ -704,7 +786,9 @@ class NutritionRepository {
     )) {
       final event = _parseAgentChatStreamEvent(json);
       final result = event.result;
-      if (result != null) await _cacheAgentResult(result);
+      if (result != null) {
+        await _cacheAgentResult(result, expectedScope: scope);
+      }
       yield event;
     }
     _healthMonitor.recordSuccess();
@@ -894,6 +978,7 @@ class NutritionRepository {
   }
 
   Future<Meal> commitProposal(String proposalId, {MealLabel? mealLabel}) async {
+    final scope = _captureScope();
     final json = await _apiClient.commitProposal(
       proposalId,
       mealLabel: mealLabel,
@@ -901,11 +986,13 @@ class NutritionRepository {
     _healthMonitor.recordSuccess();
     final output = json['output'] as Map<String, Object?>;
     final meal = Meal.fromJson(output['meal'] as Map<String, Object?>);
-    await _mergeMealIntoCachedSummary(meal);
+    await _reconcileResponseMutation(json, expectedScope: scope);
+    await _mergeMealIntoCachedSummary(meal, expectedScope: scope);
     return meal;
   }
 
   Future<Meal> correctMealItems(String mealId, List<MealItem> items) async {
+    final scope = _captureScope();
     final json = await _apiClient.correctMeal(
       mealId,
       items.map((item) => item.toJson()).toList(),
@@ -913,7 +1000,8 @@ class NutritionRepository {
     _healthMonitor.recordSuccess();
     final output = json['output'] as Map<String, Object?>;
     final meal = Meal.fromJson(output['meal'] as Map<String, Object?>);
-    await _mergeMealIntoCachedSummary(meal);
+    await _reconcileResponseMutation(json, expectedScope: scope);
+    await _mergeMealIntoCachedSummary(meal, expectedScope: scope);
     return meal;
   }
 
@@ -947,8 +1035,10 @@ class NutritionRepository {
   }
 
   Future<bool> deleteMeal(String mealId, {bool confirmed = false}) async {
+    final scope = _captureScope();
     final json = await _apiClient.deleteMeal(mealId, confirmed: confirmed);
     _healthMonitor.recordSuccess();
+    await _reconcileResponseMutation(json, expectedScope: scope);
     final output = json['output'] as Map<String, Object?>;
     return output['deleted'] as bool? ?? false;
   }
@@ -957,9 +1047,16 @@ class NutritionRepository {
     return _fetchDailySummaryFromBackend(_dateOnly(date));
   }
 
-  Future<DailySummary> _refreshDailySummaryFromBackend(String date) async {
+  Future<DailySummary> _refreshDailySummaryFromBackend(
+    String date, {
+    required int generation,
+    required _RepositoryScope scope,
+  }) async {
     final summary = await _fetchDailySummaryFromBackend(date);
-    await putCachedDailySummary(summary);
+    if (_isScopeCurrent(scope) &&
+        (_cacheGenerations['daily_summary:$date'] ?? 0) == generation) {
+      await putCachedDailySummary(summary);
+    }
     return summary;
   }
 
@@ -984,6 +1081,7 @@ class NutritionRepository {
             !isValidMacroConfig(macroConfig, calories: macroTargetCalories))) {
       throw ArgumentError('Invalid macro configuration');
     }
+    final scope = _captureScope();
     final json = await _apiClient.updateDailyGoals(
       date: _dateOnly(date),
       calories: calories,
@@ -993,7 +1091,29 @@ class NutritionRepository {
     );
     _healthMonitor.recordSuccess();
     final goals = DailyGoals.fromJson(json['goals'] as Map<String, Object?>);
-    await _mergeGoalsIntoCachedSummary(goals);
+    final summaryJson = json['summary'];
+    final summary = summaryJson is Map<String, Object?>
+        ? DailySummary.fromJson(summaryJson)
+        : null;
+    await _publishLocalEffects(
+      [
+        NutritionDataEffect(
+          domain: NutritionDataDomain.dailyGoals,
+          operation: NutritionDataOperation.replace,
+          date: goals.date,
+          snapshot: goals.toJson(),
+        ),
+        if (summary != null)
+          NutritionDataEffect(
+            domain: NutritionDataDomain.dailySummary,
+            operation: NutritionDataOperation.replace,
+            date: summary.date,
+            snapshot: summary.toJson(),
+          ),
+      ],
+      expectedScope: scope,
+    );
+    await _mergeGoalsIntoCachedSummary(goals, expectedScope: scope);
     return goals;
   }
 
@@ -1001,6 +1121,7 @@ class NutritionRepository {
     String? date,
     required double waterConsumedLiters,
   }) async {
+    final scope = _captureScope();
     final json = await _apiClient.updateDailyHydration(
       date: _dateOnly(date),
       waterConsumedLiters: waterConsumedLiters,
@@ -1009,7 +1130,15 @@ class NutritionRepository {
     final summary = DailySummary.fromJson(
       json['summary'] as Map<String, Object?>,
     );
-    await putCachedDailySummary(summary);
+    await _publishLocalEffect(
+      NutritionDataEffect(
+        domain: NutritionDataDomain.dailySummary,
+        operation: NutritionDataOperation.replace,
+        date: summary.date,
+        snapshot: summary.toJson(),
+      ),
+      expectedScope: scope,
+    );
     return summary;
   }
 
@@ -1049,9 +1178,15 @@ class NutritionRepository {
     return _fetchTemplatesFromBackend();
   }
 
-  Future<List<MealTemplate>> _refreshTemplatesFromBackend() async {
+  Future<List<MealTemplate>> _refreshTemplatesFromBackend({
+    required int generation,
+    required _RepositoryScope scope,
+  }) async {
     final templates = await _fetchTemplatesFromBackend();
-    await putCachedTemplates(templates);
+    if (_isScopeCurrent(scope) &&
+        (_cacheGenerations['meal_templates'] ?? 0) == generation) {
+      await putCachedTemplates(templates);
+    }
     return templates;
   }
 
@@ -1069,9 +1204,15 @@ class NutritionRepository {
     return _fetchUsualFoodsFromBackend();
   }
 
-  Future<List<UsualFood>> _refreshUsualFoodsFromBackend() async {
+  Future<List<UsualFood>> _refreshUsualFoodsFromBackend({
+    required int generation,
+    required _RepositoryScope scope,
+  }) async {
     final foods = await _fetchUsualFoodsFromBackend();
-    await putCachedUsualFoods(foods);
+    if (_isScopeCurrent(scope) &&
+        (_cacheGenerations['usual_foods'] ?? 0) == generation) {
+      await putCachedUsualFoods(foods);
+    }
     return foods;
   }
 
@@ -1090,6 +1231,7 @@ class NutritionRepository {
     MealTemplate template,
     bool enabled,
   ) async {
+    final scope = _captureScope();
     final body = template.toUpdateJson()
       ..['trustedAutoCommitEnabled'] = enabled;
     final json = await _apiClient.updateTemplate(template.id, body);
@@ -1098,7 +1240,8 @@ class NutritionRepository {
     final updated = MealTemplate.fromJson(
       output['template'] as Map<String, Object?>,
     );
-    await _replaceCachedTemplate(updated);
+    await _reconcileResponseMutation(json, expectedScope: scope);
+    await _replaceCachedTemplate(updated, expectedScope: scope);
     return updated;
   }
 
@@ -1108,6 +1251,7 @@ class NutritionRepository {
     required List<String> aliases,
     bool trustedAutoCommitEnabled = false,
   }) async {
+    final scope = _captureScope();
     final json = await _apiClient.createTemplate({
       'title': title,
       'trustedAutoCommitEnabled': trustedAutoCommitEnabled,
@@ -1119,7 +1263,8 @@ class NutritionRepository {
     final template = MealTemplate.fromJson(
       output['template'] as Map<String, Object?>,
     );
-    await _appendCachedTemplate(template);
+    await _reconcileResponseMutation(json, expectedScope: scope);
+    await _appendCachedTemplate(template, expectedScope: scope);
     return template;
   }
 
@@ -1130,6 +1275,7 @@ class NutritionRepository {
     required List<String> aliases,
     bool trustedAutoCommitEnabled = false,
   }) async {
+    final scope = _captureScope();
     final json = await _apiClient.updateTemplate(templateId, {
       'title': title,
       'trustedAutoCommitEnabled': trustedAutoCommitEnabled,
@@ -1141,7 +1287,8 @@ class NutritionRepository {
     final template = MealTemplate.fromJson(
       output['template'] as Map<String, Object?>,
     );
-    await _replaceCachedTemplate(template);
+    await _reconcileResponseMutation(json, expectedScope: scope);
+    await _replaceCachedTemplate(template, expectedScope: scope);
     return template;
   }
 
@@ -1160,31 +1307,37 @@ class NutritionRepository {
   }
 
   Future<UsualFood> createUsualFood(UsualFoodInput input) async {
+    final scope = _captureScope();
     final json = await _apiClient.createUsualFood(input.toJson());
     _healthMonitor.recordSuccess();
     final food = _parseUsualFoodResponse(json);
-    await _appendCachedUsualFood(food);
+    await _reconcileResponseMutation(json, expectedScope: scope);
+    await _appendCachedUsualFood(food, expectedScope: scope);
     return food;
   }
 
   Future<UsualFood> updateUsualFood(String foodId, UsualFoodInput input) async {
+    final scope = _captureScope();
     final json = await _apiClient.updateUsualFood(
       foodId,
       input.toJson(includeEmptyOptional: true),
     );
     _healthMonitor.recordSuccess();
     final food = _parseUsualFoodResponse(json);
-    await _replaceCachedUsualFood(food);
+    await _reconcileResponseMutation(json, expectedScope: scope);
+    await _replaceCachedUsualFood(food, expectedScope: scope);
     return food;
   }
 
   Future<bool> deleteUsualFood(String foodId) async {
+    final scope = _captureScope();
     final json = await _apiClient.deleteUsualFood(foodId);
     _healthMonitor.recordSuccess();
+    await _reconcileResponseMutation(json, expectedScope: scope);
     final output = _responseOutput(json);
     final deleted = output['deleted'] as bool? ?? true;
     if (deleted) {
-      await _removeCachedUsualFood(foodId);
+      await _removeCachedUsualFood(foodId, expectedScope: scope);
     }
     return deleted;
   }
@@ -1197,12 +1350,14 @@ class NutritionRepository {
   }
 
   Future<bool> deleteTemplate(String templateId) async {
+    final scope = _captureScope();
     final json = await _apiClient.deleteTemplate(templateId);
     _healthMonitor.recordSuccess();
+    await _reconcileResponseMutation(json, expectedScope: scope);
     final output = json['output'] as Map<String, Object?>;
     final deleted = output['deleted'] as bool? ?? false;
     if (deleted) {
-      await _removeCachedTemplate(templateId);
+      await _removeCachedTemplate(templateId, expectedScope: scope);
     }
     return deleted;
   }
@@ -1213,40 +1368,316 @@ class NutritionRepository {
     return json['transcript'] as String;
   }
 
-  Future<void> _cacheAgentResult(AgentRunResult result) async {
+  Future<void> _reconcileResponseMutation(
+    Map<String, Object?> response, {
+    required _RepositoryScope expectedScope,
+  }) async {
+    if (!_isScopeCurrent(expectedScope)) return;
+    final mutation = ConfirmedNutritionMutation.tryParse(
+      response['confirmedMutation'],
+    );
+    if (mutation != null && _isScopeCurrent(expectedScope)) {
+      await reconcileConfirmedMutation(mutation);
+    }
+  }
+
+  Future<void> _publishLocalEffect(
+    NutritionDataEffect effect, {
+    required _RepositoryScope expectedScope,
+  }) =>
+      _publishLocalEffects([effect], expectedScope: expectedScope);
+
+  Future<void> _publishLocalEffects(
+    List<NutritionDataEffect> effects, {
+    required _RepositoryScope expectedScope,
+  }) {
+    if (!_isScopeCurrent(expectedScope)) return Future.value();
+    return reconcileConfirmedMutation(
+      ConfirmedNutritionMutation(
+        version: 1,
+        // Deterministic API endpoints that predate the envelope still share
+        // the same local reconciliation path after their response succeeds.
+        mutationId:
+            'local-${_now().microsecondsSinceEpoch}-${++_localMutationCounter}',
+        committedAt: _now().toUtc(),
+        effects: effects,
+      ),
+    );
+  }
+
+  /// Reconciles a server-confirmed mutation before notifying any ViewModel.
+  /// The active cache owner is captured locally; agent payloads never choose a
+  /// user scope and stale account work is ignored after logout/account switch.
+  Future<void> reconcileConfirmedMutation(
+    ConfirmedNutritionMutation mutation,
+  ) async {
+    final userId = _activeUserId;
+    final epoch = _userEpoch;
+    if (userId == null || _isDisposed || mutation.effects.isEmpty) return;
+    if (_seenMutationIds.contains(mutation.mutationId)) return;
+    _seenMutationIds.add(mutation.mutationId);
+    while (_seenMutationIds.length > 100) {
+      _seenMutationIds.remove(_seenMutationIds.first);
+    }
+
+    for (final effect in mutation.effects) {
+      if (!_isCurrentScope(userId, epoch)) return;
+      await _queueCacheMutation(
+        _cacheKeyForEffect(effect),
+        () => _reconcileEffect(effect, userId: userId, epoch: epoch),
+      );
+    }
+    if (_isCurrentScope(userId, epoch) && !_dataChanges.isClosed) {
+      _dataChanges.add(NutritionDataChange(userId: userId, mutation: mutation));
+    }
+  }
+
+  Future<void> _reconcileEffect(
+    NutritionDataEffect effect, {
+    required String userId,
+    required int epoch,
+  }) async {
+    if (!_isCurrentScope(userId, epoch)) return;
+    final cacheStore = _cacheStore;
+    switch (effect.domain) {
+      case NutritionDataDomain.dailySummary:
+        final date = effect.date!;
+        _invalidateCacheKey('daily_summary:$date');
+        final summary = effect.dailySummary;
+        if (summary != null && summary.date == date) {
+          if (_isCurrentScope(userId, epoch)) {
+            await putCachedDailySummary(summary);
+          }
+        } else {
+          await cacheStore?.markDailySummaryStale(date);
+          _refreshAffectedDailySummary(date, userId, epoch);
+        }
+      case NutritionDataDomain.dailyGoals:
+        final date = effect.date ?? effect.dailyGoals?.date;
+        final goals = effect.dailyGoals;
+        if (date == null || goals == null) return;
+        _invalidateCacheKey('daily_summary:$date');
+        final cached = await cachedDailySummary(date: date);
+        if (!_isCurrentScope(userId, epoch)) return;
+        if (cached != null) {
+          await putCachedDailySummary(
+              dailySummaryWithGoals(cached.value, goals));
+        } else {
+          await cacheStore?.markDailySummaryStale(date);
+          _refreshAffectedDailySummary(date, userId, epoch);
+        }
+      case NutritionDataDomain.mealTemplates:
+        _invalidateCacheKey('meal_templates');
+        final template = effect.mealTemplate;
+        if (effect.operation == NutritionDataOperation.invalidate ||
+            (effect.operation != NutritionDataOperation.delete &&
+                template == null)) {
+          await cacheStore?.markMealTemplatesStale();
+          _refreshAffectedTemplates(userId, epoch);
+          return;
+        }
+        final cached = await cachedTemplates();
+        if (!_isCurrentScope(userId, epoch)) return;
+        if (cached == null) {
+          await cacheStore?.markMealTemplatesStale();
+          _refreshAffectedTemplates(userId, epoch);
+          return;
+        }
+        final id = effect.entityId!;
+        final next = effect.operation == NutritionDataOperation.delete
+            ? cached.value.where((item) => item.id != id).toList()
+            : _upsertById(cached.value, template!, (item) => item.id);
+        await putCachedTemplates(next);
+      case NutritionDataDomain.usualFoods:
+        _invalidateCacheKey('usual_foods');
+        final food = effect.usualFood;
+        if (effect.operation == NutritionDataOperation.invalidate ||
+            (effect.operation != NutritionDataOperation.delete &&
+                food == null)) {
+          await cacheStore?.markUsualFoodsStale();
+          _refreshAffectedUsualFoods(userId, epoch);
+          return;
+        }
+        final cached = await cachedUsualFoods();
+        if (!_isCurrentScope(userId, epoch)) return;
+        if (cached == null) {
+          await cacheStore?.markUsualFoodsStale();
+          _refreshAffectedUsualFoods(userId, epoch);
+          return;
+        }
+        final id = effect.entityId!;
+        final next = effect.operation == NutritionDataOperation.delete
+            ? cached.value.where((item) => item.id != id).toList()
+            : _upsertById(cached.value, food!, (item) => item.id);
+        await putCachedUsualFoods(next);
+    }
+  }
+
+  Future<void> _queueCacheMutation(
+    String key,
+    Future<void> Function() operation,
+  ) {
+    final previous = _cacheMutationQueues[key] ?? Future<void>.value();
+    final next = previous.catchError((_) {}).then((_) => operation());
+    _cacheMutationQueues[key] = next;
+    return next.whenComplete(() {
+      if (identical(_cacheMutationQueues[key], next)) {
+        _cacheMutationQueues.remove(key);
+      }
+    });
+  }
+
+  _RepositoryScope _captureScope() =>
+      _RepositoryScope(userId: _activeUserId, epoch: _userEpoch);
+
+  bool _isScopeCurrent(_RepositoryScope scope) =>
+      !_isDisposed &&
+      _activeUserId == scope.userId &&
+      _userEpoch == scope.epoch;
+
+  bool _isCurrentScope(String userId, int epoch) =>
+      _isScopeCurrent(_RepositoryScope(userId: userId, epoch: epoch));
+
+  void _clearRefreshState() {
+    _dailySummaryRefreshes.clear();
+    _dailySummaryRefreshStartedAt.clear();
+    _pendingDailySummaryRefreshes.clear();
+    _templatesRefresh = null;
+    _usualFoodsRefresh = null;
+    _templatesRefreshStartedAt = null;
+    _usualFoodsRefreshStartedAt = null;
+    _pendingTemplatesRefresh = false;
+    _pendingUsualFoodsRefresh = false;
+  }
+
+  void _finishDailySummaryRefresh(
+    String date,
+    Future<DailySummary> refresh,
+  ) {
+    if (!identical(_dailySummaryRefreshes[date], refresh)) return;
+    _dailySummaryRefreshes.remove(date);
+    final userId = _activeUserId;
+    if (_pendingDailySummaryRefreshes.remove(date) && userId != null) {
+      _refreshAffectedDailySummary(date, userId, _userEpoch);
+    }
+  }
+
+  void _finishTemplatesRefresh(Future<List<MealTemplate>> refresh) {
+    if (!identical(_templatesRefresh, refresh)) return;
+    _templatesRefresh = null;
+    final userId = _activeUserId;
+    final needsRefresh = _pendingTemplatesRefresh;
+    _pendingTemplatesRefresh = false;
+    if (needsRefresh && userId != null) {
+      _refreshAffectedTemplates(userId, _userEpoch);
+    }
+  }
+
+  void _finishUsualFoodsRefresh(Future<List<UsualFood>> refresh) {
+    if (!identical(_usualFoodsRefresh, refresh)) return;
+    _usualFoodsRefresh = null;
+    final userId = _activeUserId;
+    final needsRefresh = _pendingUsualFoodsRefresh;
+    _pendingUsualFoodsRefresh = false;
+    if (needsRefresh && userId != null) {
+      _refreshAffectedUsualFoods(userId, _userEpoch);
+    }
+  }
+
+  String _cacheKeyForEffect(NutritionDataEffect effect) =>
+      switch (effect.domain) {
+        NutritionDataDomain.dailySummary ||
+        NutritionDataDomain.dailyGoals =>
+          'daily_summary:${effect.date ?? effect.dailyGoals?.date ?? ''}',
+        NutritionDataDomain.mealTemplates => 'meal_templates',
+        NutritionDataDomain.usualFoods => 'usual_foods',
+      };
+
+  void _invalidateCacheKey(String key) {
+    _cacheGenerations[key] = (_cacheGenerations[key] ?? 0) + 1;
+  }
+
+  void _refreshAffectedDailySummary(String date, String userId, int epoch) {
+    if (!_isCurrentScope(userId, epoch)) return;
+    unawaited(() async {
+      try {
+        await refreshDailySummary(date: date, force: true);
+      } on Object {
+        // Cached data remains visible and marked stale after a background miss.
+      }
+    }());
+  }
+
+  void _refreshAffectedTemplates(String userId, int epoch) {
+    if (!_isCurrentScope(userId, epoch)) return;
+    unawaited(() async {
+      try {
+        await refreshTemplates(force: true);
+      } on Object {
+        // Keep the stale, still-renderable cache value on background failure.
+      }
+    }());
+  }
+
+  void _refreshAffectedUsualFoods(String userId, int epoch) {
+    if (!_isCurrentScope(userId, epoch)) return;
+    unawaited(() async {
+      try {
+        await refreshUsualFoods(force: true);
+      } on Object {
+        // Keep the stale, still-renderable cache value on background failure.
+      }
+    }());
+  }
+
+  Future<void> _cacheAgentResult(
+    AgentRunResult result, {
+    required _RepositoryScope expectedScope,
+  }) async {
+    if (!_isScopeCurrent(expectedScope)) return;
+    final mutation = result.confirmedMutation;
+    if (mutation != null) {
+      await reconcileConfirmedMutation(mutation);
+      if (!_isScopeCurrent(expectedScope)) return;
+    }
     final summary = result.summary;
-    if (summary != null) {
+    if (summary != null && _isScopeCurrent(expectedScope)) {
       await putCachedDailySummary(summary);
     }
     final meal = result.meal;
     if (meal != null) {
-      await _mergeMealIntoCachedSummary(meal);
+      await _mergeMealIntoCachedSummary(meal, expectedScope: expectedScope);
     }
     final meals = result.meals;
     if (meals != null) {
       for (final meal in meals) {
-        await _mergeMealIntoCachedSummary(meal);
+        await _mergeMealIntoCachedSummary(meal, expectedScope: expectedScope);
+        if (!_isScopeCurrent(expectedScope)) return;
       }
     }
     final templates = result.templates;
-    if (templates != null) {
+    if (templates != null && _isScopeCurrent(expectedScope)) {
       await putCachedTemplates(templates);
     }
     final usualFoods = result.usualFoods;
-    if (usualFoods != null) {
+    if (usualFoods != null && _isScopeCurrent(expectedScope)) {
       await putCachedUsualFoods(usualFoods);
     }
     final template = result.template;
     if (template != null) {
-      await _replaceCachedTemplate(template);
+      await _replaceCachedTemplate(template, expectedScope: expectedScope);
     }
   }
 
-  Future<void> _mergeMealIntoCachedSummary(Meal meal) async {
+  Future<void> _mergeMealIntoCachedSummary(
+    Meal meal, {
+    required _RepositoryScope expectedScope,
+  }) async {
+    if (!_isScopeCurrent(expectedScope)) return;
     final cached = await cachedDailySummary(
       date: _dateFromDateTime(meal.occurredAt),
     );
-    if (cached == null) return;
+    if (cached == null || !_isScopeCurrent(expectedScope)) return;
     final existingMeals = cached.value.meals;
     final hasMeal = existingMeals.any((item) => item.id == meal.id);
     final meals = hasMeal
@@ -1255,21 +1686,33 @@ class NutritionRepository {
     await putCachedDailySummary(dailySummaryWithMeals(cached.value, meals));
   }
 
-  Future<void> _mergeGoalsIntoCachedSummary(DailyGoals goals) async {
+  Future<void> _mergeGoalsIntoCachedSummary(
+    DailyGoals goals, {
+    required _RepositoryScope expectedScope,
+  }) async {
+    if (!_isScopeCurrent(expectedScope)) return;
     final cached = await cachedDailySummary(date: goals.date);
-    if (cached == null) return;
+    if (cached == null || !_isScopeCurrent(expectedScope)) return;
     await putCachedDailySummary(dailySummaryWithGoals(cached.value, goals));
   }
 
-  Future<void> _appendCachedTemplate(MealTemplate template) async {
+  Future<void> _appendCachedTemplate(
+    MealTemplate template, {
+    required _RepositoryScope expectedScope,
+  }) async {
+    if (!_isScopeCurrent(expectedScope)) return;
     final cached = await cachedTemplates();
-    if (cached == null) return;
+    if (cached == null || !_isScopeCurrent(expectedScope)) return;
     await putCachedTemplates([...cached.value, template]);
   }
 
-  Future<void> _replaceCachedTemplate(MealTemplate template) async {
+  Future<void> _replaceCachedTemplate(
+    MealTemplate template, {
+    required _RepositoryScope expectedScope,
+  }) async {
+    if (!_isScopeCurrent(expectedScope)) return;
     final cached = await cachedTemplates();
-    if (cached == null) return;
+    if (cached == null || !_isScopeCurrent(expectedScope)) return;
     final hasTemplate = cached.value.any((item) => item.id == template.id);
     final templates = hasTemplate
         ? cached.value
@@ -1279,23 +1722,35 @@ class NutritionRepository {
     await putCachedTemplates(templates);
   }
 
-  Future<void> _removeCachedTemplate(String templateId) async {
+  Future<void> _removeCachedTemplate(
+    String templateId, {
+    required _RepositoryScope expectedScope,
+  }) async {
+    if (!_isScopeCurrent(expectedScope)) return;
     final cached = await cachedTemplates();
-    if (cached == null) return;
+    if (cached == null || !_isScopeCurrent(expectedScope)) return;
     await putCachedTemplates(
       cached.value.where((item) => item.id != templateId).toList(),
     );
   }
 
-  Future<void> _appendCachedUsualFood(UsualFood food) async {
+  Future<void> _appendCachedUsualFood(
+    UsualFood food, {
+    required _RepositoryScope expectedScope,
+  }) async {
+    if (!_isScopeCurrent(expectedScope)) return;
     final cached = await cachedUsualFoods();
-    if (cached == null) return;
+    if (cached == null || !_isScopeCurrent(expectedScope)) return;
     await putCachedUsualFoods([...cached.value, food]);
   }
 
-  Future<void> _replaceCachedUsualFood(UsualFood food) async {
+  Future<void> _replaceCachedUsualFood(
+    UsualFood food, {
+    required _RepositoryScope expectedScope,
+  }) async {
+    if (!_isScopeCurrent(expectedScope)) return;
     final cached = await cachedUsualFoods();
-    if (cached == null) return;
+    if (cached == null || !_isScopeCurrent(expectedScope)) return;
     final hasFood = cached.value.any((item) => item.id == food.id);
     final foods = hasFood
         ? cached.value.map((item) => item.id == food.id ? food : item).toList()
@@ -1303,9 +1758,13 @@ class NutritionRepository {
     await putCachedUsualFoods(foods);
   }
 
-  Future<void> _removeCachedUsualFood(String foodId) async {
+  Future<void> _removeCachedUsualFood(
+    String foodId, {
+    required _RepositoryScope expectedScope,
+  }) async {
+    if (!_isScopeCurrent(expectedScope)) return;
     final cached = await cachedUsualFoods();
-    if (cached == null) return;
+    if (cached == null || !_isScopeCurrent(expectedScope)) return;
     await putCachedUsualFoods(
       cached.value.where((item) => item.id != foodId).toList(),
     );
@@ -1386,6 +1845,13 @@ class NutritionRepository {
       ),
     );
   }
+}
+
+class _RepositoryScope {
+  const _RepositoryScope({required this.userId, required this.epoch});
+
+  final String? userId;
+  final int epoch;
 }
 
 Map<String, Object?> _responseOutput(Map<String, Object?> json) {
@@ -1514,6 +1980,9 @@ AgentRunResult agentRunResultFromJson(Map<String, Object?> json) {
         : UsualMealDraft.fromJson(
             _responseOutput(json['usualMealDraft'] as Map<String, Object?>),
           ),
+    confirmedMutation: ConfirmedNutritionMutation.tryParse(
+      json['confirmedMutation'],
+    ),
   );
 }
 
@@ -1537,6 +2006,19 @@ UsualFoodDraft _parseNestedUsualFoodDraft(Map<String, Object?> json) {
       ? output['draft'] as Map<String, Object?>
       : output;
   return UsualFoodDraft.fromJson(draft);
+}
+
+List<T> _upsertById<T>(
+  List<T> items,
+  T item,
+  String Function(T item) idOf,
+) {
+  final exists = items.any((existing) => idOf(existing) == idOf(item));
+  return exists
+      ? items
+          .map((existing) => idOf(existing) == idOf(item) ? item : existing)
+          .toList(growable: false)
+      : [...items, item];
 }
 
 List<FoodCandidateGroup>? _parseCandidateGroups(Object? value) {

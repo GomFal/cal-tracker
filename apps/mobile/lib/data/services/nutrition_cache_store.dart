@@ -4,10 +4,17 @@ import '../../domain/models/nutrition_models.dart';
 import 'app_preferences_storage.dart';
 
 class CachedNutritionValue<T> {
-  const CachedNutritionValue({required this.value, required this.cachedAt});
+  const CachedNutritionValue({
+    required this.value,
+    required this.cachedAt,
+    this.isStale = false,
+  });
 
   final T value;
   final DateTime cachedAt;
+
+  /// A mutation needs reconciliation, but [value] remains safe to render.
+  final bool isStale;
 
   bool isOlderThan(Duration age, DateTime now) {
     return now.difference(cachedAt) > age;
@@ -19,9 +26,9 @@ class NutritionCacheStore {
     required StringKeyValueStorage storage,
     DateTime Function()? now,
     Duration maxEntryAge = const Duration(days: 7),
-  }) : _storage = storage,
-       _now = now ?? DateTime.now,
-       _maxEntryAge = maxEntryAge;
+  })  : _storage = storage,
+        _now = now ?? DateTime.now,
+        _maxEntryAge = maxEntryAge;
 
   static const _schemaVersion = 1;
   static const _keyPrefix = 'nutrition_cache:v1';
@@ -61,6 +68,10 @@ class NutritionCacheStore {
     return _write('daily_summary:${summary.date}', summary.toJson());
   }
 
+  Future<void> markDailySummaryStale(String date) {
+    return _markStale('daily_summary:$date');
+  }
+
   Future<CachedNutritionValue<List<MealTemplate>>?> readMealTemplates() {
     return _read(
       'meal_templates',
@@ -75,6 +86,8 @@ class NutritionCacheStore {
     );
   }
 
+  Future<void> markMealTemplatesStale() => _markStale('meal_templates');
+
   Future<CachedNutritionValue<List<UsualFood>>?> readUsualFoods() {
     return _read(
       'usual_foods',
@@ -85,6 +98,8 @@ class NutritionCacheStore {
   Future<void> writeUsualFoods(List<UsualFood> foods) {
     return _write('usual_foods', foods.map((food) => food.toJson()).toList());
   }
+
+  Future<void> markUsualFoodsStale() => _markStale('usual_foods');
 
   Future<CachedNutritionValue<T>?> _read<T>(
     String cacheKey,
@@ -116,6 +131,7 @@ class NutritionCacheStore {
       return CachedNutritionValue(
         value: decode(_normalizeJsonValue(envelope['payload'])),
         cachedAt: cachedAt,
+        isStale: envelope['stale'] == true,
       );
     } on Object {
       await _storage.remove(storageKey);
@@ -129,9 +145,28 @@ class NutritionCacheStore {
     final envelope = {
       'schemaVersion': _schemaVersion,
       'cachedAt': _now().toUtc().toIso8601String(),
+      'stale': false,
       'payload': payload,
     };
     await _storage.writeString(storageKey, jsonEncode(envelope));
+  }
+
+  Future<void> _markStale(String cacheKey) async {
+    final storageKey = _storageKey(cacheKey);
+    if (storageKey == null) return;
+    final raw = await _storage.readString(storageKey);
+    if (raw == null || raw.isEmpty) return;
+    try {
+      final envelope = _objectMap(jsonDecode(raw));
+      if (envelope['schemaVersion'] != _schemaVersion ||
+          envelope['payload'] == null) {
+        return;
+      }
+      envelope['stale'] = true;
+      await _storage.writeString(storageKey, jsonEncode(envelope));
+    } on Object {
+      // A normal read will remove malformed cache data.
+    }
   }
 
   String? _storageKey(String cacheKey) {

@@ -47,7 +47,8 @@ class ApiErrorDetails {
     final rawCode = json['code'] as String?;
     return ApiErrorDetails(
       code: publicCodes.contains(rawCode) ? rawCode! : 'internal_error',
-      message: json['message'] as String? ??
+      message:
+          json['message'] as String? ??
           'We could not complete that request. Try again.',
       traceId: json['traceId'] as String? ?? '',
     );
@@ -71,12 +72,12 @@ class CalTrackerApiClient {
     RequestIdGenerator? requestIdGenerator,
     ClientTelemetryService? telemetryService,
     Duration requestTimeout = const Duration(seconds: 20),
-  })  : _httpClient = httpClient ?? http.Client(),
-        _localeTagProvider = localeTagProvider,
-        _metadataProvider = metadataProvider,
-        _requestIdGenerator = requestIdGenerator ?? RequestIdGenerator(),
-        _telemetryService = telemetryService,
-        _requestTimeout = requestTimeout;
+  }) : _httpClient = httpClient ?? http.Client(),
+       _localeTagProvider = localeTagProvider,
+       _metadataProvider = metadataProvider,
+       _requestIdGenerator = requestIdGenerator ?? RequestIdGenerator(),
+       _telemetryService = telemetryService,
+       _requestTimeout = requestTimeout;
 
   final ApiConfig config;
   final TokenStorage tokenStorage;
@@ -100,72 +101,56 @@ class CalTrackerApiClient {
     required String password,
     required String displayName,
   }) {
-    return _post(
-        '/v1/auth/register',
-        {
-          'email': email,
-          'password': password,
-          'displayName': displayName,
-        },
-        authenticated: false);
+    return _post('/v1/auth/register', {
+      'email': email,
+      'password': password,
+      'displayName': displayName,
+    }, authenticated: false);
   }
 
   Future<Map<String, Object?>> confirmEmail({required String token}) {
-    return _post(
-        '/v1/auth/email/confirm',
-        {
-          'token': token,
-        },
-        authenticated: false);
+    return _post('/v1/auth/email/confirm', {
+      'token': token,
+    }, authenticated: false);
   }
 
   Future<Map<String, Object?>> requestPasswordReset({required String email}) {
-    return _post(
-        '/v1/auth/password-reset/request',
-        {'email': email},
-        authenticated: false);
+    return _post('/v1/auth/password-reset/request', {
+      'email': email,
+    }, authenticated: false);
   }
 
   Future<Map<String, Object?>> confirmPasswordReset({
     required String token,
     required String newPassword,
   }) {
-    return _post(
-        '/v1/auth/password-reset/confirm',
-        {'token': token, 'newPassword': newPassword},
-        authenticated: false);
+    return _post('/v1/auth/password-reset/confirm', {
+      'token': token,
+      'newPassword': newPassword,
+    }, authenticated: false);
   }
 
   Future<Map<String, Object?>> login({
     required String email,
     required String password,
   }) {
-    return _post(
-        '/v1/auth/login',
-        {
-          'email': email,
-          'password': password,
-        },
-        authenticated: false);
+    return _post('/v1/auth/login', {
+      'email': email,
+      'password': password,
+    }, authenticated: false);
   }
 
   Future<Map<String, Object?>> loginWithGoogle({required String idToken}) {
-    return _post(
-        '/v1/auth/google/login',
-        {
-          'idToken': idToken,
-        },
-        authenticated: false);
+    return _post('/v1/auth/google/login', {
+      'idToken': idToken,
+    }, authenticated: false);
   }
 
   Future<Map<String, Object?>> refresh(String refreshToken) async {
     try {
-      return await _post(
-          '/v1/auth/refresh',
-          {
-            'refreshToken': refreshToken,
-          },
-          authenticated: false);
+      return await _post('/v1/auth/refresh', {
+        'refreshToken': refreshToken,
+      }, authenticated: false);
     } on ApiException catch (error) {
       if (error.statusCode == 401) {
         await tokenStorage.clear();
@@ -175,12 +160,9 @@ class CalTrackerApiClient {
   }
 
   Future<Map<String, Object?>> logout({required String refreshToken}) {
-    return _post(
-        '/v1/auth/logout',
-        {
-          'refreshToken': refreshToken,
-        },
-        authenticated: false);
+    return _post('/v1/auth/logout', {
+      'refreshToken': refreshToken,
+    }, authenticated: false);
   }
 
   Future<Map<String, Object?>> getMe() => _get('/v1/auth/me');
@@ -260,6 +242,21 @@ class CalTrackerApiClient {
 
   Future<Map<String, Object?>> getAgentConversation(String conversationId) {
     return _get('/v1/agent/conversations/$conversationId');
+  }
+
+  Future<Map<String, Object?>> commitAgentChatProposal({
+    required String conversationId,
+    required String proposalId,
+    required String sourceToolCallId,
+    required String clientMutationId,
+  }) {
+    return _post(
+      '/v1/agent/conversations/$conversationId/meal-proposals/$proposalId/commit',
+      {
+        'sourceToolCallId': sourceToolCallId,
+        'clientMutationId': clientMutationId,
+      },
+    );
   }
 
   Future<Map<String, Object?>> deleteAgentConversation(String conversationId) {
@@ -567,7 +564,8 @@ class CalTrackerApiClient {
 
     final pending = StringBuffer();
     var terminalEventReceived = false;
-    final traceId = response.headers['x-request-id'] ??
+    final traceId =
+        response.headers['x-request-id'] ??
         response.headers['X-Request-Id'] ??
         _lastRequestId;
     try {
@@ -882,7 +880,8 @@ class CalTrackerApiClient {
     final body = await _decodeBody(response.body);
     if (response.statusCode >= 200 && response.statusCode < 300) return body;
     final error = body['error'] as Map<String, Object?>?;
-    final traceId = (error?['traceId'] as String?) ??
+    final traceId =
+        (error?['traceId'] as String?) ??
         (response.headers['x-request-id'] ?? response.headers['X-Request-Id']);
     _recordApiFailure(
       route: route,

@@ -2,6 +2,7 @@ import {
   adminLoginRequestSchema,
   agentChatRequestSchema,
   agentRunRequestSchema,
+  commitAgentChatProposalRequestSchema,
   calorieEstimateRequestSchema,
   dailyHydrationUpdateSchema,
   emailConfirmationRequestSchema,
@@ -792,6 +793,49 @@ export function createApp(input: {
       costLeaseForStream(c, costOperationStates),
     );
   });
+
+  app.post(
+    "/v1/agent/conversations/:conversationId/meal-proposals/:proposalId/commit",
+    async (c) => {
+      const user = c.get("authUser");
+      const body = commitAgentChatProposalRequestSchema.parse(
+        await c.req.json(),
+      );
+      try {
+        const committed = await agentChatService.commitProposalDirect({
+          context: buildActionContext(c, user, "flutter"),
+          conversationId: c.req.param("conversationId"),
+          proposalId: c.req.param("proposalId"),
+          sourceToolCallId: body.sourceToolCallId,
+          clientMutationId: body.clientMutationId,
+        });
+        return c.json({
+          actionId: committed.actionId,
+          clientMutationId: committed.clientMutationId,
+          reused: committed.reused,
+          result: {
+            kind: "meal_committed",
+            sourceProposalId: c.req.param("proposalId"),
+            meal: committed.meal,
+            message: "Meal logged.",
+          },
+          conversationMessage: committed.conversationMessage,
+        });
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          [
+            "agent_conversation_not_found",
+            "proposal_not_found",
+            "agent_proposal_source_not_found",
+          ].includes(error.message)
+        ) {
+          throw new HTTPException(404);
+        }
+        throw error;
+      }
+    },
+  );
 
   app.get("/v1/agent/conversations", async (c) => {
     const user = c.get("authUser");

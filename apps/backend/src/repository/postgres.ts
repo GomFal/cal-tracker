@@ -30,6 +30,7 @@ import type {
   AgentToolCallTelemetryFilter,
   AgentToolCallTelemetryRecord,
   AgentToolExecutionRecord,
+  AgentChatProposalCommit,
   AgentTurnTelemetryFilter,
   AgentTurnTelemetryRecord,
   AgentCandidateRegistryRecord,
@@ -2291,6 +2292,189 @@ export class PostgresRepository implements AppRepository {
         execution.tool_call_index, execution.created_at
     `);
     return rows.map(mapAgentToolExecution);
+  }
+
+  async commitAgentChatProposal(
+    userId: string,
+    input: {
+      conversationId: string;
+      proposalId: string;
+      sourceToolCallId: string;
+      clientMutationId: string;
+      traceId: string;
+    },
+  ): Promise<AgentChatProposalCommit> {
+    return this.db.transaction(async (tx) => {
+      const [conversationRow] = await executeRows(
+        tx,
+        dbSql`
+          SELECT id
+          FROM agent_conversations
+          WHERE id = ${input.conversationId}
+            AND user_id = ${userId}
+            AND hidden_from_user_at IS NULL
+          FOR UPDATE
+        `,
+      );
+      if (!conversationRow) throw new Error("agent_conversation_not_found");
+
+      const existing = await this.findDirectChatCommit(tx, userId, input);
+      if (existing) return { ...existing, reused: true };
+
+      const [proposalRow] = await executeRows(
+        tx,
+        dbSql`
+          SELECT * FROM meal_proposals
+          WHERE id = ${input.proposalId} AND user_id = ${userId}
+          FOR UPDATE
+        `,
+      );
+      if (!proposalRow) throw new Error("proposal_not_found");
+
+      // A different mutation key may have won while this request was waiting
+      // for the proposal lock. Replay its single persisted result.
+      const committedWhileWaiting = await this.findDirectChatCommit(
+        tx,
+        userId,
+        input,
+      );
+      if (committedWhileWaiting)
+        return { ...committedWhileWaiting, reused: true };
+
+      const proposal = await this.mapProposal(proposalRow, "Meal", tx);
+      const [existingMealRow] = await executeRows(
+        tx,
+        dbSql`
+          SELECT * FROM meals
+          WHERE user_id = ${userId} AND proposal_id = ${input.proposalId}
+            AND deleted_at IS NULL
+          LIMIT 1
+        `,
+      );
+      let meal = existingMealRow
+        ? await this.mapMeal(existingMealRow, tx)
+        : undefined;
+      if (!meal) {
+        const id = newId();
+        const nutrition = sumNutrition(proposal.items);
+        const [mealRow] = await executeRows(
+          tx,
+          dbSql`
+            INSERT INTO meals (
+              id, user_id, proposal_id, title, occurred_at, meal_type,
+              meal_type_label, calories, protein_grams, carbs_grams, fat_grams
+            ) VALUES (
+              ${id}, ${userId}, ${proposal.id}, ${proposal.title}, ${new Date().toISOString()},
+              null, null, ${nutrition.calories}, ${nutrition.proteinGrams},
+              ${nutrition.carbsGrams}, ${nutrition.fatGrams}
+            )
+            RETURNING *
+          `,
+        );
+        for (const item of proposal.items) await insertMealItem(tx, id, item);
+        meal = await this.mapMeal(mealRow, tx);
+      }
+      await executeRows(
+        tx,
+        dbSql`UPDATE meal_proposals SET status = 'committed' WHERE id = ${proposal.id}`,
+      );
+
+      const result = {
+        kind: "meal_committed",
+        sourceProposalId: proposal.id,
+        meal,
+        message: "Meal logged.",
+      };
+      const content = JSON.stringify({ actionId: "commit_meal", result });
+      const [messageRow] = await executeRows(
+        tx,
+        dbSql`
+          INSERT INTO agent_messages (
+            id, conversation_id, user_id, role, content, tool_call_id,
+            trace_id, source, active_proposal_id, metadata_json
+          ) VALUES (
+            ${newId()}, ${input.conversationId}, ${userId}, 'tool', ${content},
+            ${input.sourceToolCallId}, ${input.traceId}, 'client_direct_action',
+            ${proposal.id}, ${jsonb({
+              actionId: "commit_meal",
+              resultKind: "meal_committed",
+              sourceProposalId: proposal.id,
+              sourceToolCallId: input.sourceToolCallId,
+              clientMutationId: input.clientMutationId,
+              source: "client_direct_action",
+            })}
+          )
+          RETURNING *
+        `,
+      );
+      await executeRows(
+        tx,
+        dbSql`
+          UPDATE agent_conversations SET updated_at = now()
+          WHERE id = ${input.conversationId} AND user_id = ${userId}
+            AND hidden_from_user_at IS NULL
+        `,
+      );
+      const [actionRow] = await executeRows(
+        tx,
+        dbSql`
+          INSERT INTO agent_direct_actions (
+            user_id, action_id, conversation_id, proposal_id, source_tool_call_id,
+            client_mutation_id, meal_id, message_id
+          ) VALUES (
+            ${userId}, 'commit_meal', ${input.conversationId}, ${proposal.id},
+            ${input.sourceToolCallId}, ${input.clientMutationId}, ${meal.id}, ${messageRow.id as string}
+          )
+          RETURNING id
+        `,
+      );
+      if (!actionRow) throw new Error("direct_action_not_persisted");
+      return {
+        actionId: "commit_meal",
+        clientMutationId: input.clientMutationId,
+        reused: false,
+        meal,
+        conversationMessage: mapAgentConversationMessage(messageRow),
+      };
+    });
+  }
+
+  private async findDirectChatCommit(
+    tx: DbExecutor,
+    userId: string,
+    input: {
+      proposalId: string;
+      clientMutationId: string;
+    },
+  ): Promise<Omit<AgentChatProposalCommit, "reused"> | undefined> {
+    const [action] = await executeRows(
+      tx,
+      dbSql`
+        SELECT * FROM agent_direct_actions
+        WHERE user_id = ${userId} AND action_id = 'commit_meal'
+          AND (client_mutation_id = ${input.clientMutationId}
+            OR proposal_id = ${input.proposalId})
+        ORDER BY created_at
+        LIMIT 1
+      `,
+    );
+    if (!action) return undefined;
+    const [mealRow] = await executeRows(
+      tx,
+      dbSql`SELECT * FROM meals WHERE id = ${action.meal_id as string} AND user_id = ${userId}`,
+    );
+    const [messageRow] = await executeRows(
+      tx,
+      dbSql`SELECT * FROM agent_messages WHERE id = ${action.message_id as string} AND user_id = ${userId}`,
+    );
+    if (!mealRow || !messageRow)
+      throw new Error("direct_action_result_missing");
+    return {
+      actionId: "commit_meal",
+      clientMutationId: action.client_mutation_id as string,
+      meal: await this.mapMeal(mealRow, tx),
+      conversationMessage: mapAgentConversationMessage(messageRow),
+    };
   }
 
   async saveAgentCandidateRegistry(

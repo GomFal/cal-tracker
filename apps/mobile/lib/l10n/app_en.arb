@@ -884,5 +884,12 @@
   "aiErrorAuthentication": "Your session expired. Sign in again.",
   "aiErrorRateLimit": "You've reached the current limit. Wait before trying again.",
   "aiErrorProviderUnavailable": "The nutrition assistant is temporarily unavailable. Try again shortly.",
-  "aiErrorInternal": "Something went wrong on our side. Try again."
+  "aiErrorInternal": "Something went wrong on our side. Try again.",
+  "agentChatProposalSave": "Save",
+  "agentChatProposalCorrect": "Correct",
+  "agentChatProposalSaving": "Saving meal…",
+  "agentChatProposalSaved": "Meal saved.",
+  "agentChatProposalRetry": "Retry save",
+  "agentChatProposalSaveError": "Could not save this meal. Try again.",
+  "agentChatProposalCorrectionHint": "Tell us what to change in this meal proposal"
 }

@@ -93,6 +93,21 @@ class AgentChatCacheStore {
     });
   }
 
+  Future<void> upsertConversationMessage(
+    AgentConversationSummary conversation,
+    AgentConversationMessage message,
+  ) async {
+    final cached = await readConversationDetail(conversation.id);
+    if (cached == null) return;
+    if (cached.messages.any((item) => item.id == message.id)) return;
+    await writeConversationDetail(
+      AgentConversationDetail(
+        conversation: conversation,
+        messages: [...cached.messages, message],
+      ),
+    );
+  }
+
   Future<void> writeConversationDetail(AgentConversationDetail detail) async {
     final context = _context();
     if (context == null) return;

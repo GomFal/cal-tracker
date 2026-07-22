@@ -1855,4 +1855,27 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aiErrorInternal => 'Something went wrong on our side. Try again.';
+
+  @override
+  String get agentChatProposalSave => 'Save';
+
+  @override
+  String get agentChatProposalCorrect => 'Correct';
+
+  @override
+  String get agentChatProposalSaving => 'Saving meal…';
+
+  @override
+  String get agentChatProposalSaved => 'Meal saved.';
+
+  @override
+  String get agentChatProposalRetry => 'Retry save';
+
+  @override
+  String get agentChatProposalSaveError =>
+      'Could not save this meal. Try again.';
+
+  @override
+  String get agentChatProposalCorrectionHint =>
+      'Tell us what to change in this meal proposal';
 }

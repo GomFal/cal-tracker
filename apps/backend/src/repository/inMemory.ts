@@ -25,6 +25,7 @@ import type {
   AgentToolCallTelemetryFilter,
   AgentToolCallTelemetryRecord,
   AgentToolExecutionRecord,
+  AgentChatProposalCommit,
   AgentTurnTelemetryFilter,
   AgentTurnTelemetryRecord,
   AgentCandidateRegistryRecord,
@@ -130,6 +131,11 @@ export class InMemoryRepository implements AppRepository {
     AgentConversationMessageRecord[]
   >();
   private agentToolExecutions = new Map<string, AgentToolExecutionRecord>();
+  private agentDirectCommits = new Map<string, AgentChatProposalCommit>();
+  private agentDirectCommitRequests = new Map<
+    string,
+    Promise<AgentChatProposalCommit>
+  >();
   private agentCandidateRegistries = new Map<
     string,
     AgentCandidateRegistryRecord
@@ -1189,6 +1195,112 @@ export class InMemoryRepository implements AppRepository {
       );
   }
 
+  async commitAgentChatProposal(
+    userId: string,
+    input: {
+      conversationId: string;
+      proposalId: string;
+      sourceToolCallId: string;
+      clientMutationId: string;
+      traceId: string;
+    },
+  ): Promise<AgentChatProposalCommit> {
+    const mutationKey = `${userId}:commit_meal:${input.clientMutationId}`;
+    const proposalKey = `${userId}:proposal:${input.proposalId}`;
+    const existing =
+      this.agentDirectCommits.get(mutationKey) ??
+      this.agentDirectCommits.get(proposalKey);
+    if (existing) return { ...existing, reused: true };
+
+    const inFlight =
+      this.agentDirectCommitRequests.get(mutationKey) ??
+      this.agentDirectCommitRequests.get(proposalKey);
+    if (inFlight) return { ...(await inFlight), reused: true };
+
+    const commit = this.commitAgentChatProposalOnce(userId, input);
+    this.agentDirectCommitRequests.set(mutationKey, commit);
+    this.agentDirectCommitRequests.set(proposalKey, commit);
+    try {
+      return await commit;
+    } finally {
+      if (this.agentDirectCommitRequests.get(mutationKey) === commit) {
+        this.agentDirectCommitRequests.delete(mutationKey);
+      }
+      if (this.agentDirectCommitRequests.get(proposalKey) === commit) {
+        this.agentDirectCommitRequests.delete(proposalKey);
+      }
+    }
+  }
+
+  private async commitAgentChatProposalOnce(
+    userId: string,
+    input: {
+      conversationId: string;
+      proposalId: string;
+      sourceToolCallId: string;
+      clientMutationId: string;
+      traceId: string;
+    },
+  ): Promise<AgentChatProposalCommit> {
+    const byMutation = this.agentDirectCommits.get(
+      `${userId}:commit_meal:${input.clientMutationId}`,
+    );
+    const byProposal = this.agentDirectCommits.get(
+      `${userId}:proposal:${input.proposalId}`,
+    );
+    const existing = byMutation ?? byProposal;
+    if (existing) return { ...existing, reused: true };
+    const proposal = await this.getProposal(userId, input.proposalId);
+    if (!proposal) throw new Error("proposal_not_found");
+    const meal = await this.createMealFromProposal(
+      userId,
+      proposal,
+      new Date().toISOString(),
+    );
+    const result = {
+      kind: "meal_committed",
+      sourceProposalId: proposal.id,
+      meal,
+      message: "Meal logged.",
+    };
+    const conversationMessage = await this.addAgentConversationMessage(
+      userId,
+      input.conversationId,
+      {
+        role: "tool",
+        content: JSON.stringify({ actionId: "commit_meal", result }),
+        toolCallId: input.sourceToolCallId,
+        traceId: input.traceId,
+        source: "client_direct_action",
+        activeProposalId: proposal.id,
+        metadata: {
+          actionId: "commit_meal",
+          resultKind: "meal_committed",
+          sourceProposalId: proposal.id,
+          sourceToolCallId: input.sourceToolCallId,
+          clientMutationId: input.clientMutationId,
+          source: "client_direct_action",
+        },
+      },
+    );
+    const committed: AgentChatProposalCommit = {
+      actionId: "commit_meal",
+      clientMutationId: input.clientMutationId,
+      reused: false,
+      meal,
+      conversationMessage,
+    };
+    this.agentDirectCommits.set(
+      `${userId}:commit_meal:${input.clientMutationId}`,
+      committed,
+    );
+    this.agentDirectCommits.set(
+      `${userId}:proposal:${input.proposalId}`,
+      committed,
+    );
+    return committed;
+  }
+
   async saveAgentCandidateRegistry(
     input: Omit<AgentCandidateRegistryRecord, "id" | "createdAt">,
   ): Promise<AgentCandidateRegistryRecord> {
@@ -1344,6 +1456,11 @@ export class InMemoryRepository implements AppRepository {
       for (const [key, execution] of this.agentToolExecutions) {
         if (execution.conversationId === request.conversationId) {
           this.agentToolExecutions.delete(key);
+        }
+      }
+      for (const [key, commit] of this.agentDirectCommits) {
+        if (commit.conversationMessage.conversationId === request.conversationId) {
+          this.agentDirectCommits.delete(key);
         }
       }
       for (const [key, registry] of this.agentCandidateRegistries) {

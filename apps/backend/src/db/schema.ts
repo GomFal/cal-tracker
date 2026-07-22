@@ -1447,6 +1447,51 @@ export const agentToolExecutions = pgTable(
   ],
 );
 
+export const agentDirectActions = pgTable(
+  "agent_direct_actions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    actionId: text("action_id").notNull(),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => agentConversations.id, { onDelete: "cascade" }),
+    proposalId: uuid("proposal_id")
+      .notNull()
+      .references(() => mealProposals.id, { onDelete: "cascade" }),
+    sourceToolCallId: text("source_tool_call_id").notNull(),
+    clientMutationId: uuid("client_mutation_id").notNull(),
+    mealId: uuid("meal_id")
+      .notNull()
+      .references(() => meals.id, { onDelete: "restrict" }),
+    messageId: uuid("message_id")
+      .notNull()
+      .references(() => agentMessages.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("agent_direct_actions_user_mutation_unique").on(
+      table.userId,
+      table.actionId,
+      table.clientMutationId,
+    ),
+    uniqueIndex("agent_direct_actions_user_proposal_unique").on(
+      table.userId,
+      table.proposalId,
+    ),
+    index("agent_direct_actions_conversation_idx").on(
+      table.userId,
+      table.conversationId,
+      table.createdAt,
+    ),
+  ],
+);
+
+
 export const agentCandidateRegistries = pgTable(
   "agent_candidate_registries",
   {

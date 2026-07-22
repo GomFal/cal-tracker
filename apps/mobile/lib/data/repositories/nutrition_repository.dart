@@ -30,6 +30,7 @@ class AgentRunResult {
     this.candidateGroups,
     this.usualFoodDraft,
     this.usualMealDraft,
+    this.sourceProposalId,
   });
 
   final String kind;
@@ -51,6 +52,7 @@ class AgentRunResult {
   final List<FoodCandidateGroup>? candidateGroups;
   final UsualFoodDraft? usualFoodDraft;
   final UsualMealDraft? usualMealDraft;
+  final String? sourceProposalId;
 }
 
 class VoiceMealRunResult {
@@ -421,6 +423,22 @@ class FoodSearchResult {
   final List<FoodCandidateGroup>? candidateGroups;
 }
 
+class AgentChatProposalCommitResult {
+  const AgentChatProposalCommitResult({
+    required this.clientMutationId,
+    required this.reused,
+    required this.sourceProposalId,
+    required this.meal,
+    required this.conversationMessage,
+  });
+
+  final String clientMutationId;
+  final bool reused;
+  final String sourceProposalId;
+  final Meal meal;
+  final AgentConversationMessage conversationMessage;
+}
+
 class NutritionRepository {
   NutritionRepository({
     required CalTrackerApiClient apiClient,
@@ -444,6 +462,8 @@ class NutritionRepository {
   final DateTime Function() _now;
   final Map<String, Future<DailySummary>> _dailySummaryRefreshes = {};
   final Map<String, DateTime> _dailySummaryRefreshStartedAt = {};
+  final Map<String, Future<AgentChatProposalCommitResult>>
+  _agentProposalCommits = {};
   Future<List<MealTemplate>>? _templatesRefresh;
   Future<List<UsualFood>>? _usualFoodsRefresh;
   DateTime? _templatesRefreshStartedAt;
@@ -705,6 +725,68 @@ class NutritionRepository {
     final json = await _apiClient.getAgentConversation(conversationId);
     _healthMonitor.recordSuccess();
     return _parseAgentConversationDetail(json, conversationId: conversationId);
+  }
+
+  Future<AgentChatProposalCommitResult> commitAgentChatProposal({
+    required String conversationId,
+    required String proposalId,
+    required String sourceToolCallId,
+    required String clientMutationId,
+  }) {
+    final existing = _agentProposalCommits[proposalId];
+    if (existing != null) return existing;
+    final request = _commitAgentChatProposal(
+      conversationId: conversationId,
+      proposalId: proposalId,
+      sourceToolCallId: sourceToolCallId,
+      clientMutationId: clientMutationId,
+    );
+    late final Future<AgentChatProposalCommitResult> future;
+    void removeIfCurrent() {
+      if (identical(_agentProposalCommits[proposalId], future)) {
+        _agentProposalCommits.remove(proposalId);
+      }
+    }
+
+    future = request.then<AgentChatProposalCommitResult>(
+      (result) {
+        removeIfCurrent();
+        return result;
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        removeIfCurrent();
+        return Future<AgentChatProposalCommitResult>.error(error, stackTrace);
+      },
+    );
+    _agentProposalCommits[proposalId] = future;
+    return future;
+  }
+
+  Future<AgentChatProposalCommitResult> _commitAgentChatProposal({
+    required String conversationId,
+    required String proposalId,
+    required String sourceToolCallId,
+    required String clientMutationId,
+  }) async {
+    final json = await _apiClient.commitAgentChatProposal(
+      conversationId: conversationId,
+      proposalId: proposalId,
+      sourceToolCallId: sourceToolCallId,
+      clientMutationId: clientMutationId,
+    );
+    _healthMonitor.recordSuccess();
+    final result = json['result'] as Map<String, Object?>;
+    final meal = Meal.fromJson(result['meal'] as Map<String, Object?>);
+    await _mergeMealIntoCachedSummary(meal);
+    return AgentChatProposalCommitResult(
+      clientMutationId: json['clientMutationId'] as String? ?? clientMutationId,
+      reused: json['reused'] as bool? ?? false,
+      sourceProposalId: result['sourceProposalId'] as String? ?? proposalId,
+      meal: meal,
+      conversationMessage: AgentConversationMessage.fromJson(
+        json['conversationMessage'] as Map<String, Object?>,
+      ),
+    );
   }
 
   Future<void> deleteAgentConversation(String conversationId) async {
@@ -1426,6 +1508,7 @@ AgentRunResult agentRunResultFromJson(Map<String, Object?> json) {
         : _parseNestedUsualFoodDraft(
             json['usualFoodDraft'] as Map<String, Object?>,
           ),
+    sourceProposalId: json['sourceProposalId'] as String?,
     usualMealDraft: json['usualMealDraft'] == null
         ? null
         : UsualMealDraft.fromJson(

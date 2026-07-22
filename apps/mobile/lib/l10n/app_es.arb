@@ -578,5 +578,12 @@
   "aiErrorAuthentication": "Tu sesión ha caducado. Inicia sesión de nuevo.",
   "aiErrorRateLimit": "Has alcanzado el límite actual. Espera antes de volver a intentarlo.",
   "aiErrorProviderUnavailable": "El asistente de nutrición no está disponible temporalmente. Inténtalo de nuevo en breve.",
-  "aiErrorInternal": "Algo ha fallado por nuestra parte. Inténtalo de nuevo."
+  "aiErrorInternal": "Algo ha fallado por nuestra parte. Inténtalo de nuevo.",
+  "agentChatProposalSave": "Guardar",
+  "agentChatProposalCorrect": "Corregir",
+  "agentChatProposalSaving": "Guardando comida…",
+  "agentChatProposalSaved": "Comida guardada.",
+  "agentChatProposalRetry": "Reintentar guardado",
+  "agentChatProposalSaveError": "No se pudo guardar esta comida. Inténtalo de nuevo.",
+  "agentChatProposalCorrectionHint": "Indica qué quieres cambiar en esta propuesta de comida"
 }

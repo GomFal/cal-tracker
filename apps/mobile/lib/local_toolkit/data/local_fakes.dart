@@ -189,6 +189,31 @@ class LocalNutritionRepository extends NutritionRepository {
   }
 
   @override
+  Future<AgentChatProposalCommitResult> commitAgentChatProposal({
+    required String conversationId,
+    required String proposalId,
+    required String sourceToolCallId,
+    required String clientMutationId,
+  }) async {
+    final meal = store.commitProposal(proposalId);
+    return AgentChatProposalCommitResult(
+      clientMutationId: clientMutationId,
+      reused: false,
+      sourceProposalId: proposalId,
+      meal: meal,
+      conversationMessage: AgentConversationMessage(
+        id: 'local-direct-$proposalId',
+        conversationId: conversationId,
+        role: 'tool',
+        content: '{"actionId":"commit_meal"}',
+        toolCallId: sourceToolCallId,
+        source: 'client_direct_action',
+        createdAt: DateTime.now().toUtc(),
+      ),
+    );
+  }
+
+  @override
   Future<Meal> correctMealItems(String mealId, List<MealItem> items) async {
     return store.correctMealItems(mealId, items);
   }

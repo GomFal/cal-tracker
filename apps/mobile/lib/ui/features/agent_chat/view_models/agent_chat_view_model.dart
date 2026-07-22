@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 
@@ -13,6 +14,26 @@ import '../../../core/user_visible_error.dart';
 enum AgentChatToolStatus { running, completed, failed, interrupted }
 
 enum AgentChatEntryKind { user, assistant, tool }
+
+enum AgentChatProposalActionState { idle, saving, succeeded, failed }
+
+enum AgentChatProposalActionType { commit, correct }
+
+class AgentChatProposalAction {
+  const AgentChatProposalAction({
+    required this.type,
+    required this.conversationId,
+    required this.entryId,
+    required this.sourceToolCallId,
+    required this.proposalId,
+  });
+
+  final AgentChatProposalActionType type;
+  final String conversationId;
+  final String entryId;
+  final String sourceToolCallId;
+  final String proposalId;
+}
 
 class AgentChatEntry {
   const AgentChatEntry({
@@ -89,6 +110,10 @@ class AgentChatViewModel extends ChangeNotifier {
 
   final List<AgentChatEntry> _entries = [];
   final Set<String> _deletedConversationIds = {};
+  final Map<String, AgentChatProposalActionState> _proposalActionStates = {};
+  final Map<String, String> _proposalMutationIds = {};
+  final Set<String> _committedProposalIds = {};
+  String? _correctionProposalId;
   List<AgentChatEntry> get entries => List.unmodifiable(_entries);
 
   String? conversationId;
@@ -112,11 +137,28 @@ class AgentChatViewModel extends ChangeNotifier {
   static const _typingCharsPerTick = 4;
   static const inactivityTimeout = Duration(minutes: 2);
 
-  bool get isBusy => isSending || isStoppingRecording;
+  bool get isBusy =>
+      isSending ||
+      isStoppingRecording ||
+      _proposalActionStates.values.contains(
+        AgentChatProposalActionState.saving,
+      );
+
+  AgentChatProposalActionState proposalActionState(String proposalId) =>
+      _proposalActionStates[proposalId] ?? AgentChatProposalActionState.idle;
+
+  bool isProposalCommitted(String proposalId) =>
+      _committedProposalIds.contains(proposalId);
+
+  bool get isCorrectingProposal => _correctionProposalId != null;
   List<AgentConversationSummary> get conversations =>
       List.unmodifiable(_conversations);
 
   String? get activeProposalId {
+    final correction = _correctionProposalId;
+    if (correction != null && !_committedProposalIds.contains(correction)) {
+      return correction;
+    }
     for (final entry in _entries.reversed) {
       final result = entry.result;
       if (result == null) continue;
@@ -126,7 +168,7 @@ class AgentChatViewModel extends ChangeNotifier {
         return null;
       }
       final proposal = result.proposal;
-      if (proposal != null) {
+      if (proposal != null && !_committedProposalIds.contains(proposal.id)) {
         return proposal.id;
       }
     }
@@ -160,6 +202,10 @@ class AgentChatViewModel extends ChangeNotifier {
     statusMessage = null;
     _activeAssistantEntryId = null;
     _entryCounter = 0;
+    _proposalActionStates.clear();
+    _proposalMutationIds.clear();
+    _committedProposalIds.clear();
+    _correctionProposalId = null;
     notifyListeners();
     if (shouldCancelRecording) {
       unawaited(_cancelRecordingForLogout());
@@ -316,6 +362,111 @@ class AgentChatViewModel extends ChangeNotifier {
         activeProposalId: activeProposalId,
       ),
     );
+  }
+
+  void beginProposalCorrection(AgentChatProposalAction action) {
+    if (action.type != AgentChatProposalActionType.correct ||
+        isBusy ||
+        _committedProposalIds.contains(action.proposalId)) {
+      return;
+    }
+    _correctionProposalId = action.proposalId;
+    errorMessage = null;
+    errorCode = null;
+    statusMessage = null;
+    notifyListeners();
+  }
+
+  void cancelProposalCorrection() {
+    if (_correctionProposalId == null) return;
+    _correctionProposalId = null;
+    notifyListeners();
+  }
+
+  Future<void> commitProposalAction(AgentChatProposalAction action) async {
+    if (action.type != AgentChatProposalActionType.commit ||
+        proposalActionState(action.proposalId) ==
+            AgentChatProposalActionState.saving ||
+        _committedProposalIds.contains(action.proposalId)) {
+      return;
+    }
+    _proposalActionStates[action.proposalId] =
+        AgentChatProposalActionState.saving;
+    errorMessage = null;
+    errorCode = null;
+    notifyListeners();
+    final clientMutationId = _proposalMutationIds.putIfAbsent(
+      action.proposalId,
+      _newClientMutationId,
+    );
+    try {
+      final committed = await _nutritionRepository.commitAgentChatProposal(
+        conversationId: action.conversationId,
+        proposalId: action.proposalId,
+        sourceToolCallId: action.sourceToolCallId,
+        clientMutationId: clientMutationId,
+      );
+      _committedProposalIds.add(committed.sourceProposalId);
+      _proposalActionStates[action.proposalId] =
+          AgentChatProposalActionState.succeeded;
+      _correctionProposalId = null;
+      final result = AgentRunResult(
+        kind: 'meal_committed',
+        message: 'Meal logged.',
+        meal: committed.meal,
+        sourceProposalId: committed.sourceProposalId,
+      );
+      if (!_entries.any(
+        (entry) => entry.id == committed.conversationMessage.id,
+      )) {
+        _entries.add(
+          AgentChatEntry(
+            id: committed.conversationMessage.id,
+            kind: AgentChatEntryKind.tool,
+            toolCall: AgentToolCallFeedback(
+              id:
+                  committed.conversationMessage.toolCallId ??
+                  committed.conversationMessage.id,
+              actionId: 'commit_meal',
+              label: 'Commit meal',
+              summary: committed.conversationMessage.content,
+            ),
+            toolStatus: AgentChatToolStatus.completed,
+            result: result,
+          ),
+        );
+      }
+      AgentConversationSummary? conversation;
+      for (final item in _conversations) {
+        if (item.id == action.conversationId) {
+          conversation = item;
+          break;
+        }
+      }
+      if (conversation != null) {
+        await _cacheStore?.upsertConversationMessage(
+          conversation,
+          committed.conversationMessage,
+        );
+      }
+      await _saveActiveSession(unfinished: false);
+    } catch (error) {
+      _proposalActionStates[action.proposalId] =
+          AgentChatProposalActionState.failed;
+      _captureError(error, context: UserErrorContext.voiceCommit);
+    } finally {
+      notifyListeners();
+    }
+  }
+
+  String _newClientMutationId() {
+    final random = Random.secure();
+    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    String hex(int value) => value.toRadixString(16).padLeft(2, '0');
+    final value = bytes.map(hex).join();
+    return '${value.substring(0, 8)}-${value.substring(8, 12)}-${value.substring(12, 16)}-${value.substring(16, 20)}-${value.substring(20)}';
   }
 
   void dismissSuggestions(String entryId) {
@@ -705,6 +856,10 @@ class AgentChatViewModel extends ChangeNotifier {
     _typingTimer = null;
     _typingCompleter = null;
     _entryCounter = 0;
+    _proposalActionStates.clear();
+    _proposalMutationIds.clear();
+    _committedProposalIds.clear();
+    _correctionProposalId = null;
   }
 
   void _replaceConversations(List<AgentConversationSummary> conversations) {
@@ -721,6 +876,24 @@ class AgentChatViewModel extends ChangeNotifier {
         _entriesFromStoredMessages(detail.messages, detail.toolExecutions),
       );
     _entryCounter = _entries.length;
+    _committedProposalIds
+      ..clear()
+      ..addAll(
+        _entries
+            .map((entry) => entry.result?.sourceProposalId)
+            .whereType<String>(),
+      );
+    _proposalActionStates
+      ..clear()
+      ..addEntries(
+        _committedProposalIds.map(
+          (proposalId) => MapEntry(
+            proposalId,
+            AgentChatProposalActionState.succeeded,
+          ),
+        ),
+      );
+    _correctionProposalId = null;
     errorMessage = null;
     errorCode = null;
     statusMessage = null;

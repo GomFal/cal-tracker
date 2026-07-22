@@ -709,6 +709,14 @@ export type AgentToolExecutionRecord = {
   updatedAt: string;
 };
 
+export type AgentChatProposalCommit = {
+  actionId: "commit_meal";
+  clientMutationId: string;
+  reused: boolean;
+  meal: Meal;
+  conversationMessage: AgentConversationMessageRecord;
+};
+
 export type AgentCandidateRegistryRecord = {
   id: string;
   userId: string;
@@ -895,6 +903,16 @@ export interface AppRepository {
     userId: string,
     conversationId: string,
   ): Promise<AgentToolExecutionRecord[]>;
+  commitAgentChatProposal(
+    userId: string,
+    input: {
+      conversationId: string;
+      proposalId: string;
+      sourceToolCallId: string;
+      clientMutationId: string;
+      traceId: string;
+    },
+  ): Promise<AgentChatProposalCommit>;
   saveAgentCandidateRegistry(
     input: Omit<AgentCandidateRegistryRecord, "id" | "createdAt">,
   ): Promise<AgentCandidateRegistryRecord>;

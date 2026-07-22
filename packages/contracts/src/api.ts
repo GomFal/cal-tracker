@@ -81,6 +81,24 @@ export const agentChatRequestSchema = z
     activeProposalId: uuidSchema.optional(),
   });
 
+export const commitAgentChatProposalRequestSchema = z.object({
+  sourceToolCallId: z.string().trim().min(1).max(200),
+  clientMutationId: uuidSchema,
+});
+
+export const commitAgentChatProposalResponseSchema = z.object({
+  actionId: z.literal("commit_meal"),
+  clientMutationId: uuidSchema,
+  reused: z.boolean(),
+  result: z.object({
+    kind: z.literal("meal_committed"),
+    sourceProposalId: uuidSchema,
+    meal: mealSchema,
+    message: z.string(),
+  }),
+  conversationMessage: z.unknown(),
+});
+
 export const agentConversationSummarySchema = z.object({
   id: uuidSchema,
   userId: uuidSchema.optional(),

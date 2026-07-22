@@ -19,6 +19,7 @@ import {
 import type {
   AgentConversationMessageRecord,
   AgentConversationRecord,
+  AgentChatProposalCommit,
   AgentToolExecutionSnapshot,
   AppRepository,
 } from "../repository/types.js";
@@ -248,6 +249,43 @@ export class AgentChatService {
     private readonly telemetryService: TelemetryService = DEFAULT_TELEMETRY_SERVICE,
     private readonly selectionConfidenceThreshold = 0.75,
   ) {}
+
+  async commitProposalDirect(input: {
+    context: ActionContext;
+    conversationId: string;
+    proposalId: string;
+    sourceToolCallId: string;
+    clientMutationId: string;
+  }): Promise<AgentChatProposalCommit> {
+    const conversation = await this.repository.getAgentConversation(
+      input.context.actorUserId,
+      input.conversationId,
+    );
+    if (!conversation) throw new Error("agent_conversation_not_found");
+    const proposal = await this.repository.getProposal(
+      input.context.actorUserId,
+      input.proposalId,
+    );
+    if (!proposal) throw new Error("proposal_not_found");
+    const messages = await this.repository.listAgentConversationMessages(
+      input.context.actorUserId,
+      input.conversationId,
+    );
+    const source = messages.find(
+      (message) =>
+        message.role === "tool" &&
+        message.toolCallId === input.sourceToolCallId &&
+        storedToolMessageReferencesProposal(message, input.proposalId),
+    );
+    if (!source) throw new Error("agent_proposal_source_not_found");
+    return this.repository.commitAgentChatProposal(input.context.actorUserId, {
+      conversationId: input.conversationId,
+      proposalId: input.proposalId,
+      sourceToolCallId: input.sourceToolCallId,
+      clientMutationId: input.clientMutationId,
+      traceId: input.context.traceId,
+    });
+  }
 
   async *chat(input: {
     text: string;
@@ -1190,6 +1228,9 @@ export class AgentChatService {
                     iteration,
                     toolCallIndex: toolCallIndex + 1,
                     resultKind: mapped.kind,
+                    ...("proposal" in mapped && mapped.proposal
+                      ? { proposalId: mapped.proposal.id }
+                      : {}),
                     ...(candidateRegistry
                       ? {
                           candidateRegistryRef: candidateRegistry.searchRef,
@@ -2337,6 +2378,26 @@ function safeToolFailureForModel(error: unknown): string {
       ? rawCode
       : classifyPublicAiError(error, "internal_error");
   return JSON.stringify({ code });
+}
+
+function storedToolMessageReferencesProposal(
+  message: AgentConversationMessageRecord,
+  proposalId: string,
+): boolean {
+  const metadata =
+    message.metadata && typeof message.metadata === "object"
+      ? (message.metadata as Record<string, unknown>)
+      : undefined;
+  const actionId = metadata?.actionId;
+  return (
+    typeof actionId === "string" &&
+    [
+      "propose_meal_log",
+      "create_meal_proposal_from_items",
+      "revise_meal_proposal",
+    ].includes(actionId) &&
+    metadata?.proposalId === proposalId
+  );
 }
 
 function conversationTitleFromInput(input?: string): string {

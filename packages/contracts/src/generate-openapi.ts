@@ -14,6 +14,8 @@ import {
   adminTranscriptionsResponseSchema,
   adminTokenResponseSchema,
   agentChatRequestSchema,
+  commitAgentChatProposalRequestSchema,
+  commitAgentChatProposalResponseSchema,
   agentConversationDetailResponseSchema,
   agentConversationsResponseSchema,
   deleteAgentConversationResponseSchema,
@@ -174,6 +176,8 @@ const spec = {
       UsualMealDraftResponse: schema("UsualMealDraftResponse", usualMealDraftResponseSchema),
       AgentRunRequest: schema("AgentRunRequest", agentRunRequestSchema),
       AgentChatRequest: schema("AgentChatRequest", agentChatRequestSchema),
+      CommitAgentChatProposalRequest: schema("CommitAgentChatProposalRequest", commitAgentChatProposalRequestSchema),
+      CommitAgentChatProposalResponse: schema("CommitAgentChatProposalResponse", commitAgentChatProposalResponseSchema),
       AgentRunResponse: schema("AgentRunResponse", agentRunResponseSchema),
       AgentConversationsResponse: schema("AgentConversationsResponse", agentConversationsResponseSchema),
       AgentConversationDetailResponse: schema("AgentConversationDetailResponse", agentConversationDetailResponseSchema),
@@ -509,6 +513,23 @@ const spec = {
             content: { "text/event-stream": { schema: { type: "string" } } }
           },
           "429": rateLimitResponse
+        }
+      }
+    },
+    "/v1/agent/conversations/{conversationId}/meal-proposals/{proposalId}/commit": {
+      post: {
+        operationId: "commitAgentChatProposal",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "conversationId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          { name: "proposalId", in: "path", required: true, schema: { type: "string", format: "uuid" } }
+        ],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/CommitAgentChatProposalRequest" } } }
+        },
+        responses: {
+          "200": jsonResponse("Direct meal proposal commit", "#/components/schemas/CommitAgentChatProposalResponse")
         }
       }
     },

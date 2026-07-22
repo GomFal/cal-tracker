@@ -3422,6 +3422,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Something went wrong on our side. Try again.'**
   String get aiErrorInternal;
+
+  /// No description provided for @agentChatProposalSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get agentChatProposalSave;
+
+  /// No description provided for @agentChatProposalCorrect.
+  ///
+  /// In en, this message translates to:
+  /// **'Correct'**
+  String get agentChatProposalCorrect;
+
+  /// No description provided for @agentChatProposalSaving.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving meal…'**
+  String get agentChatProposalSaving;
+
+  /// No description provided for @agentChatProposalSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Meal saved.'**
+  String get agentChatProposalSaved;
+
+  /// No description provided for @agentChatProposalRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry save'**
+  String get agentChatProposalRetry;
+
+  /// No description provided for @agentChatProposalSaveError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save this meal. Try again.'**
+  String get agentChatProposalSaveError;
+
+  /// No description provided for @agentChatProposalCorrectionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tell us what to change in this meal proposal'**
+  String get agentChatProposalCorrectionHint;
 }
 
 class _AppLocalizationsDelegate

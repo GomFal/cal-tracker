@@ -1879,4 +1879,27 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get aiErrorInternal =>
       'Algo ha fallado por nuestra parte. Inténtalo de nuevo.';
+
+  @override
+  String get agentChatProposalSave => 'Guardar';
+
+  @override
+  String get agentChatProposalCorrect => 'Corregir';
+
+  @override
+  String get agentChatProposalSaving => 'Guardando comida…';
+
+  @override
+  String get agentChatProposalSaved => 'Comida guardada.';
+
+  @override
+  String get agentChatProposalRetry => 'Reintentar guardado';
+
+  @override
+  String get agentChatProposalSaveError =>
+      'No se pudo guardar esta comida. Inténtalo de nuevo.';
+
+  @override
+  String get agentChatProposalCorrectionHint =>
+      'Indica qué quieres cambiar en esta propuesta de comida';
 }

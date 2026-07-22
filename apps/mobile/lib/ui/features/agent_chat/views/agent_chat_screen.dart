@@ -26,6 +26,7 @@ class AgentChatScreen extends StatefulWidget {
 
 class _AgentChatScreenState extends State<AgentChatScreen> {
   final _messageController = TextEditingController();
+  final _composerFocusNode = FocusNode();
   final _scrollController = ScrollController();
   String _lastScrollSignature = '';
   int _autoScrollGeneration = 0;
@@ -49,6 +50,7 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
   @override
   void dispose() {
     _messageController.dispose();
+    _composerFocusNode.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -136,7 +138,10 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
                             for (final entry in viewModel.entries) ...[
                               FreshFadeSlide(
                                 key: ValueKey('agent_timeline_${entry.id}'),
-                                child: _AgentTimelineEntry(entry: entry),
+                                child: _AgentTimelineEntry(
+                                  entry: entry,
+                                  onProposalAction: _handleProposalAction,
+                                ),
                               ),
                               const SizedBox(height: FreshSpacing.md),
                             ],
@@ -170,6 +175,7 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
       bottomNavigationBar: _AgentInputBar(
         controller: _messageController,
         viewModel: viewModel,
+        focusNode: _composerFocusNode,
         onScanLabel: _scanNutritionLabel,
         onSubmitted: _sendMessage,
       ),
@@ -233,6 +239,16 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
     if (!mounted || trimmed == null || trimmed.isEmpty) return;
     final prompt = context.l10n.agentChatScanLabelPrompt(trimmed);
     unawaited(context.read<AgentChatViewModel>().sendText(prompt));
+  }
+
+  void _handleProposalAction(AgentChatProposalAction action) {
+    final viewModel = context.read<AgentChatViewModel>();
+    if (action.type == AgentChatProposalActionType.correct) {
+      viewModel.beginProposalCorrection(action);
+      _composerFocusNode.requestFocus();
+      return;
+    }
+    unawaited(viewModel.commitProposalAction(action));
   }
 
   void _sendPrompt(String prompt) {
@@ -456,16 +472,23 @@ class _AgentWelcomeCard extends StatelessWidget {
 }
 
 class _AgentTimelineEntry extends StatelessWidget {
-  const _AgentTimelineEntry({required this.entry});
+  const _AgentTimelineEntry({
+    required this.entry,
+    required this.onProposalAction,
+  });
 
   final AgentChatEntry entry;
+  final ValueChanged<AgentChatProposalAction> onProposalAction;
 
   @override
   Widget build(BuildContext context) {
     return switch (entry.kind) {
       AgentChatEntryKind.user => _UserBubble(text: entry.text),
       AgentChatEntryKind.assistant => _AssistantBubble(entry: entry),
-      AgentChatEntryKind.tool => _ToolCallCard(entry: entry),
+      AgentChatEntryKind.tool => _ToolCallCard(
+        entry: entry,
+        onProposalAction: onProposalAction,
+      ),
     };
   }
 }
@@ -649,9 +672,10 @@ class _AgentStatusCard extends StatelessWidget {
 }
 
 class _ToolCallCard extends StatelessWidget {
-  const _ToolCallCard({required this.entry});
+  const _ToolCallCard({required this.entry, required this.onProposalAction});
 
   final AgentChatEntry entry;
+  final ValueChanged<AgentChatProposalAction> onProposalAction;
 
   @override
   Widget build(BuildContext context) {
@@ -729,6 +753,8 @@ class _ToolCallCard extends StatelessWidget {
                   entryId: entry.id,
                   result: entry.result!,
                   completionMessage: entry.completionMessage,
+                  sourceToolCallId: toolCall?.id,
+                  onProposalAction: onProposalAction,
                 ),
               ),
             ],
@@ -743,17 +769,28 @@ class _AgentResultWidget extends StatelessWidget {
   const _AgentResultWidget({
     required this.entryId,
     required this.result,
+    required this.onProposalAction,
+    this.sourceToolCallId,
     this.completionMessage,
   });
 
   final String entryId;
   final AgentRunResult result;
+  final String? sourceToolCallId;
+  final ValueChanged<AgentChatProposalAction> onProposalAction;
   final String? completionMessage;
 
   @override
   Widget build(BuildContext context) {
     final proposal = result.proposal;
-    if (proposal != null) return _ProposalSummary(proposal: proposal);
+    if (proposal != null) {
+      return _ProposalSummary(
+        proposal: proposal,
+        entryId: entryId,
+        sourceToolCallId: sourceToolCallId,
+        onProposalAction: onProposalAction,
+      );
+    }
     if (result.meal != null) return _MealSummary(meal: result.meal!);
     if (result.summary != null) {
       return _SummarySnapshot(summary: result.summary!);
@@ -1064,9 +1101,17 @@ class _UsualFoodDraftMetrics extends StatelessWidget {
 }
 
 class _ProposalSummary extends StatelessWidget {
-  const _ProposalSummary({required this.proposal});
+  const _ProposalSummary({
+    required this.proposal,
+    required this.entryId,
+    required this.sourceToolCallId,
+    required this.onProposalAction,
+  });
 
   final MealProposal proposal;
+  final String entryId;
+  final String? sourceToolCallId;
+  final ValueChanged<AgentChatProposalAction> onProposalAction;
 
   @override
   Widget build(BuildContext context) {
@@ -1076,6 +1121,106 @@ class _ProposalSummary extends StatelessWidget {
         _NutritionHeader(title: proposal.title, nutrition: proposal.nutrition),
         const SizedBox(height: FreshSpacing.md),
         _ItemList(items: proposal.items),
+        const SizedBox(height: FreshSpacing.md),
+        _ProposalActions(
+          proposal: proposal,
+          entryId: entryId,
+          sourceToolCallId: sourceToolCallId,
+          onProposalAction: onProposalAction,
+        ),
+      ],
+    );
+  }
+}
+
+class _ProposalActions extends StatelessWidget {
+  const _ProposalActions({
+    required this.proposal,
+    required this.entryId,
+    required this.sourceToolCallId,
+    required this.onProposalAction,
+  });
+
+  final MealProposal proposal;
+  final String entryId;
+  final String? sourceToolCallId;
+  final ValueChanged<AgentChatProposalAction> onProposalAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final viewModel = context.watch<AgentChatViewModel>();
+    final state = viewModel.proposalActionState(proposal.id);
+    final conversationId = viewModel.conversationId;
+    final canAct =
+        sourceToolCallId != null &&
+        conversationId != null &&
+        viewModel.activeProposalId == proposal.id &&
+        !viewModel.isProposalCommitted(proposal.id) &&
+        state != AgentChatProposalActionState.succeeded;
+    AgentChatProposalAction action(AgentChatProposalActionType type) =>
+        AgentChatProposalAction(
+          type: type,
+          conversationId: conversationId!,
+          entryId: entryId,
+          sourceToolCallId: sourceToolCallId!,
+          proposalId: proposal.id,
+        );
+    if (state == AgentChatProposalActionState.succeeded) {
+      return Semantics(
+        label: context.l10n.agentChatProposalSaved,
+        child: Text(context.l10n.agentChatProposalSaved),
+      );
+    }
+    final isSaving = state == AgentChatProposalActionState.saving;
+    return Wrap(
+      spacing: FreshSpacing.sm,
+      runSpacing: FreshSpacing.sm,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Semantics(
+          button: true,
+          label: isSaving
+              ? context.l10n.agentChatProposalSaving
+              : state == AgentChatProposalActionState.failed
+                  ? context.l10n.agentChatProposalRetry
+                  : context.l10n.agentChatProposalSave,
+          child: FilledButton(
+            key: ValueKey('agent_chat_proposal_save_button_${proposal.id}'),
+            onPressed: canAct && !isSaving
+                ? () => onProposalAction(
+                    action(AgentChatProposalActionType.commit),
+                  )
+                : null,
+            child: Text(
+              isSaving
+                  ? context.l10n.agentChatProposalSaving
+                  : state == AgentChatProposalActionState.failed
+                      ? context.l10n.agentChatProposalRetry
+                      : context.l10n.agentChatProposalSave,
+            ),
+          ),
+        ),
+        Semantics(
+          button: true,
+          label: context.l10n.agentChatProposalCorrect,
+          child: OutlinedButton(
+            key: ValueKey('agent_chat_proposal_correct_button_${proposal.id}'),
+            onPressed: canAct && !isSaving
+                ? () => onProposalAction(
+                    action(AgentChatProposalActionType.correct),
+                  )
+                : null,
+            child: Text(context.l10n.agentChatProposalCorrect),
+          ),
+        ),
+        if (isSaving)
+          const SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        if (state == AgentChatProposalActionState.failed)
+          Text(context.l10n.agentChatProposalSaveError),
       ],
     );
   }
@@ -1334,12 +1479,14 @@ class _AgentInputBar extends StatelessWidget {
   const _AgentInputBar({
     required this.controller,
     required this.viewModel,
+    required this.focusNode,
     required this.onScanLabel,
     required this.onSubmitted,
   });
 
   final TextEditingController controller;
   final AgentChatViewModel viewModel;
+  final FocusNode focusNode;
   final VoidCallback onScanLabel;
   final VoidCallback onSubmitted;
 
@@ -1362,13 +1509,16 @@ class _AgentInputBar extends StatelessWidget {
                 child: TextField(
                   key: const ValueKey('agent_chat_message_field'),
                   controller: controller,
+                  focusNode: focusNode,
                   minLines: 1,
                   maxLines: 4,
                   textInputAction: TextInputAction.send,
                   enabled: !viewModel.isBusy && !isRecording,
                   decoration: freshUnderlineInputDecoration(
                     context,
-                    hintText: context.l10n.agentChatInputHint,
+                    hintText: viewModel.isCorrectingProposal
+                        ? context.l10n.agentChatProposalCorrectionHint
+                        : context.l10n.agentChatInputHint,
                   ),
                   onSubmitted: (_) => onSubmitted(),
                 ),

@@ -585,5 +585,15 @@
   "agentChatProposalSaved": "Comida guardada.",
   "agentChatProposalRetry": "Reintentar guardado",
   "agentChatProposalSaveError": "No se pudo guardar esta comida. Inténtalo de nuevo.",
-  "agentChatProposalCorrectionHint": "Indica qué quieres cambiar en esta propuesta de comida"
+  "agentChatProposalCorrectionHint": "Indica qué quieres cambiar en esta propuesta de comida",
+  "agentChatMealCorrectionPreviewTitle": "Revisar corrección de comida",
+  "agentChatMealCorrectionPreviewSubtitle": "No se cambiará nada hasta que confirmes esta vista previa.",
+  "agentChatMealCorrectionConfirm": "Aplicar corrección",
+  "agentChatMealCorrectionCancel": "Cancelar",
+  "agentChatMealCorrectionSaving": "Aplicando…",
+  "agentChatMealCorrectionRetry": "Reintentar corrección",
+  "agentChatMealCorrectionApplied": "Corrección de comida aplicada.",
+  "agentChatMealCorrectionCancelled": "Corrección de comida cancelada.",
+  "agentChatMealCorrectionStale": "Esta comida cambió después de la vista previa. Pide una nueva vista previa de corrección.",
+  "agentChatMealCorrectionError": "No se pudo aplicar esta corrección. Inténtalo de nuevo."
 }

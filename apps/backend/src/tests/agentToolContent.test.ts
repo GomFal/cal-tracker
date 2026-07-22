@@ -123,12 +123,22 @@ describe("agent chat tool content", () => {
         meals: Array.from({ length: 12 }, (_, index) => ({
           id: `meal-${index + 1}`,
           title: `Meal ${index + 1}`,
-          loggedAt: `2026-06-${String(index + 1).padStart(2, "0")}T12:00:00.000Z`,
-          calories: 300 + index,
-          proteinGrams: 20,
-          carbsGrams: 30,
-          fatGrams: 10,
-          items: [{ name: "verbose item", calories: 100 }],
+          occurredAt: `2026-06-${String(index + 1).padStart(2, "0")}T12:00:00.000Z`,
+          nutrition: {
+            calories: 300 + index,
+            proteinGrams: 20,
+            carbsGrams: 30,
+            fatGrams: 10,
+          },
+          items: [
+            {
+              name: "Bread",
+              quantity: 100,
+              unit: "g",
+              calories: 100,
+              displayDetails: ["verbose internal detail"],
+            },
+          ],
         })),
       },
       rawOutput: {},
@@ -140,12 +150,168 @@ describe("agent chat tool content", () => {
       "cols=n|id|time|title|kcal|p|c|f|items",
     );
     expect(built.modelContent).toContain("omitted rows=2 reason=budget");
-    expect(built.modelContent).not.toContain("verbose item");
+    expect(built.modelContent).toContain("100g Bread");
+    expect(built.modelContent).not.toContain("verbose internal detail");
     expect(built.tonTables[0]).toMatchObject({
       path: "result.meals",
       rows: 12,
       shown: 10,
     });
+  });
+
+  it("preserves nested daily summary nutrition and exact hydration for the model", () => {
+    const built = buildToolContentForModel({
+      actionId: "get_daily_summary",
+      toolInput: { date: "2026-07-22" },
+      mappedResult: {
+        kind: "summary",
+        message: "Here is your daily summary.",
+        summary: {
+          date: "2026-07-22",
+          consumed: {
+            calories: 620,
+            proteinGrams: 41.2,
+            carbsGrams: 72.4,
+            fatGrams: 18.6,
+          },
+          target: {
+            calories: 2100,
+            proteinGrams: 150,
+            carbsGrams: 230,
+            fatGrams: 70,
+          },
+          remaining: {
+            calories: 1480,
+            proteinGrams: 108.8,
+            carbsGrams: 157.6,
+            fatGrams: 51.4,
+          },
+          hydrationGoalLiters: 2,
+          waterConsumedLiters: 0.001,
+          calorieTargetConfigured: true,
+          calorieTargetSource: "manual",
+          meals: [
+            {
+              id: "11111111-1111-4111-8111-111111111111",
+              title: "Breakfast",
+              occurredAt: "2026-07-22T08:00:00.000Z",
+              nutrition: {
+                calories: 620,
+                proteinGrams: 41.2,
+                carbsGrams: 72.4,
+                fatGrams: 18.6,
+              },
+              items: [],
+            },
+          ],
+        },
+      },
+      rawOutput: {},
+      threshold: 0.75,
+    });
+
+    const result = built.contentValue.result as Record<string, unknown>;
+    const summary = result.summary as Record<string, unknown>;
+    expect(summary).toEqual({
+      date: "2026-07-22",
+      consumed: {
+        calories: 620,
+        proteinGrams: 41.2,
+        carbsGrams: 72.4,
+        fatGrams: 18.6,
+      },
+      target: {
+        calories: 2100,
+        proteinGrams: 150,
+        carbsGrams: 230,
+        fatGrams: 70,
+      },
+      remaining: {
+        calories: 1480,
+        proteinGrams: 108.8,
+        carbsGrams: 157.6,
+        fatGrams: 51.4,
+      },
+      hydrationGoalLiters: 2,
+      waterConsumedLiters: 0.001,
+      mealCount: 1,
+    });
+    expect(summary).not.toHaveProperty("calories");
+    expect(summary).not.toHaveProperty("proteinGrams");
+    expect(summary).not.toHaveProperty("carbsGrams");
+    expect(summary).not.toHaveProperty("fatGrams");
+    expect(built.modelContent).toContain('"waterConsumedLiters":0.001');
+  });
+
+  it("preserves template detail nutrition and complete items for the model", () => {
+    const built = buildToolContentForModel({
+      actionId: "get_meal_template_details",
+      toolInput: { templateId: "22222222-2222-4222-8222-222222222222" },
+      mappedResult: {
+        kind: "template_details",
+        message: "Here are the usual meal ingredients and nutrition.",
+        template: {
+          id: "22222222-2222-4222-8222-222222222222",
+          title: "Usual breakfast",
+          trustedAutoCommitEnabled: true,
+          aliases: ["weekday breakfast", "desayuno habitual"],
+          nutrition: {
+            calories: 410,
+            proteinGrams: 24.5,
+            carbsGrams: 52.25,
+            fatGrams: 11.75,
+          },
+          items: [
+            {
+              id: "33333333-3333-4333-8333-333333333333",
+              name: "Greek yogurt with oats",
+              quantity: 275,
+              unit: "g",
+              calories: 410,
+              proteinGrams: 24.5,
+              carbsGrams: 52.25,
+              fatGrams: 11.75,
+              source: "database",
+              externalSource: "usda",
+            },
+          ],
+        },
+      },
+      rawOutput: {},
+      threshold: 0.75,
+    });
+
+    const result = built.contentValue.result as Record<string, unknown>;
+    const template = result.template as Record<string, unknown>;
+    expect(template).toEqual({
+      id: "22222222-2222-4222-8222-222222222222",
+      title: "Usual breakfast",
+      trustedAutoCommitEnabled: true,
+      aliases: ["weekday breakfast", "desayuno habitual"],
+      nutrition: {
+        calories: 410,
+        proteinGrams: 24.5,
+        carbsGrams: 52.25,
+        fatGrams: 11.75,
+      },
+      items: [
+        {
+          id: "33333333-3333-4333-8333-333333333333",
+          name: "Greek yogurt with oats",
+          quantity: 275,
+          unit: "g",
+          calories: 410,
+          proteinGrams: 24.5,
+          carbsGrams: 52.25,
+          fatGrams: 11.75,
+          source: "usda",
+        },
+      ],
+    });
+    expect(template).not.toHaveProperty("calories");
+    expect(template).not.toHaveProperty("proteinGrams");
+    expect(template).not.toHaveProperty("carbsGrams");
+    expect(template).not.toHaveProperty("fatGrams");
   });
 
   it("renders safe ultra compact replay content from compact JSON", () => {

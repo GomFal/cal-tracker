@@ -187,6 +187,79 @@ void main() {
       ).called(1);
     },
   );
+
+  testWidgets(
+    'a granular meal correction updates the preserved Dashboard immediately',
+    (tester) async {
+      final harness = _Harness();
+      addTearDown(harness.dispose);
+      final original = _meal(
+        '00000000-0000-4000-8000-000000000010',
+        'Original meal',
+      );
+      final corrected = _meal(
+        '00000000-0000-4000-8000-000000000010',
+        'Corrected meal',
+      );
+      final initial = _summary(
+        harness.date,
+        meals: [original],
+        calories: original.nutrition.calories,
+      );
+      await harness.repository.putCachedDailySummary(initial);
+      when(
+        () => harness.apiClient.getDailySummary(date: any(named: 'date')),
+      ).thenAnswer((_) async => {
+            'output': {'summary': initial.toJson()}
+          });
+      when(
+        () => harness.apiClient.commitAgentChatMealCorrection(
+          conversationId: 'conversation-1',
+          mealId: original.id,
+          sourceToolCallId: 'correction-call-1',
+          clientMutationId: '00000000-0000-4000-8000-000000000004',
+        ),
+      ).thenAnswer(
+        (_) async => {
+          'actionId': 'correct_meal',
+          'clientMutationId': '00000000-0000-4000-8000-000000000004',
+          'reused': false,
+          'result': {
+            'kind': 'meal_corrected',
+            'meal': corrected.toJson(),
+            'message': 'Meal corrected.',
+            'confirmedMutation': _mealMutationJson(
+              id: '00000000-0000-4000-8000-000000000004',
+              date: harness.date,
+              meal: corrected,
+            ),
+          },
+          'conversationMessage': {
+            'id': 'correction-message-1',
+            'conversationId': 'conversation-1',
+            'role': 'tool',
+            'content': '{}',
+            'createdAt': DateTime.now().toUtc().toIso8601String(),
+          },
+        },
+      );
+
+      await harness.pumpDashboard(tester);
+      await harness.repository.commitAgentChatMealCorrection(
+        conversationId: 'conversation-1',
+        mealId: original.id,
+        sourceToolCallId: 'correction-call-1',
+        clientMutationId: '00000000-0000-4000-8000-000000000004',
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Corrected meal'), findsOneWidget);
+      expect(find.text('Original meal'), findsNothing);
+      verify(
+        () => harness.apiClient.getDailySummary(date: any(named: 'date')),
+      ).called(1);
+    },
+  );
 }
 
 class _Harness {
@@ -295,6 +368,27 @@ Map<String, Object?> _mutationJson({
           'date': summary.date,
           'revision': 'server-revision',
           'snapshot': summary.toJson(),
+        },
+      ],
+    };
+
+Map<String, Object?> _mealMutationJson({
+  required String id,
+  required String date,
+  required Meal meal,
+}) =>
+    {
+      'version': 1,
+      'mutationId': id,
+      'committedAt': DateTime.now().toUtc().toIso8601String(),
+      'effects': [
+        {
+          'domain': 'meals',
+          'operation': 'upsert',
+          'date': date,
+          'entityId': meal.id,
+          'revision': 'server-revision',
+          'snapshot': meal.toJson(),
         },
       ],
     };

@@ -718,6 +718,129 @@ describe("agent chat streaming", () => {
     expect(events.at(-1)?.type).toBe("done");
   });
 
+  it("persists an exact hydration result and does not reapply it on rehydration", async () => {
+    const agentProvider = new QueueChatAgentProvider([
+      {
+        toolCalls: [
+          {
+            id: "call_hydration",
+            type: "function",
+            function: {
+              name: "record_hydration",
+              arguments: JSON.stringify({
+                date: "2026-07-22",
+                mode: "add",
+                amount: 1,
+                unit: "ml",
+              }),
+            },
+          },
+        ],
+        rawResponse: { id: "gen_hydration_tool" },
+        interaction: { messages: [], streamEvents: [] },
+      },
+      {
+        toolCalls: [],
+        rawResponse: { id: "gen_hydration_final" },
+        interaction: {
+          messages: [],
+          assistantContent: "Hydration updated by one milliliter.",
+          streamEvents: [],
+        },
+      },
+    ]);
+    const { request, repository } = buildTestApp({ agentProvider });
+    const { authHeader, user } = await registerAndAuth(request);
+    const goals = await request("http://localhost/v1/goals", {
+      method: "PUT",
+      headers: authHeader,
+      body: JSON.stringify({
+        date: "2026-07-22",
+        hydrationGoalLiters: 2,
+      }),
+    });
+    expect(goals.status).toBe(200);
+
+    const response = await request("http://localhost/v1/agent/chat", {
+      method: "POST",
+      headers: authHeader,
+      body: JSON.stringify({
+        message: "Add exactly one milliliter of water on July 22.",
+        source: "flutter",
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    const events = parseSse(await response.text());
+    const conversationId = events.find(
+      (event) => event.type === "conversation_started",
+    )?.conversationId as string;
+    const completedResult = events.find(
+      (event) => event.type === "tool_call_completed",
+    )?.result as Record<string, unknown>;
+    expect(completedResult).toEqual(
+      expect.objectContaining({
+        kind: "hydration_updated",
+        summary: expect.objectContaining({
+          date: "2026-07-22",
+          hydrationGoalLiters: 2,
+          waterConsumedLiters: 0.001,
+        }),
+        confirmedMutation: expect.objectContaining({
+          version: 1,
+          mutationId: expect.any(String),
+          effects: [
+            expect.objectContaining({
+              domain: "daily_summary",
+              operation: "replace",
+              date: "2026-07-22",
+              snapshot: expect.objectContaining({
+                waterConsumedLiters: 0.001,
+              }),
+            }),
+          ],
+        }),
+      }),
+    );
+
+    const beforeRehydration = await repository.getDailySummary(
+      user.id,
+      "2026-07-22",
+    );
+    expect(beforeRehydration.waterConsumedLiters).toBe(0.001);
+
+    const historyResponse = await request(
+      `http://localhost/v1/agent/conversations/${conversationId}`,
+      { headers: authHeader },
+    );
+    expect(historyResponse.status).toBe(200);
+    const history = (await historyResponse.json()) as {
+      toolExecutions: Array<{ result?: Record<string, unknown> }>;
+      messages: Array<{
+        role: string;
+        metadata?: { actionId?: string; uiResult?: unknown };
+      }>;
+    };
+    expect(history.toolExecutions).toHaveLength(1);
+    expect(history.toolExecutions[0]?.result).toEqual(completedResult);
+    expect(history.toolExecutions[0]?.result?.confirmedMutation).toEqual(
+      completedResult.confirmedMutation,
+    );
+    const persistedToolMessage = history.messages.find(
+      (message) =>
+        message.role === "tool" &&
+        message.metadata?.actionId === "record_hydration",
+    );
+    expect(persistedToolMessage?.metadata?.uiResult).toEqual(completedResult);
+
+    const afterRehydration = await repository.getDailySummary(
+      user.id,
+      "2026-07-22",
+    );
+    expect(afterRehydration).toEqual(beforeRehydration);
+    expect(afterRehydration.waterConsumedLiters).toBe(0.001);
+  });
+
   it("marks a persisted started call interrupted when its stream is cancelled", async () => {
     const agentProvider = new QueueChatAgentProvider([
       {

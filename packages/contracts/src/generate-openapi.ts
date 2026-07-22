@@ -16,6 +16,8 @@ import {
   agentChatRequestSchema,
   commitAgentChatProposalRequestSchema,
   commitAgentChatProposalResponseSchema,
+  commitAgentChatMealCorrectionRequestSchema,
+  commitAgentChatMealCorrectionResponseSchema,
   agentConversationDetailResponseSchema,
   agentConversationsResponseSchema,
   deleteAgentConversationResponseSchema,
@@ -178,6 +180,8 @@ const spec = {
       AgentChatRequest: schema("AgentChatRequest", agentChatRequestSchema),
       CommitAgentChatProposalRequest: schema("CommitAgentChatProposalRequest", commitAgentChatProposalRequestSchema),
       CommitAgentChatProposalResponse: schema("CommitAgentChatProposalResponse", commitAgentChatProposalResponseSchema),
+      CommitAgentChatMealCorrectionRequest: schema("CommitAgentChatMealCorrectionRequest", commitAgentChatMealCorrectionRequestSchema),
+      CommitAgentChatMealCorrectionResponse: schema("CommitAgentChatMealCorrectionResponse", commitAgentChatMealCorrectionResponseSchema),
       AgentRunResponse: schema("AgentRunResponse", agentRunResponseSchema),
       AgentConversationsResponse: schema("AgentConversationsResponse", agentConversationsResponseSchema),
       AgentConversationDetailResponse: schema("AgentConversationDetailResponse", agentConversationDetailResponseSchema),
@@ -530,6 +534,24 @@ const spec = {
         },
         responses: {
           "200": jsonResponse("Direct meal proposal commit", "#/components/schemas/CommitAgentChatProposalResponse")
+        }
+      }
+    },
+    "/v1/agent/conversations/{conversationId}/meal-corrections/{mealId}/commit": {
+      post: {
+        operationId: "commitAgentChatMealCorrection",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "conversationId", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          { name: "mealId", in: "path", required: true, schema: { type: "string", format: "uuid" } }
+        ],
+        requestBody: {
+          required: true,
+          content: { "application/json": { schema: { $ref: "#/components/schemas/CommitAgentChatMealCorrectionRequest" } } }
+        },
+        responses: {
+          "200": jsonResponse("Direct meal correction commit", "#/components/schemas/CommitAgentChatMealCorrectionResponse"),
+          "409": jsonResponse("Meal changed since preview", "#/components/schemas/ErrorResponse")
         }
       }
     },

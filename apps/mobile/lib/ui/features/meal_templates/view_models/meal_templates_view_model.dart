@@ -424,6 +424,7 @@ class MealTemplatesViewModel extends ChangeNotifier {
           }
         case NutritionDataDomain.dailySummary:
         case NutritionDataDomain.dailyGoals:
+        case NutritionDataDomain.meals:
           break;
       }
     }

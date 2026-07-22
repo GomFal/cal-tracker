@@ -1878,4 +1878,37 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get agentChatProposalCorrectionHint =>
       'Tell us what to change in this meal proposal';
+
+  @override
+  String get agentChatMealCorrectionPreviewTitle => 'Review meal correction';
+
+  @override
+  String get agentChatMealCorrectionPreviewSubtitle =>
+      'Nothing changes until you confirm this preview.';
+
+  @override
+  String get agentChatMealCorrectionConfirm => 'Apply correction';
+
+  @override
+  String get agentChatMealCorrectionCancel => 'Cancel';
+
+  @override
+  String get agentChatMealCorrectionSaving => 'Applying…';
+
+  @override
+  String get agentChatMealCorrectionRetry => 'Retry correction';
+
+  @override
+  String get agentChatMealCorrectionApplied => 'Meal correction applied.';
+
+  @override
+  String get agentChatMealCorrectionCancelled => 'Meal correction cancelled.';
+
+  @override
+  String get agentChatMealCorrectionStale =>
+      'This meal changed after the preview. Ask for a new correction preview.';
+
+  @override
+  String get agentChatMealCorrectionError =>
+      'Could not apply this correction. Try again.';
 }

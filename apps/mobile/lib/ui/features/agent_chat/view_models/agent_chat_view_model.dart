@@ -9,6 +9,7 @@ import '../../../../data/repositories/nutrition_repository.dart';
 import '../../../../data/services/agent_chat_cache_store.dart';
 import '../../../../data/services/agent_chat_session_store.dart';
 import '../../../../data/services/audio_recorder_service.dart';
+import '../../../../generated/api/cal_tracker_api.dart';
 import '../../../core/user_visible_error.dart';
 
 enum AgentChatToolStatus { running, completed, failed, interrupted }
@@ -33,6 +34,33 @@ class AgentChatProposalAction {
   final String entryId;
   final String sourceToolCallId;
   final String proposalId;
+}
+
+enum AgentChatMealCorrectionActionState {
+  idle,
+  saving,
+  succeeded,
+  cancelled,
+  stale,
+  failed,
+}
+
+enum AgentChatMealCorrectionActionType { confirm, cancel }
+
+class AgentChatMealCorrectionAction {
+  const AgentChatMealCorrectionAction({
+    required this.type,
+    required this.conversationId,
+    required this.entryId,
+    required this.sourceToolCallId,
+    required this.mealId,
+  });
+
+  final AgentChatMealCorrectionActionType type;
+  final String conversationId;
+  final String entryId;
+  final String sourceToolCallId;
+  final String mealId;
 }
 
 class AgentChatEntry {
@@ -113,6 +141,10 @@ class AgentChatViewModel extends ChangeNotifier {
   final Map<String, AgentChatProposalActionState> _proposalActionStates = {};
   final Map<String, String> _proposalMutationIds = {};
   final Set<String> _committedProposalIds = {};
+  final Map<String, AgentChatMealCorrectionActionState>
+      _mealCorrectionActionStates = {};
+  final Map<String, String> _mealCorrectionMutationIds = {};
+  final Set<String> _confirmedMealCorrectionToolCallIds = {};
   String? _correctionProposalId;
   List<AgentChatEntry> get entries => List.unmodifiable(_entries);
 
@@ -143,6 +175,9 @@ class AgentChatViewModel extends ChangeNotifier {
       isStoppingRecording ||
       _proposalActionStates.values.contains(
         AgentChatProposalActionState.saving,
+      ) ||
+      _mealCorrectionActionStates.values.contains(
+        AgentChatMealCorrectionActionState.saving,
       );
 
   AgentChatProposalActionState proposalActionState(String proposalId) =>
@@ -150,6 +185,15 @@ class AgentChatViewModel extends ChangeNotifier {
 
   bool isProposalCommitted(String proposalId) =>
       _committedProposalIds.contains(proposalId);
+
+  AgentChatMealCorrectionActionState mealCorrectionActionState(
+    String sourceToolCallId,
+  ) =>
+      _mealCorrectionActionStates[sourceToolCallId] ??
+      AgentChatMealCorrectionActionState.idle;
+
+  bool isMealCorrectionConfirmed(String sourceToolCallId) =>
+      _confirmedMealCorrectionToolCallIds.contains(sourceToolCallId);
 
   bool get isCorrectingProposal => _correctionProposalId != null;
   List<AgentConversationSummary> get conversations =>
@@ -207,6 +251,9 @@ class AgentChatViewModel extends ChangeNotifier {
     _proposalActionStates.clear();
     _proposalMutationIds.clear();
     _committedProposalIds.clear();
+    _mealCorrectionActionStates.clear();
+    _mealCorrectionMutationIds.clear();
+    _confirmedMealCorrectionToolCallIds.clear();
     _correctionProposalId = null;
     notifyListeners();
     if (shouldCancelRecording) {
@@ -423,8 +470,7 @@ class AgentChatViewModel extends ChangeNotifier {
             id: committed.conversationMessage.id,
             kind: AgentChatEntryKind.tool,
             toolCall: AgentToolCallFeedback(
-              id:
-                  committed.conversationMessage.toolCallId ??
+              id: committed.conversationMessage.toolCallId ??
                   committed.conversationMessage.id,
               actionId: 'commit_meal',
               label: 'Commit meal',
@@ -455,6 +501,110 @@ class AgentChatViewModel extends ChangeNotifier {
       if (lifecycleGeneration != _lifecycleGeneration) return;
       _proposalActionStates[action.proposalId] =
           AgentChatProposalActionState.failed;
+      _captureError(error, context: UserErrorContext.voiceCommit);
+    } finally {
+      if (lifecycleGeneration == _lifecycleGeneration) {
+        notifyListeners();
+      }
+    }
+  }
+
+  void cancelMealCorrection(AgentChatMealCorrectionAction action) {
+    if (action.type != AgentChatMealCorrectionActionType.cancel ||
+        mealCorrectionActionState(action.sourceToolCallId) !=
+            AgentChatMealCorrectionActionState.idle) {
+      return;
+    }
+    _mealCorrectionActionStates[action.sourceToolCallId] =
+        AgentChatMealCorrectionActionState.cancelled;
+    errorMessage = null;
+    errorCode = null;
+    notifyListeners();
+  }
+
+  Future<void> confirmMealCorrection(
+    AgentChatMealCorrectionAction action,
+  ) async {
+    final currentState = mealCorrectionActionState(action.sourceToolCallId);
+    if (action.type != AgentChatMealCorrectionActionType.confirm ||
+        currentState == AgentChatMealCorrectionActionState.saving ||
+        currentState == AgentChatMealCorrectionActionState.succeeded ||
+        currentState == AgentChatMealCorrectionActionState.cancelled) {
+      return;
+    }
+    _mealCorrectionActionStates[action.sourceToolCallId] =
+        AgentChatMealCorrectionActionState.saving;
+    errorMessage = null;
+    errorCode = null;
+    notifyListeners();
+    final mutationKey = '${action.mealId}:${action.sourceToolCallId}';
+    final clientMutationId = _mealCorrectionMutationIds.putIfAbsent(
+      mutationKey,
+      _newClientMutationId,
+    );
+    final lifecycleGeneration = _lifecycleGeneration;
+    try {
+      final committed =
+          await _nutritionRepository.commitAgentChatMealCorrection(
+        conversationId: action.conversationId,
+        mealId: action.mealId,
+        sourceToolCallId: action.sourceToolCallId,
+        clientMutationId: clientMutationId,
+      );
+      if (lifecycleGeneration != _lifecycleGeneration) return;
+      _mealCorrectionActionStates[action.sourceToolCallId] =
+          AgentChatMealCorrectionActionState.succeeded;
+      _confirmedMealCorrectionToolCallIds.add(action.sourceToolCallId);
+      if (!_entries.any(
+        (entry) => entry.id == committed.conversationMessage.id,
+      )) {
+        _entries.add(
+          AgentChatEntry(
+            id: committed.conversationMessage.id,
+            kind: AgentChatEntryKind.tool,
+            toolCall: AgentToolCallFeedback(
+              id: committed.conversationMessage.id,
+              actionId: 'correct_meal',
+              label: 'Correct meal',
+              summary: committed.conversationMessage.content,
+            ),
+            toolStatus: AgentChatToolStatus.completed,
+            result: committed.result,
+          ),
+        );
+      }
+      AgentConversationSummary? conversation;
+      for (final item in _conversations) {
+        if (item.id == action.conversationId) {
+          conversation = item;
+          break;
+        }
+      }
+      if (conversation != null) {
+        await _cacheStore?.upsertConversationMessage(
+          conversation,
+          committed.conversationMessage,
+        );
+      }
+      await _saveActiveSession(unfinished: false);
+    } on StaleNutritionResponseException {
+      return;
+    } on ApiException catch (error) {
+      if (lifecycleGeneration != _lifecycleGeneration) return;
+      if (error.code == 'meal_changed_since_preview') {
+        _mealCorrectionActionStates[action.sourceToolCallId] =
+            AgentChatMealCorrectionActionState.stale;
+        errorMessage = null;
+        errorCode = null;
+      } else {
+        _mealCorrectionActionStates[action.sourceToolCallId] =
+            AgentChatMealCorrectionActionState.failed;
+        _captureError(error, context: UserErrorContext.voiceCommit);
+      }
+    } catch (error) {
+      if (lifecycleGeneration != _lifecycleGeneration) return;
+      _mealCorrectionActionStates[action.sourceToolCallId] =
+          AgentChatMealCorrectionActionState.failed;
       _captureError(error, context: UserErrorContext.voiceCommit);
     } finally {
       if (lifecycleGeneration == _lifecycleGeneration) {
@@ -863,6 +1013,9 @@ class AgentChatViewModel extends ChangeNotifier {
     _proposalActionStates.clear();
     _proposalMutationIds.clear();
     _committedProposalIds.clear();
+    _mealCorrectionActionStates.clear();
+    _mealCorrectionMutationIds.clear();
+    _confirmedMealCorrectionToolCallIds.clear();
     _correctionProposalId = null;
   }
 
@@ -897,6 +1050,20 @@ class AgentChatViewModel extends ChangeNotifier {
           ),
         ),
       );
+    _mealCorrectionActionStates.clear();
+    _mealCorrectionMutationIds.clear();
+    _confirmedMealCorrectionToolCallIds
+      ..clear()
+      ..addAll(
+        detail.messages
+            .where(_isPersistedDirectMealCorrection)
+            .map(_sourceToolCallIdFromMessage)
+            .whereType<String>(),
+      );
+    for (final toolCallId in _confirmedMealCorrectionToolCallIds) {
+      _mealCorrectionActionStates[toolCallId] =
+          AgentChatMealCorrectionActionState.succeeded;
+    }
     _correctionProposalId = null;
     errorMessage = null;
     errorCode = null;
@@ -954,14 +1121,18 @@ class AgentChatViewModel extends ChangeNotifier {
                   ? AgentChatToolStatus.failed
                   : AgentChatToolStatus.completed)
               : _statusForExecution(execution, rehydrated: true);
+          final directAction = _isClientDirectAction(message);
           entries.add(
             AgentChatEntry(
-              id: 'tool_${message.toolCallId ?? message.id}',
+              id: directAction
+                  ? 'tool_${message.toolCallId ?? message.id}_${message.id}'
+                  : 'tool_${message.toolCallId ?? message.id}',
               kind: AgentChatEntryKind.tool,
               toolCall: toolCall,
               toolStatus: status,
-              result:
-                  execution?.result ?? _resultFromStoredToolMessage(message),
+              result: directAction
+                  ? _resultFromStoredToolMessage(message)
+                  : execution?.result ?? _resultFromStoredToolMessage(message),
               execution: execution,
               error: execution?.error?.message ??
                   (message.metadata is Map
@@ -1061,6 +1232,26 @@ class AgentChatViewModel extends ChangeNotifier {
       }
     }
     return null;
+  }
+
+  bool _isClientDirectAction(AgentConversationMessage message) {
+    if (message.source == 'client_direct_action') return true;
+    final metadata = message.metadata;
+    return metadata is Map && metadata['source'] == 'client_direct_action';
+  }
+
+  bool _isPersistedDirectMealCorrection(AgentConversationMessage message) {
+    if (!_isClientDirectAction(message)) return false;
+    final metadata = message.metadata;
+    return metadata is Map && metadata['actionId'] == 'correct_meal';
+  }
+
+  String? _sourceToolCallIdFromMessage(AgentConversationMessage message) {
+    final metadata = message.metadata;
+    if (metadata is Map && metadata['sourceToolCallId'] is String) {
+      return metadata['sourceToolCallId'] as String;
+    }
+    return message.toolCallId;
   }
 
   List<AgentChatSuggestion> _suggestionsFromMetadata(Object? metadata) {

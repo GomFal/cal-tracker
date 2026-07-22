@@ -26,6 +26,7 @@ import type {
   AgentToolCallTelemetryRecord,
   AgentToolExecutionRecord,
   AgentChatProposalCommit,
+  AgentChatMealCorrectionCommit,
   AgentTurnTelemetryFilter,
   AgentTurnTelemetryRecord,
   AgentCandidateRegistryRecord,
@@ -63,6 +64,7 @@ import type {
   UserFoodPreference,
   UpdateDailyGoalsInput,
 } from "./types.js";
+import { mealFingerprint } from "../utils/mealFingerprint.js";
 
 const ACTIVE_EMBEDDING_DIMENSIONS = 1024;
 const DEFAULT_FOOD_SEARCH_LIMIT = 50;
@@ -135,6 +137,14 @@ export class InMemoryRepository implements AppRepository {
   private agentDirectCommitRequests = new Map<
     string,
     Promise<AgentChatProposalCommit>
+  >();
+  private agentDirectCorrections = new Map<
+    string,
+    AgentChatMealCorrectionCommit
+  >();
+  private agentDirectCorrectionRequests = new Map<
+    string,
+    Promise<AgentChatMealCorrectionCommit>
   >();
   private agentCandidateRegistries = new Map<
     string,
@@ -804,6 +814,24 @@ export class InMemoryRepository implements AppRepository {
     return this.getDailySummary(userId, date);
   }
 
+  async recordDailyHydration(
+    userId: string,
+    date: string,
+    mode: "add" | "set",
+    amountLiters: number,
+  ): Promise<import("@cal-tracker/contracts").DailySummary> {
+    const goals = await this.getDailyGoals(userId, date);
+    const key = dailyGoalKey(userId, date);
+    const current = this.dailyWater.get(key) ?? 0;
+    const requested = mode === "add" ? current + amountLiters : amountLiters;
+    const precise = Math.round(requested * 1000) / 1000;
+    this.dailyWater.set(
+      key,
+      Math.min(Math.max(precise, 0), goals.hydrationGoalLiters),
+    );
+    return this.getDailySummary(userId, date);
+  }
+
   async listMeals(userId: string, limit = 25): Promise<Meal[]> {
     return [...this.meals.values()]
       .filter((meal) => meal.userId === userId && !meal.deletedAt)
@@ -1232,6 +1260,164 @@ export class InMemoryRepository implements AppRepository {
     }
   }
 
+  async commitAgentChatMealCorrection(
+    userId: string,
+    input: {
+      conversationId: string;
+      mealId: string;
+      sourceToolCallId: string;
+      clientMutationId: string;
+      traceId: string;
+    },
+  ): Promise<AgentChatMealCorrectionCommit> {
+    const mutationKey = `${userId}:correct_meal:${input.clientMutationId}`;
+    const sourceKey = `${userId}:correct_meal:source:${input.sourceToolCallId}`;
+    const existing =
+      this.agentDirectCorrections.get(mutationKey) ??
+      this.agentDirectCorrections.get(sourceKey);
+    if (existing) return { ...existing, reused: true };
+    const inFlight =
+      this.agentDirectCorrectionRequests.get(mutationKey) ??
+      this.agentDirectCorrectionRequests.get(sourceKey);
+    if (inFlight) return { ...(await inFlight), reused: true };
+
+    const request = this.commitAgentChatMealCorrectionOnce(userId, input);
+    this.agentDirectCorrectionRequests.set(mutationKey, request);
+    this.agentDirectCorrectionRequests.set(sourceKey, request);
+    try {
+      return await request;
+    } finally {
+      if (this.agentDirectCorrectionRequests.get(mutationKey) === request) {
+        this.agentDirectCorrectionRequests.delete(mutationKey);
+      }
+      if (this.agentDirectCorrectionRequests.get(sourceKey) === request) {
+        this.agentDirectCorrectionRequests.delete(sourceKey);
+      }
+    }
+  }
+
+  private async commitAgentChatMealCorrectionOnce(
+    userId: string,
+    input: {
+      conversationId: string;
+      mealId: string;
+      sourceToolCallId: string;
+      clientMutationId: string;
+      traceId: string;
+    },
+  ): Promise<AgentChatMealCorrectionCommit> {
+    const conversation = await this.getAgentConversation(
+      userId,
+      input.conversationId,
+    );
+    if (!conversation) throw new Error("agent_conversation_not_found");
+    const execution = this.agentToolExecutions.get(
+      `${input.conversationId}:${input.sourceToolCallId}`,
+    );
+    const previewResult = objectValue(execution?.snapshot.result);
+    const previewMeal = objectValue(previewResult?.meal);
+    if (
+      !execution ||
+      execution.userId !== userId ||
+      execution.actionId !== "preview_meal_correction" ||
+      execution.status !== "completed" ||
+      previewResult?.kind !== "meal_correction_preview" ||
+      previewResult.requiresConfirmation !== true ||
+      previewMeal?.id !== input.mealId
+    ) {
+      throw new Error("agent_meal_correction_source_not_found");
+    }
+    const sourceMessage = (
+      this.agentConversationMessages.get(input.conversationId) ?? []
+    ).find(
+      (message) =>
+        message.userId === userId &&
+        message.role === "tool" &&
+        message.toolCallId === input.sourceToolCallId,
+    );
+    const sourceMetadata = objectValue(sourceMessage?.metadata);
+    const actionCallId = sourceMetadata?.actionCallId;
+    const actionCall =
+      typeof actionCallId === "string"
+        ? this.actionCalls.find(
+            (candidate) =>
+              candidate.id === actionCallId &&
+              candidate.userId === userId &&
+              candidate.actionId === "preview_meal_correction",
+          )
+        : undefined;
+    const internalMetadata = objectValue(actionCall?.internalMetadata);
+    const sourceFingerprint = internalMetadata?.sourceMealFingerprint;
+    if (typeof sourceFingerprint !== "string") {
+      throw new Error("agent_meal_correction_source_not_found");
+    }
+    const current = await this.getMeal(userId, input.mealId);
+    if (!current || mealFingerprint(current) !== sourceFingerprint) {
+      throw new Error("meal_changed_since_preview");
+    }
+
+    const corrected = await this.updateMeal(
+      userId,
+      previewMeal as unknown as Meal,
+    );
+    const committedAt = new Date().toISOString();
+    const result = {
+      kind: "meal_corrected",
+      meal: corrected,
+      message: "Meal corrected.",
+      confirmedMutation: {
+        version: 1 as const,
+        mutationId: input.clientMutationId,
+        committedAt,
+        effects: [{
+          domain: "meals" as const,
+          operation: "upsert" as const,
+          date: corrected.occurredAt.slice(0, 10),
+          entityId: corrected.id,
+          revision: committedAt,
+          snapshot: corrected,
+        }],
+      },
+    };
+    const conversationMessage = await this.addAgentConversationMessage(
+      userId,
+      input.conversationId,
+      {
+        role: "tool",
+        content: JSON.stringify({ actionId: "correct_meal", result }),
+        toolCallId: input.sourceToolCallId,
+        traceId: input.traceId,
+        source: "client_direct_action",
+        metadata: {
+          actionId: "correct_meal",
+          resultKind: "meal_corrected",
+          mealId: corrected.id,
+          sourceToolCallId: input.sourceToolCallId,
+          clientMutationId: input.clientMutationId,
+          source: "client_direct_action",
+          uiResult: result,
+        },
+      },
+    );
+    const committed: AgentChatMealCorrectionCommit = {
+      actionId: "correct_meal",
+      clientMutationId: input.clientMutationId,
+      reused: false,
+      meal: corrected,
+      conversationMessage,
+      result,
+    };
+    this.agentDirectCorrections.set(
+      `${userId}:correct_meal:${input.clientMutationId}`,
+      committed,
+    );
+    this.agentDirectCorrections.set(
+      `${userId}:correct_meal:source:${input.sourceToolCallId}`,
+      committed,
+    );
+    return committed;
+  }
+
   private async commitAgentChatProposalOnce(
     userId: string,
     input: {
@@ -1508,6 +1694,14 @@ export class InMemoryRepository implements AppRepository {
       for (const [key, commit] of this.agentDirectCommits) {
         if (commit.conversationMessage.conversationId === request.conversationId) {
           this.agentDirectCommits.delete(key);
+        }
+      }
+      for (const [key, correction] of this.agentDirectCorrections) {
+        if (
+          correction.conversationMessage.conversationId ===
+          request.conversationId
+        ) {
+          this.agentDirectCorrections.delete(key);
         }
       }
       for (const [key, registry] of this.agentCandidateRegistries) {
@@ -2132,6 +2326,12 @@ function agentResultFromConversationMessage(
   } catch {
     return undefined;
   }
+}
+
+function objectValue(value: unknown): Record<string, unknown> | undefined {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
 }
 
 function dailyGoalKey(userId: string, date: string) {

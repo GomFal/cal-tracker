@@ -858,7 +858,7 @@ describe("AgentService", () => {
     expect(updated.message).toContain("not able");
   });
 
-  it("maps direct commit and correction action results", async () => {
+  it("maps direct commits and blocks unconfirmed meal corrections", async () => {
     const agentProvider = new QueueChatAgentProvider();
     const { request } = buildTestApp({ agentProvider });
     const { authHeader } = await registerAndAuth(request);
@@ -936,13 +936,10 @@ describe("AgentService", () => {
     });
     const correctedBody = (await corrected.json()) as {
       kind: string;
-      meal: { items: { name: string; quantity: number }[] };
+      message: string;
     };
-    expect(correctedBody.kind).toBe("meal_corrected");
-    expect(
-      correctedBody.meal.items.find((item) => item.name === "Chicken breast")
-        ?.quantity,
-    ).toBe(200);
+    expect(correctedBody.kind).toBe("clarification_required");
+    expect(correctedBody.message).toContain("correct_meal");
   });
 
   it("runs a full active proposal revision session before commit", async () => {

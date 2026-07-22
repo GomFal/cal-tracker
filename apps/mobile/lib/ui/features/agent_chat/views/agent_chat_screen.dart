@@ -141,6 +141,8 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
                                 child: _AgentTimelineEntry(
                                   entry: entry,
                                   onProposalAction: _handleProposalAction,
+                                  onMealCorrectionAction:
+                                      _handleMealCorrectionAction,
                                 ),
                               ),
                               const SizedBox(height: FreshSpacing.md),
@@ -249,6 +251,15 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
       return;
     }
     unawaited(viewModel.commitProposalAction(action));
+  }
+
+  void _handleMealCorrectionAction(AgentChatMealCorrectionAction action) {
+    final viewModel = context.read<AgentChatViewModel>();
+    if (action.type == AgentChatMealCorrectionActionType.cancel) {
+      viewModel.cancelMealCorrection(action);
+      return;
+    }
+    unawaited(viewModel.confirmMealCorrection(action));
   }
 
   void _sendPrompt(String prompt) {
@@ -475,10 +486,12 @@ class _AgentTimelineEntry extends StatelessWidget {
   const _AgentTimelineEntry({
     required this.entry,
     required this.onProposalAction,
+    required this.onMealCorrectionAction,
   });
 
   final AgentChatEntry entry;
   final ValueChanged<AgentChatProposalAction> onProposalAction;
+  final ValueChanged<AgentChatMealCorrectionAction> onMealCorrectionAction;
 
   @override
   Widget build(BuildContext context) {
@@ -486,9 +499,10 @@ class _AgentTimelineEntry extends StatelessWidget {
       AgentChatEntryKind.user => _UserBubble(text: entry.text),
       AgentChatEntryKind.assistant => _AssistantBubble(entry: entry),
       AgentChatEntryKind.tool => _ToolCallCard(
-        entry: entry,
-        onProposalAction: onProposalAction,
-      ),
+          entry: entry,
+          onProposalAction: onProposalAction,
+          onMealCorrectionAction: onMealCorrectionAction,
+        ),
     };
   }
 }
@@ -672,10 +686,15 @@ class _AgentStatusCard extends StatelessWidget {
 }
 
 class _ToolCallCard extends StatelessWidget {
-  const _ToolCallCard({required this.entry, required this.onProposalAction});
+  const _ToolCallCard({
+    required this.entry,
+    required this.onProposalAction,
+    required this.onMealCorrectionAction,
+  });
 
   final AgentChatEntry entry;
   final ValueChanged<AgentChatProposalAction> onProposalAction;
+  final ValueChanged<AgentChatMealCorrectionAction> onMealCorrectionAction;
 
   @override
   Widget build(BuildContext context) {
@@ -755,6 +774,7 @@ class _ToolCallCard extends StatelessWidget {
                   completionMessage: entry.completionMessage,
                   sourceToolCallId: toolCall?.id,
                   onProposalAction: onProposalAction,
+                  onMealCorrectionAction: onMealCorrectionAction,
                 ),
               ),
             ],
@@ -770,6 +790,7 @@ class _AgentResultWidget extends StatelessWidget {
     required this.entryId,
     required this.result,
     required this.onProposalAction,
+    required this.onMealCorrectionAction,
     this.sourceToolCallId,
     this.completionMessage,
   });
@@ -778,10 +799,19 @@ class _AgentResultWidget extends StatelessWidget {
   final AgentRunResult result;
   final String? sourceToolCallId;
   final ValueChanged<AgentChatProposalAction> onProposalAction;
+  final ValueChanged<AgentChatMealCorrectionAction> onMealCorrectionAction;
   final String? completionMessage;
 
   @override
   Widget build(BuildContext context) {
+    if (result.kind == 'meal_correction_preview' && result.meal != null) {
+      return _MealCorrectionPreview(
+        meal: result.meal!,
+        entryId: entryId,
+        sourceToolCallId: sourceToolCallId,
+        onAction: onMealCorrectionAction,
+      );
+    }
     final proposal = result.proposal;
     if (proposal != null) {
       return _ProposalSummary(
@@ -807,7 +837,7 @@ class _AgentResultWidget extends StatelessWidget {
       return _TemplateList(templates: result.templates!);
     }
     if (result.template != null) {
-      return _TemplateList(templates: [result.template!]);
+      return _TemplateDetail(template: result.template!);
     }
     if (result.usualFoodDraft != null) {
       return _UsualFoodDraftReview(
@@ -1151,8 +1181,7 @@ class _ProposalActions extends StatelessWidget {
     final viewModel = context.watch<AgentChatViewModel>();
     final state = viewModel.proposalActionState(proposal.id);
     final conversationId = viewModel.conversationId;
-    final canAct =
-        sourceToolCallId != null &&
+    final canAct = sourceToolCallId != null &&
         conversationId != null &&
         viewModel.activeProposalId == proposal.id &&
         !viewModel.isProposalCommitted(proposal.id) &&
@@ -1188,8 +1217,8 @@ class _ProposalActions extends StatelessWidget {
             key: ValueKey('agent_chat_proposal_save_button_${proposal.id}'),
             onPressed: canAct && !isSaving
                 ? () => onProposalAction(
-                    action(AgentChatProposalActionType.commit),
-                  )
+                      action(AgentChatProposalActionType.commit),
+                    )
                 : null,
             child: Text(
               isSaving
@@ -1207,8 +1236,8 @@ class _ProposalActions extends StatelessWidget {
             key: ValueKey('agent_chat_proposal_correct_button_${proposal.id}'),
             onPressed: canAct && !isSaving
                 ? () => onProposalAction(
-                    action(AgentChatProposalActionType.correct),
-                  )
+                      action(AgentChatProposalActionType.correct),
+                    )
                 : null,
             child: Text(context.l10n.agentChatProposalCorrect),
           ),
@@ -1233,7 +1262,151 @@ class _MealSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _NutritionHeader(title: meal.title, nutrition: meal.nutrition);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _NutritionHeader(title: meal.title, nutrition: meal.nutrition),
+        const SizedBox(height: FreshSpacing.md),
+        _ItemList(items: meal.items),
+      ],
+    );
+  }
+}
+
+class _MealCorrectionPreview extends StatelessWidget {
+  const _MealCorrectionPreview({
+    required this.meal,
+    required this.entryId,
+    required this.sourceToolCallId,
+    required this.onAction,
+  });
+
+  final Meal meal;
+  final String entryId;
+  final String? sourceToolCallId;
+  final ValueChanged<AgentChatMealCorrectionAction> onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final viewModel = context.watch<AgentChatViewModel>();
+    final toolCallId = sourceToolCallId;
+    final state = toolCallId == null
+        ? AgentChatMealCorrectionActionState.failed
+        : viewModel.mealCorrectionActionState(toolCallId);
+    final conversationId = viewModel.conversationId;
+    final isSaving = state == AgentChatMealCorrectionActionState.saving;
+    final canAct = toolCallId != null &&
+        conversationId != null &&
+        state != AgentChatMealCorrectionActionState.succeeded &&
+        state != AgentChatMealCorrectionActionState.cancelled;
+    AgentChatMealCorrectionAction action(
+      AgentChatMealCorrectionActionType type,
+    ) =>
+        AgentChatMealCorrectionAction(
+          type: type,
+          conversationId: conversationId!,
+          entryId: entryId,
+          sourceToolCallId: toolCallId!,
+          mealId: meal.id,
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _DraftHeader(
+          icon: Icons.edit_note_rounded,
+          title: context.l10n.agentChatMealCorrectionPreviewTitle,
+          subtitle: context.l10n.agentChatMealCorrectionPreviewSubtitle,
+        ),
+        const SizedBox(height: FreshSpacing.md),
+        _NutritionHeader(title: meal.title, nutrition: meal.nutrition),
+        const SizedBox(height: FreshSpacing.md),
+        _ItemList(items: meal.items),
+        const SizedBox(height: FreshSpacing.md),
+        if (state == AgentChatMealCorrectionActionState.succeeded)
+          FreshStatusBanner(
+            key: const ValueKey('agent_chat_meal_correction_succeeded'),
+            icon: Icons.check_circle_rounded,
+            title: context.l10n.agentChatMealCorrectionApplied,
+            color: context.freshPalette.limeDeep,
+          )
+        else if (state == AgentChatMealCorrectionActionState.cancelled)
+          Text(
+            context.l10n.agentChatMealCorrectionCancelled,
+            key: const ValueKey('agent_chat_meal_correction_cancelled'),
+          )
+        else if (state == AgentChatMealCorrectionActionState.stale)
+          FreshStatusBanner(
+            key: const ValueKey('agent_chat_meal_correction_stale'),
+            icon: Icons.refresh_rounded,
+            title: context.l10n.agentChatMealCorrectionStale,
+            color: context.freshPalette.orange,
+          )
+        else ...[
+          Wrap(
+            spacing: FreshSpacing.sm,
+            runSpacing: FreshSpacing.sm,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Semantics(
+                button: true,
+                label: isSaving
+                    ? context.l10n.agentChatMealCorrectionSaving
+                    : state == AgentChatMealCorrectionActionState.failed
+                        ? context.l10n.agentChatMealCorrectionRetry
+                        : context.l10n.agentChatMealCorrectionConfirm,
+                child: FilledButton(
+                  key: ValueKey(
+                    'agent_chat_meal_correction_confirm_${meal.id}',
+                  ),
+                  onPressed: canAct && !isSaving
+                      ? () => onAction(
+                            action(
+                              AgentChatMealCorrectionActionType.confirm,
+                            ),
+                          )
+                      : null,
+                  child: Text(
+                    isSaving
+                        ? context.l10n.agentChatMealCorrectionSaving
+                        : state == AgentChatMealCorrectionActionState.failed
+                            ? context.l10n.agentChatMealCorrectionRetry
+                            : context.l10n.agentChatMealCorrectionConfirm,
+                  ),
+                ),
+              ),
+              Semantics(
+                button: true,
+                label: context.l10n.agentChatMealCorrectionCancel,
+                child: OutlinedButton(
+                  key: ValueKey(
+                    'agent_chat_meal_correction_cancel_${meal.id}',
+                  ),
+                  onPressed: canAct &&
+                          !isSaving &&
+                          state != AgentChatMealCorrectionActionState.stale
+                      ? () => onAction(
+                            action(AgentChatMealCorrectionActionType.cancel),
+                          )
+                      : null,
+                  child: Text(context.l10n.agentChatMealCorrectionCancel),
+                ),
+              ),
+              if (isSaving)
+                const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+            ],
+          ),
+          if (state == AgentChatMealCorrectionActionState.failed) ...[
+            const SizedBox(height: FreshSpacing.sm),
+            Text(context.l10n.agentChatMealCorrectionError),
+          ],
+        ],
+      ],
+    );
   }
 }
 
@@ -1431,6 +1604,27 @@ class _TemplateList extends StatelessWidget {
             trailing:
                 '${template.nutrition.calories} ${context.l10n.commonKcal}',
           ),
+      ],
+    );
+  }
+}
+
+class _TemplateDetail extends StatelessWidget {
+  const _TemplateDetail({required this.template});
+
+  final MealTemplate template;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _NutritionHeader(
+          title: template.title,
+          nutrition: template.nutrition,
+        ),
+        const SizedBox(height: FreshSpacing.md),
+        _ItemList(items: template.items),
       ],
     );
   }

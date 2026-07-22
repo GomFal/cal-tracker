@@ -280,6 +280,12 @@ class DashboardViewModel extends ChangeNotifier {
     for (final effect in change.effects) {
       if (effect.date != _today) continue;
       switch (effect.domain) {
+        case NutritionDataDomain.meals:
+          final meal = effect.meal;
+          if (meal != null && next != null) {
+            next = replaceMealInSummary(next, meal);
+            changed = true;
+          }
         case NutritionDataDomain.dailySummary:
           final summary = effect.dailySummary;
           if (summary != null) {
@@ -327,7 +333,7 @@ class DashboardViewModel extends ChangeNotifier {
   double _normalizedWater(double waterConsumedLiters) {
     final goal = roundHydrationLiters(_summary?.hydrationGoalLiters ?? 10);
     final clamped = waterConsumedLiters.clamp(0, goal).toDouble();
-    return roundHydrationLiters(clamped);
+    return normalizeHydrationConsumptionLiters(clamped);
   }
 
   Future<CalorieEstimate> estimateCalories({

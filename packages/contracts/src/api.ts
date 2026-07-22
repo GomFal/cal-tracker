@@ -16,6 +16,7 @@ import {
   mealProposalSchema,
   mealSchema,
   mealTemplateSchema,
+  milliliterLiterSchema,
   nutritionSnapshotSchema,
   quarterLiterSchema,
   usualFoodSchema,
@@ -101,6 +102,22 @@ export const commitAgentChatProposalResponseSchema = z.object({
   conversationMessage: z.unknown(),
 });
 
+export const commitAgentChatMealCorrectionRequestSchema =
+  commitAgentChatProposalRequestSchema;
+
+export const commitAgentChatMealCorrectionResponseSchema = z.object({
+  actionId: z.literal("correct_meal"),
+  clientMutationId: uuidSchema,
+  reused: z.boolean(),
+  result: z.object({
+    kind: z.literal("meal_corrected"),
+    meal: mealSchema,
+    message: z.string(),
+    confirmedMutation: confirmedNutritionMutationSchema,
+  }),
+  conversationMessage: z.unknown(),
+});
+
 export const agentConversationSummarySchema = z.object({
   id: uuidSchema,
   userId: uuidSchema.optional(),
@@ -154,9 +171,13 @@ export const agentRunResponseSchema = z.object({
     "summary",
     "remaining_targets",
     "history",
+    "meal_details",
+    "meal_correction_preview",
+    "hydration_updated",
     "food_memory",
     "nutrition_search",
     "templates",
+    "template_details",
     "template_saved",
     "template_deleted",
     "usual_food_draft",
@@ -184,6 +205,9 @@ export const agentRunResponseSchema = z.object({
   candidateGroups: z
     .array(z.union([foodCandidateSchema, z.unknown()]))
     .optional(),
+  requiresConfirmation: z.boolean().optional(),
+  sourceMealId: uuidSchema.optional(),
+  confirmedMutation: confirmedNutritionMutationSchema.optional(),
 });
 
 export const transcriptionResponseSchema = z.object({
@@ -350,7 +374,7 @@ export const goalsUpdateSchema = z
 
 export const dailyHydrationUpdateSchema = z.object({
   date: z.string().optional(),
-  waterConsumedLiters: quarterLiterSchema,
+  waterConsumedLiters: milliliterLiterSchema,
 });
 
 export const dailyHydrationResponseSchema = z.object({

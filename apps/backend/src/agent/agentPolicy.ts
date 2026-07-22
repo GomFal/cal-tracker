@@ -7,6 +7,7 @@ const agentRunBlockedMutations = new Set([
   "create_meal_template",
   "update_meal_template",
   "delete_meal_template",
+  "correct_meal",
 ]);
 
 export function filterToolsByPolicy(actions: ActionDefinition[], context: ActionContext): ActionDefinition[] {

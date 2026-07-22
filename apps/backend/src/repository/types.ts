@@ -205,6 +205,7 @@ export type ActionCallRecord = {
   source: string;
   input: unknown;
   output?: unknown;
+  internalMetadata?: unknown;
   error?: unknown;
   confirmationStatus: string;
   traceId: string;
@@ -719,6 +720,16 @@ export type AgentChatProposalCommit = {
   result?: unknown;
 };
 
+export type AgentChatMealCorrectionCommit = {
+  actionId: "correct_meal";
+  clientMutationId: string;
+  reused: boolean;
+  meal: Meal;
+  conversationMessage: AgentConversationMessageRecord;
+  /** Persisted canonical AgentChatMappedResult. */
+  result: unknown;
+};
+
 export type AgentCandidateRegistryRecord = {
   id: string;
   userId: string;
@@ -836,6 +847,12 @@ export interface AppRepository {
     date: string,
     waterConsumedLiters: number,
   ): Promise<DailySummary>;
+  recordDailyHydration(
+    userId: string,
+    date: string,
+    mode: "add" | "set",
+    amountLiters: number,
+  ): Promise<DailySummary>;
   listMeals(userId: string, limit?: number): Promise<Meal[]>;
   getMeal(userId: string, mealId: string): Promise<Meal | undefined>;
   createProposal(
@@ -915,6 +932,16 @@ export interface AppRepository {
       traceId: string;
     },
   ): Promise<AgentChatProposalCommit>;
+  commitAgentChatMealCorrection(
+    userId: string,
+    input: {
+      conversationId: string;
+      mealId: string;
+      sourceToolCallId: string;
+      clientMutationId: string;
+      traceId: string;
+    },
+  ): Promise<AgentChatMealCorrectionCommit>;
   persistAgentChatProposalCommitResult(
     userId: string,
     input: {

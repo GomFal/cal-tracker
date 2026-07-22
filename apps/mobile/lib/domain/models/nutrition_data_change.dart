@@ -3,6 +3,7 @@ import 'nutrition_models.dart';
 enum NutritionDataDomain {
   dailySummary,
   dailyGoals,
+  meals,
   mealTemplates,
   usualFoods,
 }
@@ -53,6 +54,16 @@ class NutritionDataEffect {
     if (value == null) return null;
     try {
       return MealTemplate.fromJson(value);
+    } on Object {
+      return null;
+    }
+  }
+
+  Meal? get meal {
+    final value = snapshot;
+    if (value == null) return null;
+    try {
+      return Meal.fromJson(value);
     } on Object {
       return null;
     }
@@ -152,6 +163,7 @@ NutritionDataEffect? _parseEffect(Object? value) {
   final domain = switch (json['domain']) {
     'daily_summary' => NutritionDataDomain.dailySummary,
     'daily_goals' => NutritionDataDomain.dailyGoals,
+    'meals' => NutritionDataDomain.meals,
     'meal_templates' => NutritionDataDomain.mealTemplates,
     'usual_foods' => NutritionDataDomain.usualFoods,
     _ => null,
@@ -177,6 +189,10 @@ NutritionDataEffect? _parseEffect(Object? value) {
   if (json['revision'] != null && json['revision'] is! String) return null;
   if (snapshot != null && snapshot is! Map) return null;
   if (domain == NutritionDataDomain.dailySummary && date is! String) {
+    return null;
+  }
+  if (domain == NutritionDataDomain.meals &&
+      (date is! String || entityId is! String || snapshot is! Map)) {
     return null;
   }
   if ((domain == NutritionDataDomain.mealTemplates ||

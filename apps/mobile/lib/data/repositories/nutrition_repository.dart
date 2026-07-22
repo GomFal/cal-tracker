@@ -34,6 +34,7 @@ class AgentRunResult {
     this.usualMealDraft,
     this.sourceProposalId,
     this.confirmedMutation,
+    this.requiresConfirmation,
   });
 
   final String kind;
@@ -57,6 +58,7 @@ class AgentRunResult {
   final UsualMealDraft? usualMealDraft;
   final String? sourceProposalId;
   final ConfirmedNutritionMutation? confirmedMutation;
+  final bool? requiresConfirmation;
 }
 
 class VoiceMealRunResult {
@@ -444,6 +446,22 @@ class AgentChatProposalCommitResult {
   Meal get meal => result.meal!;
 }
 
+class AgentChatMealCorrectionCommitResult {
+  const AgentChatMealCorrectionCommitResult({
+    required this.clientMutationId,
+    required this.reused,
+    required this.result,
+    required this.conversationMessage,
+  });
+
+  final String clientMutationId;
+  final bool reused;
+  final AgentRunResult result;
+  final AgentConversationMessage conversationMessage;
+
+  Meal get meal => result.meal!;
+}
+
 /// The response belongs to an authenticated cache owner that is no longer
 /// active. Callers must silently discard it rather than mutating current UI.
 class StaleNutritionResponseException implements Exception {
@@ -475,6 +493,8 @@ class NutritionRepository {
   final Map<String, DateTime> _dailySummaryRefreshStartedAt = {};
   final Map<String, Future<AgentChatProposalCommitResult>>
       _agentProposalCommits = {};
+  final Map<String, Future<AgentChatMealCorrectionCommitResult>>
+      _agentMealCorrectionCommits = {};
   final Set<String> _pendingDailySummaryRefreshes = {};
   Future<List<MealTemplate>>? _templatesRefresh;
   Future<List<UsualFood>>? _usualFoodsRefresh;
@@ -890,6 +910,87 @@ class NutritionRepository {
       throw const StaleNutritionResponseException();
     }
     return AgentChatProposalCommitResult(
+      clientMutationId: json['clientMutationId'] as String? ?? clientMutationId,
+      reused: json['reused'] as bool? ?? false,
+      result: result,
+      conversationMessage: AgentConversationMessage.fromJson(
+        json['conversationMessage'] as Map<String, Object?>,
+      ),
+    );
+  }
+
+  Future<AgentChatMealCorrectionCommitResult> commitAgentChatMealCorrection({
+    required String conversationId,
+    required String mealId,
+    required String sourceToolCallId,
+    required String clientMutationId,
+  }) {
+    final scope = _captureScope();
+    final operationKey =
+        '${scope.userId ?? '<signed-out>'}:$mealId:$clientMutationId';
+    final existing = _agentMealCorrectionCommits[operationKey];
+    if (existing != null) return existing;
+    final request = _commitAgentChatMealCorrection(
+      conversationId: conversationId,
+      mealId: mealId,
+      sourceToolCallId: sourceToolCallId,
+      clientMutationId: clientMutationId,
+      expectedScope: scope,
+    );
+    late final Future<AgentChatMealCorrectionCommitResult> future;
+    void removeIfCurrent() {
+      if (identical(_agentMealCorrectionCommits[operationKey], future)) {
+        _agentMealCorrectionCommits.remove(operationKey);
+      }
+    }
+
+    future = request.then<AgentChatMealCorrectionCommitResult>(
+      (result) {
+        removeIfCurrent();
+        return result;
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        removeIfCurrent();
+        return Future<AgentChatMealCorrectionCommitResult>.error(
+          error,
+          stackTrace,
+        );
+      },
+    );
+    _agentMealCorrectionCommits[operationKey] = future;
+    return future;
+  }
+
+  Future<AgentChatMealCorrectionCommitResult> _commitAgentChatMealCorrection({
+    required String conversationId,
+    required String mealId,
+    required String sourceToolCallId,
+    required String clientMutationId,
+    required _RepositoryScope expectedScope,
+  }) async {
+    final json = await _apiClient.commitAgentChatMealCorrection(
+      conversationId: conversationId,
+      mealId: mealId,
+      sourceToolCallId: sourceToolCallId,
+      clientMutationId: clientMutationId,
+    );
+    _healthMonitor.recordSuccess();
+    if (!_isScopeCurrent(expectedScope)) {
+      throw const StaleNutritionResponseException();
+    }
+    final result = agentRunResultFromJson(
+      json['result'] as Map<String, Object?>,
+    );
+    if (result.kind != 'meal_corrected' ||
+        result.meal == null ||
+        result.confirmedMutation == null) {
+      throw const ApiException(502, 'Invalid meal correction response.');
+    }
+    await reconcileConfirmedMutation(result.confirmedMutation!);
+    if (!_isScopeCurrent(expectedScope)) {
+      throw const StaleNutritionResponseException();
+    }
+    return AgentChatMealCorrectionCommitResult(
       clientMutationId: json['clientMutationId'] as String? ?? clientMutationId,
       reused: json['reused'] as bool? ?? false,
       result: result,
@@ -1466,6 +1567,21 @@ class NutritionRepository {
     if (!_isCurrentScope(userId, epoch)) return;
     final cacheStore = _cacheStore;
     switch (effect.domain) {
+      case NutritionDataDomain.meals:
+        final date = effect.date!;
+        _invalidateCacheKey('daily_summary:$date');
+        final meal = effect.meal;
+        final cached = await cachedDailySummary(date: date);
+        if (!_isCurrentScope(userId, epoch)) return;
+        if (effect.operation == NutritionDataOperation.upsert &&
+            cached != null &&
+            meal != null &&
+            cached.value.meals.any((existing) => existing.id == meal.id)) {
+          await putCachedDailySummary(replaceMealInSummary(cached.value, meal));
+        } else {
+          await cacheStore?.markDailySummaryStale(date);
+          _refreshAffectedDailySummary(date, userId, epoch);
+        }
       case NutritionDataDomain.dailySummary:
         final date = effect.date!;
         _invalidateCacheKey('daily_summary:$date');
@@ -1565,6 +1681,8 @@ class NutritionRepository {
       _isScopeCurrent(_RepositoryScope(userId: userId, epoch: epoch));
 
   void _clearRefreshState() {
+    _agentProposalCommits.clear();
+    _agentMealCorrectionCommits.clear();
     _dailySummaryRefreshes.clear();
     _dailySummaryRefreshStartedAt.clear();
     _pendingDailySummaryRefreshes.clear();
@@ -1613,7 +1731,8 @@ class NutritionRepository {
   String _cacheKeyForEffect(NutritionDataEffect effect) =>
       switch (effect.domain) {
         NutritionDataDomain.dailySummary ||
-        NutritionDataDomain.dailyGoals =>
+        NutritionDataDomain.dailyGoals ||
+        NutritionDataDomain.meals =>
           'daily_summary:${effect.date ?? effect.dailyGoals?.date ?? ''}',
         NutritionDataDomain.mealTemplates => 'meal_templates',
         NutritionDataDomain.usualFoods => 'usual_foods',
@@ -2009,6 +2128,7 @@ AgentRunResult agentRunResultFromJson(Map<String, Object?> json) {
     confirmedMutation: ConfirmedNutritionMutation.tryParse(
       json['confirmedMutation'],
     ),
+    requiresConfirmation: json['requiresConfirmation'] as bool?,
   );
 }
 

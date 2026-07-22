@@ -315,6 +315,7 @@ function compactMappedResult(input: {
     errorMessage: mappedResult.errorMessage,
     proposal: compactProposal(recordValue(mappedResult.proposal)),
     meal: compactMeal(recordValue(mappedResult.meal)),
+    template: compactTemplate(recordValue(mappedResult.template)),
     summary: compactSummary(recordValue(mappedResult.summary)),
     remaining: compactNutrition(recordValue(mappedResult.remaining)),
     selectedItem: compactMealItem(recordValue(mappedResult.selectedItem)),
@@ -386,13 +387,13 @@ function rowProfile(row: Record<string, unknown>): {
       values: (value, index) => [
         index,
         value.id,
-        value.loggedAt ?? value.createdAt ?? value.updatedAt,
+        value.occurredAt ?? value.createdAt ?? value.updatedAt,
         value.title ?? value.name,
-        value.calories,
-        value.proteinGrams,
-        value.carbsGrams,
-        value.fatGrams,
-        arrayLength(value.items),
+        recordValue(value.nutrition)?.calories ?? value.calories,
+        recordValue(value.nutrition)?.proteinGrams ?? value.proteinGrams,
+        recordValue(value.nutrition)?.carbsGrams ?? value.carbsGrams,
+        recordValue(value.nutrition)?.fatGrams ?? value.fatGrams,
+        mealItemsNotation(value.items),
       ],
     };
   }
@@ -404,10 +405,10 @@ function rowProfile(row: Record<string, unknown>): {
         value.id ?? value.externalId,
         value.name,
         quantityText(value),
-        value.calories,
-        value.proteinGrams,
-        value.carbsGrams,
-        value.fatGrams,
+        recordValue(value.nutrition)?.calories ?? value.calories,
+        recordValue(value.nutrition)?.proteinGrams ?? value.proteinGrams,
+        recordValue(value.nutrition)?.carbsGrams ?? value.carbsGrams,
+        recordValue(value.nutrition)?.fatGrams ?? value.fatGrams,
         value.externalSource ?? value.source,
       ],
     };
@@ -642,6 +643,14 @@ function compactInput(input: unknown): unknown {
     text: record.text,
     phrase: record.phrase,
     title: record.title,
+    mealId: record.mealId,
+    templateId: record.templateId,
+    instruction: record.instruction,
+    operations: record.operations,
+    date: record.date,
+    mode: record.mode,
+    amount: record.amount,
+    unit: record.unit,
     searchRef: record.searchRef,
     candidateRef: record.candidateRef,
     groupIndex: record.groupIndex,
@@ -655,11 +664,8 @@ function compactProposal(value: Record<string, unknown> | undefined): unknown {
     id: value.id,
     title: value.title,
     status: value.status,
-    totalCalories: value.totalCalories ?? value.calories,
-    totalProteinGrams: value.totalProteinGrams ?? value.proteinGrams,
-    totalCarbsGrams: value.totalCarbsGrams ?? value.carbsGrams,
-    totalFatGrams: value.totalFatGrams ?? value.fatGrams,
-    itemCount: arrayLength(value.items),
+    nutrition: compactNutrition(recordValue(value.nutrition)),
+    items: compactMealItems(value.items),
   });
 }
 
@@ -668,12 +674,10 @@ function compactMeal(value: Record<string, unknown> | undefined): unknown {
   return compactObject({
     id: value.id,
     title: value.title ?? value.name,
-    loggedAt: value.loggedAt,
-    calories: value.calories,
-    proteinGrams: value.proteinGrams,
-    carbsGrams: value.carbsGrams,
-    fatGrams: value.fatGrams,
-    itemCount: arrayLength(value.items),
+    occurredAt: value.occurredAt,
+    mealLabel: value.mealLabel,
+    nutrition: compactNutrition(recordValue(value.nutrition)),
+    items: compactMealItems(value.items),
   });
 }
 
@@ -681,12 +685,42 @@ function compactSummary(value: Record<string, unknown> | undefined): unknown {
   if (!value) return undefined;
   return compactObject({
     date: value.date,
-    calories: value.calories,
-    proteinGrams: value.proteinGrams,
-    carbsGrams: value.carbsGrams,
-    fatGrams: value.fatGrams,
+    consumed: compactNutrition(recordValue(value.consumed)),
+    target: compactNutrition(recordValue(value.target)),
+    remaining: compactNutrition(recordValue(value.remaining)),
+    hydrationGoalLiters: value.hydrationGoalLiters,
+    waterConsumedLiters: value.waterConsumedLiters,
     mealCount: arrayLength(value.meals),
   });
+}
+
+function compactTemplate(value: Record<string, unknown> | undefined): unknown {
+  if (!value) return undefined;
+  return compactObject({
+    id: value.id,
+    title: value.title,
+    trustedAutoCommitEnabled: value.trustedAutoCommitEnabled,
+    aliases: value.aliases,
+    nutrition: compactNutrition(recordValue(value.nutrition)),
+    items: compactMealItems(value.items),
+  });
+}
+
+function compactMealItems(value: unknown): unknown[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value
+    .map(recordValue)
+    .filter((item): item is Record<string, unknown> => Boolean(item))
+    .map(compactMealItem);
+}
+
+function mealItemsNotation(value: unknown): string {
+  if (!Array.isArray(value)) return "";
+  return value
+    .map(recordValue)
+    .filter((item): item is Record<string, unknown> => Boolean(item))
+    .map((item) => `${item.quantity ?? ""}${item.unit ?? ""} ${item.name ?? ""}`.trim())
+    .join(",");
 }
 
 function compactNutrition(value: Record<string, unknown> | undefined): unknown {

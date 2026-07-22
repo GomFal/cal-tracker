@@ -21,6 +21,7 @@ import type {
   AgentConversationMessageRecord,
   AgentConversationRecord,
   AgentChatProposalCommit,
+  AgentChatMealCorrectionCommit,
   AgentToolExecutionSnapshot,
   AppRepository,
 } from "../repository/types.js";
@@ -93,10 +94,14 @@ export type AgentChatResultKind =
   | "summary"
   | "remaining_targets"
   | "history"
+  | "meal_details"
+  | "meal_correction_preview"
+  | "hydration_updated"
   | "food_memory"
   | "nutrition_search"
   | "usual_foods"
   | "templates"
+  | "template_details"
   | "template_saved"
   | "template_deleted"
   | "usual_food_draft"
@@ -132,6 +137,14 @@ type AgentChatMappedResultCore =
   | { kind: "summary"; summary: DailySummary; message: string }
   | { kind: "remaining_targets"; remaining: NutritionSnapshot; message: string }
   | { kind: "history"; meals: Meal[]; message: string }
+  | { kind: "meal_details"; meal: Meal; message: string }
+  | {
+      kind: "meal_correction_preview";
+      meal: Meal;
+      requiresConfirmation: true;
+      message: string;
+    }
+  | { kind: "hydration_updated"; summary: DailySummary; message: string }
   | {
       kind: "food_memory";
       matches: unknown[];
@@ -148,6 +161,7 @@ type AgentChatMappedResultCore =
     }
   | { kind: "usual_foods"; usualFoods: UsualFood[]; message: string }
   | { kind: "templates"; templates: MealTemplate[]; message: string }
+  | { kind: "template_details"; template: MealTemplate; message: string }
   | { kind: "template_saved"; template: MealTemplate; message: string }
   | { kind: "template_deleted"; deleted: boolean; message: string }
   | {
@@ -344,6 +358,30 @@ export class AgentChatService {
       throw new Error("agent_direct_action_result_not_persisted");
     }
     return { ...committed, conversationMessage, result: canonicalResult };
+  }
+
+  async commitMealCorrectionDirect(input: {
+    context: ActionContext;
+    conversationId: string;
+    mealId: string;
+    sourceToolCallId: string;
+    clientMutationId: string;
+  }): Promise<AgentChatMealCorrectionCommit & { result: AgentChatMappedResult }> {
+    const committed = await this.repository.commitAgentChatMealCorrection(
+      input.context.actorUserId,
+      {
+        conversationId: input.conversationId,
+        mealId: input.mealId,
+        sourceToolCallId: input.sourceToolCallId,
+        clientMutationId: input.clientMutationId,
+        traceId: input.context.traceId,
+      },
+    );
+    const result = persistedDirectCorrectionResult(committed.result);
+    if (!result?.confirmedMutation) {
+      throw new Error("agent_direct_action_result_not_persisted");
+    }
+    return { ...committed, result };
   }
 
   async *chat(input: {
@@ -2389,8 +2427,12 @@ function describeToolCall(
     get_daily_summary: `Reading daily summary${text(input.date) ? ` for ${text(input.date)}` : ""}`,
     get_remaining_targets: "Checking remaining calorie and macro targets",
     get_meal_history: "Reading recent meal history",
+    get_meal_details: "Reading meal ingredients and nutrition",
+    preview_meal_correction: "Preparing a meal correction preview",
+    record_hydration: "Updating hydration",
     get_usual_foods: "Reading usual ingredients",
     get_usual_meals: "Reading usual meals",
+    get_meal_template_details: "Reading usual meal ingredients",
     draft_usual_food: "Preparing a usual ingredient draft",
     draft_usual_meal: "Preparing a usual meal draft",
   };
@@ -2537,6 +2579,40 @@ function mapActionResult(
         meals: output.meals as Meal[],
         message: "Here is your meal history.",
       };
+    case "get_meal_details":
+      return {
+        kind: "meal_details",
+        meal: output.meal as Meal,
+        message: "Here are the meal ingredients and nutrition.",
+      };
+    case "preview_meal_correction":
+      if (output.clarificationRequired || !output.meal) {
+        return {
+          kind: "clarification_required",
+          options: output.options as unknown[] | undefined,
+          candidateGroups: output.candidateGroups as unknown[] | undefined,
+          resolvedItems: output.resolvedItems as MealItem[] | undefined,
+          message:
+            typeof output.message === "string"
+              ? output.message
+              : "I need clarification before previewing this correction.",
+        };
+      }
+      return {
+        kind: "meal_correction_preview",
+        meal: output.meal as Meal,
+        requiresConfirmation: true,
+        message:
+          typeof output.message === "string"
+            ? output.message
+            : "Review this meal correction before confirming.",
+      };
+    case "record_hydration":
+      return {
+        kind: "hydration_updated",
+        summary: output.summary as DailySummary,
+        message: "Hydration updated.",
+      };
     case "get_usual_foods":
       return {
         kind: "usual_foods",
@@ -2548,6 +2624,12 @@ function mapActionResult(
         kind: "templates",
         templates: output.templates as MealTemplate[],
         message: "Here are your usual meals.",
+      };
+    case "get_meal_template_details":
+      return {
+        kind: "template_details",
+        template: output.template as MealTemplate,
+        message: "Here are the usual meal ingredients.",
       };
     case "draft_usual_food":
       return {
@@ -2624,10 +2706,14 @@ function widgetForResult(result: AgentChatMappedResult): AgentWidgetPayload {
     summary: "Daily summary",
     remaining_targets: "Remaining targets",
     history: "Meal history",
+    meal_details: "Meal details",
+    meal_correction_preview: "Meal correction preview",
+    hydration_updated: "Hydration updated",
     food_memory: "Food memory",
     nutrition_search: "Nutrition search",
     usual_foods: "Usual ingredients",
     templates: "Usual meals",
+    template_details: "Usual meal details",
     template_saved: "Usual meal saved",
     template_deleted: "Usual meal deleted",
     usual_food_draft: "Usual ingredient draft",
@@ -2659,6 +2745,19 @@ function persistedDirectCommitResult(
   if (
     !isRecord(value) ||
     value.kind !== "meal_committed" ||
+    !isRecord(value.meal)
+  ) {
+    return undefined;
+  }
+  return value as AgentChatMappedResult;
+}
+
+function persistedDirectCorrectionResult(
+  value: unknown,
+): AgentChatMappedResult | undefined {
+  if (
+    !isRecord(value) ||
+    value.kind !== "meal_corrected" ||
     !isRecord(value.meal)
   ) {
     return undefined;

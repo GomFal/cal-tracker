@@ -10,6 +10,7 @@ class ContentFrame extends StatelessWidget {
     this.actions,
     this.subtitle,
     this.leading,
+    this.layout = FreshPageLayout.standard,
   });
 
   final String title;
@@ -17,6 +18,7 @@ class ContentFrame extends StatelessWidget {
   final List<Widget>? actions;
   final String? subtitle;
   final Widget? leading;
+  final FreshPageLayout layout;
 
   @override
   Widget build(BuildContext context) {
@@ -25,6 +27,7 @@ class ContentFrame extends StatelessWidget {
       subtitle: subtitle,
       actions: actions ?? const [],
       leading: leading,
+      layout: layout,
       child: child,
     );
   }
@@ -38,6 +41,7 @@ class ContentSliverFrame extends StatelessWidget {
     this.actions,
     this.subtitle,
     this.leading,
+    this.layout = FreshPageLayout.standard,
   });
 
   final String title;
@@ -45,6 +49,7 @@ class ContentSliverFrame extends StatelessWidget {
   final List<Widget>? actions;
   final String? subtitle;
   final Widget? leading;
+  final FreshPageLayout layout;
 
   @override
   Widget build(BuildContext context) {
@@ -53,6 +58,7 @@ class ContentSliverFrame extends StatelessWidget {
       subtitle: subtitle,
       actions: actions ?? const [],
       leading: leading,
+      layout: layout,
       slivers: slivers,
     );
   }

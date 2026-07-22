@@ -19,8 +19,28 @@ import '../view_models/dashboard_view_model.dart';
 import 'calorie_target_sheet.dart';
 import 'macro_distribution_sheet.dart';
 
+class _DashboardMetrics {
+  const _DashboardMetrics._();
+
+  static const sectionGap = 12.0;
+  static const headingGap = 9.0;
+  static const compactGap = 6.0;
+  static const avatarSize = 36.0;
+  static const avatarIconSize = 15.0;
+  static const heroValueSize = 33.0;
+  static const heroRingSize = 87.0;
+  static const heroRingStroke = 8.5;
+  static const macroIconSize = 25.0;
+  static const macroRuleHeight = 66.0;
+  static const macroProgressHeight = 3.0;
+  static const emptyMealsIconSize = 36.0;
+  static const minimumTapTarget = 48.0;
+}
+
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  const DashboardScreen({super.key, this.currentDate});
+
+  final DateTime? currentDate;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -48,13 +68,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ? user!.displayName
         : l10n.fallbackUserName;
     return ContentFrame(
+      layout: FreshPageLayout.compact,
       title: displayName,
       subtitle: l10n.dashboardGreeting,
       leading: const _Avatar(),
       actions: [
-        _DashboardDatePill(label: dashboardDayMonthLabel(DateTime.now(), l10n)),
+        _DashboardDatePill(
+          label: dashboardDayMonthLabel(
+              widget.currentDate ?? DateTime.now(), l10n),
+        ),
       ],
       child: Column(
+        key: const ValueKey('dashboard_compact_content'),
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (viewModel.isLoading) ...[
@@ -80,21 +105,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
               summary: summary,
               onSetup: () => _showCalorieTargetSheet(context, viewModel),
             ),
-            const SizedBox(height: FreshSpacing.lg),
+            const SizedBox(height: _DashboardMetrics.sectionGap),
             _MacroSection(summary: summary),
-            const SizedBox(height: FreshSpacing.lg),
+            const SizedBox(height: _DashboardMetrics.sectionGap),
             _WaterSection(
               summary: summary,
               enabled: !viewModel.isLoading,
               onUpdate: viewModel.updateDailyWater,
             ),
-            const SizedBox(height: FreshSpacing.lg),
+            const SizedBox(height: _DashboardMetrics.sectionGap),
             _MealSection(
               summary: summary,
               onEditMeal: (meal) =>
                   _showMealItemEditor(context, viewModel, meal),
             ),
-            const SizedBox(height: FreshSpacing.lg),
+            const SizedBox(height: _DashboardMetrics.sectionGap),
           ],
         ],
       ),
@@ -229,14 +254,20 @@ class _Avatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
-    return Container(
-      width: 48,
-      height: 48,
-      decoration: BoxDecoration(
-        color: palette.surfaceSoft,
-        shape: BoxShape.circle,
+    return ExcludeSemantics(
+      child: Container(
+        width: _DashboardMetrics.avatarSize,
+        height: _DashboardMetrics.avatarSize,
+        decoration: BoxDecoration(
+          color: palette.surfaceSoft,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          Icons.person_rounded,
+          color: palette.lime,
+          size: _DashboardMetrics.avatarIconSize,
+        ),
       ),
-      child: Icon(Icons.person_rounded, color: palette.lime, size: 20),
     );
   }
 }
@@ -253,7 +284,13 @@ class _DashboardDatePill extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(Icons.calendar_today_outlined, color: palette.inkMuted, size: 16),
+        ExcludeSemantics(
+          child: Icon(
+            Icons.calendar_today_outlined,
+            color: palette.inkMuted,
+            size: 16,
+          ),
+        ),
         const SizedBox(width: 6),
         Text(
           label,
@@ -302,7 +339,7 @@ class _HeroCalorieSection extends StatelessWidget {
             letterSpacing: 1.4,
           ),
         ),
-        const SizedBox(height: FreshSpacing.md),
+        const SizedBox(height: _DashboardMetrics.headingGap),
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
@@ -314,7 +351,7 @@ class _HeroCalorieSection extends StatelessWidget {
                     '$remaining',
                     key: const ValueKey('dashboard_remaining_calories'),
                     style: textTheme.displayLarge?.copyWith(
-                      fontSize: 42,
+                      fontSize: _DashboardMetrics.heroValueSize,
                       height: 0.95,
                       fontWeight: FontWeight.w700,
                       fontFeatures: const [FontFeature.tabularFigures()],
@@ -329,7 +366,7 @@ class _HeroCalorieSection extends StatelessWidget {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: _DashboardMetrics.compactGap),
                   Text(
                     _consumedTargetMeta(l10n, consumed, target),
                     style: textTheme.bodyMedium?.copyWith(
@@ -341,11 +378,11 @@ class _HeroCalorieSection extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(width: FreshSpacing.md),
+            const SizedBox(width: _DashboardMetrics.headingGap),
             FreshProgressRing(
               progress: progress,
-              size: 116,
-              strokeWidth: 11.5,
+              size: _DashboardMetrics.heroRingSize,
+              strokeWidth: _DashboardMetrics.heroRingStroke,
               trackColor: palette.rule,
               color: palette.lime,
               center: Column(
@@ -397,7 +434,9 @@ class _CalorieSetupHero extends StatelessWidget {
         borderRadius: BorderRadius.circular(FreshRadii.lg),
         key: const ValueKey('dashboard_progress_card'),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: FreshSpacing.md),
+          padding: const EdgeInsets.symmetric(
+            vertical: _DashboardMetrics.headingGap,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -416,7 +455,7 @@ class _CalorieSetupHero extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              const SizedBox(height: FreshSpacing.sm),
+              const SizedBox(height: _DashboardMetrics.compactGap),
               Text(
                 l10n.calorieSetupHeadlineBadge,
                 style: textTheme.bodyLarge?.copyWith(
@@ -445,6 +484,24 @@ class _MacroSection extends StatelessWidget {
     final consumed = summary?.consumed ?? _emptyNutrition;
     final target = summary?.target ?? _emptyNutrition;
 
+    _MacroProgressRow macro({
+      required String assetPath,
+      required Key iconKey,
+      required String label,
+      required double consumedGrams,
+      required double targetGrams,
+      bool compact = false,
+    }) {
+      return _MacroProgressRow(
+        assetPath: assetPath,
+        iconKey: iconKey,
+        label: label,
+        consumedGrams: consumedGrams,
+        targetGrams: targetGrams,
+        compact: compact,
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -458,49 +515,85 @@ class _MacroSection extends StatelessWidget {
                 letterSpacing: 1.4,
               ),
             ),
-            const SizedBox(width: FreshSpacing.sm),
+            const SizedBox(width: _DashboardMetrics.compactGap),
             Expanded(
               child: Divider(color: palette.rule, height: 1, thickness: 1),
             ),
           ],
         ),
-        const SizedBox(height: FreshSpacing.md),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: _MacroProgressRow(
-                assetPath: 'assets/images/icons/svg/carbs_icon.svg',
-                iconKey: const ValueKey('dashboard_macro_carbs_icon'),
-                label: l10n.commonCarbs,
-                consumedGrams: consumed.carbsGrams,
-                targetGrams: target.carbsGrams,
-                iconSize: 36,
-              ),
-            ),
-            _VerticalRule(color: palette.rule),
-            Expanded(
-              child: _MacroProgressRow(
-                assetPath: 'assets/images/icons/svg/protein_icon.svg',
-                iconKey: const ValueKey('dashboard_macro_protein_icon'),
-                label: l10n.commonProtein,
-                consumedGrams: consumed.proteinGrams,
-                targetGrams: target.proteinGrams,
-                iconSize: 34,
-              ),
-            ),
-            _VerticalRule(color: palette.rule),
-            Expanded(
-              child: _MacroProgressRow(
-                assetPath: 'assets/images/icons/svg/fats_icon.svg',
-                iconKey: const ValueKey('dashboard_macro_fats_icon'),
-                label: l10n.commonFat,
-                consumedGrams: consumed.fatGrams,
-                targetGrams: target.fatGrams,
-                iconSize: 40,
-              ),
-            ),
-          ],
+        const SizedBox(height: _DashboardMetrics.headingGap),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final textScale = MediaQuery.textScalerOf(context).scale(1);
+            final useColumns = constraints.maxWidth >= 330 && textScale <= 1.3;
+            if (!useColumns) {
+              return Column(
+                children: [
+                  macro(
+                    assetPath: 'assets/images/icons/svg/carbs_icon.svg',
+                    iconKey: const ValueKey('dashboard_macro_carbs_icon'),
+                    label: l10n.commonCarbs,
+                    consumedGrams: consumed.carbsGrams,
+                    targetGrams: target.carbsGrams,
+                    compact: true,
+                  ),
+                  Divider(color: palette.rule, height: 13),
+                  macro(
+                    assetPath: 'assets/images/icons/svg/protein_icon.svg',
+                    iconKey: const ValueKey('dashboard_macro_protein_icon'),
+                    label: l10n.commonProtein,
+                    consumedGrams: consumed.proteinGrams,
+                    targetGrams: target.proteinGrams,
+                    compact: true,
+                  ),
+                  Divider(color: palette.rule, height: 13),
+                  macro(
+                    assetPath: 'assets/images/icons/svg/fats_icon.svg',
+                    iconKey: const ValueKey('dashboard_macro_fats_icon'),
+                    label: l10n.commonFat,
+                    consumedGrams: consumed.fatGrams,
+                    targetGrams: target.fatGrams,
+                    compact: true,
+                  ),
+                ],
+              );
+            }
+
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: macro(
+                    assetPath: 'assets/images/icons/svg/carbs_icon.svg',
+                    iconKey: const ValueKey('dashboard_macro_carbs_icon'),
+                    label: l10n.commonCarbs,
+                    consumedGrams: consumed.carbsGrams,
+                    targetGrams: target.carbsGrams,
+                  ),
+                ),
+                _VerticalRule(color: palette.rule),
+                Expanded(
+                  child: macro(
+                    assetPath: 'assets/images/icons/svg/protein_icon.svg',
+                    iconKey: const ValueKey('dashboard_macro_protein_icon'),
+                    label: l10n.commonProtein,
+                    consumedGrams: consumed.proteinGrams,
+                    targetGrams: target.proteinGrams,
+                  ),
+                ),
+                _VerticalRule(color: palette.rule),
+                Expanded(
+                  child: macro(
+                    assetPath: 'assets/images/icons/svg/fats_icon.svg',
+                    iconKey: const ValueKey('dashboard_macro_fats_icon'),
+                    label: l10n.commonFat,
+                    consumedGrams: consumed.fatGrams,
+                    targetGrams: target.fatGrams,
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ],
     );
@@ -516,8 +609,10 @@ class _VerticalRule extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: 1,
-      height: 88,
-      margin: const EdgeInsets.symmetric(horizontal: FreshSpacing.sm),
+      height: _DashboardMetrics.macroRuleHeight,
+      margin: const EdgeInsets.symmetric(
+        horizontal: _DashboardMetrics.compactGap,
+      ),
       color: color,
     );
   }
@@ -530,7 +625,7 @@ class _MacroProgressRow extends StatelessWidget {
     required this.label,
     required this.consumedGrams,
     required this.targetGrams,
-    required this.iconSize,
+    this.compact = false,
   });
 
   final String assetPath;
@@ -538,7 +633,7 @@ class _MacroProgressRow extends StatelessWidget {
   final String label;
   final double consumedGrams;
   final double targetGrams;
-  final double iconSize;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -547,33 +642,80 @@ class _MacroProgressRow extends StatelessWidget {
     final progress = targetGrams <= 0
         ? 0.0
         : (consumedGrams / targetGrams).clamp(0, 1).toDouble();
+    final icon = ExcludeSemantics(
+      child: SvgPicture.asset(
+        assetPath,
+        key: iconKey,
+        width: _DashboardMetrics.macroIconSize,
+        height: _DashboardMetrics.macroIconSize,
+        colorFilter: ColorFilter.mode(palette.lime, BlendMode.srcIn),
+      ),
+    );
+
+    if (compact) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          icon,
+          const SizedBox(width: _DashboardMetrics.headingGap),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: palette.inkSoft,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${_formatMacro(consumedGrams)} / '
+                  '${_formatMacro(targetGrams)} g · ${(progress * 100).round()}%',
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: palette.ink,
+                    fontWeight: FontWeight.w700,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+                const SizedBox(height: _DashboardMetrics.compactGap),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(999),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    backgroundColor: palette.rule,
+                    valueColor: AlwaysStoppedAnimation(palette.lime),
+                    minHeight: _DashboardMetrics.macroProgressHeight,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: FreshSpacing.md),
+      padding: const EdgeInsets.symmetric(horizontal: 2),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SvgPicture.asset(
-            assetPath,
-            key: iconKey,
-            width: iconSize,
-            height: iconSize,
-            colorFilter: ColorFilter.mode(palette.lime, BlendMode.srcIn),
-          ),
-          const SizedBox(height: FreshSpacing.sm),
+          icon,
+          const SizedBox(height: _DashboardMetrics.compactGap),
           Text(
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: textTheme.bodyMedium?.copyWith(
+            style: textTheme.labelMedium?.copyWith(
               color: palette.inkSoft,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: FreshSpacing.xs),
-          RichText(
-            text: TextSpan(
-              style: textTheme.titleMedium?.copyWith(
+          const SizedBox(height: 4),
+          Text.rich(
+            TextSpan(
+              style: textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w700,
                 fontFeatures: const [FontFeature.tabularFigures()],
               ),
@@ -588,23 +730,17 @@ class _MacroProgressRow extends StatelessWidget {
                 ),
               ],
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: FreshSpacing.sm),
+          const SizedBox(height: _DashboardMetrics.compactGap),
           ClipRRect(
             borderRadius: BorderRadius.circular(999),
             child: LinearProgressIndicator(
               value: progress,
               backgroundColor: palette.rule,
               valueColor: AlwaysStoppedAnimation(palette.lime),
-              minHeight: 4,
-            ),
-          ),
-          const SizedBox(height: FreshSpacing.xs),
-          Text(
-            '${(progress * 100).round()}%',
-            style: textTheme.bodySmall?.copyWith(
-              color: palette.inkMuted,
-              fontWeight: FontWeight.w500,
+              minHeight: _DashboardMetrics.macroProgressHeight,
             ),
           ),
         ],
@@ -647,17 +783,23 @@ class _WaterSection extends StatelessWidget {
                 letterSpacing: 1.4,
               ),
             ),
-            const SizedBox(width: FreshSpacing.sm),
+            const SizedBox(width: _DashboardMetrics.compactGap),
             Expanded(
               child: Divider(color: palette.rule, height: 1, thickness: 1),
             ),
           ],
         ),
-        const SizedBox(height: FreshSpacing.md),
+        const SizedBox(height: _DashboardMetrics.headingGap),
         Row(
           children: [
-            Icon(Icons.water_drop_outlined, color: palette.lime, size: 22),
-            const SizedBox(width: FreshSpacing.md),
+            ExcludeSemantics(
+              child: Icon(
+                Icons.water_drop_outlined,
+                color: palette.lime,
+                size: 18,
+              ),
+            ),
+            const SizedBox(width: _DashboardMetrics.headingGap),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -684,7 +826,7 @@ class _WaterSection extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(width: FreshSpacing.sm),
+            const SizedBox(width: _DashboardMetrics.compactGap),
             _WaterStepButton(
               key: const ValueKey('dashboard_water_decrease_button'),
               icon: Icons.remove_rounded,
@@ -694,7 +836,7 @@ class _WaterSection extends StatelessWidget {
                 _setWater(consumed - 0.25, goal);
               },
             ),
-            const SizedBox(width: FreshSpacing.sm),
+            const SizedBox(width: _DashboardMetrics.compactGap),
             _WaterStepButton(
               key: const ValueKey('dashboard_water_increase_button'),
               icon: Icons.add_rounded,
@@ -742,21 +884,36 @@ class _WaterStepButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.freshPalette;
-    return SizedBox.square(
-      dimension: 34,
-      child: IconButton(
-        tooltip: tooltip,
-        onPressed: enabled ? onPressed : null,
-        icon: Icon(icon, size: 18),
-        style: IconButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          foregroundColor: enabled ? palette.lime : palette.inkMuted,
-          disabledBackgroundColor: Colors.transparent,
-          disabledForegroundColor: palette.inkMuted,
-          shape: const CircleBorder(),
-          side: BorderSide(
-            color: enabled ? palette.rule : palette.ruleSoft,
-            width: 1.5,
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: tooltip,
+      onTap: enabled ? onPressed : null,
+      child: ExcludeSemantics(
+        child: SizedBox.square(
+          dimension: _DashboardMetrics.minimumTapTarget,
+          child: IconButton(
+            tooltip: tooltip,
+            onPressed: enabled ? onPressed : null,
+            icon: Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: enabled ? palette.rule : palette.ruleSoft,
+                  width: 1.5,
+                ),
+              ),
+              child: Icon(icon, size: 18),
+            ),
+            style: IconButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              foregroundColor: enabled ? palette.lime : palette.inkMuted,
+              disabledBackgroundColor: Colors.transparent,
+              disabledForegroundColor: palette.inkMuted,
+              padding: EdgeInsets.zero,
+            ),
           ),
         ),
       ),
@@ -801,19 +958,21 @@ class _MealSection extends StatelessWidget {
                 letterSpacing: 1.4,
               ),
             ),
-            const SizedBox(width: FreshSpacing.sm),
+            const SizedBox(width: _DashboardMetrics.compactGap),
             Expanded(
               child: Divider(color: palette.rule, height: 1, thickness: 1),
             ),
           ],
         ),
-        const SizedBox(height: FreshSpacing.md),
+        const SizedBox(height: _DashboardMetrics.headingGap),
         if (meals.isEmpty)
           const _DashboardEmptyMealsCard()
         else
           for (final meal in meals)
             Padding(
-              padding: const EdgeInsets.only(bottom: FreshSpacing.md),
+              padding: const EdgeInsets.only(
+                bottom: _DashboardMetrics.headingGap,
+              ),
               child: _MealRow(meal: meal, onEdit: () => onEditMeal(meal)),
             ),
       ],
@@ -835,8 +994,14 @@ class _DashboardEmptyMealsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Icon(Icons.room_service_outlined, size: 48, color: palette.inkMuted),
-          const SizedBox(height: FreshSpacing.md),
+          ExcludeSemantics(
+            child: Icon(
+              Icons.room_service_outlined,
+              size: _DashboardMetrics.emptyMealsIconSize,
+              color: palette.inkMuted,
+            ),
+          ),
+          const SizedBox(height: _DashboardMetrics.headingGap),
           Text(
             l10n.dashboardNoMealsLoggedToday,
             textAlign: TextAlign.center,
@@ -851,19 +1016,29 @@ class _DashboardEmptyMealsCard extends StatelessWidget {
             textAlign: TextAlign.center,
             style: textTheme.bodyMedium?.copyWith(color: palette.inkMuted),
           ),
-          const SizedBox(height: FreshSpacing.md),
-          TextButton.icon(
-            onPressed: () {
-              try {
-                context.push('/meal/create');
-              } catch (_) {}
-            },
-            icon: Icon(Icons.add_rounded, size: 18, color: palette.lime),
-            label: Text('${l10n.foodSearchAddAction} ${l10n.commonMeal}'),
-            style: TextButton.styleFrom(
-              foregroundColor: palette.lime,
-              textStyle: textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
+          const SizedBox(height: _DashboardMetrics.headingGap),
+          ConstrainedBox(
+            constraints: const BoxConstraints(
+              minHeight: _DashboardMetrics.minimumTapTarget,
+            ),
+            child: TextButton.icon(
+              key: const ValueKey('dashboard_empty_meals_add_button'),
+              onPressed: () {
+                try {
+                  context.push('/meal/create');
+                } catch (_) {}
+              },
+              icon: Icon(Icons.add_rounded, size: 18, color: palette.lime),
+              label: Text('${l10n.foodSearchAddAction} ${l10n.commonMeal}'),
+              style: TextButton.styleFrom(
+                foregroundColor: palette.lime,
+                minimumSize: const Size(
+                  _DashboardMetrics.minimumTapTarget,
+                  _DashboardMetrics.minimumTapTarget,
+                ),
+                textStyle: textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ),
@@ -884,53 +1059,69 @@ class _MealRow extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final palette = context.freshPalette;
     final l10n = context.l10n;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        key: ValueKey('dashboard_meal_row_${meal.id}'),
-        onTap: onEdit,
-        borderRadius: BorderRadius.circular(FreshRadii.sm),
-        child: Ink(
-          decoration: BoxDecoration(
-            border: Border(bottom: BorderSide(color: palette.rule, width: 1)),
-          ),
-          padding: const EdgeInsets.symmetric(vertical: FreshSpacing.md),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    return Semantics(
+      button: true,
+      label: '${meal.title}, ${l10n.caloriesValue(meal.nutrition.calories)}',
+      onTap: onEdit,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(
+          minHeight: _DashboardMetrics.minimumTapTarget,
+        ),
+        child: ExcludeSemantics(
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              key: ValueKey('dashboard_meal_row_${meal.id}'),
+              onTap: onEdit,
+              borderRadius: BorderRadius.circular(FreshRadii.sm),
+              child: Ink(
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(color: palette.rule, width: 1),
+                  ),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  vertical: _DashboardMetrics.compactGap,
+                ),
+                child: Row(
                   children: [
-                    if (meal.mealLabel != null) ...[
-                      _MealLabelChip(label: meal.mealLabel!),
-                      const SizedBox(height: FreshSpacing.xs),
-                    ],
-                    Text(
-                      meal.title,
-                      style: textTheme.bodyLarge?.copyWith(
-                        color: palette.ink,
-                        fontWeight: FontWeight.w600,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (meal.mealLabel != null) ...[
+                            _MealLabelChip(label: meal.mealLabel!),
+                            const SizedBox(height: FreshSpacing.xs),
+                          ],
+                          Text(
+                            meal.title,
+                            style: textTheme.bodyLarge?.copyWith(
+                              color: palette.ink,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
+                    ),
+                    const SizedBox(width: _DashboardMetrics.compactGap),
+                    Text(
+                      l10n.caloriesValue(meal.nutrition.calories),
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: palette.ink,
+                        fontWeight: FontWeight.w800,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                    const SizedBox(width: _DashboardMetrics.compactGap),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: palette.inkMuted,
+                      size: 20,
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: FreshSpacing.sm),
-              Text(
-                l10n.caloriesValue(meal.nutrition.calories),
-                style: textTheme.bodyMedium?.copyWith(
-                  color: palette.ink,
-                  fontWeight: FontWeight.w800,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-              const SizedBox(width: FreshSpacing.sm),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: palette.inkMuted,
-                size: 22,
-              ),
-            ],
+            ),
           ),
         ),
       ),

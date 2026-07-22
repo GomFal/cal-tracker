@@ -116,6 +116,38 @@ void main() {
     },
   );
 
+  testWidgets('dashboard retry action retains a 48dp touch target',
+      (tester) async {
+    final nutritionRepository = _FakeNutritionRepository(
+      loadError: Exception('offline'),
+    );
+    final authViewModel = AuthViewModel(authRepository: _FakeAuthRepository())
+      ..setUser(_testUser);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<AuthViewModel>.value(value: authViewModel),
+          ChangeNotifierProvider(
+            create: (_) => ThemeModeViewModel(
+              preferencesRepository: _FakePreferencesRepository(),
+            ),
+          ),
+          ChangeNotifierProvider(
+            create: (_) =>
+                DashboardViewModel(nutritionRepository: nutritionRepository),
+          ),
+        ],
+        child: _testApp(const DashboardScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final retry = find.widgetWithText(TextButton, 'Try again');
+    expect(tester.getSize(retry).width, greaterThanOrEqualTo(48));
+    expect(tester.getSize(retry).height, greaterThanOrEqualTo(48));
+  });
+
   testWidgets('dashboard water widget steps between zero and the goal', (
     tester,
   ) async {
@@ -231,6 +263,11 @@ void main() {
       findsNothing,
     );
     expect(find.text('No meals logged today'), findsOneWidget);
+    final addMeal = find.byKey(
+      const ValueKey('dashboard_empty_meals_add_button'),
+    );
+    expect(tester.getSize(addMeal).width, greaterThanOrEqualTo(48));
+    expect(tester.getSize(addMeal).height, greaterThanOrEqualTo(48));
   });
 
   testWidgets(
@@ -816,15 +853,215 @@ void main() {
     expect(find.text('Weight'), findsNothing);
     expect(find.text('Water'), findsNothing);
   });
+
+  testWidgets(
+    'dashboard compact layout keeps macros, meals, and a first meal in view',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(
+        _dashboardTestApp(dailySummary: _summaryWithMeal),
+      );
+      await tester.pumpAndSettle();
+
+      for (final key in const [
+        ValueKey('dashboard_macro_carbs_icon'),
+        ValueKey('dashboard_macro_protein_icon'),
+        ValueKey('dashboard_macro_fats_icon'),
+      ]) {
+        expect(tester.getSize(find.byKey(key)), const Size.square(25));
+      }
+
+      final viewportHeight = tester.view.physicalSize.height;
+      final heroToMeals = tester.getRect(find.text('MEALS')).top -
+          tester
+              .getRect(find.byKey(const ValueKey('dashboard_progress_card')))
+              .top;
+      // Baseline measured at this viewport before compact density: 457 dp.
+      expect(heroToMeals, inInclusiveRange(329, 357));
+      expect(
+        tester.getRect(find.text('MEALS')).bottom,
+        lessThanOrEqualTo(viewportHeight),
+      );
+      expect(
+        tester
+            .getRect(find.byKey(const ValueKey('dashboard_meal_row_meal-1')))
+            .bottom,
+        lessThanOrEqualTo(viewportHeight),
+      );
+    },
+  );
+
+  testWidgets('dashboard compact light surface matches its golden baseline', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      _dashboardTestApp(
+        dailySummary: _summaryWithMeal,
+        currentDate: DateTime(2026, 5, 9),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await expectLater(
+      find.byType(Scaffold),
+      matchesGoldenFile(
+          'goldens/dashboard/dashboard_compact_light_390x844.png'),
+    );
+  });
+
+  testWidgets('dashboard compact dark surface matches its golden baseline', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      _dashboardTestApp(
+        dailySummary: _summaryWithMeal,
+        currentDate: DateTime(2026, 5, 9),
+        themeMode: ThemeMode.dark,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await expectLater(
+      find.byType(Scaffold),
+      matchesGoldenFile('goldens/dashboard/dashboard_compact_dark_390x844.png'),
+    );
+  });
+
+  testWidgets('dashboard keeps 48dp controls and actionable semantics', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+
+    await tester.pumpWidget(_dashboardTestApp(dailySummary: _summaryWithMeal));
+    await tester.pumpAndSettle();
+
+    final decrease = find.byKey(
+      const ValueKey('dashboard_water_decrease_button'),
+    );
+    final increase = find.byKey(
+      const ValueKey('dashboard_water_increase_button'),
+    );
+    final meal = find.byKey(const ValueKey('dashboard_meal_row_meal-1'));
+    expect(tester.getSize(decrease), const Size.square(48));
+    expect(tester.getSize(increase), const Size.square(48));
+    expect(tester.getSize(meal).height, greaterThanOrEqualTo(48));
+    expect(
+      tester.getRect(decrease).overlaps(tester.getRect(increase)),
+      isFalse,
+    );
+    expect(find.byTooltip('Increase water intake'), findsOneWidget);
+    expect(find.bySemanticsLabel('Increase water intake'), findsOneWidget);
+    expect(find.bySemanticsLabel('Oats bowl, 420 Kcal'), findsOneWidget);
+    semantics.dispose();
+  });
+
+  testWidgets('dashboard macro layout remains readable on narrow scaled text', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      _dashboardTestApp(
+        dailySummary: _summaryWithMeal,
+        locale: const Locale('es'),
+        textScaler: const TextScaler.linear(2),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('MACROS', skipOffstage: false), findsOneWidget);
+    expect(find.text('COMIDAS', skipOffstage: false), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('dashboard keeps macro columns readable on a wide viewport', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(600, 960);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(_dashboardTestApp(dailySummary: _summaryWithMeal));
+    await tester.pumpAndSettle();
+
+    expect(find.text('MACROS'), findsOneWidget);
+    expect(find.text('MEALS'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }
 
-Widget _testApp(Widget child, {ThemeMode themeMode = ThemeMode.light}) {
+Widget _dashboardTestApp({
+  required DailySummary dailySummary,
+  DateTime? currentDate,
+  Locale? locale,
+  TextScaler? textScaler,
+  ThemeMode themeMode = ThemeMode.light,
+}) {
+  final authViewModel = AuthViewModel(authRepository: _FakeAuthRepository())
+    ..setUser(_testUser);
+  return MultiProvider(
+    providers: [
+      ChangeNotifierProvider<AuthViewModel>.value(value: authViewModel),
+      ChangeNotifierProvider(
+        create: (_) => ThemeModeViewModel(
+          preferencesRepository: _FakePreferencesRepository(),
+        ),
+      ),
+      ChangeNotifierProvider(
+        create: (_) => DashboardViewModel(
+          nutritionRepository: _FakeNutritionRepository(
+            dailySummary: dailySummary,
+          ),
+        ),
+      ),
+    ],
+    child: _testApp(
+      DashboardScreen(currentDate: currentDate),
+      locale: locale,
+      textScaler: textScaler,
+      themeMode: themeMode,
+    ),
+  );
+}
+
+Widget _testApp(
+  Widget child, {
+  ThemeMode themeMode = ThemeMode.light,
+  Locale? locale,
+  TextScaler? textScaler,
+}) {
   return MaterialApp(
+    locale: locale,
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     theme: buildLightTheme(),
     darkTheme: buildDarkTheme(),
     themeMode: themeMode,
+    builder: (context, child) {
+      if (textScaler == null || child == null) return child ?? const SizedBox();
+      return MediaQuery(
+        data: MediaQuery.of(context).copyWith(textScaler: textScaler),
+        child: child,
+      );
+    },
     home: Scaffold(body: child),
   );
 }

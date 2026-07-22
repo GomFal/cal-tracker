@@ -253,6 +253,38 @@ class FreshRadii {
   static const xl = 32.0;
 }
 
+class FreshPageLayout {
+  const FreshPageLayout({
+    required this.headerPadding,
+    required this.contentPadding,
+    required this.leadingGap,
+    required this.actionGap,
+    required this.actionSpacing,
+  });
+
+  static const standard = FreshPageLayout(
+    headerPadding: EdgeInsets.fromLTRB(20, 18, 20, 8),
+    contentPadding: EdgeInsets.fromLTRB(20, 12, 20, 28),
+    leadingGap: FreshSpacing.md,
+    actionGap: FreshSpacing.md,
+    actionSpacing: FreshSpacing.sm,
+  );
+
+  static const compact = FreshPageLayout(
+    headerPadding: EdgeInsets.fromLTRB(16, 12, 16, 6),
+    contentPadding: EdgeInsets.fromLTRB(16, 8, 16, 20),
+    leadingGap: 9,
+    actionGap: 9,
+    actionSpacing: 6,
+  );
+
+  final EdgeInsetsGeometry headerPadding;
+  final EdgeInsetsGeometry contentPadding;
+  final double leadingGap;
+  final double actionGap;
+  final double actionSpacing;
+}
+
 class FreshPage extends StatelessWidget {
   const FreshPage({
     super.key,
@@ -262,6 +294,7 @@ class FreshPage extends StatelessWidget {
     this.subtitle,
     this.maxWidth = 760,
     this.leading,
+    this.layout = FreshPageLayout.standard,
   });
 
   final String title;
@@ -270,6 +303,7 @@ class FreshPage extends StatelessWidget {
   final List<Widget> actions;
   final double maxWidth;
   final Widget? leading;
+  final FreshPageLayout layout;
 
   @override
   Widget build(BuildContext context) {
@@ -284,17 +318,18 @@ class FreshPage extends StatelessWidget {
               slivers: [
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+                    padding: layout.headerPadding,
                     child: FreshHeader(
                       title: title,
                       subtitle: subtitle,
                       actions: actions,
                       leading: leading,
+                      layout: layout,
                     ),
                   ),
                 ),
                 SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+                  padding: layout.contentPadding,
                   sliver: SliverToBoxAdapter(child: child),
                 ),
               ],
@@ -315,6 +350,7 @@ class FreshSliverPage extends StatelessWidget {
     this.subtitle,
     this.maxWidth = 760,
     this.leading,
+    this.layout = FreshPageLayout.standard,
   });
 
   final String title;
@@ -323,6 +359,7 @@ class FreshSliverPage extends StatelessWidget {
   final List<Widget> actions;
   final double maxWidth;
   final Widget? leading;
+  final FreshPageLayout layout;
 
   @override
   Widget build(BuildContext context) {
@@ -337,17 +374,18 @@ class FreshSliverPage extends StatelessWidget {
               slivers: [
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+                    padding: layout.headerPadding,
                     child: FreshHeader(
                       title: title,
                       subtitle: subtitle,
                       actions: actions,
                       leading: leading,
+                      layout: layout,
                     ),
                   ),
                 ),
                 SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+                  padding: layout.contentPadding,
                   sliver: SliverMainAxisGroup(slivers: slivers),
                 ),
               ],
@@ -377,12 +415,14 @@ class FreshHeader extends StatelessWidget {
     this.subtitle,
     this.actions = const [],
     this.leading,
+    this.layout = FreshPageLayout.standard,
   });
 
   final String title;
   final String? subtitle;
   final List<Widget> actions;
   final Widget? leading;
+  final FreshPageLayout layout;
 
   @override
   Widget build(BuildContext context) {
@@ -391,10 +431,7 @@ class FreshHeader extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        if (leading != null) ...[
-          leading!,
-          const SizedBox(width: FreshSpacing.md),
-        ],
+        if (leading != null) ...[leading!, SizedBox(width: layout.leadingGap)],
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -419,8 +456,8 @@ class FreshHeader extends StatelessWidget {
           ),
         ),
         if (actions.isNotEmpty) ...[
-          const SizedBox(width: FreshSpacing.md),
-          Wrap(spacing: FreshSpacing.sm, children: actions),
+          SizedBox(width: layout.actionGap),
+          Wrap(spacing: layout.actionSpacing, children: actions),
         ],
       ],
     );

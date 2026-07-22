@@ -375,8 +375,8 @@
     "semantic_hash": ""
   },
   "apps/backend/src/tests/agentChat.test.ts": {
-    "mtime": 1784719386.4639614,
-    "ast_hash": "38da97088c8bc1f17ad62934ce313380",
+    "mtime": 1784722211.035717,
+    "ast_hash": "ccca4cfee7dee3fa6e024c68370d3307",
     "semantic_hash": ""
   },
   "apps/backend/src/tests/agentMessages.test.ts": {
@@ -390,8 +390,8 @@
     "semantic_hash": ""
   },
   "apps/backend/src/tests/agentToolContent.test.ts": {
-    "mtime": 1784720235.6498744,
-    "ast_hash": "7f2615ba845fdc35b756504e4a69e459",
+    "mtime": 1784722121.208699,
+    "ast_hash": "e9d12c24d05b5b8b342764a11ce09829",
     "semantic_hash": ""
   },
   "apps/backend/src/tests/auth.test.ts": {
@@ -3192,6 +3192,11 @@
   "apps/mobile/test/goldens/dashboard/dashboard_compact_light_390x844.png": {
     "mtime": 1784719386.5008566,
     "ast_hash": "b7588efac8407cadfcdf1135cf92edbd",
+    "semantic_hash": ""
+  },
+  "apps/mobile/test/agent_run_result_parsing_test.dart": {
+    "mtime": 1784722218.3919826,
+    "ast_hash": "ce66ee528ac6833142b1f1acac966841",
     "semantic_hash": ""
   }
 }

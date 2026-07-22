@@ -14,10 +14,14 @@ import {
   draftUsualMealInputSchema,
   draftUsualMealOutputSchema,
   getDailySummaryInputSchema,
+  getMealDetailsInputSchema,
   getMealHistoryInputSchema,
+  getMealTemplateDetailsInputSchema,
   getRemainingTargetsInputSchema,
   proposeMealLogInputSchema,
+  previewMealCorrectionInputSchema,
   queryFoodMemoryInputSchema,
+  recordHydrationInputSchema,
   reviseMealProposalInputSchema,
   searchNutritionDatabaseInputSchema,
   updateMealTemplateInputSchema,
@@ -55,6 +59,7 @@ import {
 } from "../utils/mealTitle.js";
 import { normalizeText } from "../utils/normalize.js";
 import { sumNutrition } from "../utils/nutrition.js";
+import { mealFingerprint } from "../utils/mealFingerprint.js";
 import type { UsualFoodDraftProvider } from "../agent/usualFoodDraftProvider.js";
 import type { UsualMealDraftProvider } from "../agent/usualMealDraftProvider.js";
 
@@ -86,6 +91,11 @@ type RevisionMentionResolution =
       candidateGroups: FoodCandidateGroup[];
       message: string;
     };
+
+const actionInternalMetadata = Symbol("actionInternalMetadata");
+type ActionOutputWithInternalMetadata = Record<string, unknown> & {
+  [actionInternalMetadata]?: Record<string, unknown>;
+};
 
 function actionInstrumentation(output: unknown): Record<string, unknown> | undefined {
   if (
@@ -192,6 +202,7 @@ export class ActionExecutor {
           source: context.source,
           input,
           output,
+          internalMetadata: internalMetadataFromOutput(output),
           confirmationStatus: definition.confirmationPolicy,
           traceId: context.traceId,
           latencyMs: Date.now() - started,
@@ -282,6 +293,18 @@ export class ActionExecutor {
       case "commit_meal":
       case "correct_meal":
         return mutation(await dailySummaryEffectForMeal(output.meal as Meal | undefined));
+      case "record_hydration": {
+        const summary = output.summary;
+        return isRecord(summary) && typeof summary.date === "string"
+          ? mutation([{
+              domain: "daily_summary",
+              operation: "replace",
+              date: summary.date,
+              revision,
+              snapshot: summary as import("@cal-tracker/contracts").DailySummary,
+            }])
+          : undefined;
+      }
       case "propose_meal_log":
         return mutation(
           await dailySummaryEffectForMeal(output.autoCommittedMeal as Meal | undefined),
@@ -468,10 +491,44 @@ export class ActionExecutor {
           ),
         };
       }
+      case "get_meal_details": {
+        const parsed = getMealDetailsInputSchema.parse(input);
+        const meal = await this.repository.getMeal(
+          context.actorUserId,
+          parsed.mealId,
+        );
+        if (!meal) throw new ActionExecutionError("meal_not_found");
+        return { meal };
+      }
+      case "preview_meal_correction":
+        return this.previewMealCorrection(input, context);
+      case "record_hydration": {
+        const parsed = recordHydrationInputSchema.parse(input);
+        const amountLiters = Math.round(
+          (parsed.unit === "ml" ? parsed.amount / 1000 : parsed.amount) * 1000,
+        ) / 1000;
+        const date = parsed.date ?? dateInTimeZone(context.timezone);
+        return {
+          summary: await this.repository.recordDailyHydration(
+            context.actorUserId,
+            date,
+            parsed.mode,
+            amountLiters,
+          ),
+        };
+      }
       case "get_usual_meals":
         return {
           templates: await this.repository.listTemplates(context.actorUserId),
         };
+      case "get_meal_template_details": {
+        const parsed = getMealTemplateDetailsInputSchema.parse(input);
+        const template = (
+          await this.repository.listTemplates(context.actorUserId)
+        ).find((candidate) => candidate.id === parsed.templateId);
+        if (!template) throw new ActionExecutionError("template_not_found");
+        return { template };
+      }
       case "get_usual_foods":
         return {
           usualFoods: await this.repository.listUsualFoods(context.actorUserId),
@@ -1004,6 +1061,163 @@ export class ActionExecutor {
     return { meal: corrected };
   }
 
+  private async previewMealCorrection(
+    input: unknown,
+    context: ActionContext,
+  ): Promise<Record<string, unknown>> {
+    const parsed = previewMealCorrectionInputSchema.parse(input);
+    const meal = await this.repository.getMeal(
+      context.actorUserId,
+      parsed.mealId,
+    );
+    if (!meal) throw new ActionExecutionError("meal_not_found");
+
+    const items = [...meal.items];
+    const resolvedCandidateGroups: FoodCandidateGroup[] = [];
+    const unresolved: Extract<
+      RevisionMentionResolution,
+      { clarificationRequired: true }
+    >[] = [];
+
+    for (const operation of parsed.operations) {
+      switch (operation.type) {
+        case "add_item": {
+          const resolved = await this.resolveRevisionMention(
+            context.actorUserId,
+            operation.mention,
+            context.locale,
+          );
+          if ("clarificationRequired" in resolved) {
+            unresolved.push(resolved);
+          } else {
+            resolvedCandidateGroups.push(...resolved.candidateGroups);
+            items.push(...resolved.items);
+          }
+          break;
+        }
+        case "remove_item": {
+          const target = findUniqueMealItemIndex(items, operation);
+          if (target.status !== "found") {
+            return mealCorrectionTargetClarification(target.status);
+          }
+          items.splice(target.index, 1);
+          break;
+        }
+        case "replace_item": {
+          const target = findUniqueMealItemIndex(items, operation);
+          if (target.status !== "found") {
+            return mealCorrectionTargetClarification(target.status);
+          }
+          const resolved = await this.resolveRevisionMention(
+            context.actorUserId,
+            operation.mention,
+            context.locale,
+          );
+          if ("clarificationRequired" in resolved) {
+            unresolved.push(resolved);
+          } else {
+            resolvedCandidateGroups.push(...resolved.candidateGroups);
+            items.splice(target.index, 1, ...resolved.items);
+          }
+          break;
+        }
+        case "update_item_quantity": {
+          const target = findUniqueMealItemIndex(items, operation);
+          if (target.status !== "found") {
+            return mealCorrectionTargetClarification(target.status);
+          }
+          const current = items[target.index]!;
+          if (sameUnit(current.unit, operation.unit)) {
+            items[target.index] = scaleMealItem(
+              current,
+              operation.quantity,
+              operation.unit,
+            );
+            break;
+          }
+          const foodName = current.canonicalName ?? current.name;
+          const resolved = await this.resolveRevisionMention(
+            context.actorUserId,
+            {
+              originalText:
+                `${operation.quantity} ${operation.rawUnitText ?? operation.unit} ${foodName}`.trim(),
+              canonicalName: foodName,
+              quantity: operation.quantity,
+              unit: operation.unit,
+              rawUnitText: operation.rawUnitText ?? operation.unit,
+              unitKind: operation.unit === "g" ? "metric" : "unknown",
+              language: current.language,
+              confidence: current.confidence ?? 0.8,
+            },
+            context.locale,
+          );
+          if ("clarificationRequired" in resolved) {
+            unresolved.push(resolved);
+          } else {
+            resolvedCandidateGroups.push(...resolved.candidateGroups);
+            items.splice(target.index, 1, ...resolved.items);
+          }
+          break;
+        }
+      }
+    }
+
+    const unresolvedMentions = unresolved.flatMap(
+      (entry) => entry.unresolvedMentions,
+    );
+    if (unresolved.length > 0) {
+      const options = mergeCandidateGroups(
+        unresolved.flatMap((entry) => entry.options),
+        unresolvedMentions,
+      );
+      return {
+        requiresConfirmation: false,
+        clarificationRequired: true,
+        resolvedItems: unresolved.flatMap((entry) => entry.resolvedItems),
+        unresolvedMentions,
+        options,
+        candidateGroups: mergeCandidateGroups(
+          [
+            ...resolvedCandidateGroups,
+            ...unresolved.flatMap((entry) => entry.candidateGroups),
+          ],
+          unresolvedMentions,
+        ),
+        message: foodMatchClarificationMessage(
+          options,
+          "Please choose a food match or rephrase the correction.",
+          "before previewing the meal correction",
+        ),
+      };
+    }
+    if (items.length === 0) {
+      return {
+        requiresConfirmation: false,
+        clarificationRequired: true,
+        message: "A meal needs at least one ingredient.",
+      };
+    }
+
+    const previewMeal: Meal = {
+      ...meal,
+      nutrition: sumNutrition(items),
+      items,
+    };
+    const output: ActionOutputWithInternalMetadata = {
+      meal: previewMeal,
+      requiresConfirmation: true,
+      message: "Review this meal correction before confirming.",
+    };
+    Object.defineProperty(output, actionInternalMetadata, {
+      value: {
+        sourceMealFingerprint: mealFingerprint(meal),
+        sourceMealId: meal.id,
+      },
+      enumerable: false,
+    });
+    return output;
+  }
+
   async getProposalForAgentContext(
     userId: string,
     proposalId: string,
@@ -1263,6 +1477,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function internalMetadataFromOutput(output: unknown): unknown {
+  return isRecord(output)
+    ? (output as ActionOutputWithInternalMetadata)[actionInternalMetadata]
+    : undefined;
+}
+
 function hasMealMentionResolution(
   provider: NutritionProvider,
 ): provider is MealMentionResolutionProvider {
@@ -1504,6 +1724,51 @@ function findProposalItemIndex(
   });
 }
 
+function findUniqueMealItemIndex(
+  items: MealItem[],
+  target: { itemIndex?: number; matchText?: string },
+):
+  | { status: "found"; index: number }
+  | { status: "missing" | "ambiguous" } {
+  if (target.itemIndex !== undefined) {
+    return target.itemIndex >= 0 && target.itemIndex < items.length
+      ? { status: "found", index: target.itemIndex }
+      : { status: "missing" };
+  }
+  const normalizedMatch = normalizeText(target.matchText ?? "");
+  if (!normalizedMatch) return { status: "missing" };
+  const matches = items
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) =>
+      [item.name, item.canonicalName, item.originalText]
+        .filter((value): value is string => Boolean(value))
+        .map(normalizeText)
+        .some(
+          (name) =>
+            name === normalizedMatch ||
+            name.includes(normalizedMatch) ||
+            normalizedMatch.includes(name),
+        ),
+    );
+  if (matches.length === 1) {
+    return { status: "found", index: matches[0]!.index };
+  }
+  return { status: matches.length === 0 ? "missing" : "ambiguous" };
+}
+
+function mealCorrectionTargetClarification(
+  status: "missing" | "ambiguous",
+): Record<string, unknown> {
+  return {
+    requiresConfirmation: false,
+    clarificationRequired: true,
+    message:
+      status === "ambiguous"
+        ? "More than one ingredient matches that correction. Please identify the ingredient by its position."
+        : "I could not find the ingredient to correct. Please identify it from the meal details.",
+  };
+}
+
 function sameUnit(left: string, right: string): boolean {
   return normalizeText(left) === normalizeText(right);
 }
@@ -1534,6 +1799,23 @@ function scaleMealItem(
 
 function roundOne(value: number): number {
   return Math.round(value * 10) / 10;
+}
+
+function dateInTimeZone(timeZone: string): string {
+  try {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(new Date());
+    const value = Object.fromEntries(
+      parts.map((part) => [part.type, part.value]),
+    );
+    return `${value.year}-${value.month}-${value.day}`;
+  } catch {
+    throw new ActionExecutionError("invalid_timezone");
+  }
 }
 
 function inferTitle(items: MealItem[]): string {

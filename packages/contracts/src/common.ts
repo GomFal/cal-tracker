@@ -100,6 +100,12 @@ export const quarterLiterSchema = z.number().min(0).max(10).refine(
   "must be in 0.25 L increments"
 );
 
+/** Water consumption is stored and exchanged with one milliliter precision. */
+export const milliliterLiterSchema = z.number().min(0).max(10).refine(
+  (value) => Math.abs(value * 1000 - Math.round(value * 1000)) < 1e-9,
+  "must be in 0.001 L increments"
+);
+
 export const dailyGoalsSchema = z.object({
   date: z.string(),
   target: nutritionSnapshotSchema,
@@ -279,7 +285,7 @@ export const dailySummarySchema = z.object({
   target: nutritionSnapshotSchema,
   remaining: nutritionSnapshotSchema,
   hydrationGoalLiters: quarterLiterSchema,
-  waterConsumedLiters: quarterLiterSchema,
+  waterConsumedLiters: milliliterLiterSchema,
   calorieTargetConfigured: z.boolean(),
   calorieTargetSource: calorieTargetSourceSchema,
   ...macroGoalMetadataSchema.shape,

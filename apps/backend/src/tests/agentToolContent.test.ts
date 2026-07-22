@@ -123,12 +123,22 @@ describe("agent chat tool content", () => {
         meals: Array.from({ length: 12 }, (_, index) => ({
           id: `meal-${index + 1}`,
           title: `Meal ${index + 1}`,
-          loggedAt: `2026-06-${String(index + 1).padStart(2, "0")}T12:00:00.000Z`,
-          calories: 300 + index,
-          proteinGrams: 20,
-          carbsGrams: 30,
-          fatGrams: 10,
-          items: [{ name: "verbose item", calories: 100 }],
+          occurredAt: `2026-06-${String(index + 1).padStart(2, "0")}T12:00:00.000Z`,
+          nutrition: {
+            calories: 300 + index,
+            proteinGrams: 20,
+            carbsGrams: 30,
+            fatGrams: 10,
+          },
+          items: [
+            {
+              name: "Bread",
+              quantity: 100,
+              unit: "g",
+              calories: 100,
+              displayDetails: ["verbose internal detail"],
+            },
+          ],
         })),
       },
       rawOutput: {},
@@ -140,7 +150,8 @@ describe("agent chat tool content", () => {
       "cols=n|id|time|title|kcal|p|c|f|items",
     );
     expect(built.modelContent).toContain("omitted rows=2 reason=budget");
-    expect(built.modelContent).not.toContain("verbose item");
+    expect(built.modelContent).toContain("100g Bread");
+    expect(built.modelContent).not.toContain("verbose internal detail");
     expect(built.tonTables[0]).toMatchObject({
       path: "result.meals",
       rows: 12,

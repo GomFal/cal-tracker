@@ -12,6 +12,7 @@ import {
   mealProposalSchema,
   mealSchema,
   mealTemplateSchema,
+  milliliterLiterSchema,
   nutritionSnapshotSchema,
   usualFoodSchema,
   uuidSchema,
@@ -205,6 +206,71 @@ export const getMealHistoryInputSchema = z.object({
 });
 export const getMealHistoryOutputSchema = z.object({
   meals: z.array(mealSchema),
+});
+
+export const getMealDetailsInputSchema = z.object({
+  mealId: uuidSchema,
+});
+export const getMealDetailsOutputSchema = z.object({
+  meal: mealSchema,
+});
+
+export const getMealTemplateDetailsInputSchema = z.object({
+  templateId: uuidSchema,
+});
+export const getMealTemplateDetailsOutputSchema = z.object({
+  template: mealTemplateSchema,
+});
+
+export const previewMealCorrectionInputSchema = z.object({
+  mealId: uuidSchema,
+  instruction: z.string().trim().min(1),
+  operations: z.array(reviseMealProposalOperationSchema).min(1),
+});
+export const previewMealCorrectionOutputSchema = z.object({
+  meal: mealSchema.optional(),
+  requiresConfirmation: z.boolean(),
+  clarificationRequired: z.boolean().optional(),
+  resolvedItems: z.array(mealItemSchema).optional(),
+  unresolvedMentions: z.array(foodMentionSchema).optional(),
+  options: z.array(foodCandidateSchema).optional(),
+  candidateGroups: z.array(foodCandidateSchema).optional(),
+  message: z.string().optional(),
+});
+
+export const recordHydrationInputSchema = z
+  .object({
+    date: z.string().date().optional(),
+    mode: z.enum(["add", "set"]),
+    amount: z.number().nonnegative().max(10_000),
+    unit: z.enum(["ml", "l"]),
+  })
+  .superRefine((value, ctx) => {
+    if (value.mode === "add" && value.amount <= 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["amount"],
+        message: "add amount must be greater than zero",
+      });
+    }
+    const liters = value.unit === "ml" ? value.amount / 1000 : value.amount;
+    if (!milliliterLiterSchema.safeParse(liters).success) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["amount"],
+        message: "amount must resolve to 0.001 L precision within 0-10 L",
+      });
+    }
+    if (value.unit === "ml" && !Number.isInteger(value.amount)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["amount"],
+        message: "milliliter amount must be an integer",
+      });
+    }
+  });
+export const recordHydrationOutputSchema = z.object({
+  summary: dailySummarySchema,
 });
 
 export const getUsualMealsOutputSchema = z.object({
@@ -413,6 +479,44 @@ export const actionDefinitions = [
     executionMode: "deterministic",
   },
   {
+    id: "get_meal_details",
+    version: "1.0.0",
+    title: "Get Meal Details",
+    description: "Get one user-owned meal with its ingredients and nutrition.",
+    inputSchema: getMealDetailsInputSchema,
+    outputSchema: getMealDetailsOutputSchema,
+    permissionScope: PermissionScope.NutritionReadHistory,
+    sideEffect: "none",
+    confirmationPolicy: "never",
+    executionMode: "deterministic",
+  },
+  {
+    id: "preview_meal_correction",
+    version: "1.0.0",
+    title: "Preview Meal Correction",
+    description:
+      "Build a non-mutating correction preview from structured add, remove, replace, or quantity operations.",
+    inputSchema: previewMealCorrectionInputSchema,
+    outputSchema: previewMealCorrectionOutputSchema,
+    permissionScope: PermissionScope.NutritionWriteCorrect,
+    sideEffect: "none",
+    confirmationPolicy: "required",
+    executionMode: "deterministic",
+  },
+  {
+    id: "record_hydration",
+    version: "1.0.0",
+    title: "Record Hydration",
+    description:
+      "Add to or set hydration using an explicit milliliter or liter amount. Never infer container volume.",
+    inputSchema: recordHydrationInputSchema,
+    outputSchema: recordHydrationOutputSchema,
+    permissionScope: PermissionScope.NutritionWriteCommit,
+    sideEffect: "write",
+    confirmationPolicy: "never",
+    executionMode: "deterministic",
+  },
+  {
     id: "get_usual_foods",
     version: "1.0.0",
     title: "Get Usual Foods",
@@ -467,6 +571,18 @@ export const actionDefinitions = [
     description: "List user-owned recurring meal templates.",
     inputSchema: emptyInputSchema,
     outputSchema: getUsualMealsOutputSchema,
+    permissionScope: PermissionScope.NutritionTemplatesRead,
+    sideEffect: "none",
+    confirmationPolicy: "never",
+    executionMode: "deterministic",
+  },
+  {
+    id: "get_meal_template_details",
+    version: "1.0.0",
+    title: "Get Meal Template Details",
+    description: "Get one user-owned usual meal with its ingredients.",
+    inputSchema: getMealTemplateDetailsInputSchema,
+    outputSchema: getMealTemplateDetailsOutputSchema,
     permissionScope: PermissionScope.NutritionTemplatesRead,
     sideEffect: "none",
     confirmationPolicy: "never",

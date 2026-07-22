@@ -72,6 +72,14 @@ type AgentRunResultCore =
   | { kind: "summary"; summary: DailySummary; message: string }
   | { kind: "remaining_targets"; remaining: NutritionSnapshot; message: string }
   | { kind: "history"; meals: Meal[]; message: string }
+  | { kind: "meal_details"; meal: Meal; message: string }
+  | {
+      kind: "meal_correction_preview";
+      meal: Meal;
+      requiresConfirmation: true;
+      message: string;
+    }
+  | { kind: "hydration_updated"; summary: DailySummary; message: string }
   | {
       kind: "food_memory";
       matches: unknown[];
@@ -85,6 +93,7 @@ type AgentRunResultCore =
       options?: unknown[];
     }
   | { kind: "templates"; templates: MealTemplate[]; message: string }
+  | { kind: "template_details"; template: MealTemplate; message: string }
   | { kind: "template_saved"; template: MealTemplate; message: string }
   | { kind: "template_deleted"; deleted: boolean; message: string }
   | {
@@ -706,11 +715,48 @@ export class AgentService {
           meals: output.meals as Meal[],
           message: "Here is your meal history.",
         };
+      case "get_meal_details":
+        return {
+          kind: "meal_details",
+          meal: output.meal as Meal,
+          message: "Here are the meal ingredients and nutrition.",
+        };
+      case "preview_meal_correction":
+        if (output.clarificationRequired || !output.meal) {
+          return {
+            kind: "clarification_required",
+            options: output.options as unknown[] | undefined,
+            candidateGroups: output.candidateGroups as unknown[] | undefined,
+            resolvedItems: output.resolvedItems as MealItem[] | undefined,
+            message:
+              typeof output.message === "string"
+                ? output.message
+                : "I need clarification before previewing this correction.",
+          };
+        }
+        return {
+          kind: "meal_correction_preview",
+          meal: output.meal as Meal,
+          requiresConfirmation: true,
+          message: "Review this meal correction before confirming.",
+        };
+      case "record_hydration":
+        return {
+          kind: "hydration_updated",
+          summary: output.summary as DailySummary,
+          message: "Hydration updated.",
+        };
       case "get_usual_meals":
         return {
           kind: "templates",
           templates: output.templates as MealTemplate[],
           message: "Here are your usual meals.",
+        };
+      case "get_meal_template_details":
+        return {
+          kind: "template_details",
+          template: output.template as MealTemplate,
+          message: "Here are the usual meal ingredients.",
         };
       case "draft_usual_food":
         return {

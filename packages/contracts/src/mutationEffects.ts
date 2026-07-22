@@ -3,6 +3,7 @@ import {
   dailyGoalsSchema,
   dailySummarySchema,
   mealTemplateSchema,
+  mealSchema,
   usualFoodSchema,
 } from "./common.js";
 
@@ -13,6 +14,7 @@ import {
 export const nutritionDataEffectDomainSchema = z.enum([
   "daily_summary",
   "daily_goals",
+  "meals",
   "meal_templates",
   "usual_foods",
 ]);
@@ -33,6 +35,7 @@ export type NutritionDataEffectOperation = z.infer<
 const nutritionDataEffectSnapshotSchema = z.union([
   dailySummarySchema,
   dailyGoalsSchema,
+  mealSchema,
   mealTemplateSchema,
   usualFoodSchema,
 ]);

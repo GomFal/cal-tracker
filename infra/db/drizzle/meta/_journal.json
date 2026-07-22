@@ -169,6 +169,13 @@
       "when": 1784712073690,
       "tag": "0023_agent_direct_meal_commits",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1784720193927,
+      "tag": "0024_agent_history_capabilities",
+      "breakpoints": true
     }
   ]
 }

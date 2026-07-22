@@ -95,6 +95,170 @@ function redMeatMention(): FoodMention {
 }
 
 describe("action loop", () => {
+  it("returns user-scoped meal and template details with complete items", async () => {
+    const { request } = buildTestApp();
+    const owner = await registerAndAuth(request);
+    const other = await registerAndAuth(request, {
+      email: "details-other@example.com",
+    });
+    const proposalResponse = await request(
+      "http://localhost/v1/actions/create_meal_proposal_from_items/execute",
+      {
+        method: "POST",
+        headers: owner.authHeader,
+        body: JSON.stringify({
+          input: { phrase: "bread", items: [testBreadItem] },
+          source: "flutter",
+        }),
+      },
+    ).then((response) => response.json()) as {
+      output: { proposal: { id: string } };
+    };
+    const committed = await request(
+      `http://localhost/v1/meals/proposals/${proposalResponse.output.proposal.id}/commit`,
+      { method: "POST", headers: owner.authHeader, body: "{}" },
+    ).then((response) => response.json()) as {
+      output: { meal: { id: string } };
+    };
+    const template = await createTestUsualBreakfastTemplate(
+      request,
+      owner.authHeader,
+    );
+
+    for (const [actionId, input, expectedField] of [
+      ["get_meal_details", { mealId: committed.output.meal.id }, "meal"],
+      [
+        "get_meal_template_details",
+        { templateId: template.output.template.id },
+        "template",
+      ],
+    ] as const) {
+      const ownerResponse = await request(
+        `http://localhost/v1/actions/${actionId}/execute`,
+        {
+          method: "POST",
+          headers: owner.authHeader,
+          body: JSON.stringify({ input, source: "flutter" }),
+        },
+      );
+      expect(ownerResponse.status).toBe(200);
+      const ownerBody = await ownerResponse.json() as Record<string, any>;
+      expect(ownerBody.output[expectedField].items).toHaveLength(1);
+      expect(ownerBody.output[expectedField].nutrition.calories).toBe(265);
+
+      const otherResponse = await request(
+        `http://localhost/v1/actions/${actionId}/execute`,
+        {
+          method: "POST",
+          headers: other.authHeader,
+          body: JSON.stringify({ input, source: "flutter" }),
+        },
+      );
+      expect(otherResponse.status).toBe(400);
+    }
+  });
+
+  it("previews a structured meal correction without mutating the meal", async () => {
+    const { request, repository } = buildTestApp();
+    const auth = await registerAndAuth(request);
+    const proposal = await repository.createProposal(auth.user.id, {
+      phrase: "bread",
+      title: "Bread",
+      status: "pending",
+      confidence: 1,
+      requiresConfirmation: true,
+      trustedAutoCommitEligible: false,
+      source: "test",
+      nutrition: {
+        calories: 265,
+        proteinGrams: 9,
+        carbsGrams: 49,
+        fatGrams: 3.2,
+      },
+      items: [testBreadItem],
+    });
+    const meal = await repository.createMealFromProposal(
+      auth.user.id,
+      proposal,
+      "2026-07-22T12:00:00.000Z",
+    );
+
+    const response = await request(
+      "http://localhost/v1/actions/preview_meal_correction/execute",
+      {
+        method: "POST",
+        headers: auth.authHeader,
+        body: JSON.stringify({
+          input: {
+            mealId: meal.id,
+            instruction: "Make bread 200 grams",
+            operations: [
+              {
+                type: "update_item_quantity",
+                itemIndex: 0,
+                quantity: 200,
+                unit: "g",
+              },
+            ],
+          },
+          source: "flutter",
+        }),
+      },
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json() as Record<string, any>;
+    expect(body.output.requiresConfirmation).toBe(true);
+    expect(body.output.meal.items[0].quantity).toBe(200);
+    expect(body.output.meal.nutrition.calories).toBe(530);
+    expect(JSON.stringify(body)).not.toContain("sourceMealFingerprint");
+    expect((await repository.getMeal(auth.user.id, meal.id))?.items[0]?.quantity)
+      .toBe(100);
+  });
+
+  it("records hydration in add/set modes with one milliliter precision and clamps to goal", async () => {
+    const { request } = buildTestApp();
+    const auth = await registerAndAuth(request);
+    await request("http://localhost/v1/goals", {
+      method: "PUT",
+      headers: auth.authHeader,
+      body: JSON.stringify({ date: "2026-07-22", hydrationGoalLiters: 2 }),
+    });
+    const execute = async (input: Record<string, unknown>) => {
+      const response = await request(
+        "http://localhost/v1/actions/record_hydration/execute",
+        {
+          method: "POST",
+          headers: auth.authHeader,
+          body: JSON.stringify({ input, source: "flutter" }),
+        },
+      );
+      expect(response.status).toBe(200);
+      return response.json() as Promise<Record<string, any>>;
+    };
+    const oneMl = await execute({
+      date: "2026-07-22",
+      mode: "add",
+      amount: 1,
+      unit: "ml",
+    });
+    expect(oneMl.output.summary.waterConsumedLiters).toBe(0.001);
+    expect(oneMl.confirmedMutation.effects[0].snapshot.waterConsumedLiters)
+      .toBe(0.001);
+    const set = await execute({
+      date: "2026-07-22",
+      mode: "set",
+      amount: 1.234,
+      unit: "l",
+    });
+    expect(set.output.summary.waterConsumedLiters).toBe(1.234);
+    const clamped = await execute({
+      date: "2026-07-22",
+      mode: "add",
+      amount: 1,
+      unit: "l",
+    });
+    expect(clamped.output.summary.waterConsumedLiters).toBe(2);
+  });
   it("creates a proposal from explicit selected meal items", async () => {
     const { request, repository } = buildTestApp();
     const recordFoodFeedback = vi.fn(async () => undefined);

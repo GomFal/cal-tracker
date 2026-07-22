@@ -1,5 +1,6 @@
 import {
   defaultUserScopes,
+  mealSchema,
   type CalorieTargetSource,
   type CreateUsualFoodRequest,
   type DailyGoals,
@@ -31,6 +32,7 @@ import type {
   AgentToolCallTelemetryRecord,
   AgentToolExecutionRecord,
   AgentChatProposalCommit,
+  AgentChatMealCorrectionCommit,
   AgentTurnTelemetryFilter,
   AgentTurnTelemetryRecord,
   AgentCandidateRegistryRecord,
@@ -69,6 +71,7 @@ import type {
   UpdateDailyGoalsInput,
   UserFoodPreference,
 } from "./types.js";
+import { mealFingerprint } from "../utils/mealFingerprint.js";
 
 const ACTIVE_EMBEDDING_DIMENSIONS = 1024;
 const DEFAULT_FOOD_SEARCH_LIMIT = 50;
@@ -1817,6 +1820,34 @@ export class PostgresRepository implements AppRepository {
     return this.getDailySummary(userId, date);
   }
 
+  async recordDailyHydration(
+    userId: string,
+    date: string,
+    mode: "add" | "set",
+    amountLiters: number,
+  ) {
+    await this.getDailyGoals(userId, date);
+    await this.execute(dbSql`
+      UPDATE daily_goal_snapshots
+      SET water_consumed_liters = LEAST(
+            hydration_goal_liters,
+            GREATEST(
+              0,
+              ROUND((
+                CASE
+                  WHEN ${mode} = 'add'
+                  THEN water_consumed_liters + ${amountLiters}
+                  ELSE ${amountLiters}
+                END
+              )::numeric, 3)
+            )
+          ),
+          updated_at = now()
+      WHERE user_id = ${userId} AND target_date = ${date}
+    `);
+    return this.getDailySummary(userId, date);
+  }
+
   async listMeals(userId: string, limit = 25): Promise<Meal[]> {
     const rows = await this.execute(dbSql`
       SELECT * FROM meals
@@ -2442,6 +2473,237 @@ export class PostgresRepository implements AppRepository {
     });
   }
 
+  async commitAgentChatMealCorrection(
+    userId: string,
+    input: {
+      conversationId: string;
+      mealId: string;
+      sourceToolCallId: string;
+      clientMutationId: string;
+      traceId: string;
+    },
+  ): Promise<AgentChatMealCorrectionCommit> {
+    return this.db.transaction(async (tx) => {
+      const [conversationRow] = await executeRows(
+        tx,
+        dbSql`
+          SELECT id FROM agent_conversations
+          WHERE id = ${input.conversationId}
+            AND user_id = ${userId}
+            AND hidden_from_user_at IS NULL
+          FOR UPDATE
+        `,
+      );
+      if (!conversationRow) throw new Error("agent_conversation_not_found");
+
+      const existing = await this.findDirectChatCorrection(tx, userId, input);
+      if (existing) return { ...existing, reused: true };
+
+      const [sourceRow] = await executeRows(
+        tx,
+        dbSql`
+          SELECT execution.snapshot_json, message.metadata_json
+          FROM agent_tool_executions execution
+          JOIN agent_messages message
+            ON message.conversation_id = execution.conversation_id
+           AND message.user_id = execution.user_id
+           AND message.tool_call_id = execution.tool_call_id
+           AND message.role = 'tool'
+          WHERE execution.user_id = ${userId}
+            AND execution.conversation_id = ${input.conversationId}
+            AND execution.tool_call_id = ${input.sourceToolCallId}
+            AND execution.action_id = 'preview_meal_correction'
+            AND execution.status = 'completed'
+          ORDER BY message.created_at
+          LIMIT 1
+        `,
+      );
+      const snapshot = objectRecord(sourceRow?.snapshot_json);
+      const previewResult = objectRecord(snapshot?.result);
+      const previewMealValue = objectRecord(previewResult?.meal);
+      const sourceMetadata = objectRecord(sourceRow?.metadata_json);
+      if (
+        previewResult?.kind !== "meal_correction_preview" ||
+        previewResult.requiresConfirmation !== true ||
+        previewMealValue?.id !== input.mealId ||
+        typeof sourceMetadata?.actionCallId !== "string"
+      ) {
+        throw new Error("agent_meal_correction_source_not_found");
+      }
+      const previewMeal = mealSchema.parse(previewMealValue);
+      const [actionCallRow] = await executeRows(
+        tx,
+        dbSql`
+          SELECT internal_metadata_json FROM action_calls
+          WHERE id = ${sourceMetadata.actionCallId}
+            AND user_id = ${userId}
+            AND action_id = 'preview_meal_correction'
+          LIMIT 1
+        `,
+      );
+      const internalMetadata = objectRecord(
+        actionCallRow?.internal_metadata_json,
+      );
+      const sourceFingerprint = internalMetadata?.sourceMealFingerprint;
+      if (typeof sourceFingerprint !== "string") {
+        throw new Error("agent_meal_correction_source_not_found");
+      }
+
+      const [mealRow] = await executeRows(
+        tx,
+        dbSql`
+          SELECT * FROM meals
+          WHERE id = ${input.mealId} AND user_id = ${userId}
+          FOR UPDATE
+        `,
+      );
+      if (!mealRow) throw new Error("meal_changed_since_preview");
+      const currentMeal = await this.mapMeal(mealRow, tx);
+      if (
+        currentMeal.deletedAt ||
+        mealFingerprint(currentMeal) !== sourceFingerprint
+      ) {
+        throw new Error("meal_changed_since_preview");
+      }
+
+      await executeRows(
+        tx,
+        dbSql`
+          UPDATE meals SET
+            title = ${previewMeal.title},
+            occurred_at = ${previewMeal.occurredAt},
+            meal_type = ${previewMeal.mealLabel?.type ?? null},
+            meal_type_label = ${previewMeal.mealLabel?.label ?? null},
+            calories = ${previewMeal.nutrition.calories},
+            protein_grams = ${previewMeal.nutrition.proteinGrams},
+            carbs_grams = ${previewMeal.nutrition.carbsGrams},
+            fat_grams = ${previewMeal.nutrition.fatGrams}
+          WHERE id = ${input.mealId} AND user_id = ${userId}
+        `,
+      );
+      await executeRows(
+        tx,
+        dbSql`DELETE FROM meal_items WHERE meal_id = ${input.mealId}`,
+      );
+      for (const item of previewMeal.items) {
+        await insertMealItem(tx, input.mealId, item);
+      }
+      const [correctedRow] = await executeRows(
+        tx,
+        dbSql`SELECT * FROM meals WHERE id = ${input.mealId} AND user_id = ${userId}`,
+      );
+      const corrected = await this.mapMeal(correctedRow, tx);
+      const committedAt = new Date().toISOString();
+      const result = {
+        kind: "meal_corrected",
+        meal: corrected,
+        message: "Meal corrected.",
+        confirmedMutation: {
+          version: 1 as const,
+          mutationId: input.clientMutationId,
+          committedAt,
+          effects: [{
+            domain: "meals" as const,
+            operation: "upsert" as const,
+            date: corrected.occurredAt.slice(0, 10),
+            entityId: corrected.id,
+            revision: committedAt,
+            snapshot: corrected,
+          }],
+        },
+      };
+      const [messageRow] = await executeRows(
+        tx,
+        dbSql`
+          INSERT INTO agent_messages (
+            id, conversation_id, user_id, role, content, tool_call_id,
+            trace_id, source, metadata_json
+          ) VALUES (
+            ${newId()}, ${input.conversationId}, ${userId}, 'tool',
+            ${JSON.stringify({ actionId: "correct_meal", result })},
+            ${input.sourceToolCallId}, ${input.traceId}, 'client_direct_action',
+            ${jsonb({
+              actionId: "correct_meal",
+              resultKind: "meal_corrected",
+              mealId: corrected.id,
+              sourceToolCallId: input.sourceToolCallId,
+              clientMutationId: input.clientMutationId,
+              source: "client_direct_action",
+              uiResult: result,
+            })}
+          ) RETURNING *
+        `,
+      );
+      await executeRows(
+        tx,
+        dbSql`
+          INSERT INTO agent_direct_actions (
+            user_id, action_id, conversation_id, proposal_id,
+            source_tool_call_id, client_mutation_id, meal_id, message_id
+          ) VALUES (
+            ${userId}, 'correct_meal', ${input.conversationId}, null,
+            ${input.sourceToolCallId}, ${input.clientMutationId},
+            ${corrected.id}, ${messageRow.id as string}
+          )
+        `,
+      );
+      await executeRows(
+        tx,
+        dbSql`
+          UPDATE agent_conversations SET updated_at = now()
+          WHERE id = ${input.conversationId} AND user_id = ${userId}
+        `,
+      );
+      return {
+        actionId: "correct_meal",
+        clientMutationId: input.clientMutationId,
+        reused: false,
+        meal: corrected,
+        conversationMessage: mapAgentConversationMessage(messageRow),
+        result,
+      };
+    });
+  }
+
+  private async findDirectChatCorrection(
+    tx: DbExecutor,
+    userId: string,
+    input: { clientMutationId: string; sourceToolCallId: string },
+  ): Promise<Omit<AgentChatMealCorrectionCommit, "reused"> | undefined> {
+    const [action] = await executeRows(
+      tx,
+      dbSql`
+        SELECT * FROM agent_direct_actions
+        WHERE user_id = ${userId} AND action_id = 'correct_meal'
+          AND (client_mutation_id = ${input.clientMutationId}
+            OR source_tool_call_id = ${input.sourceToolCallId})
+        ORDER BY created_at LIMIT 1
+      `,
+    );
+    if (!action) return undefined;
+    const [mealRow] = await executeRows(
+      tx,
+      dbSql`SELECT * FROM meals WHERE id = ${action.meal_id as string} AND user_id = ${userId}`,
+    );
+    const [messageRow] = await executeRows(
+      tx,
+      dbSql`SELECT * FROM agent_messages WHERE id = ${action.message_id as string} AND user_id = ${userId}`,
+    );
+    if (!mealRow || !messageRow) throw new Error("direct_action_result_missing");
+    const conversationMessage = mapAgentConversationMessage(messageRow);
+    const result = agentResultFromConversationMessage(conversationMessage);
+    if (!objectRecord(result)?.confirmedMutation) {
+      throw new Error("direct_action_result_missing");
+    }
+    return {
+      actionId: "correct_meal",
+      clientMutationId: action.client_mutation_id as string,
+      meal: await this.mapMeal(mealRow, tx),
+      conversationMessage,
+      result,
+    };
+  }
+
   private async findDirectChatCommit(
     tx: DbExecutor,
     userId: string,
@@ -2889,8 +3151,8 @@ export class PostgresRepository implements AppRepository {
       { actionId: input.actionId, status: input.confirmationStatus },
       () =>
         this.execute(dbSql`
-      INSERT INTO action_calls (user_id, action_id, source, input_json, output_json, error_json, confirmation_status, trace_id, latency_ms)
-      VALUES (${input.userId}, ${input.actionId}, ${input.source}, ${jsonb(input.input)}, ${jsonb(input.output ?? null)}, ${jsonb(input.error ?? null)}, ${input.confirmationStatus}, ${input.traceId}, ${input.latencyMs})
+      INSERT INTO action_calls (user_id, action_id, source, input_json, output_json, internal_metadata_json, error_json, confirmation_status, trace_id, latency_ms)
+      VALUES (${input.userId}, ${input.actionId}, ${input.source}, ${jsonb(input.input)}, ${jsonb(input.output ?? null)}, ${jsonb(input.internalMetadata ?? null)}, ${jsonb(input.error ?? null)}, ${input.confirmationStatus}, ${input.traceId}, ${input.latencyMs})
       RETURNING *
     `),
     );
@@ -4396,6 +4658,7 @@ function mapActionCall(row: Record<string, unknown>): ActionCallRecord {
     source: row.source as string,
     input: row.input_json,
     output: row.output_json,
+    internalMetadata: row.internal_metadata_json,
     error: row.error_json,
     confirmationStatus: row.confirmation_status as string,
     traceId: row.trace_id as string,
@@ -4784,6 +5047,10 @@ function arrayOfStrings(value: unknown): string[] {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function objectRecord(value: unknown): Record<string, unknown> | undefined {
+  return isRecord(value) ? value : undefined;
 }
 
 function tokenPhraseContained(text: string, phrase: string): boolean {

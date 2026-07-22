@@ -3,6 +3,7 @@ import {
   agentChatRequestSchema,
   agentRunRequestSchema,
   commitAgentChatProposalRequestSchema,
+  commitAgentChatMealCorrectionRequestSchema,
   calorieEstimateRequestSchema,
   dailyHydrationUpdateSchema,
   emailConfirmationRequestSchema,
@@ -823,6 +824,59 @@ export function createApp(input: {
             "agent_conversation_not_found",
             "proposal_not_found",
             "agent_proposal_source_not_found",
+          ].includes(error.message)
+        ) {
+          throw new HTTPException(404);
+        }
+        throw error;
+      }
+    },
+  );
+
+  app.post(
+    "/v1/agent/conversations/:conversationId/meal-corrections/:mealId/commit",
+    async (c) => {
+      const user = c.get("authUser");
+      const body = commitAgentChatMealCorrectionRequestSchema.parse(
+        await c.req.json(),
+      );
+      try {
+        const committed = await agentChatService.commitMealCorrectionDirect({
+          context: buildActionContext(c, user, "flutter"),
+          conversationId: c.req.param("conversationId"),
+          mealId: c.req.param("mealId"),
+          sourceToolCallId: body.sourceToolCallId,
+          clientMutationId: body.clientMutationId,
+        });
+        return c.json({
+          actionId: committed.actionId,
+          clientMutationId: committed.clientMutationId,
+          reused: committed.reused,
+          result: committed.result,
+          conversationMessage: committed.conversationMessage,
+        });
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          error.message === "meal_changed_since_preview"
+        ) {
+          return c.json(
+            {
+              error: {
+                code: "meal_changed_since_preview",
+                message:
+                  "This meal changed after the preview. Create a new correction preview.",
+                traceId: getTraceId(c),
+              },
+            },
+            409,
+          );
+        }
+        if (
+          error instanceof Error &&
+          [
+            "agent_conversation_not_found",
+            "agent_meal_correction_source_not_found",
           ].includes(error.message)
         ) {
           throw new HTTPException(404);

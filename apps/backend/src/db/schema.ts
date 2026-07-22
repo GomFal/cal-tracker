@@ -219,8 +219,8 @@ export const dailyGoalSnapshots = pgTable(
       .notNull()
       .default("0"),
     waterConsumedLiters: numeric("water_consumed_liters", {
-      precision: 5,
-      scale: 2,
+      precision: 6,
+      scale: 3,
     })
       .notNull()
       .default("0"),
@@ -1062,6 +1062,7 @@ export const actionCalls = pgTable("action_calls", {
   source: text("source").notNull(),
   inputJson: jsonb("input_json").$type<unknown>().notNull(),
   outputJson: jsonb("output_json").$type<unknown>(),
+  internalMetadataJson: jsonb("internal_metadata_json").$type<unknown>(),
   errorJson: jsonb("error_json").$type<unknown>(),
   confirmationStatus: text("confirmation_status").notNull(),
   traceId: text("trace_id").notNull(),
@@ -1462,7 +1463,6 @@ export const agentDirectActions = pgTable(
       .notNull()
       .references(() => agentConversations.id, { onDelete: "cascade" }),
     proposalId: uuid("proposal_id")
-      .notNull()
       .references(() => mealProposals.id, { onDelete: "cascade" }),
     sourceToolCallId: text("source_tool_call_id").notNull(),
     clientMutationId: uuid("client_mutation_id").notNull(),
@@ -1479,16 +1479,24 @@ export const agentDirectActions = pgTable(
   (table) => [
     check(
       "agent_direct_actions_action_id_check",
-      sql`${table.actionId} = 'commit_meal'`,
+      sql`${table.actionId} IN ('commit_meal','correct_meal')`,
     ),
     uniqueIndex("agent_direct_actions_user_mutation_unique").on(
       table.userId,
       table.actionId,
       table.clientMutationId,
     ),
-    uniqueIndex("agent_direct_actions_user_proposal_unique").on(
+    uniqueIndex("agent_direct_actions_user_action_proposal_unique")
+      .on(
+        table.userId,
+        table.actionId,
+        table.proposalId,
+      )
+      .where(sql`${table.proposalId} IS NOT NULL`),
+    uniqueIndex("agent_direct_actions_user_action_source_unique").on(
       table.userId,
-      table.proposalId,
+      table.actionId,
+      table.sourceToolCallId,
     ),
     index("agent_direct_actions_conversation_idx").on(
       table.userId,

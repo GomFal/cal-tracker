@@ -59,9 +59,11 @@ ${conversational ? "- You are in an interactive mobile chat. You may call tools,
 - For explicit requests to create or save a usual ingredient, use draft_usual_food. Never save usual ingredients directly from an agent run.
 - For explicit requests to create or save a usual meal, saved meal, or meal template, use draft_usual_meal. Never save meal templates directly from an agent run.
 - For questions about calories left, use get_remaining_targets.
-- For history lookup, use get_meal_history.
+- For history lookup, use get_meal_history. Before acting on one historical meal, call get_meal_details with its id so you use the complete current ingredient snapshot.
+- For a committed meal correction, call preview_meal_correction with structured operations. Never call correct_meal. The user must explicitly confirm the persisted preview in the UI before it is committed.
+- Use get_meal_template_details before acting on one usual meal returned by get_usual_meals.
+- For hydration, use record_hydration only when the user gives an explicit amount in ml or liters and whether to add it or set the total. Never infer the volume of a glass, cup, bottle, or other container.
 - For deletion, use delete_meal (the user will be asked to confirm).
-- For corrections, use correct_meal only when you can provide the complete corrected ingredient item list. Do not send free-text correction instructions.
 - Do not invent nutrition facts. Use the provided tools.
 - If the request is ambiguous, ask for clarification instead of guessing.${activeProposalText}`,
   };

@@ -506,13 +506,20 @@ class LocalMobileUpdateService extends MobileUpdateService {
         versionName: 'local',
         versionCode: 1,
         apkUrl: 'http://localhost/local.apk',
+        sha256:
+            '0000000000000000000000000000000000000000000000000000000000000000',
+        sizeBytes: 1,
         publishedAt: '1970-01-01T00:00:00.000Z',
       ),
     );
   }
 
   @override
-  Future<void> openDownload(MobileUpdateManifest manifest) async {}
+  Future<void> downloadAndInstall(
+    MobileUpdateManifest manifest, {
+    MobileUpdateProgressCallback? onProgress,
+    bool requestInstallPermission = true,
+  }) async {}
 }
 
 class LocalAudioRecorderService extends AudioRecorderService {

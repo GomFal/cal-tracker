@@ -401,7 +401,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get mobileUpdateMessage =>
-      'Hay una nueva versión de BetterCalories. Descarga la APK desde el navegador para actualizar.';
+      'Hay una nueva versión de BetterCalories. Descárgala e instálala de forma segura sin salir de la app.';
 
   @override
   String get mobileUpdateNow => 'Actualizar ahora';
@@ -410,12 +410,34 @@ class AppLocalizationsEs extends AppLocalizations {
   String get mobileUpdateLater => 'Ahora no';
 
   @override
+  String get mobileUpdatePreparing => 'Preparando la descarga segura…';
+
+  @override
+  String get mobileUpdateDownloading => 'Descargando la actualización…';
+
+  @override
+  String get mobileUpdateVerifying =>
+      'Verificando la actualización descargada…';
+
+  @override
+  String get mobileUpdatePermissionInstructions =>
+      'Permite que BetterCalories instale aplicaciones y vuelve aquí. La actualización continuará automáticamente.';
+
+  @override
   String get mobileUpdateVerificationFailed =>
       'No se pudo verificar esta actualización, así que se bloqueó la descarga.';
 
   @override
-  String get mobileUpdateOpenFailed =>
-      'No se pudo abrir la actualización verificada. Inténtalo de nuevo más tarde.';
+  String get mobileUpdateDownloadFailed =>
+      'No se pudo descargar la actualización. Comprueba tu conexión e inténtalo de nuevo.';
+
+  @override
+  String get mobileUpdatePermissionDenied =>
+      'No se activó el permiso para instalar esta actualización. Pulsa Actualizar ahora para intentarlo de nuevo.';
+
+  @override
+  String get mobileUpdateInstallFailed =>
+      'Android no pudo abrir el instalador para esta actualización verificada. Inténtalo de nuevo.';
 
   @override
   String get settingsMacroRequiresCaloriesTitle =>

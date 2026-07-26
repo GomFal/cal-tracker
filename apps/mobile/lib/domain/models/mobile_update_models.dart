@@ -5,9 +5,9 @@ class MobileUpdateManifest {
     required this.versionName,
     required this.versionCode,
     required this.apkUrl,
+    required this.sha256,
+    required this.sizeBytes,
     required this.publishedAt,
-    this.sha256,
-    this.sizeBytes,
   });
 
   final String channel;
@@ -15,9 +15,9 @@ class MobileUpdateManifest {
   final String versionName;
   final int versionCode;
   final String apkUrl;
+  final String sha256;
+  final int sizeBytes;
   final String publishedAt;
-  final String? sha256;
-  final int? sizeBytes;
 
   factory MobileUpdateManifest.fromJson(Map<String, Object?> json) {
     const requiredKeys = <String>{
@@ -26,6 +26,8 @@ class MobileUpdateManifest {
       'versionName',
       'versionCode',
       'apkUrl',
+      'sha256',
+      'sizeBytes',
       'publishedAt',
     };
     final keys = json.keys.toSet();
@@ -41,15 +43,14 @@ class MobileUpdateManifest {
       );
     }
 
-    final sha256 = _nullableString(json, 'sha256');
-    if (sha256 != null && !RegExp(r'^[a-fA-F0-9]{64}$').hasMatch(sha256)) {
+    final sha256 = _string(json, 'sha256');
+    if (!RegExp(r'^[a-fA-F0-9]{64}$').hasMatch(sha256)) {
       throw const FormatException(
         'Invalid mobile update manifest: invalid sha256',
       );
     }
 
-    final sizeBytes =
-        json['sizeBytes'] == null ? null : _positiveInt(json, 'sizeBytes');
+    final sizeBytes = _positiveInt(json, 'sizeBytes');
 
     return MobileUpdateManifest(
       channel: _string(json, 'channel'),
@@ -57,9 +58,9 @@ class MobileUpdateManifest {
       versionName: _string(json, 'versionName'),
       versionCode: _positiveInt(json, 'versionCode'),
       apkUrl: _string(json, 'apkUrl'),
-      publishedAt: publishedAt,
-      sha256: sha256,
+      sha256: sha256.toLowerCase(),
       sizeBytes: sizeBytes,
+      publishedAt: publishedAt,
     );
   }
 }
@@ -82,13 +83,6 @@ String _string(Map<String, Object?> json, String key) {
   final value = json[key];
   if (value is String && value.isNotEmpty) return value;
   throw FormatException('Invalid mobile update manifest: missing $key');
-}
-
-String? _nullableString(Map<String, Object?> json, String key) {
-  final value = json[key];
-  if (value == null) return null;
-  if (value is String && value.isNotEmpty) return value;
-  throw FormatException('Invalid mobile update manifest: invalid $key');
 }
 
 int _int(Map<String, Object?> json, String key) {

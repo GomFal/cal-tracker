@@ -31,6 +31,8 @@ REQUIRED_KEYS = {
     "versionName",
     "versionCode",
     "apkUrl",
+    "sha256",
+    "sizeBytes",
     "publishedAt",
 }
 APK_NAME = re.compile(r"^[A-Za-z0-9._-]+\.apk$")
@@ -126,13 +128,11 @@ def validate(manifest: dict[str, object], args: argparse.Namespace) -> tuple[str
     ):
         fail("apkUrl is outside the exact approved HTTPS origin and APK path")
 
-    sha256 = manifest.get("sha256")
-    if sha256 is not None and (
-        not isinstance(sha256, str) or not SHA256.fullmatch(sha256)
-    ):
+    sha256 = manifest["sha256"]
+    if not isinstance(sha256, str) or not SHA256.fullmatch(sha256):
         fail("sha256 must be one hexadecimal SHA-256 digest")
-    size_bytes = manifest.get("sizeBytes")
-    if size_bytes is not None and (
+    size_bytes = manifest["sizeBytes"]
+    if (
         isinstance(size_bytes, bool)
         or not isinstance(size_bytes, int)
         or size_bytes <= 0

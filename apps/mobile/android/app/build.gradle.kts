@@ -155,6 +155,7 @@ flutter {
 }
 
 dependencies {
+    implementation("androidx.core:core-ktx:1.18.0")
     androidTestUtil("androidx.test:orchestrator:1.5.1")
     androidTestUtil("androidx.test.services:test-services:1.5.0")
 }

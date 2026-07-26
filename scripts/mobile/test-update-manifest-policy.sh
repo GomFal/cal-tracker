@@ -70,6 +70,18 @@ done
 printf '{"channel":"dev"}\n' > "$TMP_DIR/manipulated.json"
 expect_rejected python3 "$VALIDATOR" "$TMP_DIR/manipulated.json" --channel dev
 
+cp "$dev_manifest" "$TMP_DIR/missing-integrity.json"
+python3 - "$TMP_DIR/missing-integrity.json" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+manifest = json.loads(open(path, encoding="utf-8").read())
+manifest.pop("sha256")
+open(path, "w", encoding="utf-8").write(json.dumps(manifest))
+PY
+expect_rejected python3 "$VALIDATOR" "$TMP_DIR/missing-integrity.json" --channel dev
+
 touch "$TMP_DIR/app.apk"
 cat > "$TMP_DIR/apkanalyzer" <<'SCRIPT'
 #!/usr/bin/env bash

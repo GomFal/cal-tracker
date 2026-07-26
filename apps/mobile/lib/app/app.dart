@@ -224,12 +224,14 @@ class _CalTrackerComposition {
     required this.agentChatSessionStore,
     required this.agentChatCacheStore,
     required this.mobileUpdateService,
+    required bool ownsMobileUpdateService,
     required this.audioRecorderService,
     required this.ownsAudioRecorderService,
     required this.telemetryService,
     required this.metadataProvider,
     required bool ownsTelemetryService,
   })  : _ownsNutritionRepository = ownsNutritionRepository,
+        _ownsMobileUpdateService = ownsMobileUpdateService,
         _ownsTelemetryService = ownsTelemetryService;
 
   factory _CalTrackerComposition.create(CalTrackerBootstrap widget) {
@@ -277,6 +279,7 @@ class _CalTrackerComposition {
       storage: privateCacheStorage,
     );
     final ownsAudioRecorderService = widget.audioRecorderService == null;
+    final ownsMobileUpdateService = widget.mobileUpdateService == null;
 
     return _CalTrackerComposition(
       preferencesRepository: preferencesRepository,
@@ -287,6 +290,7 @@ class _CalTrackerComposition {
       agentChatCacheStore: agentChatCacheStore,
       mobileUpdateService: widget.mobileUpdateService ??
           MobileUpdateService(apiConfig: widget.apiConfig),
+      ownsMobileUpdateService: ownsMobileUpdateService,
       audioRecorderService:
           widget.audioRecorderService ?? AudioRecorderService(),
       ownsAudioRecorderService: ownsAudioRecorderService,
@@ -303,6 +307,7 @@ class _CalTrackerComposition {
   final AgentChatSessionStore agentChatSessionStore;
   final AgentChatCacheStore agentChatCacheStore;
   final MobileUpdateService mobileUpdateService;
+  final bool _ownsMobileUpdateService;
   final AudioRecorderService audioRecorderService;
   final bool ownsAudioRecorderService;
   final ClientTelemetryService telemetryService;
@@ -310,6 +315,9 @@ class _CalTrackerComposition {
   final bool _ownsTelemetryService;
 
   Future<void> dispose() async {
+    if (_ownsMobileUpdateService) {
+      mobileUpdateService.dispose();
+    }
     if (_ownsNutritionRepository) {
       await nutritionRepository.dispose();
     }

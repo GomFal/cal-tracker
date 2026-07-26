@@ -16,10 +16,11 @@ debe ser un fichero `.apk` directo bajo `/apk/`.
 ## Contrato del manifest
 
 Los campos obligatorios son `channel`, `packageName`, `versionName`,
-`versionCode`, `apkUrl` y `publishedAt`. `sha256` y `sizeBytes` continúan siendo
-metadatos de publicación: la app no descarga el APK ni calcula su hash. Los
-campos futuros desconocidos se toleran para poder ampliar el documento, pero
-los campos conocidos se validan con tipos estrictos.
+`versionCode`, `apkUrl`, `sha256`, `sizeBytes` y `publishedAt`. La app descarga
+el APK en su caché privada y no lo entrega al instalador hasta confirmar tanto
+el tamaño exacto como el SHA-256 publicado. Los campos futuros desconocidos se
+toleran para poder ampliar el documento, pero los campos conocidos se validan
+con tipos estrictos.
 
 La app compara el package instalado con el canal derivado de su API oficial y
 solo ofrece un `versionCode` estrictamente superior. Un manifest igual o
@@ -27,10 +28,10 @@ inferior no produce un prompt y tampoco puede abrirse mediante el servicio. Un
 canal, package, origen o formato incompatible bloquea la actualización con un
 mensaje seguro que no muestra URLs ni detalles internos.
 
-El GET del manifest y el HEAD previo del APK desactivan redirects. El HEAD no
-descarga el artefacto: confirma que el endpoint directo responde antes de
-delegar la descarga al navegador externo. No existe una verificación
-criptográfica propia del manifest ni una descarga interna en este MVP.
+El GET del manifest y el GET del APK desactivan redirects. La descarga se
+escribe primero como fichero parcial, tiene un límite de 250 MiB y se renombra
+solo después de superar la verificación de tamaño y SHA-256. Un APK incompleto
+o manipulado se elimina y nunca se comparte con Android.
 
 ## Publicación
 
@@ -54,11 +55,16 @@ del package instalado cuando su identidad de firma es compatible. No se debe
 añadir el fingerprint al manifest como si eso demostrara por sí mismo la firma
 del binario.
 
-## Límite del navegador
+## Instalación dentro de la app
 
-El HEAD sin redirects elimina redirects estables o configurados en el endpoint
-al comprobarlo. Como la descarga posterior pertenece a otro proceso, existe
-una ventana TOCTOU entre el HEAD y la petición del navegador. En el alcance
-MVP, el riesgo residual queda limitado por TLS, el origen exacto y la
-verificación de package/firma que Android aplica durante la instalación. La
-eliminación definitiva del flujo llega con Play Store.
+La app no abre el navegador. Android solicita una sola vez el permiso especial
+para instalar desde BetterCalories y, al volver, la descarga continúa
+automáticamente. El APK verificado permanece en `cache/mobile_updates` y se
+comparte únicamente mediante un `FileProvider` no exportado con permiso de
+lectura temporal. El puente nativo rechaza cualquier ruta fuera de ese
+directorio o cualquier nombre que no corresponda al formato interno esperado.
+
+El instalador de paquetes de Android vuelve a validar el package, el
+`versionCode` y la identidad de firma compatible antes de permitir la
+actualización. Play Store seguirá siendo el reemplazo definitivo de este canal
+temporal.

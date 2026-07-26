@@ -1,7 +1,7 @@
 name: cal_tracker_mobile
 description: Agent-operable calorie and nutrition tracker MVP.
 publish_to: "none"
-version: 0.1.10+26
+version: 0.1.11+27
 
 environment:
   sdk: ">=3.4.0 <4.0.0"
@@ -12,6 +12,7 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   camera: ^0.11.0
+  crypto: ^3.0.7
   flutter_secure_storage: ^9.2.4
   go_router: ^16.3.0
   google_mlkit_text_recognition: ^0.13.0
@@ -27,7 +28,6 @@ dependencies:
   record: ^6.1.2
   marionette_flutter: ^0.5.0
   shared_preferences: ^2.5.3
-  url_launcher: ^6.3.2
   flutter_svg: ^2.3.0
   flutter_markdown: ^0.7.7
   app_links: ^7.0.0

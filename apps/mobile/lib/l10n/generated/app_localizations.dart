@@ -810,7 +810,7 @@ abstract class AppLocalizations {
   /// No description provided for @mobileUpdateMessage.
   ///
   /// In en, this message translates to:
-  /// **'A new BetterCalories version is available. Download the APK from your browser to update.'**
+  /// **'A new BetterCalories version is available. Download and install it securely without leaving the app.'**
   String get mobileUpdateMessage;
 
   /// No description provided for @mobileUpdateNow.
@@ -825,17 +825,53 @@ abstract class AppLocalizations {
   /// **'Later'**
   String get mobileUpdateLater;
 
+  /// No description provided for @mobileUpdatePreparing.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing the secure download…'**
+  String get mobileUpdatePreparing;
+
+  /// No description provided for @mobileUpdateDownloading.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading update…'**
+  String get mobileUpdateDownloading;
+
+  /// No description provided for @mobileUpdateVerifying.
+  ///
+  /// In en, this message translates to:
+  /// **'Verifying the downloaded update…'**
+  String get mobileUpdateVerifying;
+
+  /// No description provided for @mobileUpdatePermissionInstructions.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow BetterCalories to install apps, then return here. The update will continue automatically.'**
+  String get mobileUpdatePermissionInstructions;
+
   /// No description provided for @mobileUpdateVerificationFailed.
   ///
   /// In en, this message translates to:
   /// **'This update could not be verified, so the download was blocked.'**
   String get mobileUpdateVerificationFailed;
 
-  /// No description provided for @mobileUpdateOpenFailed.
+  /// No description provided for @mobileUpdateDownloadFailed.
   ///
   /// In en, this message translates to:
-  /// **'The verified update could not be opened. Please try again later.'**
-  String get mobileUpdateOpenFailed;
+  /// **'The update could not be downloaded. Please check your connection and try again.'**
+  String get mobileUpdateDownloadFailed;
+
+  /// No description provided for @mobileUpdatePermissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Permission to install this update was not enabled. Tap Update now to try again.'**
+  String get mobileUpdatePermissionDenied;
+
+  /// No description provided for @mobileUpdateInstallFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Android could not open the installer for this verified update. Please try again.'**
+  String get mobileUpdateInstallFailed;
 
   /// No description provided for @settingsMacroRequiresCaloriesTitle.
   ///

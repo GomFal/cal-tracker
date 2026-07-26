@@ -3,25 +3,33 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../domain/models/mobile_update_models.dart';
 import 'api_config.dart';
+import 'mobile_update_installer.dart';
 
 typedef PackageInfoLoader = Future<PackageInfo> Function();
-typedef UrlOpener = Future<bool> Function(Uri uri);
+typedef DownloadDirectoryLoader = Future<Directory> Function();
+typedef MobileUpdateProgressCallback = void Function(double progress);
 
 enum MobileUpdateFailureCode {
   checkUnavailable,
   manifestRejected,
   downloadRejected,
-  downloadOpenFailed,
+  downloadFailed,
+  installPermissionRequired,
+  installPermissionDenied,
+  installFailed,
 }
 
 extension MobileUpdateFailureCodePresentation on MobileUpdateFailureCode {
-  bool get isUserVisible => this != MobileUpdateFailureCode.checkUnavailable;
+  bool get isUserVisible =>
+      this != MobileUpdateFailureCode.checkUnavailable &&
+      this != MobileUpdateFailureCode.installPermissionRequired;
 }
 
 class MobileUpdateException implements Exception {
@@ -38,29 +46,41 @@ class MobileUpdateService {
     required ApiConfig apiConfig,
     http.Client? httpClient,
     PackageInfoLoader? packageInfoLoader,
-    UrlOpener? urlOpener,
+    MobileUpdateInstaller? installer,
+    DownloadDirectoryLoader? downloadDirectoryLoader,
     Duration timeout = const Duration(seconds: 4),
-  }) : _policy = _MobileUpdateTrustPolicy.fromApiBase(apiConfig.baseUrl),
-       _httpClient = httpClient ?? http.Client(),
-       _packageInfoLoader = packageInfoLoader ?? PackageInfo.fromPlatform,
-       _urlOpener =
-           urlOpener ??
-           ((uri) => launchUrl(uri, mode: LaunchMode.externalApplication)),
-       _timeout = timeout;
+    Duration downloadInactivityTimeout = const Duration(seconds: 30),
+    Duration installerTimeout = const Duration(seconds: 30),
+  })  : _policy = _MobileUpdateTrustPolicy.fromApiBase(apiConfig.baseUrl),
+        _httpClient = httpClient ?? http.Client(),
+        _ownsHttpClient = httpClient == null,
+        _packageInfoLoader = packageInfoLoader ?? PackageInfo.fromPlatform,
+        _installer = installer ?? AndroidMobileUpdateInstaller(),
+        _downloadDirectoryLoader =
+            downloadDirectoryLoader ?? getTemporaryDirectory,
+        _timeout = timeout,
+        _downloadInactivityTimeout = downloadInactivityTimeout,
+        _installerTimeout = installerTimeout;
 
   static const _maximumManifestBytes = 64 * 1024;
+  static const _maximumApkBytes = 250 * 1024 * 1024;
+  static const _updateDirectoryName = 'mobile_updates';
 
   final _MobileUpdateTrustPolicy? _policy;
   final http.Client _httpClient;
+  final bool _ownsHttpClient;
   final PackageInfoLoader _packageInfoLoader;
-  final UrlOpener _urlOpener;
+  final MobileUpdateInstaller _installer;
+  final DownloadDirectoryLoader _downloadDirectoryLoader;
   final Duration _timeout;
+  final Duration _downloadInactivityTimeout;
+  final Duration _installerTimeout;
 
   String? get manifestUrl => _policy?.manifestUri.toString();
 
   Future<MobileUpdateCheck> checkForUpdate() async {
     final policy = _policy;
-    if (policy == null) {
+    if (policy == null || !_installer.isSupported) {
       throw const MobileUpdateException(
         MobileUpdateFailureCode.checkUnavailable,
       );
@@ -113,16 +133,29 @@ class MobileUpdateService {
     );
   }
 
-  Future<void> openDownload(MobileUpdateManifest manifest) async {
+  Future<bool> canInstallPackages() async {
+    if (!_installer.isSupported) return false;
+    try {
+      return await _installer.canInstallPackages().timeout(_timeout);
+    } on Object {
+      return false;
+    }
+  }
+
+  Future<void> downloadAndInstall(
+    MobileUpdateManifest manifest, {
+    MobileUpdateProgressCallback? onProgress,
+    bool requestInstallPermission = true,
+  }) async {
     final policy = _policy;
-    if (policy == null) {
+    if (policy == null || !_installer.isSupported) {
       throw const MobileUpdateException(
         MobileUpdateFailureCode.downloadRejected,
       );
     }
 
     final packageInfo = await _loadPackageInfo(
-      failureCode: MobileUpdateFailureCode.downloadOpenFailed,
+      failureCode: MobileUpdateFailureCode.downloadFailed,
     );
     final installedVersionCode = int.tryParse(packageInfo.buildNumber);
     if (packageInfo.packageName != policy.packageName ||
@@ -140,33 +173,225 @@ class MobileUpdateService {
       );
     }
 
-    final uri = Uri.parse(manifest.apkUrl);
-    final request = http.Request('HEAD', uri)
+    final apkFile = await _downloadVerifiedApk(
+      manifest,
+      onProgress: onProgress,
+    );
+    await _ensureInstallPermission(requestInstallPermission);
+
+    try {
+      await _installer
+          .installApk(
+            filePath: apkFile.path,
+            expectedVersionCode: manifest.versionCode,
+            expectedSha256: manifest.sha256,
+            expectedSizeBytes: manifest.sizeBytes,
+          )
+          .timeout(_installerTimeout);
+    } on MobileUpdateInstallerException catch (error) {
+      if (error.code == 'install_permission_required') {
+        await _ensureInstallPermission(requestInstallPermission);
+      }
+      if (const {
+        'invalid_arguments',
+        'invalid_apk_path',
+        'integrity_mismatch',
+        'apk_invalid',
+        'package_mismatch',
+        'version_mismatch',
+        'signature_mismatch',
+      }.contains(error.code)) {
+        throw const MobileUpdateException(
+          MobileUpdateFailureCode.downloadRejected,
+        );
+      }
+      throw const MobileUpdateException(
+        MobileUpdateFailureCode.installFailed,
+      );
+    } on Object {
+      throw const MobileUpdateException(
+        MobileUpdateFailureCode.installFailed,
+      );
+    }
+  }
+
+  Future<void> _ensureInstallPermission(bool requestPermission) async {
+    bool allowed;
+    try {
+      allowed = await _installer.canInstallPackages().timeout(_timeout);
+    } on Object {
+      throw const MobileUpdateException(
+        MobileUpdateFailureCode.installFailed,
+      );
+    }
+    if (allowed) return;
+    if (!requestPermission) {
+      throw const MobileUpdateException(
+        MobileUpdateFailureCode.installPermissionDenied,
+      );
+    }
+    try {
+      await _installer.openInstallPermissionSettings().timeout(_timeout);
+    } on Object {
+      throw const MobileUpdateException(
+        MobileUpdateFailureCode.installFailed,
+      );
+    }
+    throw const MobileUpdateException(
+      MobileUpdateFailureCode.installPermissionRequired,
+    );
+  }
+
+  Future<File> _downloadVerifiedApk(
+    MobileUpdateManifest manifest, {
+    MobileUpdateProgressCallback? onProgress,
+  }) async {
+    late final Directory updateDirectory;
+    try {
+      final cacheDirectory = await _downloadDirectoryLoader().timeout(_timeout);
+      updateDirectory = Directory(
+        '${cacheDirectory.path}${Platform.pathSeparator}$_updateDirectoryName',
+      );
+      await updateDirectory.create(recursive: true);
+    } on Object {
+      throw const MobileUpdateException(
+        MobileUpdateFailureCode.downloadFailed,
+      );
+    }
+
+    final apkFile = File(
+      '${updateDirectory.path}${Platform.pathSeparator}'
+      'bettercalories-update-${manifest.versionCode}.apk',
+    );
+    if (await _isVerifiedApk(apkFile, manifest, onProgress: onProgress)) {
+      return apkFile;
+    }
+
+    final partialFile = File('${apkFile.path}.part');
+    await _deleteIfPresent(apkFile);
+    await _deleteIfPresent(partialFile);
+
+    final request = http.Request('GET', Uri.parse(manifest.apkUrl))
       ..headers[HttpHeaders.acceptHeader] =
           'application/vnd.android.package-archive';
     final response = await _sendWithoutRedirects(
       request,
-      transportFailure: MobileUpdateFailureCode.downloadOpenFailed,
+      transportFailure: MobileUpdateFailureCode.downloadFailed,
       redirectFailure: MobileUpdateFailureCode.downloadRejected,
     );
-    await response.stream.drain<void>();
     if (response.statusCode < 200 || response.statusCode >= 300) {
+      await response.stream.drain<void>();
       throw const MobileUpdateException(
-        MobileUpdateFailureCode.downloadOpenFailed,
+        MobileUpdateFailureCode.downloadFailed,
+      );
+    }
+    if (!_isApkResponse(response)) {
+      await response.stream.drain<void>();
+      throw const MobileUpdateException(
+        MobileUpdateFailureCode.downloadRejected,
+      );
+    }
+    final contentLength = response.contentLength;
+    if (contentLength != null && contentLength != manifest.sizeBytes) {
+      await response.stream.drain<void>();
+      throw const MobileUpdateException(
+        MobileUpdateFailureCode.downloadRejected,
       );
     }
 
-    bool opened;
+    RandomAccessFile? output;
+    Digest? calculatedDigest;
+    final digestOutput = ChunkedConversionSink<Digest>.withCallback((digests) {
+      if (digests.length != 1) {
+        throw const MobileUpdateException(
+          MobileUpdateFailureCode.downloadRejected,
+        );
+      }
+      calculatedDigest = digests.single;
+    });
+    final digestInput = sha256.startChunkedConversion(digestOutput);
+    var receivedBytes = 0;
     try {
-      opened = await _urlOpener(uri).timeout(_timeout);
+      output = await partialFile.open(mode: FileMode.write);
+      final chunks = response.stream.timeout(_downloadInactivityTimeout);
+      await for (final chunk in chunks) {
+        receivedBytes += chunk.length;
+        if (receivedBytes > manifest.sizeBytes) {
+          throw const MobileUpdateException(
+            MobileUpdateFailureCode.downloadRejected,
+          );
+        }
+        digestInput.add(chunk);
+        await output.writeFrom(chunk);
+        onProgress?.call(receivedBytes / manifest.sizeBytes);
+      }
+      digestInput.close();
+      await output.close();
+      output = null;
+
+      if (receivedBytes != manifest.sizeBytes ||
+          calculatedDigest?.toString() != manifest.sha256) {
+        throw const MobileUpdateException(
+          MobileUpdateFailureCode.downloadRejected,
+        );
+      }
+      await partialFile.rename(apkFile.path);
+      onProgress?.call(1);
+      await _deleteOtherUpdateFiles(updateDirectory, keep: apkFile);
+      return apkFile;
+    } on MobileUpdateException {
+      await output?.close();
+      await _deleteIfPresent(partialFile);
+      rethrow;
     } on Object {
+      await output?.close();
+      await _deleteIfPresent(partialFile);
       throw const MobileUpdateException(
-        MobileUpdateFailureCode.downloadOpenFailed,
+        MobileUpdateFailureCode.downloadFailed,
       );
     }
-    if (!opened) {
+  }
+
+  Future<bool> _isVerifiedApk(
+    File apkFile,
+    MobileUpdateManifest manifest, {
+    MobileUpdateProgressCallback? onProgress,
+  }) async {
+    try {
+      if (!await apkFile.exists() ||
+          await apkFile.length() != manifest.sizeBytes) {
+        return false;
+      }
+      final digest = await sha256.bind(apkFile.openRead()).first;
+      if (digest.toString() != manifest.sha256) return false;
+      onProgress?.call(1);
+      return true;
+    } on Object {
+      return false;
+    }
+  }
+
+  Future<void> _deleteOtherUpdateFiles(
+    Directory directory, {
+    required File keep,
+  }) async {
+    try {
+      await for (final entity in directory.list()) {
+        if (entity is File && entity.path != keep.path) {
+          await entity.delete();
+        }
+      }
+    } on Object {
+      // Cache cleanup is best effort and does not invalidate a verified APK.
+    }
+  }
+
+  Future<void> _deleteIfPresent(File file) async {
+    try {
+      if (await file.exists()) await file.delete();
+    } on Object {
       throw const MobileUpdateException(
-        MobileUpdateFailureCode.downloadOpenFailed,
+        MobileUpdateFailureCode.downloadFailed,
       );
     }
   }
@@ -253,6 +478,7 @@ class MobileUpdateService {
     final apkUri = Uri.tryParse(manifest.apkUrl);
     if (manifest.channel != policy.channel ||
         manifest.packageName != policy.packageName ||
+        manifest.sizeBytes > _maximumApkBytes ||
         apkUri == null ||
         !_isApprovedApkUri(apkUri, policy)) {
       throw const MobileUpdateException(
@@ -278,6 +504,29 @@ class MobileUpdateService {
     if (contentType == null) return false;
     return contentType.split(';').first.trim().toLowerCase() ==
         'application/json';
+  }
+
+  bool _isApkResponse(http.StreamedResponse response) {
+    final contentEncoding = response.headers[HttpHeaders.contentEncodingHeader]
+        ?.trim()
+        .toLowerCase();
+    if (contentEncoding != null &&
+        contentEncoding.isNotEmpty &&
+        contentEncoding != 'identity') {
+      return false;
+    }
+    final contentType = response.headers[HttpHeaders.contentTypeHeader];
+    if (contentType == null) return false;
+    return switch (contentType.split(';').first.trim().toLowerCase()) {
+      'application/vnd.android.package-archive' ||
+      'application/octet-stream' =>
+        true,
+      _ => false,
+    };
+  }
+
+  void dispose() {
+    if (_ownsHttpClient) _httpClient.close();
   }
 }
 

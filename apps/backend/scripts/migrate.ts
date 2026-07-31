@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { migrate as migrateDrizzle } from "drizzle-orm/postgres-js/migrator";
 import { loadConfig } from "../src/config/env.js";
 import { createDbClient } from "../src/db/client.js";
+import { validateDrizzleMigrationIntegrity } from "./check-drizzle-migration-integrity.js";
 import { databaseSchema, prepareSchema } from "./schema.js";
 
 const config = loadConfig();
@@ -10,6 +11,8 @@ const client = createDbClient(config.DATABASE_URL, { max: 1 });
 const legacyMigrationDir = resolve(process.cwd(), "../../infra/db/migrations");
 const drizzleMigrationDir = resolve(process.cwd(), "../../infra/db/drizzle");
 const schema = databaseSchema();
+
+validateDrizzleMigrationIntegrity(drizzleMigrationDir);
 
 await prepareSchema(client.sql, schema);
 

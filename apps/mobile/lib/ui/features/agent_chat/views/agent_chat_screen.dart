@@ -713,6 +713,7 @@ class _ToolCallCard extends StatelessWidget {
       AgentChatToolStatus.failed => palette.coral,
       AgentChatToolStatus.interrupted => palette.orange,
     };
+    final summary = _visibleToolSummary(context, entry);
     return DecoratedBox(
       key: ValueKey('agent_tool_${toolCall?.id ?? entry.id}'),
       decoration: BoxDecoration(
@@ -742,17 +743,16 @@ class _ToolCallCard extends StatelessWidget {
                             .titleMedium
                             ?.copyWith(fontWeight: FontWeight.w700),
                       ),
-                      const SizedBox(height: FreshSpacing.xs),
-                      Text(
-                        localizedPublicAiErrorMessage(
-                          context.l10n,
-                          entry.errorCode,
-                          fallback: entry.error ?? toolCall?.summary ?? '',
+                      if (summary != null) ...[
+                        const SizedBox(height: FreshSpacing.xs),
+                        Text(
+                          summary,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(color: palette.inkSoft),
                         ),
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: palette.inkSoft,
-                            ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
@@ -783,6 +783,26 @@ class _ToolCallCard extends StatelessWidget {
       ),
     );
   }
+}
+
+String? _visibleToolSummary(BuildContext context, AgentChatEntry entry) {
+  if (entry.error != null || entry.errorCode != null) {
+    return localizedPublicAiErrorMessage(
+      context.l10n,
+      entry.errorCode,
+      fallback: entry.error ?? '',
+    );
+  }
+  final summary = entry.toolCall?.summary.trim() ?? '';
+  if (summary.isEmpty || _isTechnicalToolPayload(summary)) return null;
+  return summary;
+}
+
+bool _isTechnicalToolPayload(String value) {
+  final summary = value.trim();
+  return (summary.startsWith('{') || summary.startsWith('[')) ||
+      summary.contains('"actionId"') ||
+      summary.contains("'actionId'");
 }
 
 class _AgentResultWidget extends StatelessWidget {

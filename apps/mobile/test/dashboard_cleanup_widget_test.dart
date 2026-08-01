@@ -404,6 +404,10 @@ void main() {
       find.byKey(const ValueKey('dashboard_water_increase_button')),
       findsOneWidget,
     );
+    expect(
+      find.byKey(const ValueKey('dashboard_meal_container_meal-1')),
+      findsOneWidget,
+    );
 
     final mealRow = find.byKey(
       const ValueKey('dashboard_meal_row_meal-1'),
@@ -414,6 +418,15 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Edit ingredients'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('dashboard_meal_editor_fullscreen')),
+      findsOneWidget,
+    );
+    expect(find.byType(BottomSheet), findsNothing);
+    expect(
+      find.byKey(const ValueKey('dashboard_item_surface_0')),
+      findsOneWidget,
+    );
     expect(
       find.byKey(const ValueKey('dashboard_item_compact_0')),
       findsOneWidget,
@@ -446,6 +459,14 @@ void main() {
     expect(find.byKey(const ValueKey('dashboard_item_name_0')), findsNothing);
     await tester.tap(find.byKey(const ValueKey('dashboard_item_compact_0')));
     await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('dashboard_item_surface_0')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('dashboard_item_expanded_0')),
+      findsOneWidget,
+    );
     expect(find.byKey(const ValueKey('dashboard_item_name_0')), findsOneWidget);
 
     final actionsFinder = find.byKey(

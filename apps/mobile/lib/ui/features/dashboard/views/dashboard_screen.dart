@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:animations/animations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
@@ -11,6 +14,7 @@ import '../../../../l10n/meal_label_localizations.dart';
 import '../../../core/content_frame.dart';
 import '../../../core/design_system.dart';
 import '../../../core/motion.dart';
+import '../../../shared/food_search_panel.dart';
 import '../../../shared/meal_item_editor_sheet.dart';
 import '../../auth/view_models/auth_view_model.dart';
 import '../../hydration/hydration_format.dart';
@@ -117,35 +121,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(height: _DashboardMetrics.sectionGap),
             _MealSection(
               summary: summary,
-              onEditMeal: (meal) =>
-                  _showMealItemEditor(context, viewModel, meal),
+              searchFoods: viewModel.searchFoods,
+              onSaveMeal: viewModel.correctMealItems,
+              onDeleteMeal: (editorContext, meal) =>
+                  _confirmDeleteMeal(editorContext, viewModel, meal),
             ),
             const SizedBox(height: _DashboardMetrics.sectionGap),
           ],
         ],
       ),
     );
-  }
-
-  Future<void> _showMealItemEditor(
-    BuildContext context,
-    DashboardViewModel viewModel,
-    Meal meal,
-  ) async {
-    final items = await showModalBottomSheet<List<MealItem>>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      sheetAnimationStyle: freshSheetAnimationStyle(context),
-      builder: (context) => MealItemEditorSheet(
-        meal: meal,
-        keyPrefix: 'dashboard',
-        searchFoods: viewModel.searchFoods,
-        onDeleteMeal: () => _confirmDeleteMeal(context, viewModel, meal),
-      ),
-    );
-    if (!context.mounted || items == null) return;
-    await viewModel.correctMealItems(meal, items);
   }
 
   Future<bool> _confirmDeleteMeal(
@@ -216,8 +201,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         selection.macroConfig != null) {
       return;
     }
-    final shouldConfigure =
-        await showModalBottomSheet<bool>(
+    final shouldConfigure = await showModalBottomSheet<bool>(
           context: context,
           useSafeArea: true,
           sheetAnimationStyle: freshSheetAnimationStyle(context),
@@ -326,9 +310,8 @@ class _HeroCalorieSection extends StatelessWidget {
     final remaining = (summary?.remaining.calories ?? target - consumed)
         .clamp(0, target)
         .toInt();
-    final progress = target <= 0
-        ? 0.0
-        : (consumed / target).clamp(0, 1).toDouble();
+    final progress =
+        target <= 0 ? 0.0 : (consumed / target).clamp(0, 1).toDouble();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -973,10 +956,17 @@ String _formatMacro(double value) {
 }
 
 class _MealSection extends StatelessWidget {
-  const _MealSection({required this.summary, required this.onEditMeal});
+  const _MealSection({
+    required this.summary,
+    required this.searchFoods,
+    required this.onSaveMeal,
+    required this.onDeleteMeal,
+  });
 
   final DailySummary? summary;
-  final ValueChanged<Meal> onEditMeal;
+  final FoodSearchCallback searchFoods;
+  final Future<void> Function(Meal meal, List<MealItem> items) onSaveMeal;
+  final Future<bool> Function(BuildContext context, Meal meal) onDeleteMeal;
 
   @override
   Widget build(BuildContext context) {
@@ -1011,7 +1001,12 @@ class _MealSection extends StatelessWidget {
           for (final meal in meals)
             Padding(
               padding: const EdgeInsets.only(bottom: _DashboardMetrics.itemGap),
-              child: _MealRow(meal: meal, onEdit: () => onEditMeal(meal)),
+              child: _MealRow(
+                meal: meal,
+                searchFoods: searchFoods,
+                onSave: (items) => onSaveMeal(meal, items),
+                onDelete: (editorContext) => onDeleteMeal(editorContext, meal),
+              ),
             ),
       ],
     );
@@ -1087,77 +1082,146 @@ class _DashboardEmptyMealsCard extends StatelessWidget {
 }
 
 class _MealRow extends StatelessWidget {
-  const _MealRow({required this.meal, required this.onEdit});
+  const _MealRow({
+    required this.meal,
+    required this.searchFoods,
+    required this.onSave,
+    required this.onDelete,
+  });
 
   final Meal meal;
-  final VoidCallback onEdit;
+  final FoodSearchCallback searchFoods;
+  final Future<void> Function(List<MealItem> items) onSave;
+  final Future<bool> Function(BuildContext context) onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.freshPalette;
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(FreshRadii.md),
+      side: BorderSide(color: palette.rule),
+    );
+    final transitionDuration = FreshMotion.duration(
+      context,
+      FreshMotion.medium,
+    );
+    return OpenContainer<List<MealItem>>(
+      key: ValueKey('dashboard_meal_container_${meal.id}'),
+      transitionDuration: transitionDuration,
+      transitionType: ContainerTransitionType.fade,
+      useRootNavigator: true,
+      tappable: false,
+      closedColor: palette.surface,
+      middleColor: palette.surface,
+      openColor: palette.screen,
+      closedElevation: 0,
+      openElevation: 0,
+      closedShape: shape,
+      openShape: const RoundedRectangleBorder(),
+      closedShadows: [
+        BoxShadow(
+          color: palette.ink.withValues(alpha: 0.055),
+          blurRadius: 18,
+          offset: const Offset(0, 6),
+        ),
+      ],
+      openShadows: const [],
+      onClosed: (items) {
+        if (items != null) unawaited(onSave(items));
+      },
+      openBuilder: (editorContext, _) => MealItemEditorSheet(
+        meal: meal,
+        keyPrefix: 'dashboard',
+        searchFoods: searchFoods,
+        fullScreen: true,
+        cardItems: true,
+        onDeleteMeal: () => onDelete(editorContext),
+      ),
+      closedBuilder: (context, openContainer) => _MealCardContent(
+        meal: meal,
+        onTap: openContainer,
+      ),
+    );
+  }
+}
+
+class _MealCardContent extends StatelessWidget {
+  const _MealCardContent({required this.meal, required this.onTap});
+
+  final Meal meal;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final palette = context.freshPalette;
     final l10n = context.l10n;
+    final semanticsLabel =
+        '${meal.title}, ${l10n.caloriesValue(meal.nutrition.calories)}';
     return Semantics(
       button: true,
-      label: '${meal.title}, ${l10n.caloriesValue(meal.nutrition.calories)}',
-      onTap: onEdit,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          minHeight: _DashboardMetrics.minimumTapTarget,
-        ),
-        child: ExcludeSemantics(
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              key: ValueKey('dashboard_meal_row_${meal.id}'),
-              onTap: onEdit,
-              borderRadius: BorderRadius.circular(FreshRadii.sm),
-              child: Ink(
-                decoration: BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(color: palette.rule, width: 1),
-                  ),
-                ),
-                padding: const EdgeInsets.symmetric(
-                  vertical: _DashboardMetrics.itemGap,
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (meal.mealLabel != null) ...[
-                            _MealLabelChip(label: meal.mealLabel!),
-                            const SizedBox(height: FreshSpacing.xs),
-                          ],
-                          Text(
-                            meal.title,
-                            style: textTheme.bodyLarge?.copyWith(
-                              color: palette.ink,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+      label: semanticsLabel,
+      onTap: onTap,
+      child: ExcludeSemantics(
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            key: ValueKey('dashboard_meal_row_${meal.id}'),
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(FreshRadii.md),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (meal.mealLabel != null) ...[
+                          _MealLabelChip(label: meal.mealLabel!),
+                          const SizedBox(height: FreshSpacing.sm),
                         ],
+                        Text(
+                          meal.title,
+                          style: textTheme.bodyLarge?.copyWith(
+                            color: palette.ink,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: FreshSpacing.xs),
+                        Text(
+                          _mealMacroSummary(context, meal.nutrition),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.bodySmall?.copyWith(
+                            color: palette.inkMuted,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: FreshSpacing.md),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        l10n.caloriesValue(meal.nutrition.calories),
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: palette.ink,
+                          fontWeight: FontWeight.w900,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: _DashboardMetrics.compactGap),
-                    Text(
-                      l10n.caloriesValue(meal.nutrition.calories),
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: palette.ink,
-                        fontWeight: FontWeight.w800,
-                        fontFeatures: const [FontFeature.tabularFigures()],
+                      const SizedBox(height: FreshSpacing.sm),
+                      Icon(
+                        Icons.arrow_outward_rounded,
+                        color: palette.limeDeep,
+                        size: 20,
                       ),
-                    ),
-                    const SizedBox(width: _DashboardMetrics.compactGap),
-                    Icon(
-                      Icons.chevron_right_rounded,
-                      color: palette.inkMuted,
-                      size: 20,
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ),
@@ -1165,6 +1229,13 @@ class _MealRow extends StatelessWidget {
       ),
     );
   }
+}
+
+String _mealMacroSummary(BuildContext context, NutritionSnapshot nutrition) {
+  final l10n = context.l10n;
+  return '${l10n.commonProtein} ${_formatMacro(nutrition.proteinGrams)}g · '
+      '${l10n.commonCarbs} ${_formatMacro(nutrition.carbsGrams)}g · '
+      '${l10n.commonFat} ${_formatMacro(nutrition.fatGrams)}g';
 }
 
 class _MealLabelChip extends StatelessWidget {

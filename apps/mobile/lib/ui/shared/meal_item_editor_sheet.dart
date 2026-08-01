@@ -10,13 +10,12 @@ import 'food_search_panel.dart';
 import 'nutrition_edit_components.dart';
 import 'nutrition_edit_sheet.dart';
 
-typedef MealItemHeaderBuilder =
-    Widget? Function(
-      BuildContext context,
-      EditableMealItemController item,
-      int index,
-      ValueChanged<MealItem> onReplace,
-    );
+typedef MealItemHeaderBuilder = Widget? Function(
+  BuildContext context,
+  EditableMealItemController item,
+  int index,
+  ValueChanged<MealItem> onReplace,
+);
 
 class MealItemEditorSheet extends StatefulWidget {
   const MealItemEditorSheet({
@@ -28,6 +27,8 @@ class MealItemEditorSheet extends StatefulWidget {
     this.itemHeaderBuilder,
     this.initiallyExpandFirst = false,
     this.ensureInitialItem = true,
+    this.fullScreen = false,
+    this.cardItems = false,
   });
 
   final Meal meal;
@@ -37,6 +38,8 @@ class MealItemEditorSheet extends StatefulWidget {
   final MealItemHeaderBuilder? itemHeaderBuilder;
   final bool initiallyExpandFirst;
   final bool ensureInitialItem;
+  final bool fullScreen;
+  final bool cardItems;
 
   @override
   State<MealItemEditorSheet> createState() => _MealItemEditorSheetState();
@@ -77,31 +80,46 @@ class _MealItemEditorSheetState extends State<MealItemEditorSheet> {
     final textTheme = Theme.of(context).textTheme;
     final l10n = context.l10n;
     final palette = context.freshPalette;
-    final maxHeight = MediaQuery.sizeOf(context).height * 0.92;
-    return DecoratedBox(
-      decoration: BoxDecoration(color: palette.surface),
+    final maxHeight =
+        MediaQuery.sizeOf(context).height * (widget.fullScreen ? 1 : 0.92);
+    final editor = DecoratedBox(
+      decoration: BoxDecoration(
+        color: widget.fullScreen ? palette.screen : palette.surface,
+      ),
       child: Padding(
         padding: EdgeInsets.fromLTRB(18, 12, 18, bottomInset + 18),
         child: ConstrainedBox(
           constraints: BoxConstraints(maxHeight: maxHeight),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisSize:
+                widget.fullScreen ? MainAxisSize.max : MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Center(
-                child: Container(
-                  width: 44,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: context.freshPalette.rule,
-                    borderRadius: BorderRadius.circular(999),
+              if (!widget.fullScreen) ...[
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: context.freshPalette.rule,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: FreshSpacing.md),
+                const SizedBox(height: FreshSpacing.md),
+              ],
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (widget.fullScreen) ...[
+                    FreshIconButton(
+                      key: ValueKey('${widget.keyPrefix}_editor_back_button'),
+                      icon: Icons.arrow_back_rounded,
+                      tooltip: l10n.commonBack,
+                      onPressed: () => Navigator.of(context).maybePop(),
+                    ),
+                    const SizedBox(width: FreshSpacing.md),
+                  ],
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -218,6 +236,12 @@ class _MealItemEditorSheetState extends State<MealItemEditorSheet> {
         ),
       ),
     );
+    if (!widget.fullScreen) return editor;
+    return Scaffold(
+      key: ValueKey('${widget.keyPrefix}_meal_editor_fullscreen'),
+      backgroundColor: palette.screen,
+      body: SafeArea(child: editor),
+    );
   }
 
   Widget _buildListHeader(BuildContext context) {
@@ -286,6 +310,7 @@ class _MealItemEditorSheetState extends State<MealItemEditorSheet> {
       searchFoods: widget.searchFoods,
       isExpanded: _expandedIndex == index,
       isReplacementSearchActive: _replacementSearchIndex == index,
+      useCardStyle: widget.cardItems,
       header: widget.itemHeaderBuilder?.call(context, _items[index], index, (
         replacement,
       ) {
@@ -464,6 +489,7 @@ class _IngredientEditorCard extends StatelessWidget {
     required this.searchFoods,
     required this.isExpanded,
     required this.isReplacementSearchActive,
+    required this.useCardStyle,
     required this.header,
     required this.onExpand,
     required this.onReplacementSearchRequested,
@@ -479,6 +505,7 @@ class _IngredientEditorCard extends StatelessWidget {
   final FoodSearchCallback? searchFoods;
   final bool isExpanded;
   final bool isReplacementSearchActive;
+  final bool useCardStyle;
   final Widget? header;
   final VoidCallback onExpand;
   final VoidCallback? onReplacementSearchRequested;
@@ -490,17 +517,21 @@ class _IngredientEditorCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
+    final palette = context.freshPalette;
     final nutrition = item.currentNutrition();
     final macroCalories = nutrition.macroCalories;
     final hasWarning = nutrition.hasCalorieMismatch;
     Widget content;
     if (!isExpanded) {
-      content = _CompactIngredientRow(
-        item: item,
-        index: index,
-        keyPrefix: keyPrefix,
-        nutrition: nutrition,
-        onTap: onExpand,
+      content = KeyedSubtree(
+        key: ValueKey('${keyPrefix}_item_collapsed_$index'),
+        child: _CompactIngredientRow(
+          item: item,
+          index: index,
+          keyPrefix: keyPrefix,
+          nutrition: nutrition,
+          onTap: onExpand,
+        ),
       );
     } else {
       final nameField = FreshUnderlineTextField(
@@ -509,10 +540,10 @@ class _IngredientEditorCard extends StatelessWidget {
         placeholder: l10n.commonIngredient,
         onChanged: (_) => onChanged(),
       );
-      content = DecoratedBox(
-        decoration: const BoxDecoration(color: Colors.transparent),
+      content = KeyedSubtree(
+        key: ValueKey('${keyPrefix}_item_expanded_$index'),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: EdgeInsets.symmetric(vertical: useCardStyle ? 2 : 12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -619,11 +650,53 @@ class _IngredientEditorCard extends StatelessWidget {
       );
     }
 
-    return AnimatedSize(
-      duration: FreshMotion.duration(context, FreshMotion.fast),
+    if (!useCardStyle) {
+      return AnimatedSize(
+        duration: FreshMotion.duration(context, FreshMotion.fast),
+        curve: FreshMotion.easeOutQuart,
+        alignment: Alignment.topCenter,
+        child: content,
+      );
+    }
+
+    final duration = FreshMotion.duration(context, FreshMotion.normal);
+    final radius = BorderRadius.circular(FreshRadii.md);
+    return AnimatedContainer(
+      key: ValueKey('${keyPrefix}_item_surface_$index'),
+      duration: duration,
       curve: FreshMotion.easeOutQuart,
-      alignment: Alignment.topCenter,
-      child: content,
+      clipBehavior: Clip.antiAlias,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: palette.surface,
+        borderRadius: radius,
+        border: Border.all(
+          color:
+              isExpanded ? palette.lime.withValues(alpha: 0.42) : palette.rule,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: palette.ink.withValues(alpha: isExpanded ? 0.07 : 0.04),
+            blurRadius: isExpanded ? 20 : 14,
+            offset: Offset(0, isExpanded ? 8 : 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: radius,
+        clipBehavior: Clip.antiAlias,
+        child: AnimatedSize(
+          duration: duration,
+          curve: FreshMotion.easeOutQuart,
+          alignment: Alignment.topCenter,
+          child: FreshAnimatedSwitcher(
+            duration: duration,
+            alignment: Alignment.topCenter,
+            child: content,
+          ),
+        ),
+      ),
     );
   }
 

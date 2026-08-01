@@ -683,24 +683,9 @@ class AgentChatViewModel extends ChangeNotifier {
       path = audio?.path;
       if (path == null) throw const RecorderException('missing_audio');
 
-      // Fetch the transcript separately so it reaches the timeline as soon as
-      // STT finishes. The deployed SSE proxy may buffer the transcript event
-      // from /agent/chat/audio until the assistant stream has more data.
-      final transcript =
-          (await _nutritionRepository.transcribeAudio(File(path))).trim();
-      if (transcript.isNotEmpty) {
-        _entries.add(
-          AgentChatEntry(
-            id: _nextEntryId('user'),
-            kind: AgentChatEntryKind.user,
-            text: transcript,
-          ),
-        );
-        notifyListeners();
-      }
       await _runStream(
-        _nutritionRepository.streamAgentChat(
-          transcript,
+        _nutritionRepository.streamAgentChatAudio(
+          File(path),
           conversationId: conversationId,
           activeProposalId: activeProposalId,
         ),

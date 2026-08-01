@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:cal_tracker_mobile/app/theme.dart';
 import 'package:cal_tracker_mobile/data/repositories/nutrition_repository.dart';
@@ -86,6 +87,7 @@ void main() {
       ),
     );
     registerFallbackValue(<UsualFood>[]);
+    registerFallbackValue(File('/tmp/fallback-agent-audio.m4a'));
   });
 
   test('CalTrackerApiClient parses split agent chat SSE events', () async {
@@ -275,6 +277,67 @@ void main() {
 
     expect(viewModel.isRecording, isFalse);
     verify(() => recorder.cancel()).called(1);
+  });
+
+  test('voice chat uses one audio stream and displays its transcript',
+      () async {
+    final repository = MockNutritionRepository();
+    final recorder = MockAudioRecorderService();
+    const audioPath = '/tmp/agent-chat-voice-test.m4a';
+    when(() => recorder.start()).thenAnswer((_) async {});
+    when(() => recorder.stop()).thenAnswer(
+      (_) async => const RecordedAudio(
+        path: audioPath,
+        mimeType: 'audio/m4a',
+        sizeBytes: 1024,
+      ),
+    );
+    when(
+      () => repository.streamAgentChatAudio(
+        any(),
+        conversationId: any(named: 'conversationId'),
+        activeProposalId: any(named: 'activeProposalId'),
+      ),
+    ).thenAnswer(
+      (_) => Stream.fromIterable([
+        const AgentChatStreamEvent(
+          type: 'transcription_completed',
+          transcript: 'Voice meal request',
+        ),
+        const AgentChatStreamEvent(type: 'done'),
+      ]),
+    );
+    final viewModel = AgentChatViewModel(
+      nutritionRepository: repository,
+      audioRecorderService: recorder,
+    );
+
+    await viewModel.startRecording();
+    await viewModel.stopRecording();
+
+    expect(
+      viewModel.entries.any(
+        (entry) =>
+            entry.kind == AgentChatEntryKind.user &&
+            entry.text == 'Voice meal request',
+      ),
+      isTrue,
+    );
+    verify(
+      () => repository.streamAgentChatAudio(
+        any(),
+        conversationId: null,
+        activeProposalId: null,
+      ),
+    ).called(1);
+    verifyNever(() => repository.transcribeAudio(any()));
+    verifyNever(
+      () => repository.streamAgentChat(
+        any(),
+        conversationId: any(named: 'conversationId'),
+        activeProposalId: any(named: 'activeProposalId'),
+      ),
+    );
   });
 
   for (final testCase in <(Locale, String)>[
@@ -734,7 +797,71 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Get Remaining Targets'), findsOneWidget);
+    expect(find.text('Checking remaining targets'), findsOneWidget);
     expect(find.textContaining('780'), findsOneWidget);
+  });
+
+  testWidgets('AgentChatScreen hides technical tool payload summaries', (
+    tester,
+  ) async {
+    final repository = MockNutritionRepository();
+    final recorder = MockAudioRecorderService();
+    const technicalPayload =
+        '{"actionId":"get_daily_summary","arguments":{"date":"today"}}';
+    when(
+      () => repository.streamAgentChat(
+        any(),
+        conversationId: any(named: 'conversationId'),
+        activeProposalId: any(named: 'activeProposalId'),
+      ),
+    ).thenAnswer(
+      (_) => Stream.fromIterable([
+        const AgentChatStreamEvent(
+          type: 'tool_call_started',
+          toolCall: AgentToolCallFeedback(
+            id: 'call_summary_payload',
+            actionId: 'get_daily_summary',
+            label: 'Get Daily Summary',
+            summary: technicalPayload,
+          ),
+        ),
+        const AgentChatStreamEvent(
+          type: 'tool_call_completed',
+          toolCall: AgentToolCallFeedback(
+            id: 'call_summary_payload',
+            actionId: 'get_daily_summary',
+            label: 'Get Daily Summary',
+            summary: technicalPayload,
+          ),
+        ),
+        const AgentChatStreamEvent(type: 'done'),
+      ]),
+    );
+    final viewModel = AgentChatViewModel(
+      nutritionRepository: repository,
+      audioRecorderService: recorder,
+    );
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: viewModel,
+        child: MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          theme: buildLightTheme(),
+          home: const AgentChatScreen(),
+        ),
+      ),
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('agent_chat_message_field')),
+      'show my summary',
+    );
+    await tester.tap(find.byKey(const ValueKey('agent_chat_send_button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Get Daily Summary'), findsOneWidget);
+    expect(find.text(technicalPayload), findsNothing);
   });
 
   testWidgets('AgentChatScreen renders quick reply buttons that send text', (

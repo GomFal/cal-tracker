@@ -1102,6 +1102,8 @@ describe("agent chat streaming", () => {
     });
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("x-accel-buffering")).toBe("no");
+    expect(response.headers.get("cache-control")).toContain("no-transform");
     const events = parseSse(await response.text());
     expect(events.map((event) => event.type)).toContain(
       "transcription_completed",
@@ -1139,6 +1141,42 @@ describe("agent chat streaming", () => {
       transcriptLength: 13,
       status: "completed",
     });
+  });
+
+  it("handles an empty audio transcript inside the voice pipeline", async () => {
+    const agentProvider = new QueueChatAgentProvider([]);
+    const { request } = buildTestApp({
+      agentProvider,
+      sttProvider: new FakeSpeechToTextProvider(""),
+    });
+    const { authHeader } = await registerAndAuth(request);
+    const form = new FormData();
+    form.append(
+      "audio",
+      new Blob(["fake audio"], { type: "audio/m4a" }),
+      "test.m4a",
+    );
+
+    const response = await request("http://localhost/v1/agent/chat/audio", {
+      method: "POST",
+      headers: bearerOnly(authHeader),
+      body: form,
+    });
+
+    expect(response.status).toBe(200);
+    const events = parseSse(await response.text());
+    expect(
+      events.find((event) => event.type === "transcription_completed")
+        ?.transcript,
+    ).toBe("");
+    expect(
+      events.some(
+        (event) =>
+          event.type === "assistant_delta" &&
+          String(event.delta).includes("could not understand"),
+      ),
+    ).toBe(true);
+    expect(agentProvider.inputs).toHaveLength(0);
   });
 
   it("hides immediately and permanently purges a deleted conversation", async () => {

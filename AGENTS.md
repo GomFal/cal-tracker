@@ -117,12 +117,13 @@ Required local assumptions:
 - Device ID after boot: `emulator-5554`
 - KVM must be available at `/dev/kvm`
 
-Antonio workstation overrides verified on 2026-05-28:
+Antonio workstation overrides verified on 2026-08-01:
 
 - Android SDK: `/home/antonio/Android/Sdk`
 - AVDs: `Medium_Phone_API_36.1`, `Pixel_9_Pro`
-- Display environment: `DISPLAY=:0`, `XAUTHORITY=/tmp/xauth_aWXqXR`
-- Use `-memory 8192` when a roomy local emulator is requested.
+- Display environment: `DISPLAY=:0`; the X server auth token rotates between sessions (sddm generates `/run/sddm/xauth_*`), so resolve `XAUTHORITY` at launch time. `scripts/start-emulator.sh` does this automatically; do not hardcode a stale token.
+- Preferred launch: `scripts/start-emulator.sh` (GPU host via NVIDIA RTX 3060, 6 GB RAM guest, 8 cores, KVM, `-netfast`). Verified dramatically smoother than `-gpu off` on 2026-08-01.
+- `-memory 8192` only when an exceptionally roomy guest is needed; 6144 is the recommended default (the 31 GB host often runs under memory pressure and 8 GB guest + swap hurts FPS more than it helps).
 
 Use this exact startup sequence for local development and voice-capable testing. Start the emulator as a transient user systemd service so it is not tied to the coding agent command process, but do not give the service an automatic restart policy. If the emulator crashes, inspect the crash instead of masking it with a restart loop.
 
@@ -155,10 +156,18 @@ adb -s emulator-5554 shell 'pm list packages -f | grep android | wc -l'
 adb -s emulator-5554 shell echo alive
 ```
 
-Equivalent Antonio 8 GB local emulator command:
+Equivalent Antonio launch (recommended): use `scripts/start-emulator.sh` from the repo root; it resolves `XAUTHORITY` automatically and supports `--restart`, `--wipe-data`, `--memory=`, `--cores=`, `--gpu=`. Equivalent inline command:
+
+```bash
+cd /home/antonio/code/bettercalories
+scripts/start-emulator.sh
+```
+
+Or the raw systemd-run it wraps (AVD `Medium_Phone_API_36.1`, verified 2026-08-01):
 
 ```bash
 export PATH="/home/antonio/Android/Sdk/emulator:/home/antonio/Android/Sdk/platform-tools:$PATH"
+XAUTH="$(ps -p "$(pgrep -x Xorg | head -1)" -o args= | grep -oP '(?<=-auth )\S+' | head -1)"
 
 systemctl --user stop cal-tracker-app-watch.service 2>/dev/null || true
 systemctl --user stop cal-tracker-emulator.service 2>/dev/null || true
@@ -167,18 +176,18 @@ ps aux | awk '/qemu-system/ && !/awk/ {print $2}' | xargs -r kill -9
 sleep 2
 
 systemd-run --user --unit=cal-tracker-emulator --collect \
-  --working-directory=/home/antonio/code/cal-tracker \
+  --working-directory=/home/antonio/code/bettercalories \
   -E PATH=/home/antonio/Android/Sdk/emulator:/home/antonio/Android/Sdk/platform-tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
   -E DISPLAY=:0 \
-  -E XAUTHORITY=/tmp/xauth_aWXqXR \
+  -E XAUTHORITY="$XAUTH" \
   -E XDG_RUNTIME_DIR=/run/user/1000 \
   -E DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus \
   -p StandardOutput=append:/tmp/emulator-systemd.log \
   -p StandardError=append:/tmp/emulator-systemd.log \
-  /home/antonio/Android/Sdk/emulator/emulator -avd Medium_Phone_API_36.1 -memory 8192 -no-snapshot -no-snapshot-save -allow-host-audio -no-boot-anim -gpu off -accel on
+  /home/antonio/Android/Sdk/emulator/emulator -avd Medium_Phone_API_36.1 -memory 6144 -cores 8 -accel on -gpu host -netfast -no-snapshot -no-snapshot-save -allow-host-audio -no-boot-anim
 
-adb wait-for-device
-adb -s emulator-5554 shell 'while [[ $(getprop sys.boot_completed) != 1 ]]; do sleep 1; done; echo Boot completed'
+adb -s emulator-5554 wait-for-device
+adb -s emulator-5554 shell 'while [[ $(getprop sys.boot_completed) != 1 ]]; do sleep 3; done; echo Boot completed'
 adb -s emulator-5554 shell echo alive
 ```
 
@@ -187,7 +196,8 @@ Important constraints:
 - Always cold boot with `-no-snapshot -no-snapshot-save`; corrupted snapshots have caused missing Android services.
 - Do not use `-no-audio` when testing Whisper/STT or microphone flows. `-no-audio` disables emulator audio support.
 - Use `-allow-host-audio` for voice testing. Without it, Android Emulator can zero out host microphone input before it reaches the virtual device.
-- Use `-gpu off` on Android Emulator 36.5.11 for the `cal_tracker_api36` AVD. This was the stable local path for keeping the emulator alive while running Flutter with hot reload. `-gpu software` and `-gpu swiftshader_indirect` have both led to native emulator graphics crashes or host `RenderThread` segfaults on this machine.
+- Use `-gpu off` on Android Emulator 36.5.11 for the `cal_tracker_api36` AVD (Javier workstation). This was the stable local path for keeping the emulator alive while running Flutter with hot reload. `-gpu software` and `-gpu swiftshader_indirect` have both led to native emulator graphics crashes or host `RenderThread` segfaults on that machine.
+- On the Antonio workstation (`Medium_Phone_API_36.1`, NVIDIA RTX 3060), `-gpu host` is the recommended mode (verified 2026-08-01): the emulator renders with the real GPU and is dramatically smoother than `-gpu off`. Keep `-gpu off` only as a fallback if host GPU rendering crashes. `scripts/start-emulator.sh` defaults to `-gpu host` with 6 GB RAM and 8 cores.
 - Do not add `Restart=always` to the emulator service. Repeated `qemu-system-x86_64` `SIGSEGV` failures become a constant restart loop and hide the real crash.
 - Do not use an app watchdog service while using `flutter run`; it can fight the Flutter tool. Let `flutter run` own install, launch, logs, hot reload, and hot restart.
 - Keep emulator logs in `/tmp/emulator-systemd.log` and inspect the service with `systemctl --user status cal-tracker-emulator.service`.
@@ -236,6 +246,15 @@ For normal development and any "start the whole system" request, start the emula
 cd /home/javier/dev/cal-tracker/apps/mobile
 flutter run --flavor dev --debug --dart-define=API_BASE_URL=http://10.0.2.2:3000 -d emulator-5554
 ```
+
+For the dev flavor against the deployed dev backend **with Google sign-in working locally** (Antonio workstation), use `config/dev-debug.json` — it carries the API base URL, the shared dev server client ID, and the local debug Android client ID (`...jtg280qkmbc38...`, registered in Google Cloud with the SHA-1 of this machine's `~/.android/debug.keystore`, `8C:B1:3B:28:CC:5D:DD:3F:5D:72:2F:20:29:7B:58:77:02:9C:62:7D`, package `app.bettercalories.dev`):
+
+```bash
+cd /home/antonio/code/bettercalories/apps/mobile
+flutter run --flavor dev --debug --dart-define-from-file=config/dev-debug.json -d emulator-5554
+```
+
+Why: the `dev` flavor debug APK is signed with the local debug keystore, but the Android client ID in `config/dev.json` / the CI secrets (`MOBILE_DEV_GOOGLE_ANDROID_CLIENT_ID`) is registered with the CI dev keystore SHA-1 (`E7:80:73:41:...`), so Google rejects sign-in (`Google sign-in did not finish. Try again.`). The debug-local client ID fixes that for local `flutter run` only; CI is untouched. Also remember the emulator needs a Google account added (wipe-data removes it).
 
 For the tracked local UI toolkit flavor, use the dedicated local entrypoint. This flavor installs as `app.bettercalories.dev.local`, uses in-app fake repositories/fixtures, and does not require the backend for toolkit flows:
 

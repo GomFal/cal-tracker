@@ -33,6 +33,7 @@
     "db:generate": "bun run --cwd apps/backend db:generate",
     "db:generate:custom": "bun run --cwd apps/backend db:generate:custom",
     "db:check": "bun run --cwd apps/backend db:check",
+    "db:validate": "bun run --cwd apps/backend db:validate",
     "db:seed": "bun run --cwd apps/backend db:seed",
     "test": "bun run build:contracts && bun run --cwd apps/backend test",
     "test:backend": "bun run build:contracts && bun run --cwd apps/backend test",

@@ -43,6 +43,8 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
+      - run: bun run db:validate
+
       - run: bun run typecheck
 
       - run: bun run test

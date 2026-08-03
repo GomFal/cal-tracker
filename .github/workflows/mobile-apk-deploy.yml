@@ -26,6 +26,55 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Verify APK version was bumped
+        run: |
+          set -euo pipefail
+
+          version_line="$(sed -n 's/^version:[[:space:]]*//p' apps/mobile/pubspec.yaml | head -n 1)"
+          version_name="${version_line%%+*}"
+          version_code="${version_line##*+}"
+          if [[ -z "$version_name" || ! "$version_code" =~ ^[0-9]+$ || "$version_name" == "$version_code" ]]; then
+            echo "Could not infer versionName/versionCode from apps/mobile/pubspec.yaml." >&2
+            exit 1
+          fi
+
+          channel="${{ inputs.environment }}"
+          case "$channel" in
+            dev) public_base_url="https://dev-api.bettercalories.app" ;;
+            prod) public_base_url="https://api.bettercalories.app" ;;
+            *)
+              echo "Unsupported mobile environment: $channel" >&2
+              exit 1
+              ;;
+          esac
+
+          published_manifest="$RUNNER_TEMP/published-mobile-$channel.json"
+          if ! published_status="$(
+            curl --silent --show-error \
+              --proto '=https' --tlsv1.2 --location --max-redirs 0 \
+              --output "$published_manifest" --write-out '%{http_code}' \
+              "$public_base_url/apk/latest.json"
+          )"; then
+            echo "Refusing to build because the published manifest request redirected or failed." >&2
+            exit 1
+          fi
+          if [[ "$published_status" != "200" ]]; then
+            echo "Refusing to build after update manifest HTTP $published_status." >&2
+            exit 1
+          fi
+
+          published_version_code="$(
+            python3 scripts/mobile/validate-update-manifest.py \
+              "$published_manifest" --channel "$channel" --print-version-code
+          )"
+          if (( version_code <= published_version_code )); then
+            echo "Refusing to build $channel $version_name+$version_code over published versionCode $published_version_code." >&2
+            echo "Increment apps/mobile/pubspec.yaml before building." >&2
+            exit 1
+          fi
+
+          echo "Version gate passed: $channel $version_name+$version_code advances published versionCode $published_version_code."
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
